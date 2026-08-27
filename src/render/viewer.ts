@@ -54,6 +54,20 @@ export class Viewer {
    */
   side: THREE.Side = THREE.DoubleSide;
 
+  /**
+   * Diagnostic: draw the whole mesh with ONE material and no draw groups.
+   *
+   * Level geometry is normally split into a group per texture page, each with
+   * its own material. If those ranges are interpreted differently than
+   * intended, geometry can be drawn more than once — which looks like
+   * duplicated props. Collapsing to a single ungrouped material removes that
+   * variable entirely: if duplication survives it is in the geometry, and if
+   * it vanishes it is in the group/material path.
+   */
+  singleMaterial = false;
+
+  private lastLevel: { geometry: LevelGeometry; textures: Map<number, THREE.Texture> } | null = null;
+
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -138,6 +152,7 @@ export class Viewer {
    */
   setLevel(geometry: LevelGeometry, textures: Map<number, THREE.Texture>): void {
     this.clearModel();
+    this.lastLevel = { geometry, textures };
     if (geometry.triangleCount === 0) return;
 
     const buffer = new THREE.BufferGeometry();
@@ -145,6 +160,15 @@ export class Viewer {
     buffer.setAttribute('color', new THREE.BufferAttribute(geometry.colors, 3));
     buffer.setAttribute('uv', new THREE.BufferAttribute(geometry.uvs, 2));
     buffer.computeVertexNormals();
+
+    if (this.singleMaterial) {
+      this.current = new THREE.Mesh(buffer, new THREE.MeshBasicMaterial({
+        vertexColors: true, side: this.side, wireframe: false,
+      }));
+      this.scene.add(this.current);
+      this.frameObject(buffer);
+      return;
+    }
 
     const materials: THREE.Material[] = [];
     for (const group of geometry.groups) {
@@ -167,6 +191,27 @@ export class Viewer {
     this.current = new THREE.Mesh(buffer, materials);
     this.scene.add(this.current);
     this.frameObject(buffer);
+  }
+
+  /** How many meshes are actually in the scene. Should be exactly one. */
+  describeScene(): string {
+    let meshes = 0, tris = 0;
+    this.scene.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      meshes++;
+      const pos = mesh.geometry.getAttribute('position');
+      if (pos) tris += pos.count / 3;
+    });
+    return `${meshes} mesh(es) in scene, ${tris} triangles total, ` +
+      `${this.scene.children.length} top-level children`;
+  }
+
+  /** Toggle the single-material diagnostic and redraw. Returns the new state. */
+  toggleSingleMaterial(): string {
+    this.singleMaterial = !this.singleMaterial;
+    if (this.lastLevel) this.setLevel(this.lastLevel.geometry, this.lastLevel.textures);
+    return this.singleMaterial ? 'single material, no draw groups' : 'one material per texture page';
   }
 
   /** Cycle back-face -> front-face -> double-sided, returning the new name. */

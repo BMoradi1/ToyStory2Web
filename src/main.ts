@@ -282,11 +282,24 @@ window.addEventListener('unhandledrejection', (ev) =>
 // A `webkitdirectory` input is the most reliable way in: it works in every
 // current browser and needs none of the FileSystemEntry tree walking that
 // drag-and-drop requires.
+// Vite replaces this module on every edit, but the previously created Viewer
+// keeps its animation loop running against the same canvas. That stacks
+// renderers, and each one draws the scene again — the level appears two or
+// three times over. Dispose the old one when the module is replaced.
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    viewer?.stop();
+    viewer = null;
+  });
+}
+
 // `c` cycles face culling. Which winding three.js considers front-facing
 // can't be determined offline, so make it one keystroke to find out.
 window.addEventListener('keydown', (ev) => {
-  if (ev.key !== 'c' || !viewer) return;
-  infoEl.textContent = `culling: ${viewer.cycleSide()}`;
+  if (!viewer) return;
+  if (ev.key === 'c') infoEl.textContent = `culling: ${viewer.cycleSide()}`;
+  if (ev.key === 'g') infoEl.textContent = `draw groups: ${viewer.toggleSingleMaterial()}`;
+  if (ev.key === 's') infoEl.textContent = viewer.describeScene();
 });
 
 const fileInput = $<HTMLInputElement>('pickfile');

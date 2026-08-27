@@ -63,23 +63,61 @@ export function parseAll(buffer: ArrayBuffer | Uint8Array): AllFile {
     throw new Error(`.all: group table ends at ${expectedEnd}, file is ${bytes.length}`);
   }
 
+  // Each entry states its own payload offset at +0x48, in 16-bit words from
+  // byte 4. **The group table is not in payload order** — 433 of 1229 sized
+  // character entries disagree with a sequential walk — so assigning payloads
+  // sequentially pairs the right mesh with the wrong group position. Every
+  // size check still passes when that happens, because the totals are
+  // unaffected; the model simply comes apart.
+  //
+  // That field does not carry this meaning in TERRAIN.ALL, where runs of
+  // groups share one value, so it is used only when it demonstrably tiles the
+  // data region exactly. Otherwise fall back to packing in order.
+  const sizes: number[] = [];
+  const stated: number[] = [];
+  for (let i = 0; i < count; i++) {
+    const entry = metaOffset + 4 + i * GROUP_ENTRY_SIZE;
+    sizes.push(view.getUint32(entry, true));
+    stated.push(4 + view.getUint32(entry + 0x48, true) * 2);
+  }
+
+  const useStated = (() => {
+    const spans: [number, number][] = [];
+    for (let i = 0; i < count; i++) {
+      if (sizes[i] === 0) continue;
+      const start = stated[i]!;
+      const end = start + sizes[i]! * 2;
+      if (start < 4 || end > metaOffset) return false;
+      spans.push([start, end]);
+    }
+    if (spans.length === 0) return false;
+    // The spans must tile [4, metaOffset) exactly: no gaps, no overlaps.
+    spans.sort((a, b) => a[0] - b[0]);
+    let cursor = 4;
+    for (const [start, end] of spans) {
+      if (start !== cursor) return false;
+      cursor = end;
+    }
+    return cursor === metaOffset;
+  })();
+
   const groups: AllGroup[] = [];
-  // Payloads pack contiguously from byte 4. A size of 0 means the group reuses
-  // the previous group's payload rather than contributing one of its own.
   let payloadPos = 4;
   let previous: Uint8Array = new Uint8Array(0);
 
   for (let i = 0; i < count; i++) {
     const entry = metaOffset + 4 + i * GROUP_ENTRY_SIZE;
-    const sizeWords = view.getUint32(entry, true);
+    const sizeWords = sizes[i]!;
 
     let payload: Uint8Array;
     if (sizeWords === 0) {
+      // A size of 0 means the group reuses the previous group's payload.
       payload = previous;
     } else {
       const size = sizeWords * 2;
-      payload = bytes.subarray(payloadPos, payloadPos + size);
-      payloadPos += size;
+      const start = useStated ? stated[i]! : payloadPos;
+      payload = bytes.subarray(start, start + size);
+      payloadPos = start + size;
       previous = payload;
     }
 

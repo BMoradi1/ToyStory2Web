@@ -13,6 +13,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 import { parseNgn, type NgnTexture } from '../src/formats/ngn.ts';
 import { parseDat, buildLevelGeometry } from '../src/formats/dat.ts';
+import { parseAll, buildMeshData } from '../src/formats/all.ts';
 
 const W = 900, H = 700;
 
@@ -71,15 +72,19 @@ function writePng(path: string, w: number, h: number, rgb: Uint8Array): void {
   ]));
 }
 
-const [, , root, sceneId, outPath = 'level.png', view = ''] = process.argv;
+const [, , root, sceneId, outPath = 'level.png', view = '', texScene = 'level01/level'] = process.argv;
 if (!root || !sceneId) {
-  console.error('usage: npx tsx tools/render-level.ts <game dir> <levelNN/base> <out.png> [--top]');
+  console.error('usage: npx tsx tools/render-level.ts <game dir> <levelNN/base|charsN/name> <out.png> [--top] [texScene]');
   process.exit(1);
 }
 
-const base = `${root}/data/${sceneId}`;
-const level = parseDat(readFileSync(`${base}.dat`));
-const geo = buildLevelGeometry(level);
+// A character model, or a level scene. Characters take their textures from a
+// level's .ngn, since chars* ships none of its own.
+const isModel = /^chars/.test(sceneId);
+const base = isModel ? `${root}/data/${texScene}` : `${root}/data/${sceneId}`;
+const geo = isModel
+  ? buildMeshData(parseAll(readFileSync(`${root}/data/${sceneId}.all`)))
+  : buildLevelGeometry(parseDat(readFileSync(`${base}.dat`)));
 
 // Decode the same textures the browser binds, keyed by slot.
 const textures = new Map<number, { w: number; h: number; px: Uint8Array }>();
@@ -99,13 +104,39 @@ for (let i = 0; i < p.length; i += 3)
 const centre = [0, 1, 2].map((a) => (lo[a]! + hi[a]!) / 2);
 const radius = Math.max(...[0, 1, 2].map((a) => hi[a]! - lo[a]!)) / 2 || 1;
 
+// `--viewer` reproduces the camera Viewer.frameObject() picks on load, so the
+// headless output can be compared against what the browser actually shows.
+const viewerCam = view === '--viewer';
+let sphereC = centre, sphereR = radius;
+if (viewerCam) {
+  // three.js computeBoundingSphere: centre of the bounding box, radius = max
+  // distance from it to any vertex.
+  let r2 = 0;
+  for (let i = 0; i < p.length; i += 3) {
+    const dx = p[i]! - centre[0]!, dy = p[i + 1]! - centre[1]!, dz2 = p[i + 2]! - centre[2]!;
+    r2 = Math.max(r2, dx * dx + dy * dy + dz2 * dz2);
+  }
+  sphereR = Math.sqrt(r2);
+  sphereC = centre;
+}
+
 const topDown = view === '--top';
-const eye = topDown
-  ? [centre[0]!, centre[1]! + radius * 2.4, centre[2]! + 0.001]
-  : [centre[0]! + radius * 1.5, centre[1]! + radius * 1.1, centre[2]! + radius * 1.5];
+const inside = view === '--inside';
+// `--inside` stands the camera in the middle of the level at roughly Buzz's
+// eye height, which is the view the game actually plays from and the one
+// exterior shots never reveal.
+const viewerD = Math.max(sphereR * 2.2, 1);
+const eye = viewerCam
+  ? [sphereC[0]! + viewerD * 0.6, sphereC[1]! + viewerD * 0.5, sphereC[2]! + viewerD * 0.8]
+  : topDown
+    ? [centre[0]!, centre[1]! + radius * 2.4, centre[2]! + 0.001]
+    : inside
+      ? [centre[0]!, lo[1]! + radius * 0.12, centre[2]!]
+      : [centre[0]! + radius * 1.5, centre[1]! + radius * 1.1, centre[2]! + radius * 1.5];
+const target = inside ? [centre[0]! + radius, lo[1]! + radius * 0.12, centre[2]! + radius] : centre;
 
 // Basis looking from eye at centre.
-const fwd = [0, 1, 2].map((a) => centre[a]! - eye[a]!);
+const fwd = [0, 1, 2].map((a) => target[a]! - eye[a]!);
 const fl = Math.hypot(...fwd); fwd.forEach((_, i) => (fwd[i]! /= fl));
 const upHint = topDown ? [0, 0, -1] : [0, 1, 0];
 const right = [
@@ -121,6 +152,22 @@ const up = [
 ];
 
 const focal = W / 2 / Math.tan((60 * Math.PI) / 180 / 2);
+
+// Optional: emulate a real GPU depth buffer. WebGL stores a hyperbolic,
+// quantised depth value, so precision collapses as the near/far ratio grows.
+// A float z-buffer hides that entirely, which is exactly why this renderer can
+// look correct while the browser shatters.
+const emulateDepth = process.env.ZNEAR !== undefined;
+const zNear = Number(process.env.ZNEAR ?? 0.1);
+const zFar = Number(process.env.ZFAR ?? 10000);
+const DEPTH_BITS = 16777216; // 24-bit
+const encodeDepth = (z: number): number => {
+  if (!emulateDepth) return z;
+  // Standard perspective depth, mapped to [0,1] then quantised.
+  const ndc = (zFar + zNear) / (zFar - zNear) + (2 * zFar * zNear) / ((zFar - zNear) * -z);
+  // Map to [0,1] so it INCREASES with distance, matching the depth test below.
+  return Math.round(((ndc + 1) / 2) * DEPTH_BITS);
+};
 const colour = new Uint8Array(W * H * 3).fill(20);
 const depth = new Float32Array(W * H).fill(Infinity);
 
@@ -153,8 +200,9 @@ for (const group of geo.groups) {
         if (u0 < 0 || u2 < 0 || v2 < 0) continue;
         const z = 1 / (u0 / a.z + u2 / b.z + v2 / c.z);
         const idx = y * W + x;
-        if (z >= depth[idx]!) continue;
-        depth[idx] = z;
+        const dz = encodeDepth(z);
+        if (dz >= depth[idx]!) continue;
+        depth[idx] = dz;
         const pick = (arr: Float32Array, off: number) =>
           (u0 * arr[t * 3 + off]! / a.z + u2 * arr[(t + 1) * 3 + off]! / b.z + v2 * arr[(t + 2) * 3 + off]! / c.z) * z;
         let r: number, g: number, bl: number;
@@ -164,7 +212,11 @@ for (const group of geo.groups) {
           const tx = Math.max(0, Math.min(tex.w - 1, Math.floor(pickUv(0) * tex.w)));
           const ty = Math.max(0, Math.min(tex.h - 1, Math.floor(pickUv(1) * tex.h)));
           const o = (ty * tex.w + tx) * 3;
-          r = tex.px[o]!; g = tex.px[o + 1]!; bl = tex.px[o + 2]!;
+          // three.js multiplies map by vertex colour; match that so this
+          // renderer is a faithful oracle rather than merely a similar one.
+          r = tex.px[o]! * pick(geo.colors, 0);
+          g = tex.px[o + 1]! * pick(geo.colors, 1);
+          bl = tex.px[o + 2]! * pick(geo.colors, 2);
           // Pure green is the transparency key; skip the texel entirely so
           // this matches what the browser draws.
           if (r === 0 && g === 255 && bl === 0) { depth[idx] = Infinity; continue; }
@@ -179,4 +231,6 @@ for (const group of geo.groups) {
   }
 }
 writePng(outPath, W, H, colour);
-console.log(`${sceneId}: ${geo.triangleCount} tris, ${geo.groups.length} groups, ${textures.size} textures, ${drawn} rasterised -> ${outPath}`);
+console.log(`${sceneId}: ${geo.triangleCount} tris, ${geo.groups.length} groups ` +
+  `(pages ${geo.groups.map((g) => g.page ?? 'none').join(',')}), ` +
+  `${textures.size} textures, ${drawn} rasterised -> ${outPath}`);

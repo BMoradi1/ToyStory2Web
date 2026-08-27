@@ -35,6 +35,18 @@ Buzz Lightyear to the Rescue** (Traveller's Tales, 1999).
 - Engine runs at ~59 FPS (16949 microsecond frame pacing) with a native 4:3
   projection. Source: RibShark's ToyStory2Fix, which patches this exe.
 
+## Working with subagents
+
+Spawn a **fresh agent for each new task** rather than resuming a previous one.
+Resuming replays the agent's entire transcript, so a long-lived agent drags all
+its accumulated context into unrelated work. Resume only when that in-flight
+context is the point — redirecting an agent mid-task on files it is actively
+working on. Once an agent reports, treat it as finished.
+
+Give agents the established findings up front (point them at docs/FORMATS.md)
+so they validate rather than re-derive, and tell them the install directory is
+read-only.
+
 ## Layout
 
     src/formats/     asset parsers (browser + node, plain TS on Uint8Array)

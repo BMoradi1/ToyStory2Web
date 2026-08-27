@@ -87,11 +87,16 @@ export class Viewer {
       geometry.addGroup(group.start, group.count, materials.length);
       // Double-sided: the bits that would mark single-sided faces aren't
       // decoded, and culling by unknown winding drops visible geometry.
+      // Cutout, not blended. `alphaTest` discards colour-keyed texels while
+      // the material stays in the OPAQUE queue, so depth testing works per
+      // pixel. Marking these `transparent` instead moves them to the blended
+      // queue, which sorts per draw group rather than per pixel — with one
+      // group per texture page, surfaces then draw over each other in the
+      // wrong order and the level looks scrambled.
       materials.push(new THREE.MeshBasicMaterial({
         map: texture ?? null,
         vertexColors: true,
         side: THREE.DoubleSide,
-        transparent: true,
         alphaTest: 0.5,
       }));
     }
@@ -126,11 +131,16 @@ export class Viewer {
     for (const group of geometry.groups) {
       const texture = group.page === null ? undefined : textures.get(group.page);
       buffer.addGroup(group.start, group.count, materials.length);
+      // Cutout, not blended. `alphaTest` discards colour-keyed texels while
+      // the material stays in the OPAQUE queue, so depth testing works per
+      // pixel. Marking these `transparent` instead moves them to the blended
+      // queue, which sorts per draw group rather than per pixel — with one
+      // group per texture page, surfaces then draw over each other in the
+      // wrong order and the level looks scrambled.
       materials.push(new THREE.MeshBasicMaterial({
         map: texture ?? null,
         vertexColors: true,
         side: THREE.DoubleSide,
-        transparent: true,
         alphaTest: 0.5,
       }));
     }

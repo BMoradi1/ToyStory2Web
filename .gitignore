@@ -1,0 +1,14 @@
+# Game data — never commit. The models, textures, audio and video are
+# Disney/Pixar/Activision property and must be supplied by the user from their
+# own copy, read locally at runtime. See CLAUDE.md.
+Toy Story 2/
+assets/game/
+*.iso
+*.cue
+
+# Build + dependencies
+node_modules/
+dist/
+
+# Extraction output
+out/

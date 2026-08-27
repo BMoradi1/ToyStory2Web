@@ -1,7 +1,7 @@
 ================================================================================
  ToyStory2Web - PROJECT ROADMAP
  Browser reimplementation of Toy Story 2: Buzz Lightyear to the Rescue (1999)
- Last updated: 2026-08-26
+ Last updated: 2026-08-26 (.all solved and ported)
 ================================================================================
 
  HOW TO USE THIS FILE
@@ -39,15 +39,19 @@
  PHASE 1 - ASSET PIPELINE
 ================================================================================
  [DONE]   .ngn textures - 24bpp BMPs, browser-decodable, sparse slot IDs
- [ACTIVE] .ALL container parser  (agent working; spec verified 78/78 files)
+ [DONE]   .ALL container parser  (src/formats/all.ts; verified 88/88 files)
           - u32@0 = metadata offset in 16-BIT WORDS (x2 for bytes)
           - metadata: u32 count N, then N x 0x4C entries, ending exactly at EOF
           - types: 0x0001 mesh | 0x0006 collision | 0x0008 dyn collision
                    0x0009 target pos | 0x0101 infinite wall | 0x011F joint
- [READY]  .ALL gfx mesh reader - faces while (byte[pos+3] & 0xF0) == 0x30
-          !! TS2 TRIANGLES STORE 4 VERTICES AND 4 UVs (one unused). Not 3.
+ [DONE]   .ALL gfx mesh reader - 9556 faces across 694 groups, each group
+          consuming exactly its declared size; renders as recognisable models
+          !! CORRECTION: TS2 PC triangles store 3 VERTICES, not 4. The PSX-
+          derived spec is wrong for this build. Face = 4 + n*8 + (n-1)*4.
+ [DONE]   .ALL gfx joint reader - 433 joints, magic 0x12345678
  [READY]  .ALL collision reader - 44-byte polys (22 x i16), p2/p3/p4 as deltas
           from origin; bouncing2 == 0x7FFF means triangle, else quad
+          (container confirmed; payload not yet parsed)
  [READY]  .ANM parser - magic 0xFFF0 (TS2 final). 10 bytes/bone/frame:
           i16 x/4,y/4,z/4 then a 20-bit packed rotation across two u16
           (rz = rot & 0x3FF, ry = (rot>>10) & 0x3FF, rx = (rot>>20) & 0x3FF,
@@ -73,7 +77,7 @@
  [BLOCKED] Texture slot binding             <- needs mesh UV + vrampage mapping
  [BLOCKED] Material system                  <- needs mesh flags: textured,
            double-sided, additive, subtractive, 50% translucent
- [BLOCKED] Collision mesh rendering (debug) <- needs .ALL collision reader
+ [READY]   Collision mesh rendering (debug) <- container done, payload not
  [READY]   Level select UI driven by the install's own directories
  [OPEN]    Zone / room streaming. Reference: lazycurler/ToyStory2Research has
            decompiled C for zone and boundary logic (gAdjecentZoneLUT,
@@ -82,8 +86,10 @@
 ================================================================================
  PHASE 3 - CHARACTERS AND ANIMATION
 ================================================================================
- [BLOCKED] Static character render (Buzz first) <- needs .ALL mesh reader
- [BLOCKED] Skeleton from gfx joints (0x011F)    <- needs .ALL container
+ [DONE]    Static character render - Buzz, Woody, Rex, Bullseye and the rest
+           load and display; feet land on Y=0, vertex colours stand in for
+           textures (UV-to-texture mapping is still unknown)
+ [READY]   Skeleton from gfx joints (0x011F)    <- parser done, unused
  [BLOCKED] Animation playback                   <- needs .ANM parser
            Rigid parented parts, NOT skinned meshes. Bone i drives mesh group i.
  [BLOCKED] Animation catalogue - buzz.anm is 156 KB against woody.anm's 2.9 KB;
@@ -165,8 +171,9 @@
  1. WHERE IS LEVEL VISUAL GEOMETRY? Not in .ALL (collision only). Either the
     PC .dat or inside .ngn beyond the textures. Nothing renders until this is
     answered. HIGHEST PRIORITY.
- 2. Does the .ALL/.ANM spec, written from PSX files, hold on this PC build?
-    Container does (78/78 verified). Mesh and animation readers are unproven.
+ 2. Does the .ANM spec, written from PSX files, hold on this PC build? The
+    .ALL container and mesh reader do (88/88 files) but only AFTER correcting
+    the triangle vertex count, so expect .ANM to need similar correction.
  3. .vis / .kp2 / .kep / .new are undocumented publicly. We are first.
  4. How faithful can gameplay get without interpreting the original logic?
 

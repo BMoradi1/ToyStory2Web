@@ -145,3 +145,13 @@ export function findLevels(dir: GameDir): { id: string; ngn: GameFile }[] {
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([id, ngn]) => ({ id, ngn }));
 }
+
+/** Character models: every `.all` under the `chars*` directories, by name. */
+export function findModels(dir: GameDir): { name: string; file: GameFile }[] {
+  const models: { name: string; file: GameFile }[] = [];
+  for (const [path, file] of dir) {
+    const m = /^data\/chars\d*\/([^/]+)\.all$/.exec(path);
+    if (m) models.push({ name: m[1]!, file });
+  }
+  return models.sort((a, b) => a.name.localeCompare(b.name));
+}

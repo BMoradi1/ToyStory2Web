@@ -14,6 +14,7 @@
  */
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import type { MeshData } from '../formats/all.ts';
 
 /** The original's frame pacing, in seconds. Game logic steps at this rate. */
 export const TICK_SECONDS = 16949 / 1_000_000;
@@ -30,6 +31,8 @@ export class Viewer {
 
   /** Called once per fixed logic tick. Wire gameplay in here, not the render loop. */
   onTick: ((dt: number) => void) | null = null;
+
+  private current: THREE.Mesh | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -50,6 +53,51 @@ export class Viewer {
     // with a texture strip whose height changes independently of the window.
     new ResizeObserver(() => this.resize()).observe(canvas);
     this.resize();
+  }
+
+  /**
+   * Replace the displayed model and frame it.
+   *
+   * Rendered with vertex colours rather than textures: the `.all` format
+   * stores UVs and what looks like a texture-page byte, but how those map onto
+   * the texture set is still unknown (see docs/FORMATS.md). The baked
+   * near-greyscale vertex colours read as lighting, so the shape is legible.
+   */
+  setModel(mesh: MeshData): void {
+    if (this.current) {
+      this.scene.remove(this.current);
+      this.current.geometry.dispose();
+      (this.current.material as THREE.Material).dispose();
+      this.current = null;
+    }
+    if (mesh.triangleCount === 0) return;
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(mesh.positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(mesh.colors, 3));
+    geometry.setAttribute('uv', new THREE.BufferAttribute(mesh.uvs, 2));
+    geometry.computeVertexNormals();
+
+    // Double-sided because the material bits that would tell us which faces are
+    // single-sided aren't decoded yet, and back-face culling on a rigid-part
+    // model with unknown winding drops visible geometry.
+    const material = new THREE.MeshLambertMaterial({
+      vertexColors: true,
+      side: THREE.DoubleSide,
+    });
+
+    this.current = new THREE.Mesh(geometry, material);
+    this.scene.add(this.current);
+
+    // Frame the model: characters sit on Y=0 with the body above it.
+    geometry.computeBoundingSphere();
+    const sphere = geometry.boundingSphere;
+    if (sphere) {
+      const d = Math.max(sphere.radius * 3, 1);
+      this.camera.position.set(d * 0.6, sphere.center.y + d * 0.4, d * 0.8);
+      this.controls.target.copy(sphere.center);
+      this.controls.update();
+    }
   }
 
   private resize(): void {

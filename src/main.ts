@@ -1,6 +1,7 @@
+import { buildMeshData, parseAll } from './formats/all.ts';
 import { parseNgn, type NgnTexture } from './formats/ngn.ts';
 import {
-  findLevels, gameDirFromDrop, pickGameDir, supportsDirectoryPicker,
+  findLevels, findModels, gameDirFromDrop, pickGameDir, supportsDirectoryPicker,
   validateGameDir, type GameDir,
 } from './loader/gamedir.ts';
 import { Viewer } from './render/viewer.ts';
@@ -11,11 +12,13 @@ const dropEl = $<HTMLDivElement>('drop');
 const appEl = $<HTMLDivElement>('app');
 const statusEl = $<HTMLParagraphElement>('status');
 const levelEl = $<HTMLSelectElement>('level');
+const modelEl = $<HTMLSelectElement>('model');
 const infoEl = $<HTMLSpanElement>('info');
 const texturesEl = $<HTMLDivElement>('textures');
 
 let viewer: Viewer | null = null;
 let levels: ReturnType<typeof findLevels> = [];
+let models: ReturnType<typeof findModels> = [];
 
 function setStatus(msg: string, isError = false): void {
   statusEl.textContent = msg;
@@ -49,6 +52,18 @@ async function drawTexture(tex: NgnTexture): Promise<HTMLElement> {
   return figure;
 }
 
+async function showModel(index: number): Promise<void> {
+  const model = models[index];
+  if (!model || !viewer) return;
+
+  const file = parseAll(await model.file.read());
+  const mesh = buildMeshData(file);
+  viewer.setModel(mesh);
+
+  const groups = file.groups.length;
+  infoEl.textContent = `${model.name}.all — ${groups} groups, ${mesh.triangleCount} triangles`;
+}
+
 async function showLevel(index: number): Promise<void> {
   const level = levels[index];
   if (!level) return;
@@ -78,6 +93,10 @@ async function open(dir: GameDir): Promise<void> {
   );
   levelEl.onchange = () => void showLevel(levelEl.selectedIndex);
 
+  models = findModels(dir);
+  modelEl.replaceChildren(...models.map(({ name }, i) => new Option(name, String(i))));
+  modelEl.onchange = () => void showModel(modelEl.selectedIndex);
+
   dropEl.hidden = true;
   appEl.hidden = false;
 
@@ -85,6 +104,13 @@ async function open(dir: GameDir): Promise<void> {
   viewer.start();
 
   await showLevel(0);
+
+  const buzz = models.findIndex((m) => m.name.toLowerCase() === 'buzz');
+  if (models.length > 0) {
+    const start = buzz >= 0 ? buzz : 0;
+    modelEl.selectedIndex = start;
+    await showModel(start);
+  }
 }
 
 $<HTMLButtonElement>('pick').onclick = async () => {

@@ -50,7 +50,7 @@ Do not use these comments to identify levels.
 | `rtlibs/*.dll` | MPEG-1 system streams (cutscenes), misnamed | **Solved** |
 | `.wav` | 267 standard audio files | **Solved** |
 | `level.bin` | MIPS R3000 overlay code | **Identified**, not decoded |
-| `.all` | TT data-group container (meshes OR collision) | **Container solved** |
+| `.all` | TT data-group container (meshes OR collision) | **Solved & ported** |
 | `.anm` | Animations | **Spec found**, unverified |
 | `.dat` | PSX scene/world | Under investigation |
 | `.raw` `.raws` | RNC PRO-PACK compressed, identical container | **Spec found** |
@@ -148,23 +148,81 @@ The consequence matters: **level visual geometry is not in `.ALL` at all.**
 The word-vs-byte distinction is the trap: an earlier pass read the header as a
 byte offset, landed mid-data, and drew wrong conclusions from what it found.
 
-**Mesh (type `0x0001`), unverified on this build:** faces run flat while
-`(byte[pos+3] & 0xF0) == 0x30`. Per face: 3x `u8` RGB, `u8` flag (bit `0x08`
-means quad), then per vertex `i16 x,y,z` + `u8 u,v`, then for vertices 1..n-1
-`u8 r,g,b` + `u8` vrampage/flags. Terminated by `u32` 0 (end) or 2 (an LOD mesh
-follows at +4). The flag's low 3 bits plus a vrampage bit select the material:
-textured, double-sided, additive, subtractive, or 50% translucent.
+**Mesh (type `0x0001`) — CONFIRMED on this build.** Faces run flat while
+`(byte[pos+3] & 0xF0) == 0x30`. Per face:
 
-> **In Toy Story 2, triangles still store 4 vertices and 4 UVs** — one is
-> unused. A Bug's Life packs 3. This is the main divergence between titles and
-> the most likely source of a subtly broken mesh reader.
+    u8 r, g, b          colour of vertex 0
+    u8 code             PSX GPU polygon command
+    n x { i16 x, y, z; u8 u, v }        n = 4 if (code & 0x08) else 3
+    (n-1) x { u8 r, g, b; u8 flag }     colours of vertices 1..n-1
+
+Face size is `4 + n*8 + (n-1)*4` — 36 bytes for a triangle, 48 for a quad. Only
+four command bytes occur: `0x34`, `0x36`, `0x3C`, `0x3E` (gouraud and textured
+always set; `0x02` = semi-transparent on 214 faces). The last flag byte of each
+face carries what looks like texture page plus material bits; its low nibble
+reads as a page index. Quads are PSX **Z-order** — triangulate `(v0,v1,v2)` +
+`(v1,v3,v2)`, not as a fan.
+
+> **Divergence from the PSX-derived spec: triangles store 3 vertices here, not
+> 4.** Prior art says Toy Story 2 keeps 4 with one unused, which holds for other
+> titles on this engine but not for this PC build. With 3, all 694 face-bearing
+> mesh groups consume exactly their declared size; with 4, the first triangle in
+> `hamm.all` desynchronises immediately.
+
+Two further corrections to the prior spec, both verified here:
+
+- **Terminator `2` never occurs.** All 749 terminators are `0`. Multi-mesh
+  groups do exist (6, in `slime` and `fsauce`) but are separated by `0`, so a
+  parser must continue while payload bytes remain rather than stop at the first
+  terminator.
+- **`+0x29` bit `0x04` (LOD) is never set** in any character file, and `+0x28`
+  is only ever `0x00`/`0xFF` for meshes. Neither field carries information here.
+
+New field found: **entry `+0x48` is the payload offset in 16-bit words from byte
+4** (`payload = 4 + 2*value`), exact on all 728 non-zero character entries. It
+does *not* hold that meaning in `TERRAIN.ALL`.
+
+**Group counts differ depending on what you count.** 743 groups are typed as
+meshes; 694 of them produce geometry and 49 hold exactly 4 bytes — a bare
+terminator and nothing else. Both figures are correct; they measure different
+things. Expect to meet this discrepancy again and not mistake it for a bug.
+
+**Trailing block.** 97 mesh groups (Buzz, Bo Peep, the slime, the bubble, the
+flying saucer) carry data after the last terminator: `u16 count`, `u16 flags`,
+`count x { i16 nx, ny, nz, w }` where the vectors are unit length in 4.12 fixed
+point, then a `u16` index list filling the remainder. **The index list's length
+cannot be derived from `count`** — only the group table makes it parseable,
+which is the clearest demonstration of why this format cannot be walked from the
+byte stream alone. Purpose unknown; plausibly per-part convex hulls.
+
+**Joints (type `0x011F`) — confirmed layout:**
+
+    u32 magic = 0x12345678
+    u16 nseg
+    u16 unknown
+    (nseg+1) x { i16 x, y, z; u16 side }
+
+Exact on all 433 joints. `side` is only 0 or 1, and 361 of 433 are closed loops
+— consistent with seam-bridging rings between rigid parts, skinned at runtime to
+hide the gap as a joint rotates.
+
+**Coordinate system.** PSX convention: +X right, +Y **down**, +Z into the
+screen. Negate Y and Z for WebGL. Each group's position at `+0x04` must be added
+to its vertices — without it, limbs on `army`, `prosp`, `gunsl` and `rc` float
+away from the body. Applied correctly, every character's feet land on Y = 0.
+Dividing by 256 puts Woody at 2.11 units tall and Buzz at 1.80.
 
 **Collision poly:** 44 bytes (22 x `i16`). Four `i16` active-area bounds, `i16`
 origin xyz (absolute), then p2/p3/p4 as **deltas from the origin**, then
 inclination/bouncing pairs. `bouncing2 == 0x7FFF` means a single triangle,
-otherwise a quad. Single-sided. Meshes are lists (`i16 enabled == 1`,
-`i16 count`, 4x `i16` unknown, then polys); a following `0x0100` word means
-another mesh belongs to the same object.
+otherwise a quad. Single-sided. Not yet parsed here — the container around it is
+confirmed, the payload is not.
+
+**Still unknown:** the per-face `X` flag byte (1..112, varies within a group, so
+not a per-part palette index); exact material bits beyond the page nibble; the
+horizontal terms of the bounding fields at `0x2C`/`0x34`/`0x3C`; entry `+0x44`;
+the joint `unknown`; type `0x0009` payload; and **where character textures live
+and how UVs map onto them** — which is why the viewer renders vertex colours.
 
 ### `.anm` — spec found, not yet verified on this build
 

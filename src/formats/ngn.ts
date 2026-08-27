@@ -157,5 +157,30 @@ export function decodeBmp(
       src += 3; dst += 4;
     }
   }
+
+  // Bleed edge colours into keyed texels. Their RGB is invisible at full
+  // resolution (alpha 0), but mipmap generation averages RGB and alpha
+  // independently, so pure-green key pixels tint every minified cutout edge
+  // green. Replacing a keyed texel's RGB with the mean of its non-keyed
+  // neighbours makes the mip chain average toward the art instead of the key.
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const o = (y * width + x) * 4;
+      if (rgba[o + 3] !== 0) continue;
+      let r = 0, g = 0, b = 0, n = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx, ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+          const no = (ny * width + nx) * 4;
+          if (rgba[no + 3] === 0) continue;
+          r += rgba[no]!; g += rgba[no + 1]!; b += rgba[no + 2]!; n++;
+        }
+      }
+      if (n > 0) {
+        rgba[o] = r / n; rgba[o + 1] = g / n; rgba[o + 2] = b / n;
+      }
+    }
+  }
   return { width, height, rgba };
 }

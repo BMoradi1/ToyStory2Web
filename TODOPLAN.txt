@@ -1,7 +1,7 @@
 ================================================================================
  ToyStory2Web - PROJECT ROADMAP
  Browser reimplementation of Toy Story 2: Buzz Lightyear to the Rescue (1999)
- Last updated: 2026-08-26 (ALL asset formats solved; behaviour is what remains)
+ Last updated: 2026-08-27 (level defect solved: mode bit 0x01 = triangle group)
 ================================================================================
 
  HOW TO USE THIS FILE
@@ -66,9 +66,11 @@
  [READY]  .raw / .raws decoder - chunked RNC PRO-PACK, magic stripped,
           TS2 chunk size 0x830C. Same container for both extensions.
  [DONE]   PC .dat scene format - src/formats/dat.ts; 16/16 real scene files
-          parse, 338,650 triangles across the game. IT IS THE LEVEL GEOMETRY.
+          parse, 319,556 triangles across the game. IT IS THE LEVEL GEOMETRY.
           !! Quads are plain polygons, NOT PSX two-triangle strips.
-          !! Triangles marked by a 4th index >= nverts.
+          !! mode bit 0x01 = TRIANGLE group: 3 indices, UVs shifted 2 bytes.
+          !! Reading those as quads was "the level defect": stray slivers
+          !! plus wrong texture regions on 12,650 faces. No sentinel exists.
           !! Resolve meshes from object pointers, not just a pool walk.
  [DONE]   .kep / .new - older revisions of level.dat itself (Sept vs Oct 1999)
  [OPEN]   .vis / .kp2 - same container as .dat, 12-byte first-section records,
@@ -90,9 +92,16 @@
  [DONE]    Texture mapping for CHARACTERS - page = material & 0x1f, slots 16-24,
            living in the LEVEL .ngn files. All 68 models are single-page.
            Verified visually across 12 characters.
- [DONE]    Colour-key transparency - pure green (0,255,0) is the key
+ [DONE]    Colour-key transparency - pure green (0,255,0) is the key; keyed
+           texels get their RGB bled from neighbours so mipmaps don't tint
+           cutout edges green
+ [DONE]    Untextured faces draw vertex colour at 0-255 scale (PSX flat-poly
+           rule); only textured faces use the 0x80-neutral modulation. The
+           /128-everywhere reading clamped window glass to neon cyan.
  [OPEN]    PSX semi-transparency (material & 0x20) - unimplemented; Buzz's
-           helmet is an opaque dome until it is
+           helmet is an opaque dome until it is. Levels: mode bits 13/14 mark
+           single-texel flat-colour overlay faces (shadows, glass tint),
+           currently drawn opaque - blend mode undecoded.
  [OPEN]    hoola.all reports page 0, unlike every other model (16-24)
  [BLOCKED] Material system                  <- needs mesh flags: textured,
            double-sided, additive, subtractive, 50% translucent

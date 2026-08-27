@@ -227,15 +227,18 @@ for (const group of geo.groups) {
           const tx = Math.max(0, Math.min(tex.w - 1, Math.floor(pickUv(0) * tex.w)));
           const ty = Math.max(0, Math.min(tex.h - 1, Math.floor(pickUv(1) * tex.h)));
           const o = (ty * tex.w + tx) * 3;
+          // Pure green is the transparency key. Test the RAW texel, before
+          // vertex-colour modulation — the browser keys on the stored texel
+          // (alpha punched out at decode), so testing the modulated colour
+          // would keep keyed texels whenever the vertex colour isn't exactly
+          // neutral.
+          if (tex.px[o] === 0 && tex.px[o + 1] === 255 && tex.px[o + 2] === 0) continue;
           // three.js multiplies map by vertex colour; match that so this
           // renderer is a faithful oracle rather than merely a similar one.
           // Vertex colours already carry the 0x80-neutral scaling.
           r = tex.px[o]! * pick(geo.colors, 0);
           g = tex.px[o + 1]! * pick(geo.colors, 1);
           bl = tex.px[o + 2]! * pick(geo.colors, 2);
-          // Pure green is the transparency key; skip the texel entirely so
-          // this matches what the browser draws.
-          if (r === 0 && g === 255 && bl === 0) { depth[idx] = Infinity; continue; }
         } else {
           r = pick(geo.colors, 0) * 255; g = pick(geo.colors, 1) * 255; bl = pick(geo.colors, 2) * 255;
         }

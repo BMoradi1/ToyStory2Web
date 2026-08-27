@@ -48,7 +48,7 @@ export interface DatObject {
 export interface DatVertex { x: number; y: number; z: number; r: number; g: number; b: number }
 
 export interface DatFace {
-  /** Three or four vertex indices. */
+  /** Three or four vertex indices — the group's `mode` bit 0 decides which. */
   indices: number[];
   /** Per-corner UVs, empty when the face group is untextured. */
   uvs: { u: number; v: number }[];
@@ -137,20 +137,39 @@ function readMesh(r: Reader, offset: number): DatMesh | null {
     const faceSize = textured ? 12 : 4;
     if (pos + count * faceSize > r.length) return null;
 
+    // Bit 0x01 SET means the group holds TRIANGLES, clear means quads. Both
+    // face sizes stay the same; a triangle stores only three indices and (when
+    // textured) three UV pairs, shifted two bytes right of where a quad keeps
+    // them:
+    //
+    //     quad     v0 v1 v2 v3 | u0 v0 u1 v1 u2 v2 u3 v3
+    //     triangle v0 v1 v2 NN | 00 00 u0 v0 u1 v1 u2 v2
+    //
+    // NN is the group's face count repeated in every face (12,650 of 12,650
+    // faces across the install; likewise the two zero bytes). Reading a
+    // triangle as a quad both invents a 4th vertex — the stray sliver
+    // triangles — and shifts every UV one slot, which is why those faces also
+    // rendered with the wrong part of the texture.
+    const triangles = (mode & 0x01) !== 0;
+
     for (let i = 0; i < count; i++) {
-      const v = [r.bytes[pos]!, r.bytes[pos + 1]!, r.bytes[pos + 2]!, r.bytes[pos + 3]!];
-      // A 4th index at or past the vertex count is a sentinel marking a
-      // triangle. Any other out-of-range index means this isn't a mesh.
-      const isTriangle = v[3]! >= vertexCount;
-      if (v[0]! >= vertexCount || v[1]! >= vertexCount || v[2]! >= vertexCount) return null;
+      const v = triangles
+        ? [r.bytes[pos]!, r.bytes[pos + 1]!, r.bytes[pos + 2]!]
+        : [r.bytes[pos]!, r.bytes[pos + 1]!, r.bytes[pos + 2]!, r.bytes[pos + 3]!];
+      for (const idx of v) if (idx >= vertexCount) return null;
+      // Structural checks that make the boundary search stronger: a triangle's
+      // 4th byte echoes the group's face count, and its UV slot 0 is padding.
+      if (triangles && r.bytes[pos + 3] !== (count & 0xff)) return null;
+      if (triangles && textured && (r.bytes[pos + 4] !== 0 || r.bytes[pos + 5] !== 0)) return null;
 
       const uvs: DatFace['uvs'] = [];
       if (textured) {
-        for (let k = 0; k < 4; k++) {
-          uvs.push({ u: r.bytes[pos + 4 + k * 2]!, v: r.bytes[pos + 5 + k * 2]! });
+        const uvBase = triangles ? pos + 6 : pos + 4;
+        for (let k = 0; k < v.length; k++) {
+          uvs.push({ u: r.bytes[uvBase + k * 2]!, v: r.bytes[uvBase + k * 2 + 1]! });
         }
       }
-      faces.push({ indices: isTriangle ? v.slice(0, 3) : v, uvs, mode, textured });
+      faces.push({ indices: v, uvs, mode, textured });
       pos += faceSize;
     }
   }
@@ -424,6 +443,13 @@ export function buildLevelGeometry(level: DatLevel): LevelGeometry {
       const page = face.textured ? texturePage(face.mode) : null;
       const bucket = bucketFor(page);
 
+      // PSX colour scaling differs by primitive kind: textured polys modulate
+      // the texel by colour/128 (0x80 neutral, up to 2x brightening), but
+      // UNTEXTURED polys draw their colour as-is on a 0-255 scale. Using /128
+      // for both clamps bright flat colours into neon — sky-blue window panes
+      // come out pure cyan and any channel above 128 saturates.
+      const colourScale = face.textured ? PSX_NEUTRAL : 255;
+
       const corner = (k: number) => {
         const v = mesh.vertices[face.indices[k]!];
         if (v) {
@@ -433,7 +459,7 @@ export function buildLevelGeometry(level: DatLevel): LevelGeometry {
             -(m[3]! * x + m[4]! * y + m[5]! * z + object.position.y) / WORLD_SCALE,
             -(m[6]! * x + m[7]! * y + m[8]! * z + object.position.z) / WORLD_SCALE,
           );
-          bucket.col.push(v.r / PSX_NEUTRAL, v.g / PSX_NEUTRAL, v.b / PSX_NEUTRAL);
+          bucket.col.push(v.r / colourScale, v.g / colourScale, v.b / colourScale);
         }
         const t = face.uvs[k];
         bucket.uv.push(t ? t.u / 255 : 0, t ? t.v / 255 : 0);

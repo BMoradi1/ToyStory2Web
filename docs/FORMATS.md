@@ -220,7 +220,11 @@ divide by 128. Dividing by 255 caps every surface near half brightness and
 drives darker vertices to near-black, which looks like holes rather than
 shading. Buzz's vertex colours peak at 126 and average 79, so nothing in the
 file ever reaches full brightness under the wrong reading. The same convention
-applies to level vertex colours.
+applies to level vertex colours — but **only where a texture is being
+modulated**. PSX flat (untextured) polys draw their colour as-is on a 0-255
+scale, and level vertex colours use that full range: dividing untextured faces
+by 128 clamps anything bright into neon (sky-blue window panes render as pure
+cyan, whites blow out). Textured faces divide by 128; untextured divide by 255.
 
 **Face culling is not a global setting.** Measured offline, both culling
 conventions punch holes through 13-15% of Buzz's silhouette, so character parts
@@ -415,8 +419,22 @@ Two findings that will silently corrupt a renderer if missed:
 - **Quads are wound as a plain polygon** (`v0 v1 v2 v3`), *not* as a PSX
   two-triangle strip. Strip order produces bow-tie artefacts. This is a real
   divergence from raw `POLY_FT4`.
-- **Triangles are marked by a sentinel**: a face is a triangle when its 4th
-  index is `>= nverts`. Rare, and easy to mistake for corruption.
+- **`mode` bit `0x01` marks a TRIANGLE group.** Face records keep the quad
+  group's size (12 bytes textured, 4 untextured) but hold three vertices, and
+  a textured triangle's UVs sit two bytes later than a quad's:
+
+      quad     v0 v1 v2 v3 | u0 v0 u1 v1 u2 v2 u3 v3
+      triangle v0 v1 v2 NN | 00 00 u0 v0 u1 v1 u2 v2
+
+  `NN` is the group's face count echoed into every face (12,650 of 12,650
+  across the install), and the two zero bytes are always zero — both make
+  good structural checks. Reading these as quads is a double corruption:
+  it invents a 4th vertex (stray sliver triangles all over the level) *and*
+  shifts every UV one slot, so the same faces also bind the wrong part of
+  their texture. An earlier revision of this document claimed triangles were
+  marked by a sentinel 4th index `>= nverts` — that was this count byte
+  occasionally exceeding the vertex count. No genuine quad in any scene file
+  has an out-of-range 4th index (0 of 102,945).
 
 **Do not resolve meshes by walking the pool alone.** The pool ends in a 2D
 sprite section we can't parse yet, so a contiguous walk stops early; objects
@@ -424,10 +442,11 @@ pointing past that point must be resolved from their own pointers. Doing only
 the walk silently drops ~27% of level 1's objects — it renders, so the loss is
 easy to miss.
 
-**Validated:** 16 of 16 real scene files parse, 338,650 triangles across the
-game. Level 1 yields 1,126 objects over 701 meshes drawing 1,072 of them, plus
-70 markers, 30 paths and 22 zones — matching an independent Python
-implementation exactly. Top-down renders show a room with floorboards, an
+**Validated:** 16 of 16 real scene files parse, 319,556 triangles across the
+game (an earlier figure of 338,650 counted the phantom second halves of
+triangle-group faces). Level 1 yields 1,126 objects over 701 meshes drawing
+1,072 of them, plus 70 markers, 30 paths and 22 zones — matching an
+independent Python implementation exactly. Top-down renders show a room with floorboards, an
 octagonal rug and a roof gable.
 
 The four files that fail (`level07`–`level10`'s `level1.dat`) are **one
@@ -445,18 +464,19 @@ Zones are planar quads standing in doorways (triggers or portals).
 
 `mode` is a bitfield, not a byte pair:
 
-    bit 15 14 13 | 12..8 | 7 6 5 | 4   | 3..0
-        flags    | PAGE  | flags | tex | material
+    bit 15 14 13 | 12..8 | 7 6 5 | 4   | 3 2 1 | 0
+        flags    | PAGE  | flags | tex | flags | tri
 
     page       = (mode >> 8) & 0x1f      -> `.ngn` texture slot id
     untextured = (mode & 0x10) != 0
+    triangles  = (mode & 0x01) != 0      -> see the face-layout note above
     UVs        = u8 0..255, mapping 1:1 onto the 256x256 slot texture
 
 The `0x1f` mask is the crux. Bits 13 and 14 are real flags, and a wider mask
 scores them as page bits, producing impossible slot ids like 96 and 112. Those
 faces are not corrupt and need no parser fix — only the correct mask. With it,
 **every page reached by a drawn object resolves in all 16 scene files**, and
-83.8% of the game's 338,650 drawn triangles bind a texture. The rest are
+84.2% of the game's 319,556 drawn triangles bind a texture. The rest are
 genuinely untextured.
 
 The `mode & 0x10` discriminator is exact across the whole game: 89,078 textured
@@ -493,9 +513,19 @@ Prospector is page 23 and needs `level03`.
 **Still unimplemented:** PSX semi-transparency (`material & 0x20`), which is why
 Buzz's helmet renders as an opaque dome rather than a clear bubble.
 
-**Still unknown:** `mode & 0x8000` (real and systematic, meaning unknown), bits
-13/14, the material nibble, character flag bit `0x80`, and the 2D sprite pool at
-the mesh-pool tail.
+**Bits 13/14 — partly understood.** Face groups with `mode & 0x6000` set are
+flat-colour-via-texel faces: their UVs pin all corners to a single texel or a
+tiny rect (`fd c4 fd c4 fd c4 fd c4`), so the whole face takes one colour from
+the page. In level 1 they sample greys and browns — which reads as shadow and
+glass-tint overlays, i.e. the PSX semi-transparent pass — and 39 of the 243
+sample the pure-green key, faces the original hardware would draw fully
+transparent. The blend mode those bits select is not yet decoded; the faces
+currently render opaque.
+
+**Still unknown:** `mode & 0x8000` (real and systematic, meaning unknown; it
+often co-occurs with the triangle bit but is not equivalent to it), bits 1-3 of
+the low nibble, character flag bit `0x80`, and the 2D sprite pool at the
+mesh-pool tail.
 
 **Still unknown:** the 20-byte ref list (its positions sit near but not on the
 objects it points at, and only ~72% of pointers resolve); `Object.flags`; the

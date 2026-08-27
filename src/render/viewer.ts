@@ -15,6 +15,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { MeshData } from '../formats/all.ts';
+import type { LevelGeometry } from '../formats/dat.ts';
 
 /** The original's frame pacing, in seconds. Game logic steps at this rate. */
 export const TICK_SECONDS = 16949 / 1_000_000;
@@ -64,12 +65,7 @@ export class Viewer {
    * near-greyscale vertex colours read as lighting, so the shape is legible.
    */
   setModel(mesh: MeshData): void {
-    if (this.current) {
-      this.scene.remove(this.current);
-      this.current.geometry.dispose();
-      (this.current.material as THREE.Material).dispose();
-      this.current = null;
-    }
+    this.clearModel();
     if (mesh.triangleCount === 0) return;
 
     const geometry = new THREE.BufferGeometry();
@@ -88,16 +84,64 @@ export class Viewer {
 
     this.current = new THREE.Mesh(geometry, material);
     this.scene.add(this.current);
+    this.frameObject(geometry);
+  }
 
-    // Frame the model: characters sit on Y=0 with the body above it.
+  /**
+   * Display a level, binding one texture per page.
+   *
+   * Geometry arrives bucketed by texture page, so each bucket becomes a draw
+   * group with its own material. Faces whose page is null — untextured, or
+   * carrying a mode we don't yet trust — fall back to vertex colours.
+   *
+   * Textures are filtered nearest on magnification: these are 256x256 source
+   * images built for a 1999 console, and smoothing them looks wrong rather
+   * than better.
+   */
+  setLevel(geometry: LevelGeometry, textures: Map<number, THREE.Texture>): void {
+    this.clearModel();
+    if (geometry.triangleCount === 0) return;
+
+    const buffer = new THREE.BufferGeometry();
+    buffer.setAttribute('position', new THREE.BufferAttribute(geometry.positions, 3));
+    buffer.setAttribute('color', new THREE.BufferAttribute(geometry.colors, 3));
+    buffer.setAttribute('uv', new THREE.BufferAttribute(geometry.uvs, 2));
+    buffer.computeVertexNormals();
+
+    const materials: THREE.Material[] = [];
+    for (const group of geometry.groups) {
+      const texture = group.page === null ? undefined : textures.get(group.page);
+      buffer.addGroup(group.start, group.count, materials.length);
+      materials.push(new THREE.MeshBasicMaterial({
+        map: texture ?? null,
+        vertexColors: true,
+        side: THREE.DoubleSide,
+      }));
+    }
+
+    this.current = new THREE.Mesh(buffer, materials);
+    this.scene.add(this.current);
+    this.frameObject(buffer);
+  }
+
+  private clearModel(): void {
+    if (!this.current) return;
+    this.scene.remove(this.current);
+    this.current.geometry.dispose();
+    const material = this.current.material;
+    if (Array.isArray(material)) material.forEach((m) => m.dispose());
+    else material.dispose();
+    this.current = null;
+  }
+
+  private frameObject(geometry: THREE.BufferGeometry): void {
     geometry.computeBoundingSphere();
     const sphere = geometry.boundingSphere;
-    if (sphere) {
-      const d = Math.max(sphere.radius * 3, 1);
-      this.camera.position.set(d * 0.6, sphere.center.y + d * 0.4, d * 0.8);
-      this.controls.target.copy(sphere.center);
-      this.controls.update();
-    }
+    if (!sphere) return;
+    const d = Math.max(sphere.radius * 2.2, 1);
+    this.camera.position.set(sphere.center.x + d * 0.6, sphere.center.y + d * 0.5, sphere.center.z + d * 0.8);
+    this.controls.target.copy(sphere.center);
+    this.controls.update();
   }
 
   private resize(): void {

@@ -339,6 +339,39 @@ no per-marker type field, so the *kind* would have to come from `level.bin`.
 Paths are polylines tracing loops around rooms (patrol routes, platform rails).
 Zones are planar quads standing in doorways (triggers or portals).
 
+### Texture mapping — mostly solved
+
+A face group's `mode` selects its texture:
+
+    page      = (mode >> 8) & 0x1f      -> the `.ngn` texture slot id
+    untextured = (mode & 0x10) != 0
+    UVs        = u8 0..255, mapping 1:1 onto the 256x256 slot texture
+
+The low byte of `mode` carries material bits, not page information. Verified
+across the install: every page id reached by a *drawn* object resolves to a real
+slot in that scene's own `.ngn`, and **81.5% of the game's 338,650 drawn
+triangles bind a texture** — the rest are genuinely untextured faces.
+
+One caveat worth keeping: scanning every mesh in the pool (rather than only
+those an object references) turns up a page id with no matching slot in
+`level02/level1`. It sits in geometry nothing draws. Unreferenced meshes are not
+evidence of a mapping gap.
+
+**About 1.7% of textured faces carry malformed modes** — a low byte that is not
+a known material value, and a high byte that looks like a material byte shifted
+up. That pattern suggests a misaligned read rather than a distinct encoding, but
+it is **unconfirmed**; those faces currently fall back to vertex colours instead
+of binding an absurd page. Known material low bytes: `0x00`-`0x04`, `0x20`-`0x23`,
+`0x26`, `0x60`-`0x64`, `0x66`, `0x70`-`0x74`, `0xe0`-`0xe4`, `0xf0`, `0xf1`.
+
+**Not yet verified visually**, and the open question is UV orientation: BMP rows
+are stored bottom-up, so V may need flipping. Statistics cannot settle that — a
+textured render can.
+
+**Character textures remain unsolved.** The `chars*` directories hold no texture
+files at all, so a character's textures must live in a level `.ngn`, the shared
+`gfx` set, or somewhere not yet identified.
+
 **Still unknown:** the 20-byte ref list (its positions sit near but not on the
 objects it points at, and only ~72% of pointers resolve); `Object.flags`; the
 `mode` low nibble and bit `0x8000`; the `aux` block; zone `a`/`b`; the sprite

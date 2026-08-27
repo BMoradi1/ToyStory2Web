@@ -325,12 +325,57 @@ export function parseDat(buffer: ArrayBuffer | Uint8Array): DatLevel {
 
 // --- Renderable output ------------------------------------------------------
 
+/**
+ * A run of triangles sharing one texture page, ready to become a draw group.
+ * Triangles are bucketed by page so each range can bind a single texture.
+ */
+export interface GeometryGroup {
+  /** First vertex index in the flattened arrays (3 per triangle). */
+  start: number;
+  /** Vertex count in this run. */
+  count: number;
+  /** `.ngn` texture slot id, or null for untextured faces. */
+  page: number | null;
+}
+
 export interface LevelGeometry {
   positions: Float32Array;
   colors: Float32Array;
   uvs: Float32Array;
+  groups: GeometryGroup[];
   triangleCount: number;
   objectCount: number;
+}
+
+/**
+ * Texture page selector for a face group.
+ *
+ * Verified across the install: in 15 of 16 scene files every page derived this
+ * way is a valid texture slot in that scene's own `.ngn`, and UVs (u8 0..255)
+ * map 1:1 onto the 256x256 textures. The low byte of `mode` carries material
+ * bits rather than page information, and bit `0x10` there marks untextured.
+ */
+export function texturePage(mode: number): number {
+  return (mode >> 8) & 0x1f;
+}
+
+/**
+ * Does this face group's mode look like a real one?
+ *
+ * About 1.7% of textured faces carry modes whose low byte is not a known
+ * material value, and whose high byte looks like a material byte shifted up —
+ * the signature of a misaligned read rather than a distinct encoding. They are
+ * excluded from texturing until that is settled, so they draw untextured
+ * instead of binding an absurd page id.
+ */
+const MATERIAL_BYTES = new Set([
+  0x00, 0x01, 0x02, 0x03, 0x04, 0x20, 0x21, 0x22, 0x23, 0x26,
+  0x60, 0x61, 0x62, 0x63, 0x64, 0x66, 0x70, 0x71, 0x72, 0x73, 0x74,
+  0xe0, 0xe1, 0xe2, 0xe3, 0xe4, 0xf0, 0xf1,
+]);
+
+export function modeIsWellFormed(mode: number): boolean {
+  return MATERIAL_BYTES.has(mode & 0xff) && ((mode >> 8) & 0x7f) <= 0x1f;
 }
 
 /**
@@ -360,9 +405,15 @@ function rotationMatrix(rot: Vec3): number[] {
  * artefacts, which is a real divergence from raw `POLY_FT4`.
  */
 export function buildLevelGeometry(level: DatLevel): LevelGeometry {
-  const positions: number[] = [];
-  const colors: number[] = [];
-  const uvs: number[] = [];
+  // Bucket triangles by texture page so each page becomes one draw group.
+  // `null` collects untextured faces and anything whose mode we don't trust.
+  const buckets = new Map<number | null, { pos: number[]; col: number[]; uv: number[] }>();
+  const bucketFor = (page: number | null) => {
+    let bucket = buckets.get(page);
+    if (!bucket) { bucket = { pos: [], col: [], uv: [] }; buckets.set(page, bucket); }
+    return bucket;
+  };
+
   let objectCount = 0;
 
   for (const object of level.objects) {
@@ -371,27 +422,32 @@ export function buildLevelGeometry(level: DatLevel): LevelGeometry {
     objectCount++;
 
     const m = rotationMatrix(object.rotation);
-    const sc = { x: object.scale.x / ANGLE_UNITS, y: object.scale.y / ANGLE_UNITS, z: object.scale.z / ANGLE_UNITS };
-
-    const place = (v: DatVertex) => {
-      const x = v.x * sc.x, y = v.y * sc.y, z = v.z * sc.z;
-      const wx = m[0]! * x + m[1]! * y + m[2]! * z + object.position.x;
-      const wy = m[3]! * x + m[4]! * y + m[5]! * z + object.position.y;
-      const wz = m[6]! * x + m[7]! * y + m[8]! * z + object.position.z;
-      positions.push(wx / WORLD_SCALE, -wy / WORLD_SCALE, -wz / WORLD_SCALE);
-      colors.push(v.r / 255, v.g / 255, v.b / 255);
+    const sc = {
+      x: object.scale.x / ANGLE_UNITS,
+      y: object.scale.y / ANGLE_UNITS,
+      z: object.scale.z / ANGLE_UNITS,
     };
 
     for (const face of mesh.faces) {
-      const idx = face.indices;
-      const uv = face.uvs;
+      const page = face.textured && modeIsWellFormed(face.mode) ? texturePage(face.mode) : null;
+      const bucket = bucketFor(page);
+
       const corner = (k: number) => {
-        const vertex = mesh.vertices[idx[k]!];
-        if (vertex) place(vertex);
-        const t = uv[k];
-        uvs.push(t ? t.u / 255 : 0, t ? t.v / 255 : 0);
+        const v = mesh.vertices[face.indices[k]!];
+        if (v) {
+          const x = v.x * sc.x, y = v.y * sc.y, z = v.z * sc.z;
+          bucket.pos.push(
+            (m[0]! * x + m[1]! * y + m[2]! * z + object.position.x) / WORLD_SCALE,
+            -(m[3]! * x + m[4]! * y + m[5]! * z + object.position.y) / WORLD_SCALE,
+            -(m[6]! * x + m[7]! * y + m[8]! * z + object.position.z) / WORLD_SCALE,
+          );
+          bucket.col.push(v.r / 255, v.g / 255, v.b / 255);
+        }
+        const t = face.uvs[k];
+        bucket.uv.push(t ? t.u / 255 : 0, t ? t.v / 255 : 0);
       };
-      if (idx.length === 4) {
+
+      if (face.indices.length === 4) {
         corner(0); corner(1); corner(2);
         corner(0); corner(2); corner(3);
       } else {
@@ -400,11 +456,36 @@ export function buildLevelGeometry(level: DatLevel): LevelGeometry {
     }
   }
 
+  // Concatenate the buckets, recording each one's range. Copy through typed
+  // arrays rather than `push(...bucket)` — spreading a bucket passes every
+  // number as a separate argument, which overflows the stack on larger levels.
+  // Untextured last, so textured pages take the low material indices.
+  const order = [...buckets.keys()].sort((a, b) =>
+    a === null ? 1 : b === null ? -1 : a - b);
+
+  let totalPos = 0, totalUv = 0;
+  for (const bucket of buckets.values()) { totalPos += bucket.pos.length; totalUv += bucket.uv.length; }
+
+  const positions = new Float32Array(totalPos);
+  const colors = new Float32Array(totalPos);
+  const uvs = new Float32Array(totalUv);
+  const groups: GeometryGroup[] = [];
+
+  let posOffset = 0, uvOffset = 0;
+  for (const page of order) {
+    const bucket = buckets.get(page)!;
+    if (bucket.pos.length === 0) continue;
+    positions.set(bucket.pos, posOffset);
+    colors.set(bucket.col, posOffset);
+    uvs.set(bucket.uv, uvOffset);
+    groups.push({ start: posOffset / 3, count: bucket.pos.length / 3, page });
+    posOffset += bucket.pos.length;
+    uvOffset += bucket.uv.length;
+  }
+
   return {
-    positions: new Float32Array(positions),
-    colors: new Float32Array(colors),
-    uvs: new Float32Array(uvs),
-    triangleCount: positions.length / 9,
+    positions, colors, uvs, groups,
+    triangleCount: totalPos / 9,
     objectCount,
   };
 }

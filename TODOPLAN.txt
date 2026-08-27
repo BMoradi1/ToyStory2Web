@@ -76,9 +76,13 @@
 ================================================================================
  [DONE]    Level visual geometry - it is level.dat. Levels render in the
            viewer with vertex colours.
- [BLOCKED] Texture slot binding   <- NOW THE TOP BLOCKER. UVs and a page id
-           are recovered from both .all and .dat, but neither has been mapped
-           to a region of level.raw / the .ngn texture slots.
+ [DONE]    Texture slot binding for LEVELS - page = (mode >> 8) & 0x1f selects
+           the .ngn slot; UVs map 1:1 onto the 256x256 texture. 81.5% of drawn
+           triangles bind a texture, every page id resolves.
+           !! NOT yet verified visually. UV orientation (V flip) is unsettled.
+ [OPEN]    Texture mapping for CHARACTERS - chars* dirs hold no texture files,
+           so character textures live elsewhere. Genuinely unsolved.
+ [OPEN]    The 1.7% malformed face modes - probably a parse desync, unconfirmed
  [BLOCKED] Material system                  <- needs mesh flags: textured,
            double-sided, additive, subtractive, 50% translucent
  [READY]   Collision mesh rendering (debug) <- container done, payload not
@@ -172,10 +176,10 @@
 ================================================================================
  KEY UNKNOWNS - the things most likely to derail the plan
 ================================================================================
- 1. ANSWERED: level visual geometry is level.dat. Levels now render.
-    The new top unknown is TEXTURE MAPPING - how a face's texture page id
-    selects a region of level.raw or an .ngn slot. Everything renders with
-    vertex colours until this is solved.
+ 1. ANSWERED: level geometry is level.dat, and level texture mapping is
+    page = (mode >> 8) & 0x1f -> .ngn slot. Pending visual confirmation.
+    The new top unknown is CHARACTER texture mapping - where Buzz's texture
+    actually lives, since chars* holds no texture files at all.
  2. Does the .ANM spec, written from PSX files, hold on this PC build? The
     .ALL container and mesh reader do (88/88 files) but only AFTER correcting
     the triangle vertex count, so expect .ANM to need similar correction.

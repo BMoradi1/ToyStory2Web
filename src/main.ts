@@ -1,4 +1,5 @@
 import { buildMeshData, parseAll } from './formats/all.ts';
+import * as THREE from 'three';
 import { buildLevelGeometry, parseDat } from './formats/dat.ts';
 import { parseNgn, type NgnTexture } from './formats/ngn.ts';
 import {
@@ -65,6 +66,31 @@ async function showModel(index: number): Promise<void> {
   infoEl.textContent = `${model.name}.all — ${groups} groups, ${mesh.triangleCount} triangles`;
 }
 
+/**
+ * Decode a scene's textures into GPU textures, keyed by slot id.
+ *
+ * The slot id is what a face's texture page resolves to, and slots are sparse,
+ * so a Map rather than an array.
+ */
+async function loadTextures(textures: NgnTexture[]): Promise<Map<number, THREE.Texture>> {
+  const out = new Map<number, THREE.Texture>();
+  await Promise.all(textures.map(async (t) => {
+    if (t.slot === null) return;
+    try {
+      const bitmap = await createImageBitmap(new Blob([t.bmp.slice()], { type: 'image/bmp' }));
+      const texture = new THREE.Texture(bitmap);
+      // 256x256 art drawn for a 1999 console: keep it crisp.
+      texture.magFilter = THREE.NearestFilter;
+      texture.minFilter = THREE.LinearMipmapLinearFilter;
+      texture.generateMipmaps = true;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.needsUpdate = true;
+      out.set(t.slot, texture);
+    } catch { /* a texture that won't decode simply goes untextured */ }
+  }));
+  return out;
+}
+
 async function showLevel(index: number): Promise<void> {
   const level = levels[index];
   if (!level) return;
@@ -73,10 +99,12 @@ async function showLevel(index: number): Promise<void> {
   infoEl.textContent = 'reading…';
 
   let textureCount = 0;
+  let gpuTextures = new Map<number, THREE.Texture>();
   if (level.ngn) {
     const textures = parseNgn(await level.ngn.read());
     textureCount = textures.length;
     texturesEl.replaceChildren(...(await Promise.all(textures.map(drawTexture))));
+    gpuTextures = await loadTextures(textures);
   }
 
   // World geometry lives in the .dat; the .ngn holds only textures, and
@@ -86,10 +114,13 @@ async function showLevel(index: number): Promise<void> {
     try {
       const parsed = parseDat(await level.dat.read());
       const geometry = buildLevelGeometry(parsed);
-      viewer.setModel(geometry);
+      viewer.setLevel(geometry, gpuTextures);
+      const textured = geometry.groups.filter((g) => g.page !== null && gpuTextures.has(g.page));
       summary +=
         `, ${geometry.objectCount}/${parsed.objects.length} objects, ` +
-        `${geometry.triangleCount} triangles, ${parsed.markers.length} markers`;
+        `${geometry.triangleCount} triangles, ` +
+        `${textured.length}/${geometry.groups.length} groups textured, ` +
+        `${parsed.markers.length} markers`;
     } catch (err) {
       summary += ` — geometry failed: ${(err as Error).message}`;
     }

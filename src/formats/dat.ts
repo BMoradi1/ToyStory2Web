@@ -354,28 +354,14 @@ export interface LevelGeometry {
  * way is a valid texture slot in that scene's own `.ngn`, and UVs (u8 0..255)
  * map 1:1 onto the 256x256 textures. The low byte of `mode` carries material
  * bits rather than page information, and bit `0x10` there marks untextured.
+ *
+ * The `0x1f` mask matters: a wider mask scores bits 13/14 — which are real
+ * flags, not page bits — as part of the page and yields impossible slot ids.
+ * With this mask, every page reached by a drawn object resolves in all 16
+ * scene files, with no exceptions to special-case.
  */
 export function texturePage(mode: number): number {
   return (mode >> 8) & 0x1f;
-}
-
-/**
- * Does this face group's mode look like a real one?
- *
- * About 1.7% of textured faces carry modes whose low byte is not a known
- * material value, and whose high byte looks like a material byte shifted up —
- * the signature of a misaligned read rather than a distinct encoding. They are
- * excluded from texturing until that is settled, so they draw untextured
- * instead of binding an absurd page id.
- */
-const MATERIAL_BYTES = new Set([
-  0x00, 0x01, 0x02, 0x03, 0x04, 0x20, 0x21, 0x22, 0x23, 0x26,
-  0x60, 0x61, 0x62, 0x63, 0x64, 0x66, 0x70, 0x71, 0x72, 0x73, 0x74,
-  0xe0, 0xe1, 0xe2, 0xe3, 0xe4, 0xf0, 0xf1,
-]);
-
-export function modeIsWellFormed(mode: number): boolean {
-  return MATERIAL_BYTES.has(mode & 0xff) && ((mode >> 8) & 0x7f) <= 0x1f;
 }
 
 /**
@@ -396,14 +382,6 @@ function rotationMatrix(rot: Vec3): number[] {
   ];
 }
 
-/**
- * Flatten a level into one triangle soup in WebGL coordinates.
- *
- * As with `.all`, the PlayStation's +Y points down and +Z into the screen, so
- * both are negated. Quads here are wound as a **plain polygon** (v0,v1,v2,v3),
- * not as a PSX two-triangle strip — using strip order produces bow-tie
- * artefacts, which is a real divergence from raw `POLY_FT4`.
- */
 export function buildLevelGeometry(level: DatLevel): LevelGeometry {
   // Bucket triangles by texture page so each page becomes one draw group.
   // `null` collects untextured faces and anything whose mode we don't trust.
@@ -429,7 +407,7 @@ export function buildLevelGeometry(level: DatLevel): LevelGeometry {
     };
 
     for (const face of mesh.faces) {
-      const page = face.textured && modeIsWellFormed(face.mode) ? texturePage(face.mode) : null;
+      const page = face.textured ? texturePage(face.mode) : null;
       const bucket = bucketFor(page);
 
       const corner = (k: number) => {

@@ -64,7 +64,14 @@ export class Viewer {
    * the texture set is still unknown (see docs/FORMATS.md). The baked
    * near-greyscale vertex colours read as lighting, so the shape is legible.
    */
-  setModel(mesh: MeshData): void {
+  /**
+   * Display a single character model.
+   *
+   * Characters ship no textures of their own; their art lives in the level
+   * `.ngn` files at slots 16-24, so the caller passes whichever scene's
+   * textures are loaded. Every model uses exactly one page.
+   */
+  setModel(mesh: MeshData, textures?: Map<number, THREE.Texture>): void {
     this.clearModel();
     if (mesh.triangleCount === 0) return;
 
@@ -74,15 +81,22 @@ export class Viewer {
     geometry.setAttribute('uv', new THREE.BufferAttribute(mesh.uvs, 2));
     geometry.computeVertexNormals();
 
-    // Double-sided because the material bits that would tell us which faces are
-    // single-sided aren't decoded yet, and back-face culling on a rigid-part
-    // model with unknown winding drops visible geometry.
-    const material = new THREE.MeshLambertMaterial({
-      vertexColors: true,
-      side: THREE.DoubleSide,
-    });
+    const materials: THREE.Material[] = [];
+    for (const group of mesh.groups) {
+      const texture = group.page === null ? undefined : textures?.get(group.page);
+      geometry.addGroup(group.start, group.count, materials.length);
+      // Double-sided: the bits that would mark single-sided faces aren't
+      // decoded, and culling by unknown winding drops visible geometry.
+      materials.push(new THREE.MeshBasicMaterial({
+        map: texture ?? null,
+        vertexColors: true,
+        side: THREE.DoubleSide,
+        transparent: true,
+        alphaTest: 0.5,
+      }));
+    }
 
-    this.current = new THREE.Mesh(geometry, material);
+    this.current = new THREE.Mesh(geometry, materials);
     this.scene.add(this.current);
     this.frameObject(geometry);
   }
@@ -116,6 +130,8 @@ export class Viewer {
         map: texture ?? null,
         vertexColors: true,
         side: THREE.DoubleSide,
+        transparent: true,
+        alphaTest: 0.5,
       }));
     }
 

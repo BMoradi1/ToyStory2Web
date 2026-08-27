@@ -76,13 +76,17 @@
 ================================================================================
  [DONE]    Level visual geometry - it is level.dat. Levels render in the
            viewer with vertex colours.
- [DONE]    Texture slot binding for LEVELS - page = (mode >> 8) & 0x1f selects
-           the .ngn slot; UVs map 1:1 onto the 256x256 texture. 81.5% of drawn
-           triangles bind a texture, every page id resolves.
-           !! NOT yet verified visually. UV orientation (V flip) is unsettled.
- [OPEN]    Texture mapping for CHARACTERS - chars* dirs hold no texture files,
-           so character textures live elsewhere. Genuinely unsolved.
- [OPEN]    The 1.7% malformed face modes - probably a parse desync, unconfirmed
+ [DONE]    Texture mapping for LEVELS - page = (mode >> 8) & 0x1f selects the
+           .ngn slot; UVs map 1:1, NO V flip. 83.8% of drawn triangles bind a
+           texture, every page resolves. Verified visually: Andy's House shows
+           star wallpaper, quilt bed, brick fireplace, checkerboard tile.
+ [DONE]    Texture mapping for CHARACTERS - page = material & 0x1f, slots 16-24,
+           living in the LEVEL .ngn files. All 68 models are single-page.
+           Verified visually across 12 characters.
+ [DONE]    Colour-key transparency - pure green (0,255,0) is the key
+ [OPEN]    PSX semi-transparency (material & 0x20) - unimplemented; Buzz's
+           helmet is an opaque dome until it is
+ [OPEN]    hoola.all reports page 0, unlike every other model (16-24)
  [BLOCKED] Material system                  <- needs mesh flags: textured,
            double-sided, additive, subtractive, 50% translucent
  [READY]   Collision mesh rendering (debug) <- container done, payload not
@@ -176,10 +180,10 @@
 ================================================================================
  KEY UNKNOWNS - the things most likely to derail the plan
 ================================================================================
- 1. ANSWERED: level geometry is level.dat, and level texture mapping is
-    page = (mode >> 8) & 0x1f -> .ngn slot. Pending visual confirmation.
-    The new top unknown is CHARACTER texture mapping - where Buzz's texture
-    actually lives, since chars* holds no texture files at all.
+ 1. ANSWERED: geometry is level.dat; textures are page = (mode >> 8) & 0x1f
+    for levels and material & 0x1f for characters, both indexing .ngn slots.
+    Levels and characters both render textured. The next unknown is .ANM
+    animation - the last format standing between here and a moving Buzz.
  2. Does the .ANM spec, written from PSX files, hold on this PC build? The
     .ALL container and mesh reader do (88/88 files) but only AFTER correcting
     the triangle vertex count, so expect .ANM to need similar correction.

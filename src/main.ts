@@ -21,6 +21,8 @@ const texturesEl = $<HTMLDivElement>('textures');
 let viewer: Viewer | null = null;
 let levels: ReturnType<typeof findLevels> = [];
 let models: ReturnType<typeof findModels> = [];
+/** Textures from the currently selected scene. Characters borrow these. */
+let sceneTextures = new Map<number, THREE.Texture>();
 
 function setStatus(msg: string, isError = false): void {
   statusEl.textContent = msg;
@@ -60,10 +62,14 @@ async function showModel(index: number): Promise<void> {
 
   const file = parseAll(await model.file.read());
   const mesh = buildMeshData(file);
-  viewer.setModel(mesh);
+  viewer.setModel(mesh, sceneTextures);
 
-  const groups = file.groups.length;
-  infoEl.textContent = `${model.name}.all — ${groups} groups, ${mesh.triangleCount} triangles`;
+  const pages = [...new Set(mesh.groups.map((g) => g.page))].filter((p) => p !== null);
+  const missing = pages.filter((p) => !sceneTextures.has(p));
+  infoEl.textContent =
+    `${model.name}.all — ${file.groups.length} groups, ${mesh.triangleCount} triangles, ` +
+    `page ${pages.join(',')}` +
+    (missing.length ? ` (not in this scene — try another level)` : '');
 }
 
 /**
@@ -78,12 +84,32 @@ async function loadTextures(textures: NgnTexture[]): Promise<Map<number, THREE.T
     if (t.slot === null) return;
     try {
       const bitmap = await createImageBitmap(new Blob([t.bmp.slice()], { type: 'image/bmp' }));
-      const texture = new THREE.Texture(bitmap);
+
+      // Punch out the colour key. These textures have no alpha channel; the
+      // engine treats pure green as transparent, which is why untreated models
+      // show green fringes around cut-out shapes like Bo Peep's crook.
+      const canvas = document.createElement('canvas');
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+      ctx.drawImage(bitmap, 0, 0);
+      bitmap.close();
+
+      const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const px = image.data;
+      for (let i = 0; i < px.length; i += 4) {
+        if (px[i] === 0 && px[i + 1] === 255 && px[i + 2] === 0) px[i + 3] = 0;
+      }
+      ctx.putImageData(image, 0, 0);
+
+      const texture = new THREE.CanvasTexture(canvas);
       // 256x256 art drawn for a 1999 console: keep it crisp.
       texture.magFilter = THREE.NearestFilter;
       texture.minFilter = THREE.LinearMipmapLinearFilter;
-      texture.generateMipmaps = true;
       texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      // UVs index rows from the top, so no vertical flip — flipping floods
+      // surfaces with the colour key instead of their real art.
+      texture.flipY = false;
       texture.needsUpdate = true;
       out.set(t.slot, texture);
     } catch { /* a texture that won't decode simply goes untextured */ }
@@ -105,6 +131,7 @@ async function showLevel(index: number): Promise<void> {
     textureCount = textures.length;
     texturesEl.replaceChildren(...(await Promise.all(textures.map(drawTexture))));
     gpuTextures = await loadTextures(textures);
+    sceneTextures = gpuTextures;
   }
 
   // World geometry lives in the .dat; the .ngn holds only textures, and

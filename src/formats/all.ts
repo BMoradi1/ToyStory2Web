@@ -244,13 +244,38 @@ export function parseGfxJoint(group: AllGroup): JointRing {
  */
 export const MODEL_SCALE = 256;
 
+/** A run of triangles sharing one texture page. */
+export interface MeshGroup {
+  start: number;
+  count: number;
+  page: number | null;
+}
+
 export interface MeshData {
   /** Triangle soup, GL coordinates, ready for a BufferAttribute. */
   positions: Float32Array;
   /** Per-vertex RGB in 0..1, matching `positions`. */
   colors: Float32Array;
   uvs: Float32Array;
+  groups: MeshGroup[];
   triangleCount: number;
+}
+
+/**
+ * Texture page for a character face, from the last trailing flag byte.
+ *
+ * Characters carry no texture files of their own — the `chars*` directories
+ * hold only models and animations. Their art lives in the level `.ngn` files
+ * alongside level textures, at slots 16-24. Verified: all 68 character models
+ * use exactly one page each, and 67 of 68 fall in that range.
+ */
+export function characterTexturePage(material: number): number {
+  return material & 0x1f;
+}
+
+/** Bit 0x20 of the material byte marks PSX semi-transparency. */
+export function isSemiTransparent(material: number): boolean {
+  return (material & 0x20) !== 0;
 }
 
 /**
@@ -262,39 +287,62 @@ export interface MeshData {
  * limbs float away from the body.
  */
 export function buildMeshData(file: AllFile): MeshData {
-  const positions: number[] = [];
-  const colors: number[] = [];
-  const uvs: number[] = [];
-
-  const push = (v: MeshVertex, origin: AllGroup['position']) => {
-    positions.push(
-      (v.x + origin.x) / MODEL_SCALE,
-      -(v.y + origin.y) / MODEL_SCALE,
-      -(v.z + origin.z) / MODEL_SCALE,
-    );
-    colors.push(v.r / 255, v.g / 255, v.b / 255);
-    uvs.push(v.u / 255, v.v / 255);
+  // Bucket by texture page so each page becomes its own draw group.
+  const buckets = new Map<number | null, { pos: number[]; col: number[]; uv: number[] }>();
+  const bucketFor = (page: number | null) => {
+    let bucket = buckets.get(page);
+    if (!bucket) { bucket = { pos: [], col: [], uv: [] }; buckets.set(page, bucket); }
+    return bucket;
   };
 
   for (const group of file.groups) {
     if (group.type !== GroupType.GfxMesh) continue;
+    const origin = group.position;
 
     for (const face of parseGfxMesh(group)) {
+      const bucket = bucketFor(characterTexturePage(face.material));
+      const push = (v: MeshVertex) => {
+        bucket.pos.push(
+          (v.x + origin.x) / MODEL_SCALE,
+          -(v.y + origin.y) / MODEL_SCALE,
+          -(v.z + origin.z) / MODEL_SCALE,
+        );
+        bucket.col.push(v.r / 255, v.g / 255, v.b / 255);
+        bucket.uv.push(v.u / 255, v.v / 255);
+      };
+
       const v = face.vertices;
       if (v.length === 4) {
         // PSX quads are in Z-order, not a fan: corners run v0,v1,v3,v2.
-        push(v[0]!, group.position); push(v[1]!, group.position); push(v[2]!, group.position);
-        push(v[1]!, group.position); push(v[3]!, group.position); push(v[2]!, group.position);
+        push(v[0]!); push(v[1]!); push(v[2]!);
+        push(v[1]!); push(v[3]!); push(v[2]!);
       } else {
-        push(v[0]!, group.position); push(v[1]!, group.position); push(v[2]!, group.position);
+        push(v[0]!); push(v[1]!); push(v[2]!);
       }
     }
   }
 
-  return {
-    positions: new Float32Array(positions),
-    colors: new Float32Array(colors),
-    uvs: new Float32Array(uvs),
-    triangleCount: positions.length / 9,
-  };
+  // Concatenate through typed arrays — spreading a bucket into push() passes
+  // every number as its own argument and overflows the stack on large meshes.
+  let total = 0, totalUv = 0;
+  for (const b of buckets.values()) { total += b.pos.length; totalUv += b.uv.length; }
+
+  const positions = new Float32Array(total);
+  const colors = new Float32Array(total);
+  const uvs = new Float32Array(totalUv);
+  const groups: MeshGroup[] = [];
+
+  let posOffset = 0, uvOffset = 0;
+  for (const [page, bucket] of [...buckets].sort((a, b) =>
+    a[0] === null ? 1 : b[0] === null ? -1 : a[0] - b[0])) {
+    if (bucket.pos.length === 0) continue;
+    positions.set(bucket.pos, posOffset);
+    colors.set(bucket.col, posOffset);
+    uvs.set(bucket.uv, uvOffset);
+    groups.push({ start: posOffset / 3, count: bucket.pos.length / 3, page });
+    posOffset += bucket.pos.length;
+    uvOffset += bucket.uv.length;
+  }
+
+  return { positions, colors, uvs, groups, triangleCount: total / 9 };
 }

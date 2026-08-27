@@ -34,7 +34,7 @@
  */
 
 import {
-  GroupType, MODEL_SCALE, characterTexturePage, parseGfxMesh,
+  GroupType, MODEL_SCALE, PSX_NEUTRAL, characterTexturePage, parseGfxMesh,
   type AllFile, type MeshData, type MeshGroup, type MeshVertex,
 } from './all.ts';
 
@@ -247,15 +247,15 @@ export function buildPosedMeshData(
         const z = m[6]! * v.x + m[7]! * v.y + m[8]! * v.z + t.z;
         // PSX +Y is down and +Z into the screen.
         bucket.pos.push(x / MODEL_SCALE, -y / MODEL_SCALE, -z / MODEL_SCALE);
-        bucket.col.push(v.r / 255, v.g / 255, v.b / 255);
+        bucket.col.push(v.r / PSX_NEUTRAL, v.g / PSX_NEUTRAL, v.b / PSX_NEUTRAL);
         bucket.uv.push(v.u / 255, v.v / 255);
       };
 
       const v = face.vertices;
       if (v.length === 4) {
-        // PSX quads are Z-order: corners run v0,v1,v3,v2.
+        // Plain polygon order, matching buildMeshData — see the note there.
         push(v[0]!); push(v[1]!); push(v[2]!);
-        push(v[1]!); push(v[3]!); push(v[2]!);
+        push(v[0]!); push(v[2]!); push(v[3]!);
       } else {
         push(v[0]!); push(v[1]!); push(v[2]!);
       }

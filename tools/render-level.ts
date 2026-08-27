@@ -78,6 +78,9 @@ if (!root || !sceneId) {
   process.exit(1);
 }
 
+// Must be set before any geometry is built, or the filter has no effect.
+(globalThis as { __MODEBIT?: string }).__MODEBIT = process.env.MODEBIT;
+
 // A character model, or a level scene. Characters take their textures from a
 // level's .ngn, since chars* ships none of its own.
 const isModel = /^chars/.test(sceneId);
@@ -157,6 +160,7 @@ const focal = W / 2 / Math.tan((60 * Math.PI) / 180 / 2);
 // quantised depth value, so precision collapses as the near/far ratio grows.
 // A float z-buffer hides that entirely, which is exactly why this renderer can
 // look correct while the browser shatters.
+const cullMode = process.env.CULL ?? '';
 const emulateDepth = process.env.ZNEAR !== undefined;
 const zNear = Number(process.env.ZNEAR ?? 0.1);
 const zFar = Number(process.env.ZFAR ?? 10000);
@@ -191,6 +195,11 @@ for (const group of geo.groups) {
     const maxY = Math.min(H - 1, Math.ceil(Math.max(a.y, b.y, c.y)));
     const area = (b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y);
     if (Math.abs(area) < 1e-9) continue;
+    // Backface culling by winding sign. CULL=front keeps counter-clockwise
+    // triangles, CULL=back keeps clockwise; unset draws everything, which is
+    // what `side: DoubleSide` does in the viewer today.
+    if (cullMode === 'front' && area > 0) continue;
+    if (cullMode === 'back' && area < 0) continue;
     drawn++;
     for (let y = minY; y <= maxY; y++) {
       for (let x = minX; x <= maxX; x++) {
@@ -214,6 +223,7 @@ for (const group of geo.groups) {
           const o = (ty * tex.w + tx) * 3;
           // three.js multiplies map by vertex colour; match that so this
           // renderer is a faithful oracle rather than merely a similar one.
+          // Vertex colours already carry the 0x80-neutral scaling.
           r = tex.px[o]! * pick(geo.colors, 0);
           g = tex.px[o + 1]! * pick(geo.colors, 1);
           bl = tex.px[o + 2]! * pick(geo.colors, 2);
@@ -231,6 +241,6 @@ for (const group of geo.groups) {
   }
 }
 writePng(outPath, W, H, colour);
-console.log(`${sceneId}: ${geo.triangleCount} tris, ${geo.groups.length} groups ` +
+console.log(`${sceneId}: cull=${cullMode || 'none'}, ${geo.triangleCount} tris, ${geo.groups.length} groups ` +
   `(pages ${geo.groups.map((g) => g.page ?? 'none').join(',')}), ` +
   `${textures.size} textures, ${drawn} rasterised -> ${outPath}`);

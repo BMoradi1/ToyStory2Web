@@ -35,6 +35,25 @@ export class Viewer {
 
   private current: THREE.Mesh | null = null;
 
+  /**
+   * Face culling mode.
+   *
+   * Rendering everything double-sided draws interior faces through walls and
+   * lets them overdraw what should be visible — "extra polygons in some places
+   * and missing ones in others". Offline rasterisation confirms that culling
+   * one winding gives solid geometry; which of three.js's two names
+   * corresponds to that winding can't be settled offline, because the
+   * rasteriser works in y-down screen space and WebGL in y-up NDC, so the sign
+   * of the signed area flips between them. Hence a toggle.
+   *
+   * Default is double-sided because CHARACTERS need it: measured offline, both
+   * culling conventions punch holes through 13-15% of Buzz's silhouette, so
+   * his parts are not closed shells. Level geometry does benefit from culling,
+   * which is why this is switchable rather than fixed — the real answer is
+   * almost certainly per-face, via the material bits that are still undecoded.
+   */
+  side: THREE.Side = THREE.DoubleSide;
+
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -96,7 +115,7 @@ export class Viewer {
       materials.push(new THREE.MeshBasicMaterial({
         map: texture ?? null,
         vertexColors: true,
-        side: THREE.DoubleSide,
+        side: this.side,
         alphaTest: 0.5,
       }));
     }
@@ -140,7 +159,7 @@ export class Viewer {
       materials.push(new THREE.MeshBasicMaterial({
         map: texture ?? null,
         vertexColors: true,
-        side: THREE.DoubleSide,
+        side: this.side,
         alphaTest: 0.5,
       }));
     }
@@ -148,6 +167,19 @@ export class Viewer {
     this.current = new THREE.Mesh(buffer, materials);
     this.scene.add(this.current);
     this.frameObject(buffer);
+  }
+
+  /** Cycle back-face -> front-face -> double-sided, returning the new name. */
+  cycleSide(): string {
+    this.side = this.side === THREE.BackSide ? THREE.FrontSide
+      : this.side === THREE.FrontSide ? THREE.DoubleSide : THREE.BackSide;
+    const mesh = this.current;
+    if (mesh) {
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const m of materials) { (m as THREE.MeshBasicMaterial).side = this.side; m.needsUpdate = true; }
+    }
+    return this.side === THREE.BackSide ? 'back-face culled'
+      : this.side === THREE.FrontSide ? 'front-face culled' : 'double-sided';
   }
 
   private clearModel(): void {

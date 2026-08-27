@@ -300,6 +300,13 @@ window.addEventListener('unhandledrejection', (ev) =>
 // A `webkitdirectory` input is the most reliable way in: it works in every
 // current browser and needs none of the FileSystemEntry tree walking that
 // drag-and-drop requires.
+// `c` cycles face culling. Which winding three.js considers front-facing
+// can't be determined offline, so make it one keystroke to find out.
+window.addEventListener('keydown', (ev) => {
+  if (ev.key !== 'c' || !viewer) return;
+  infoEl.textContent = `culling: ${viewer.cycleSide()}`;
+});
+
 const fileInput = $<HTMLInputElement>('pickfile');
 fileInput.onchange = async () => {
   const files = fileInput.files;

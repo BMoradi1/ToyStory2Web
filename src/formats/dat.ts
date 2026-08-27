@@ -23,6 +23,9 @@
 /** Model units per world unit, matching the `.all` convention. */
 export const WORLD_SCALE = 256;
 
+/** See PSX_NEUTRAL in all.ts: 0x80 is neutral modulation, not 0xFF. */
+export const PSX_NEUTRAL = 128;
+
 /** PSX angle units: 4096 == 360 degrees. Also the fixed-point 1.0 for scale. */
 const ANGLE_UNITS = 4096;
 
@@ -407,6 +410,9 @@ export function buildLevelGeometry(level: DatLevel): LevelGeometry {
     };
 
     for (const face of mesh.faces) {
+      const filter = (globalThis as { __MODEBIT?: string }).__MODEBIT;
+      if (filter === 'set' && (face.mode & 0x8000) === 0) continue;
+      if (filter === 'clear' && (face.mode & 0x8000) !== 0) continue;
       const page = face.textured ? texturePage(face.mode) : null;
       const bucket = bucketFor(page);
 
@@ -419,7 +425,7 @@ export function buildLevelGeometry(level: DatLevel): LevelGeometry {
             -(m[3]! * x + m[4]! * y + m[5]! * z + object.position.y) / WORLD_SCALE,
             -(m[6]! * x + m[7]! * y + m[8]! * z + object.position.z) / WORLD_SCALE,
           );
-          bucket.col.push(v.r / 255, v.g / 255, v.b / 255);
+          bucket.col.push(v.r / PSX_NEUTRAL, v.g / PSX_NEUTRAL, v.b / PSX_NEUTRAL);
         }
         const t = face.uvs[k];
         bucket.uv.push(t ? t.u / 255 : 0, t ? t.v / 255 : 0);

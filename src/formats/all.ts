@@ -282,6 +282,18 @@ export function parseGfxJoint(group: AllGroup): JointRing {
  */
 export const MODEL_SCALE = 256;
 
+/**
+ * Neutral value for PSX vertex-colour modulation.
+ *
+ * PSX texture modulation treats 0x80 as neutral, not 0xFF: a vertex colour of
+ * 128 leaves the texel unchanged and higher values brighten it. Dividing by
+ * 255 therefore caps every surface at roughly half brightness and pushes the
+ * darker vertices to near-black, which reads as holes punched through the
+ * model rather than as shading. Buzz's vertex colours peak at 126 and average
+ * 79, so nothing in the file ever reaches full brightness under that reading.
+ */
+export const PSX_NEUTRAL = 128;
+
 /** A run of triangles sharing one texture page. */
 export interface MeshGroup {
   start: number;
@@ -345,15 +357,19 @@ export function buildMeshData(file: AllFile): MeshData {
           -(v.y + origin.y) / MODEL_SCALE,
           -(v.z + origin.z) / MODEL_SCALE,
         );
-        bucket.col.push(v.r / 255, v.g / 255, v.b / 255);
+        bucket.col.push(v.r / PSX_NEUTRAL, v.g / PSX_NEUTRAL, v.b / PSX_NEUTRAL);
         bucket.uv.push(v.u / 255, v.v / 255);
       };
 
       const v = face.vertices;
       if (v.length === 4) {
-        // PSX quads are in Z-order, not a fan: corners run v0,v1,v3,v2.
+        // Quads are wound as a plain polygon, NOT as a PSX two-triangle
+        // strip. The published spec says Z-order (v0,v1,v3,v2), which is what
+        // other titles on this engine use, but on this build it bow-ties every
+        // quad — the visible result is triangular notches punched through
+        // limbs and torsos. The level format diverges the same way.
         push(v[0]!); push(v[1]!); push(v[2]!);
-        push(v[1]!); push(v[3]!); push(v[2]!);
+        push(v[0]!); push(v[2]!); push(v[3]!);
       } else {
         push(v[0]!); push(v[1]!); push(v[2]!);
       }

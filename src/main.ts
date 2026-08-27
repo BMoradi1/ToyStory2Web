@@ -5,7 +5,7 @@ import {
 } from './formats/anm.ts';
 import * as THREE from 'three';
 import { buildLevelGeometry, parseDat } from './formats/dat.ts';
-import { parseNgn, type NgnTexture } from './formats/ngn.ts';
+import { decodeBmp, parseNgn, type NgnTexture } from './formats/ngn.ts';
 import {
   findLevels, findModels, gameDirFromDrop, gameDirFromFileList, pickGameDir,
   supportsDirectoryPicker, validateGameDir, type GameDir,
@@ -85,40 +85,22 @@ async function drawTexture(tex: NgnTexture): Promise<HTMLElement> {
  */
 async function loadTextures(textures: NgnTexture[]): Promise<Map<number, THREE.Texture>> {
   const out = new Map<number, THREE.Texture>();
-  await Promise.all(textures.map(async (t) => {
-    if (t.slot === null) return;
-    try {
-      const bitmap = await createImageBitmap(new Blob([t.bmp.slice()], { type: 'image/bmp' }));
+  for (const t of textures) {
+    if (t.slot === null) continue;
+    const image = decodeBmp(t.bmp);
+    if (!image) continue;
 
-      // Punch out the colour key. These textures have no alpha channel; the
-      // engine treats pure green as transparent, which is why untreated models
-      // show green fringes around cut-out shapes like Bo Peep's crook.
-      const canvas = document.createElement('canvas');
-      canvas.width = bitmap.width;
-      canvas.height = bitmap.height;
-      const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
-      ctx.drawImage(bitmap, 0, 0);
-      bitmap.close();
-
-      const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const px = image.data;
-      for (let i = 0; i < px.length; i += 4) {
-        if (px[i] === 0 && px[i + 1] === 255 && px[i + 2] === 0) px[i + 3] = 0;
-      }
-      ctx.putImageData(image, 0, 0);
-
-      const texture = new THREE.CanvasTexture(canvas);
-      // 256x256 art drawn for a 1999 console: keep it crisp.
-      texture.magFilter = THREE.NearestFilter;
-      texture.minFilter = THREE.LinearMipmapLinearFilter;
-      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-      // UVs index rows from the top, so no vertical flip — flipping floods
-      // surfaces with the colour key instead of their real art.
-      texture.flipY = false;
-      texture.needsUpdate = true;
-      out.set(t.slot, texture);
-    } catch { /* a texture that won't decode simply goes untextured */ }
-  }));
+    const texture = new THREE.DataTexture(image.rgba, image.width, image.height, THREE.RGBAFormat);
+    // 256x256 art drawn for a 1999 console: keep it crisp.
+    texture.magFilter = THREE.NearestFilter;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.generateMipmaps = true;
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    // Rows come back top-down and UVs index from the top, so no flip.
+    texture.flipY = false;
+    texture.needsUpdate = true;
+    out.set(t.slot, texture);
+  }
   return out;
 }
 

@@ -110,3 +110,52 @@ export function parseNgn(buffer: ArrayBuffer | Uint8Array): NgnTexture[] {
 
   return textures;
 }
+
+/** Pure green is the engine's transparency key. */
+export const COLOUR_KEY = { r: 0, g: 255, b: 0 };
+
+/**
+ * Decode a 24bpp Windows BMP to RGBA, punching the colour key out to alpha 0.
+ *
+ * Decoding here rather than via `createImageBitmap` plus a canvas readback is
+ * deliberate. That route passes the pixels through the browser's colour
+ * management, which can shift a texel stored as exactly (0,255,0) to something
+ * like (1,254,2) — so an exact-match key test silently stops matching and the
+ * keyed areas render as solid green panels. Reading the bytes directly is both
+ * exact and faster.
+ *
+ * Rows are returned top-down regardless of how the file stores them, matching
+ * the UV convention (v indexes rows from the top).
+ */
+export function decodeBmp(
+  bmp: Uint8Array,
+): { width: number; height: number; rgba: Uint8Array<ArrayBuffer> } | null {
+  if (bmp.length < 54) return null;
+  const view = new DataView(bmp.buffer, bmp.byteOffset, bmp.byteLength);
+  if (view.getUint16(0, true) !== BMP_MAGIC) return null;
+
+  const pixelOffset = view.getUint32(10, true);
+  const width = view.getInt32(18, true);
+  const rawHeight = view.getInt32(22, true);
+  const bitsPerPixel = view.getUint16(28, true);
+  if (bitsPerPixel !== 24 || width <= 0 || rawHeight === 0) return null;
+
+  const height = Math.abs(rawHeight);
+  // A positive height means the rows are stored bottom-up.
+  const bottomUp = rawHeight > 0;
+  const stride = (width * 3 + 3) & ~3;
+  if (pixelOffset + stride * height > bmp.length) return null;
+
+  const rgba = new Uint8Array(new ArrayBuffer(width * height * 4));
+  for (let y = 0; y < height; y++) {
+    let src = pixelOffset + (bottomUp ? height - 1 - y : y) * stride;
+    let dst = y * width * 4;
+    for (let x = 0; x < width; x++) {
+      const b = bmp[src]!, g = bmp[src + 1]!, r = bmp[src + 2]!;
+      rgba[dst] = r; rgba[dst + 1] = g; rgba[dst + 2] = b;
+      rgba[dst + 3] = r === COLOUR_KEY.r && g === COLOUR_KEY.g && b === COLOUR_KEY.b ? 0 : 255;
+      src += 3; dst += 4;
+    }
+  }
+  return { width, height, rgba };
+}

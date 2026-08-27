@@ -16,8 +16,9 @@ The practical consequence: assume PlayStation conventions everywhere. Signed
 16-bit vertex coordinates, 8-bit UVs, CLUT/TPage indirection, and GPU primitive
 command bytes (`0x20` flat tri, `0x24` textured tri, `0x2C` textured quad,
 `0x30` gouraud tri, `0x34` gouraud textured tri, `0x3C` gouraud textured quad).
-PSX quads are four vertices in Z-order — triangulate as (v0,v1,v2) + (v1,v2,v3),
-**not** as a fan. PSX hardware is exhaustively documented; PC-only formats
+PSX quads are four vertices, but **this build winds them as a plain polygon**,
+(v0,v1,v2) + (v0,v2,v3) — not the Z-order strip the hardware convention implies.
+That holds for both the model and level formats. PSX hardware is exhaustively documented; PC-only formats
 usually are not, so prefer parsing the PSX-side file wherever both exist.
 
 ## The build pipeline, in the developers' own words
@@ -160,8 +161,15 @@ Face size is `4 + n*8 + (n-1)*4` — 36 bytes for a triangle, 48 for a quad. Onl
 four command bytes occur: `0x34`, `0x36`, `0x3C`, `0x3E` (gouraud and textured
 always set; `0x02` = semi-transparent on 214 faces). The last flag byte of each
 face carries what looks like texture page plus material bits; its low nibble
-reads as a page index. Quads are PSX **Z-order** — triangulate `(v0,v1,v2)` +
-`(v1,v3,v2)`, not as a fan.
+reads as a page index.
+
+> **Quads are wound as a plain polygon** — `(v0,v1,v2)` + `(v0,v2,v3)` — **not
+> as a PSX two-triangle strip.** The published spec says Z-order
+> (`v0,v1,v3,v2`), which other titles on this engine do use, but on this build
+> it bow-ties every quad. The visible result is triangular notches punched
+> through limbs and torsos, which reads as holes in the model rather than as a
+> winding error. The level format diverges identically — that should have been
+> the hint.
 
 > **Divergence from the PSX-derived spec: triangles store 3 vertices here, not
 > 4.** Prior art says Toy Story 2 keeps 4 with one unused, which holds for other
@@ -205,6 +213,20 @@ byte stream alone. Purpose unknown; plausibly per-part convex hulls.
 Exact on all 433 joints. `side` is only 0 or 1, and 361 of 433 are closed loops
 — consistent with seam-bridging rings between rigid parts, skinned at runtime to
 hide the gap as a joint rotates.
+
+**Vertex colours are PSX modulation, where 0x80 is neutral — not 0xFF.** A
+value of 128 leaves the texel unchanged and higher values brighten it, so
+divide by 128. Dividing by 255 caps every surface near half brightness and
+drives darker vertices to near-black, which looks like holes rather than
+shading. Buzz's vertex colours peak at 126 and average 79, so nothing in the
+file ever reaches full brightness under the wrong reading. The same convention
+applies to level vertex colours.
+
+**Face culling is not a global setting.** Measured offline, both culling
+conventions punch holes through 13-15% of Buzz's silhouette, so character parts
+are not closed shells and need double-sided rendering. Level geometry does
+benefit from culling. The real answer is per-face, via the material bits that
+remain undecoded.
 
 **Coordinate system.** PSX convention: +X right, +Y **down**, +Z into the
 screen. Negate Y and Z for WebGL. Each group's position at `+0x04` must be added

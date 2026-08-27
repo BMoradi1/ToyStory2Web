@@ -129,21 +129,39 @@ export function validateGameDir(dir: GameDir): string | null {
   return null;
 }
 
-/** Level directories that actually contain a `.ngn`, in numeric order. */
-export function findLevels(dir: GameDir): { id: string; ngn: GameFile }[] {
-  const levels = new Map<string, GameFile>();
+/**
+ * Playable scenes, in order.
+ *
+ * A level directory holds two independent complete scenes — `level.*` and
+ * `level1.*` — which are sub-areas rather than variants of each other, so both
+ * are listed. Each pairs a `.ngn` (textures) with a `.dat` (world geometry).
+ */
+export interface LevelScene {
+  id: string;
+  ngn: GameFile | null;
+  dat: GameFile | null;
+}
+
+export function findLevels(dir: GameDir): LevelScene[] {
+  const scenes = new Map<string, LevelScene>();
+  const want = (id: string): LevelScene => {
+    let scene = scenes.get(id);
+    if (!scene) { scene = { id, ngn: null, dat: null }; scenes.set(id, scene); }
+    return scene;
+  };
+
   for (const [path, file] of dir) {
-    const m = /^data\/(level\d+)\/[^/]+\.ngn$/.exec(path);
+    const m = /^data\/(level\d+)\/([^/]+)\.(ngn|dat)$/.exec(path);
     if (!m) continue;
-    const id = m[1]!;
-    // Prefer the shorter basename (`level.ngn` over `level1.ngn`) as the
-    // level's primary scene; the relationship between the two is still open.
-    const existing = levels.get(id);
-    if (!existing || file.name.length < existing.name.length) levels.set(id, file);
+    const [, levelDir, base, ext] = m;
+    const scene = want(`${levelDir}/${base}`);
+    if (ext === 'ngn') scene.ngn = file;
+    else scene.dat = file;
   }
-  return [...levels.entries()]
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([id, ngn]) => ({ id, ngn }));
+
+  return [...scenes.values()]
+    .filter((s) => s.dat !== null || s.ngn !== null)
+    .sort((a, b) => a.id.localeCompare(b.id));
 }
 
 /** Character models: every `.all` under the `chars*` directories, by name. */

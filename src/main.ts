@@ -1,4 +1,5 @@
 import { buildMeshData, parseAll } from './formats/all.ts';
+import { buildLevelGeometry, parseDat } from './formats/dat.ts';
 import { parseNgn, type NgnTexture } from './formats/ngn.ts';
 import {
   findLevels, findModels, gameDirFromDrop, pickGameDir, supportsDirectoryPicker,
@@ -71,14 +72,29 @@ async function showLevel(index: number): Promise<void> {
   texturesEl.replaceChildren();
   infoEl.textContent = 'reading…';
 
-  const textures = parseNgn(await level.ngn.read());
-  const figures = await Promise.all(textures.map(drawTexture));
-  texturesEl.replaceChildren(...figures);
+  let textureCount = 0;
+  if (level.ngn) {
+    const textures = parseNgn(await level.ngn.read());
+    textureCount = textures.length;
+    texturesEl.replaceChildren(...(await Promise.all(textures.map(drawTexture))));
+  }
 
-  const slots = textures.map((t) => t.slot).filter((s): s is number => s !== null);
-  infoEl.textContent =
-    `${level.ngn.name} — ${textures.length} textures` +
-    (slots.length ? ` (slots ${Math.min(...slots)}–${Math.max(...slots)}, sparse)` : '');
+  // World geometry lives in the .dat; the .ngn holds only textures, and
+  // TERRAIN.ALL holds only collision. See docs/FORMATS.md.
+  let summary = `${level.id} — ${textureCount} textures`;
+  if (level.dat && viewer) {
+    try {
+      const parsed = parseDat(await level.dat.read());
+      const geometry = buildLevelGeometry(parsed);
+      viewer.setModel(geometry);
+      summary +=
+        `, ${geometry.objectCount}/${parsed.objects.length} objects, ` +
+        `${geometry.triangleCount} triangles, ${parsed.markers.length} markers`;
+    } catch (err) {
+      summary += ` — geometry failed: ${(err as Error).message}`;
+    }
+  }
+  infoEl.textContent = summary;
 }
 
 async function open(dir: GameDir): Promise<void> {
@@ -86,7 +102,7 @@ async function open(dir: GameDir): Promise<void> {
   if (problem) return setStatus(problem, true);
 
   levels = findLevels(dir);
-  if (levels.length === 0) return setStatus('No level .ngn files found under data/.', true);
+  if (levels.length === 0) return setStatus('No levels found under data/.', true);
 
   levelEl.replaceChildren(
     ...levels.map(({ id }, i) => new Option(id, String(i))),
@@ -106,11 +122,7 @@ async function open(dir: GameDir): Promise<void> {
   await showLevel(0);
 
   const buzz = models.findIndex((m) => m.name.toLowerCase() === 'buzz');
-  if (models.length > 0) {
-    const start = buzz >= 0 ? buzz : 0;
-    modelEl.selectedIndex = start;
-    await showModel(start);
-  }
+  if (buzz >= 0) modelEl.selectedIndex = buzz;
 }
 
 $<HTMLButtonElement>('pick').onclick = async () => {

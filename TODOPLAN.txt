@@ -1,7 +1,7 @@
 ================================================================================
  ToyStory2Web - PROJECT ROADMAP
  Browser reimplementation of Toy Story 2: Buzz Lightyear to the Rescue (1999)
- Last updated: 2026-08-26 (.all solved and ported)
+ Last updated: 2026-08-26 (.all + level.dat solved and ported)
 ================================================================================
 
  HOW TO USE THIS FILE
@@ -58,11 +58,14 @@
           each x PI/512). Bones map 1:1 onto mesh groups by index. 20 fps.
  [READY]  .raw / .raws decoder - chunked RNC PRO-PACK, magic stripped,
           TS2 chunk size 0x830C. Same container for both extensions.
- [ACTIVE] PC .dat scene format  (agent working; genuinely undocumented)
-          NOTE: the PC .dat is NOT the PSX .dat. The conversion rewrote it.
- [OPEN]   .vis / .kp2 / .kep / .new - no public documentation anywhere.
-          Lead: .dat/.vis/.kp2 may share an 8-byte header + int32 XYZ triples.
-          Do NOT assume .vis is a visibility set; content looks like paths.
+ [DONE]   PC .dat scene format - src/formats/dat.ts; 16/16 real scene files
+          parse, 338,650 triangles across the game. IT IS THE LEVEL GEOMETRY.
+          !! Quads are plain polygons, NOT PSX two-triangle strips.
+          !! Triangles marked by a 4th index >= nverts.
+          !! Resolve meshes from object pointers, not just a pool walk.
+ [DONE]   .kep / .new - older revisions of level.dat itself (Sept vs Oct 1999)
+ [OPEN]   .vis / .kp2 - same container as .dat, 12-byte first-section records,
+          no object table or mesh pool. Confirmed NOT a visibility set.
  [READY]  Cutscene playback - rtlibs/*.dll are MPEG-1 system streams (214 MB).
           Needs an in-browser MPEG-1 decoder or a local transcode step.
  [READY]  Audio - 267 standard .wav files, no decoding work expected
@@ -71,10 +74,11 @@
 ================================================================================
  PHASE 2 - RENDER A LEVEL
 ================================================================================
- [BLOCKED] Level visual geometry            <- needs PC .dat or .ngn scene data
-           IMPORTANT: TERRAIN.ALL is collision-ONLY. Level visuals are NOT in
-           .ALL. They live in .ngn or .dat; establishing which is urgent.
- [BLOCKED] Texture slot binding             <- needs mesh UV + vrampage mapping
+ [DONE]    Level visual geometry - it is level.dat. Levels render in the
+           viewer with vertex colours.
+ [BLOCKED] Texture slot binding   <- NOW THE TOP BLOCKER. UVs and a page id
+           are recovered from both .all and .dat, but neither has been mapped
+           to a region of level.raw / the .ngn texture slots.
  [BLOCKED] Material system                  <- needs mesh flags: textured,
            double-sided, additive, subtractive, 50% translucent
  [READY]   Collision mesh rendering (debug) <- container done, payload not
@@ -168,9 +172,10 @@
 ================================================================================
  KEY UNKNOWNS - the things most likely to derail the plan
 ================================================================================
- 1. WHERE IS LEVEL VISUAL GEOMETRY? Not in .ALL (collision only). Either the
-    PC .dat or inside .ngn beyond the textures. Nothing renders until this is
-    answered. HIGHEST PRIORITY.
+ 1. ANSWERED: level visual geometry is level.dat. Levels now render.
+    The new top unknown is TEXTURE MAPPING - how a face's texture page id
+    selects a region of level.raw or an .ngn slot. Everything renders with
+    vertex colours until this is solved.
  2. Does the .ANM spec, written from PSX files, hold on this PC build? The
     .ALL container and mesh reader do (88/88 files) but only AFTER correcting
     the triangle vertex count, so expect .ANM to need similar correction.

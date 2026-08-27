@@ -52,10 +52,10 @@ Do not use these comments to identify levels.
 | `level.bin` | MIPS R3000 overlay code | **Identified**, not decoded |
 | `.all` | TT data-group container (meshes OR collision) | **Solved & ported** |
 | `.anm` | Animations | **Spec found**, unverified |
-| `.dat` | PSX scene/world | Under investigation |
+| `.dat` | PC world geometry: meshes + placements | **Solved & ported** |
 | `.raw` `.raws` | RNC PRO-PACK compressed, identical container | **Spec found** |
-| `.vis` | NOT visibility — looks like path/grid data | Open |
-| `.kep` `.kp2` `.new` `.raws` | Unknown | Unknown |
+| `.vis` `.kp2` | Same container as `.dat`, 12-byte records | Partly mapped |
+| `.kep` `.new` | **Older revisions of `level.dat` itself** | Identified |
 
 ### `.ngn` — SOLVED
 
@@ -267,32 +267,93 @@ Chunked **RNC PRO-PACK** with the `RNC\x01` magic stripped. Repeating header:
 
 Largely superseded for textures by `.ngn`, which already holds decoded BMPs.
 
-### PC `level.dat` — genuinely undocumented
+### PC `level.dat` — SOLVED
 
-**The PC `.dat` is not the PSX `.dat`.** A published spec exists for the
-PlayStation scene format, but these PC files fail its container check — the
-conversion rewrote them. No public documentation exists for the PC variant.
+**This file is the level's complete visual world geometry** — every static
+mesh with vertices, faces, per-corner UVs and vertex colours, plus a placement
+transform for each object. Since `TERRAIN.ALL` holds collision and nothing
+else, `.dat` is the other half of a level.
 
-Level 1's is 437,164 bytes, opening `35 00 00 00 46 00 3f 00` and settling into
-a repeating 16-byte pattern: three `int32` then a constant `0x10`. Structural
-lead: `.dat`, `.vis` and `.kp2` appear to **share an 8-byte header followed by
-dense `int32` XYZ triples**, so cracking one may crack several.
+It is **not** the PlayStation `.dat` that published prior art describes; these
+files fail that spec's checks, because the PC conversion rewrote them. Nothing
+public documents this variant.
 
-Since `TERRAIN.ALL` turned out to be collision-only, **level visual geometry
-must live in either this file or the `.ngn`.** Establishing which is the single
-highest-priority unknown in the project — nothing renders until it is answered.
+Structurally it is a **pointer-linked memory image**: 32-bit "address" fields
+are byte offsets from the start of the file. Sections are contiguous, in order,
+with no offset table:
 
-### `.vis` / `.kp2` / `.kep` / `.new` — no public documentation
+    header(8) | markers | paths | zone quads | ref list | objects | mesh pool
 
-We are first here. Two working hypotheses, both **unverified**:
+    header    u32 nextPathSlot, u16 markerCount, u16 pathSlotCount (63)
+    marker    i32 x, y, z; i32 flag        always 0x10 in 1999-dated files
+    path      u16 count, u16 id; count x { i32 x, y, z }     ids are sparse
+    zone      u16 0x0005, u16 0x0041; 4 x { i32 x,y,z }; i32 a, b, c
+    object    u32 meshPtr; i32 x,y,z; [u16 rx,ry,rz]; [u16 sx,sy,sz]; u16 flags
+    mesh      i32 nverts; nverts x { i16 x,y,z; u16 colour }; face groups; FFFFFFFF
 
-- `.vis` and `.kp2` hold smoothly-varying `int32` XYZ triples (`level.kp2`
-  steps Z by a constant 1500 at fixed Y). That reads as paths, waypoints or
-  grid data — **not** a visibility bitset. The extension is a hint, not
-  evidence, and the earlier "presumed PVS" note in this file was a guess.
-- `.kep` and `.new` live only in `data/PAD/` as `path14.*`, are 52-60 bytes of
-  4-byte records terminated by `0xFFFF`. "PAD" plus that shape suggests
-  **recorded joypad input for attract-mode demos**.
+**Object records do not store their own size.** They are 20, 24 or 32 bytes and
+must be recovered by tiling the table exactly — walk backwards marking every
+offset from which some sequence of valid records reaches the end, then forwards
+choosing sizes. This resolves uniquely in practice; where both 24 and 32 would
+tile, the identity-scale signature (`0x1000` on all three axes at `+22`) picks
+the 32-byte form. Rotations are PSX angle units (4096 = 360 degrees) and scale
+is 4.12 fixed point (4096 = 1.0). Composition order is assumed `Ry*Rx*Rz` and
+is **unverified** — though most objects rotate on one axis, where it can't
+matter.
+
+**Meshes** sit back to back, each closed by `FFFFFFFF`. A negative vertex count
+means an extra `u32[n+1]` block follows the vertices (purpose unknown, size rule
+verified). Face groups are `u16 mode, u16 count` followed by faces; **`mode &
+0x10` discriminates untextured 4-byte faces from textured 12-byte ones**, with
+zero overlap observed. The 16-bit vertex field is a PSX **5:5:5:1 vertex
+colour** (33.8% are exact greys, where a random field would give ~0.1%).
+
+Two findings that will silently corrupt a renderer if missed:
+
+- **Quads are wound as a plain polygon** (`v0 v1 v2 v3`), *not* as a PSX
+  two-triangle strip. Strip order produces bow-tie artefacts. This is a real
+  divergence from raw `POLY_FT4`.
+- **Triangles are marked by a sentinel**: a face is a triangle when its 4th
+  index is `>= nverts`. Rare, and easy to mistake for corruption.
+
+**Do not resolve meshes by walking the pool alone.** The pool ends in a 2D
+sprite section we can't parse yet, so a contiguous walk stops early; objects
+pointing past that point must be resolved from their own pointers. Doing only
+the walk silently drops ~27% of level 1's objects — it renders, so the loss is
+easy to miss.
+
+**Validated:** 16 of 16 real scene files parse, 338,650 triangles across the
+game. Level 1 yields 1,126 objects over 701 meshes drawing 1,072 of them, plus
+70 markers, 30 paths and 22 zones — matching an independent Python
+implementation exactly. Top-down renders show a room with floorboards, an
+octagonal rug and a roof gable.
+
+The four files that fail (`level07`–`level10`'s `level1.dat`) are **one
+byte-identical 1998 file copied into four directories** (md5 `bf2414e3…`),
+using an older revision with a `0x14` marker constant. One stale artefact, not
+four failures.
+
+**Interpretation, unconfirmed:** markers spread evenly over walkable floor at
+plausible pickup heights, which reads as collectible placements — but there is
+no per-marker type field, so the *kind* would have to come from `level.bin`.
+Paths are polylines tracing loops around rooms (patrol routes, platform rails).
+Zones are planar quads standing in doorways (triggers or portals).
+
+**Still unknown:** the 20-byte ref list (its positions sit near but not on the
+objects it points at, and only ~72% of pointers resolve); `Object.flags`; the
+`mode` low nibble and bit `0x8000`; the `aux` block; zone `a`/`b`; the sprite
+pool at the mesh-pool tail; and **which region of `level.raw` a texture page id
+refers to** — which is why levels currently render with vertex colours.
+
+### `.vis` / `.kp2` / `.kep` / `.new`
+
+`.kep` and `.new` are **older revisions of `level.dat` itself** — same header
+shape, same marker records, dated September against October 1999.
+
+`.vis` and `.kp2` share the 8-byte header and the path section but use 12-byte
+records in the first section (no `0x10` field), and carry no object table or
+mesh pool. Same container, different payload. Confirmed **not** a PVS bitset,
+so the extension is misleading; an earlier note in this file guessed otherwise.
 
 ## Game structure
 

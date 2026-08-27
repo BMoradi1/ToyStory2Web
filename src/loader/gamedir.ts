@@ -79,6 +79,32 @@ async function walkEntry(entry: FileSystemEntry, prefix: string, out: GameDir): 
   }
 }
 
+/**
+ * Build a GameDir from an `<input webkitdirectory>` selection.
+ *
+ * This is the most reliable path by a wide margin: it works in every current
+ * browser, needs no recursive async directory walking, and hands over every
+ * file's relative path up front via `webkitRelativePath`. Drag-and-drop and the
+ * directory picker are conveniences layered on top of it.
+ */
+export function gameDirFromFileList(files: ArrayLike<File>): GameDir {
+  const out: GameDir = new Map();
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i]!;
+    const relative: string =
+      (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
+    // Paths arrive prefixed with the selected folder's own name; drop it so
+    // keys are relative to the install root.
+    const parts = relative.split('/');
+    const path = (parts.length > 1 ? parts.slice(1) : parts).join('/').toLowerCase();
+    if (!path) continue;
+    // Skip the cutscene folder: 214 MB of video we don't need enumerated.
+    if (path.startsWith('rtlibs/')) continue;
+    out.set(path, fileEntry(path, file));
+  }
+  return out;
+}
+
 export function supportsDirectoryPicker(): boolean {
   return 'showDirectoryPicker' in window;
 }
@@ -122,9 +148,11 @@ export async function gameDirFromDrop(ev: DragEvent): Promise<GameDir> {
  * `creatures.cfg` is a good marker: small, plaintext, and distinctive.
  */
 export function validateGameDir(dir: GameDir): string | null {
-  if (dir.size === 0) return 'No files found in that folder.';
+  if (dir.size === 0) return 'No files were read from that folder.';
   if (!dir.has('data/creatures.cfg')) {
-    return "That doesn't look like a Toy Story 2 install — no data/creatures.cfg.";
+    const sample = [...dir.keys()].slice(0, 3).join(', ');
+    return `Read ${dir.size} files but found no data/creatures.cfg — ` +
+      `choose the folder that CONTAINS "data" (saw: ${sample || 'nothing'}).`;
   }
   return null;
 }
@@ -159,8 +187,14 @@ export function findLevels(dir: GameDir): LevelScene[] {
     else scene.dat = file;
   }
 
+  // A scene needs geometry to be a scene. `level00` holds four .ngn texture
+  // bundles and no .dat at all (the developers' mkdat.btm ran their converter
+  // there four times for menu and loading art), and level11-19 are empty
+  // directories. Offering those produced a default scene that could never
+  // render. Textures are optional by contrast: a few levels have more .dat
+  // files than .ngn, and those simply draw untextured.
   return [...scenes.values()]
-    .filter((s) => s.dat !== null || s.ngn !== null)
+    .filter((s) => s.dat !== null)
     .sort((a, b) => a.id.localeCompare(b.id));
 }
 

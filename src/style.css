@@ -7,6 +7,15 @@
   --accent: #5aa9e6;
 }
 * { box-sizing: border-box; }
+
+/*
+ * The `hidden` attribute hides an element by applying `display: none` from the
+ * browser's default stylesheet, which ANY author `display` rule outranks.
+ * Both panels below set `display` explicitly, so without this they stayed
+ * visible regardless of `hidden` — the loading panel sat on top of a fully
+ * loaded level, which looked exactly like a hang.
+ */
+[hidden] { display: none !important; }
 html, body { height: 100%; margin: 0; }
 body {
   background: var(--bg);

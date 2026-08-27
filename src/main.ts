@@ -7,8 +7,8 @@ import * as THREE from 'three';
 import { buildLevelGeometry, parseDat } from './formats/dat.ts';
 import { parseNgn, type NgnTexture } from './formats/ngn.ts';
 import {
-  findLevels, findModels, gameDirFromDrop, pickGameDir, supportsDirectoryPicker,
-  validateGameDir, type GameDir,
+  findLevels, findModels, gameDirFromDrop, gameDirFromFileList, pickGameDir,
+  supportsDirectoryPicker, validateGameDir, type GameDir,
 } from './loader/gamedir.ts';
 import { Viewer } from './render/viewer.ts';
 
@@ -38,7 +38,16 @@ let frame = 0;
 function setStatus(msg: string, isError = false): void {
   statusEl.textContent = msg;
   statusEl.classList.toggle('error', isError);
+  if (isError) console.error(msg); else console.log('[ts2]', msg);
 }
+
+/**
+ * Hand control back to the browser so a status update is actually painted.
+ * Without this every message is invisible: the main thread runs straight
+ * through and only the final state is ever drawn, which makes a slow stage
+ * indistinguishable from a hung one.
+ */
+const yieldToBrowser = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 /**
  * Browsers decode BMP natively, which is the whole payoff of pconv having
@@ -163,8 +172,12 @@ async function showLevel(index: number): Promise<void> {
     const textures = parseNgn(await level.ngn.read());
     textureCount = textures.length;
     texturesEl.replaceChildren(...(await Promise.all(textures.map(drawTexture))));
+    setStatus(`${level.id}: decoding ${textures.length} textures\u2026`);
+    await yieldToBrowser();
     gpuTextures = await loadTextures(textures);
     sceneTextures = gpuTextures;
+    setStatus(`${level.id}: building geometry\u2026`);
+    await yieldToBrowser();
   }
 
   // World geometry lives in the .dat; the .ngn holds only textures, and
@@ -172,9 +185,28 @@ async function showLevel(index: number): Promise<void> {
   let summary = `${level.id} — ${textureCount} textures`;
   if (level.dat && viewer) {
     try {
-      const parsed = parseDat(await level.dat.read());
+      // Reported stage by stage: node runs this whole path in ~135ms, so if
+      // the browser stalls, knowing which call it stalls in is the difference
+      // between a fix and a guess.
+      setStatus(`${level.id}: reading scene file\u2026`);
+      await yieldToBrowser();
+      const bytes = await level.dat.read();
+
+      setStatus(`${level.id}: parsing scene (${(bytes.length / 1024) | 0} KB)\u2026`);
+      await yieldToBrowser();
+      const parsed = parseDat(bytes);
+
+      setStatus(`${level.id}: building ${parsed.objects.length} objects\u2026`);
+      await yieldToBrowser();
       const geometry = buildLevelGeometry(parsed);
+
+      setStatus(`${level.id}: uploading ${geometry.triangleCount} triangles\u2026`);
+      await yieldToBrowser();
       viewer.setLevel(geometry, gpuTextures);
+
+      setStatus(`${level.id}: ready`);
+      await yieldToBrowser();
+
       const textured = geometry.groups.filter((g) => g.page !== null && gpuTextures.has(g.page));
       summary +=
         `, ${geometry.objectCount}/${parsed.objects.length} objects, ` +
@@ -183,6 +215,7 @@ async function showLevel(index: number): Promise<void> {
         `${parsed.markers.length} markers`;
     } catch (err) {
       summary += ` — geometry failed: ${(err as Error).message}`;
+      setStatus(`${level.id}: geometry failed — ${(err as Error).message}`, true);
     }
   }
   infoEl.textContent = summary;
@@ -192,25 +225,40 @@ async function open(dir: GameDir): Promise<void> {
   const problem = validateGameDir(dir);
   if (problem) return setStatus(problem, true);
 
+  // Each stage announces itself and yields, so if one hangs the last message
+  // on screen names it. The drop panel deliberately stays up until the first
+  // level has rendered, so these remain visible throughout.
+  setStatus(`Loaded ${dir.size} files. Finding levels\u2026`);
+  await yieldToBrowser();
+
   levels = findLevels(dir);
+  models = findModels(dir);
   if (levels.length === 0) return setStatus('No levels found under data/.', true);
 
-  levelEl.replaceChildren(
-    ...levels.map(({ id }, i) => new Option(id, String(i))),
-  );
-  levelEl.onchange = () => void showLevel(levelEl.selectedIndex);
+  setStatus(`${levels.length} scenes, ${models.length} models. Building UI\u2026`);
+  await yieldToBrowser();
 
-  models = findModels(dir);
+  levelEl.replaceChildren(...levels.map(({ id }, i) => new Option(id, String(i))));
+  levelEl.onchange = () => void showLevel(levelEl.selectedIndex);
   modelEl.replaceChildren(...models.map(({ name }, i) => new Option(name, String(i))));
   modelEl.onchange = () => void showModel(modelEl.selectedIndex);
 
-  dropEl.hidden = true;
-  appEl.hidden = false;
+  setStatus('Starting renderer\u2026');
+  await yieldToBrowser();
 
-  viewer ??= new Viewer($<HTMLCanvasElement>('view'));
+  // The canvas must be laid out before WebGL sizes itself to it.
+  appEl.hidden = false;
+  await yieldToBrowser();
+
+  try {
+    viewer ??= new Viewer($<HTMLCanvasElement>('view'));
+  } catch (err) {
+    return setStatus(`WebGL failed to start: ${(err as Error).message}`, true);
+  }
+
   // Animation advances on the engine's fixed tick, then rebuilds the posed
-  // mesh. Rates: the render loop is uncapped, game logic runs at the original
-  // ~59 FPS, and animation plays at its own (unverified) 20 FPS.
+  // mesh. The render loop is uncapped, game logic runs at the original ~59 FPS,
+  // and animation plays at its own (unverified) 20 FPS.
   viewer.onTick = (dt) => {
     if (!playing || !current || !viewer) return;
     frameTime += dt;
@@ -219,35 +267,60 @@ async function open(dir: GameDir): Promise<void> {
     while (frameTime >= step) frameTime -= step;
     frame = (frame + 1) % Math.max(1, playing.frameCount);
     if (current.anm) {
-      viewer.setModel(
-        buildPosedMeshData(current.model, current.anm, playing, frame),
-        sceneTextures,
-      );
+      viewer.setModel(buildPosedMeshData(current.model, current.anm, playing, frame), sceneTextures);
     }
   };
   viewer.start();
 
-  await showLevel(0);
+  setStatus(`Loading ${levels[0]!.id}\u2026`);
+  await yieldToBrowser();
+
+  try {
+    await showLevel(0);
+  } catch (err) {
+    // Don't strand the user on the loading panel — the UI is usable and they
+    // can pick a different scene from the dropdown.
+    setStatus(`${levels[0]!.id} failed: ${(err as Error).message}. Pick another scene.`, true);
+    infoEl.textContent = `${levels[0]!.id} failed to load`;
+  }
 
   const buzz = models.findIndex((m) => m.name.toLowerCase() === 'buzz');
   if (buzz >= 0) modelEl.selectedIndex = buzz;
+
+  // Everything worked — only now take the panel down.
+  dropEl.hidden = true;
 }
 
+// Surface failures instead of leaving the page looking inert. A silent
+// exception is indistinguishable from "nothing happened".
+window.addEventListener('error', (ev) => setStatus(`Error: ${ev.message}`, true));
+window.addEventListener('unhandledrejection', (ev) =>
+  setStatus(`Error: ${(ev.reason as Error)?.message ?? ev.reason}`, true));
+
+// A `webkitdirectory` input is the most reliable way in: it works in every
+// current browser and needs none of the FileSystemEntry tree walking that
+// drag-and-drop requires.
+const fileInput = $<HTMLInputElement>('pickfile');
+fileInput.onchange = async () => {
+  const files = fileInput.files;
+  if (!files || files.length === 0) return setStatus('No files selected.', true);
+  setStatus(`Reading ${files.length} files\u2026`);
+  await yieldToBrowser();
+  await open(gameDirFromFileList(files));
+};
+
 $<HTMLButtonElement>('pick').onclick = async () => {
-  if (!supportsDirectoryPicker()) {
-    return setStatus('This browser has no folder picker — drag the folder in instead.', true);
-  }
+  // The file input works everywhere, so fall back to it rather than
+  // dead-ending whenever the fancier picker is missing or refuses.
+  if (!supportsDirectoryPicker()) return fileInput.click();
   try {
-    setStatus('Reading folder…');
+    setStatus('Reading folder\u2026');
     const dir = await pickGameDir();
     if (dir) await open(dir);
   } catch (err) {
-    // An AbortError just means the user closed the picker.
-    if ((err as DOMException)?.name !== 'AbortError') {
-      setStatus(`Could not read that folder: ${(err as Error).message}`, true);
-    } else {
-      setStatus('');
-    }
+    if ((err as DOMException)?.name === 'AbortError') return setStatus('');
+    setStatus(`Picker failed (${(err as Error).message}) — opening file chooser\u2026`);
+    fileInput.click();
   }
 };
 
@@ -260,9 +333,11 @@ dropEl.addEventListener('drop', async (ev) => {
   ev.preventDefault();
   dropEl.classList.remove('over');
   try {
-    setStatus('Reading folder…');
-    await open(await gameDirFromDrop(ev));
+    setStatus('Reading folder\u2026');
+    const dir = await gameDirFromDrop(ev);
+    setStatus(`Read ${dir.size} files, opening\u2026`);
+    await open(dir);
   } catch (err) {
-    setStatus(`Could not read that folder: ${(err as Error).message}`, true);
+    setStatus(`Drag-and-drop failed: ${(err as Error).message}. Use the button instead.`, true);
   }
 });

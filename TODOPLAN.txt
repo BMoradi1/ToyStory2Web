@@ -1,7 +1,7 @@
 ================================================================================
  ToyStory2Web - PROJECT ROADMAP
  Browser reimplementation of Toy Story 2: Buzz Lightyear to the Rescue (1999)
- Last updated: 2026-08-26 (.all + level.dat solved and ported)
+ Last updated: 2026-08-26 (ALL asset formats solved; behaviour is what remains)
 ================================================================================
 
  HOW TO USE THIS FILE
@@ -49,10 +49,17 @@
           !! CORRECTION: TS2 PC triangles store 3 VERTICES, not 4. The PSX-
           derived spec is wrong for this build. Face = 4 + n*8 + (n-1)*4.
  [DONE]   .ALL gfx joint reader - 433 joints, magic 0x12345678
- [READY]  .ALL collision reader - 44-byte polys (22 x i16), p2/p3/p4 as deltas
-          from origin; bouncing2 == 0x7FFF means triangle, else quad
-          (container confirmed; payload not yet parsed)
- [READY]  .ANM parser - magic 0xFFF0 (TS2 final). 10 bytes/bone/frame:
+ [DONE]   .ALL collision reader - src/formats/collision.ts. 1555 groups,
+          23394 polys. Header is 12 bytes + a group-level FFFFFFFF terminator.
+          !! No inclination/bouncing fields exist - words 16-18 are a unit
+          !! face normal, so walkability is just normal.y. 300 groups skipped
+          !! are one stale 1998 file copied into level07-10.
+ [DONE]   .ANM parser - src/formats/anm.ts. 170/170 animations byte-exact,
+          66/66 boneCount matches. Characters animate in the viewer.
+          !! Translations are stored x4 - DIVIDE, don't multiply.
+          !! flagBytes selects a SCALE channel, not a hide mask.
+          !! T is the part's pivot - do NOT also add the .all group position.
+ [SUPERSEDED] prior-art .ANM spec - magic 0xFFF0 (TS2 final):
           i16 x/4,y/4,z/4 then a 20-bit packed rotation across two u16
           (rz = rot & 0x3FF, ry = (rot>>10) & 0x3FF, rx = (rot>>20) & 0x3FF,
           each x PI/512). Bones map 1:1 onto mesh groups by index. 20 fps.
@@ -89,7 +96,7 @@
  [OPEN]    hoola.all reports page 0, unlike every other model (16-24)
  [BLOCKED] Material system                  <- needs mesh flags: textured,
            double-sided, additive, subtractive, 50% translucent
- [READY]   Collision mesh rendering (debug) <- container done, payload not
+ [READY]   Collision mesh rendering (debug) <- parser done, not yet drawn
  [READY]   Level select UI driven by the install's own directories
  [OPEN]    Zone / room streaming. Reference: lazycurler/ToyStory2Research has
            decompiled C for zone and boundary logic (gAdjecentZoneLUT,
@@ -102,8 +109,8 @@
            load and display; feet land on Y=0, vertex colours stand in for
            textures (UV-to-texture mapping is still unknown)
  [READY]   Skeleton from gfx joints (0x011F)    <- parser done, unused
- [BLOCKED] Animation playback                   <- needs .ANM parser
-           Rigid parented parts, NOT skinned meshes. Bone i drives mesh group i.
+ [DONE]    Animation playback - plays in the viewer at a tunable 20 FPS
+           (the rate is NOT derivable from the game files)
  [BLOCKED] Animation catalogue - buzz.anm is 156 KB against woody.anm's 2.9 KB;
            Buzz is the player and by far the richest test case
  [OPEN]    Map animation indices to named states (idle, run, jump, spin, laser)
@@ -113,11 +120,12 @@
 ================================================================================
  Buzz is the ONLY playable character. Woody is rescued, not controlled.
 
- [BLOCKED] Character controller                 <- needs collision reader
+ [READY]   Character controller  <- UNBLOCKED. Collision and animation both
+           parse; this is now the next thing on the critical path.
            Moveset: jump, double jump, chargeable wrist laser, chargeable spin
            attack off the wing tips
- [BLOCKED] Collision response against 44-byte collision polys (single-sided;
-           inclination and bouncing fields exist and matter)
+ [READY]   Collision response against the 44-byte polys (single-sided; use
+           the stored unit normal for slope limits)
  [BLOCKED] Camera - follow, collision-aware, matching a 4:3 native framing
  [READY]   Fixed-timestep game loop (already wired: Viewer.onTick)
  [OPEN]    Enemy behaviour and AI

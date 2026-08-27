@@ -164,12 +164,17 @@ export function findLevels(dir: GameDir): LevelScene[] {
     .sort((a, b) => a.id.localeCompare(b.id));
 }
 
-/** Character models: every `.all` under the `chars*` directories, by name. */
-export function findModels(dir: GameDir): { name: string; file: GameFile }[] {
-  const models: { name: string; file: GameFile }[] = [];
+/**
+ * Character models: every `.all` under the `chars*` directories, paired with
+ * the `.anm` beside it. Bone `i` of the animation drives mesh group `i` of the
+ * model, so the two files are only meaningful together.
+ */
+export function findModels(dir: GameDir): { name: string; file: GameFile; anm: GameFile | null }[] {
+  const models: { name: string; file: GameFile; anm: GameFile | null }[] = [];
   for (const [path, file] of dir) {
-    const m = /^data\/chars\d*\/([^/]+)\.all$/.exec(path);
-    if (m) models.push({ name: m[1]!, file });
+    const m = /^data\/(chars\d*)\/([^/]+)\.all$/.exec(path);
+    if (!m) continue;
+    models.push({ name: m[2]!, file, anm: dir.get(`data/${m[1]}/${m[2]}.anm`) ?? null });
   }
   return models.sort((a, b) => a.name.localeCompare(b.name));
 }

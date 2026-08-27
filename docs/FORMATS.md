@@ -51,7 +51,7 @@ Do not use these comments to identify levels.
 | `.wav` | 267 standard audio files | **Solved** |
 | `level.bin` | MIPS R3000 overlay code | **Identified**, not decoded |
 | `.all` | TT data-group container (meshes OR collision) | **Solved & ported** |
-| `.anm` | Animations | **Spec found**, unverified |
+| `.anm` | Skeletal animation | **Solved & ported** |
 | `.dat` | PC world geometry: meshes + placements | **Solved & ported** |
 | `.raw` `.raws` | RNC PRO-PACK compressed, identical container | **Spec found** |
 | `.vis` `.kp2` | Same container as `.dat`, 12-byte records | Partly mapped |
@@ -224,39 +224,119 @@ horizontal terms of the bounding fields at `0x2C`/`0x34`/`0x3C`; entry `+0x44`;
 the joint `unknown`; type `0x0009` payload; and **where character textures live
 and how UVs map onto them** — which is why the viewer renders vertex colours.
 
-### `.anm` — spec found, not yet verified on this build
+### `.anm` — SOLVED
 
-    u16 0, u16 count N, then u32 @8+4i = offset of animation i (0 = empty slot)
+    u16 0, u16 slotCount, u32 0, u32 x slotCount   byte offset per slot, 0 = empty
 
-    per animation:
-      u16  magic       0xFFF0 = TS2 final "new engine"
-                       0xFFF2 = old engine (TS2 demo/proto, Bug's Life, Rascal)
-      u16  3
-      u16  loopFrames
-      u16  boneCount
-      u16  frameStride (words)
-      u16  boneCount again (integrity check)
-      u16  hideFlagBytes
-      u16  pad
-      i16 x boneCount   per-bone data offsets (NEGATIVE => bone hidden)
-      then a hide bitmask
+    per animation (16-byte header):
+      u16 0xFFF0   magic (0xFFF2 is the older engine)
+      u16 3
+      u16 frameCount
+      u16 boneCount
+      u16 frameStride    in words
+      u16 boneCount      repeated, an integrity check
+      u16 flagBytes
+      u16 tail
+      i16 x boneCount    each bone's word offset into a frame; negative = none
+      u8  x flagBytes    per-bone bitmask, little-endian
+      frameCount * frameStride * 2 bytes of frame data
 
-    per bone per frame (new engine, 10 bytes):
-      i16 x/4, y/4, z/4
-      then a 20-bit packed rotation across two u16:
-        rz = (rot        & 0x3FF) * PI/512
-        ry = ((rot >> 10) & 0x3FF) * PI/512
-        rx = ((rot >> 20) & 0x3FF) * PI/512
+    bone entry (10 bytes, or 16 when its flag bit is set):
+      i16 x, y, z        translation, stored x4 — DIVIDE by 4
+      u16 lo, hi         a 30-bit rotation, ten bits per axis
+      u16 sx, sy, sz     4.12 scale, only when the flag bit is set
 
-    old engine (12 bytes): i16 x,y,z,rx,ry,rz — each rotation * PI/2048
+      rz = ( packed        & 0x3FF) * PI/512
+      ry = ((packed >> 10) & 0x3FF) * PI/512
+      rx = ((packed >> 20) & 0x3FF) * PI/512
 
-**Bones map 1:1 onto graphics mesh groups by index.** These are rigid parented
-parts, not skinned meshes — expect per-part transforms, no vertex weights.
-Reference playback is a flat 20 fps. Corroborated structurally: `dino.anm` has
-4 animations x 20 bones and `dino.all` has exactly 20 mesh groups.
+**Bone `i` drives graphics-mesh group `i`** of the matching `.all` — `boneCount`
+equals that group count on all 66 characters, which settles the mapping.
 
-`buzz.anm` is 156,094 bytes against `woody.anm`'s 2,956 — Buzz is the player
-character and the richest test case, but start small (`sheep.anm` is 1,340).
+Three corrections to the published spec, each of which breaks a parser written
+to it:
+
+- **`loopFrames` is the frame count.** `payloadBytes == frameCount *
+  frameStride * 2` holds byte-exactly on all 170 animations, no padding.
+- **`hideFlagBytes` is not a hide mask** — it selects which bones carry a
+  **scale** channel, making those entries 16 bytes rather than 10 (445 of 1,766
+  tracks). A parser expecting a hide mask desynchronises on the first one.
+  Confirmed neatly: Buzz's wings sit at scale `4/4096` in 30 of 35 animations
+  and snap to `4096` in exactly the five where they deploy.
+- **Translations are stored pre-multiplied by 4** and must be divided, not
+  multiplied. Fitted against an oracle rather than assumed — see below.
+
+**Transforms are flat and absolute: `v' = (Rx*Ry*Rz)*v + T`, no hierarchy.**
+`T` **is** the part's pivot, and the `.all` group position at `+0x04` is that
+same pivot at rest. So an animated renderer must **not** also add the group
+position the way the static path does; doing both tears apart exactly the
+characters whose group positions are non-zero.
+
+That relationship is also the format's best self-check. A bone's frame-0
+translation should reproduce its group's rest position: at the correct scale the
+median error is 13 units, where multiplying by 4 instead misses by ~4,145. It
+caught a real inversion in this repo's first port, which had produced a median
+bounding-box growth of 8.7x and 141 of 170 models torn apart. Posed correctly
+the median is 1.008x with 2 outliers, both genuinely large motions.
+
+**Negative track offsets mean two different things.** `-2` (716 tracks) is a
+bone absent from every animation in the file — the seam-bridge meshes, which the
+original skins at runtime from the `0x011F` joint rings. `-3` (162, only `buzz`
+and `slime`) means the track lives in another animation: those files are
+**layered**, pairing full-body animations with upper-body-only and legs-only
+sets.
+
+**Frame rate is not in the files.** The 20 fps figure is inherited from prior
+art, unverified, and kept tunable. Supporting hint only: 107 of 170 frame counts
+are multiples of 12.
+
+**Known gap:** at least one animation poses to empty geometry, presumably a
+layered slot whose tracks all live elsewhere. Not yet chased down.
+
+### Collision payloads — SOLVED
+
+Collision lives in `TERRAIN.ALL` (pairing with `level.dat`) and `TERR1.ALL`
+(pairing with `level1.dat`). Character files carry none.
+
+    payload : mesh+ , u32 0xFFFFFFFF
+    mesh    : i16 enabled(=1), i16 polyCount, i16 xMin, xExt, zMin, zExt
+              polyCount x 44-byte poly
+
+    poly, 22 x i16:
+      [0,1]   xMin, xExt
+      [2,3]   partly understood extent encoding
+      [4..6]  first vertex, absolute
+      [7..9]  second vertex, as a delta
+      [10..12] third vertex, as a delta
+      [13..15] fourth vertex, as a delta (garbage on triangles)
+      [16..18] unit face normal, 2.14 fixed point
+      [19..21] word 20 == 0x7FFF marks a triangle
+
+The header is **12 bytes**, with the trailing `FFFFFFFF` belonging to the group
+rather than the last mesh. Measuring it as 16 makes single-mesh groups tile
+while every multi-mesh group fails — which reads convincingly as "there are no
+multi-mesh groups." There are 418.
+
+**There is no `inclination` and no `bouncing`.** The published spec names those
+fields; words 16-18 are a unit face normal, and what it calls `bouncing1` is
+simply the normal's Y. Verified: all 23,394 normals are unit length to within
+0.0000, and each is antiparallel to its winding's geometric normal. There is no
+restitution or material term in the record at all.
+
+So **walkability is just the normal's Y component** (PSX +Y is down): a floor
+faces `-Y`. No material system to reverse-engineer. Roughly a third of faces are
+walkable at a 45-degree limit.
+
+Other confirmed properties: collision is **instanced** (261 groups reuse the
+previous payload at a new position); type `0x0008` is byte-identical to
+`0x0006` and marks movers — crane arms, platform decks, vehicles; and on a
+triangle the fourth vertex and parts of the trailing words are uninitialised, so
+reading them produces stray geometry.
+
+**Validated:** 1,555 groups parse across the install, 23,394 polys (4,496
+triangles). The 300 that don't are `level07`-`level10` each holding a copy of one
+stale 1998 `TERR1.ALL` that uses the older 32-byte A Bug's Life poly — the twin
+of the stale `level1.dat` recorded above. One artefact, not 300 failures.
 
 ### `.raw` / `.raws` — spec found
 

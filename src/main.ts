@@ -1,4 +1,8 @@
-import { buildMeshData, parseAll } from './formats/all.ts';
+import { buildMeshData, parseAll, type AllFile } from './formats/all.ts';
+import {
+  DEFAULT_ANIMATION_FPS, buildPosedMeshData, parseAnm,
+  type AnmFile, type Animation,
+} from './formats/anm.ts';
 import * as THREE from 'three';
 import { buildLevelGeometry, parseDat } from './formats/dat.ts';
 import { parseNgn, type NgnTexture } from './formats/ngn.ts';
@@ -15,6 +19,7 @@ const appEl = $<HTMLDivElement>('app');
 const statusEl = $<HTMLParagraphElement>('status');
 const levelEl = $<HTMLSelectElement>('level');
 const modelEl = $<HTMLSelectElement>('model');
+const animEl = $<HTMLSelectElement>('anim');
 const infoEl = $<HTMLSpanElement>('info');
 const texturesEl = $<HTMLDivElement>('textures');
 
@@ -23,6 +28,12 @@ let levels: ReturnType<typeof findLevels> = [];
 let models: ReturnType<typeof findModels> = [];
 /** Textures from the currently selected scene. Characters borrow these. */
 let sceneTextures = new Map<number, THREE.Texture>();
+
+/** Currently displayed character, if any, and its animation playback state. */
+let current: { model: AllFile; anm: AnmFile | null } | null = null;
+let playing: Animation | null = null;
+let frameTime = 0;
+let frame = 0;
 
 function setStatus(msg: string, isError = false): void {
   statusEl.textContent = msg;
@@ -56,27 +67,12 @@ async function drawTexture(tex: NgnTexture): Promise<HTMLElement> {
   return figure;
 }
 
-async function showModel(index: number): Promise<void> {
-  const model = models[index];
-  if (!model || !viewer) return;
-
-  const file = parseAll(await model.file.read());
-  const mesh = buildMeshData(file);
-  viewer.setModel(mesh, sceneTextures);
-
-  const pages = [...new Set(mesh.groups.map((g) => g.page))].filter((p) => p !== null);
-  const missing = pages.filter((p) => !sceneTextures.has(p));
-  infoEl.textContent =
-    `${model.name}.all — ${file.groups.length} groups, ${mesh.triangleCount} triangles, ` +
-    `page ${pages.join(',')}` +
-    (missing.length ? ` (not in this scene — try another level)` : '');
-}
-
 /**
  * Decode a scene's textures into GPU textures, keyed by slot id.
  *
  * The slot id is what a face's texture page resolves to, and slots are sparse,
- * so a Map rather than an array.
+ * so a Map rather than an array. Characters borrow these too — their art lives
+ * in the level files at slots 16-24, not in `chars*`.
  */
 async function loadTextures(textures: NgnTexture[]): Promise<Map<number, THREE.Texture>> {
   const out = new Map<number, THREE.Texture>();
@@ -115,6 +111,43 @@ async function loadTextures(textures: NgnTexture[]): Promise<Map<number, THREE.T
     } catch { /* a texture that won't decode simply goes untextured */ }
   }));
   return out;
+}
+
+async function showModel(index: number): Promise<void> {
+  const entry = models[index];
+  if (!entry || !viewer) return;
+
+  playing = null;
+  const model = parseAll(await entry.file.read());
+  const anm = entry.anm ? parseAnm(await entry.anm.read()) : null;
+  current = { model, anm };
+
+  const available = anm
+    ? anm.animations
+        .map((a, i) => (a ? { a, i } : null))
+        .filter((x): x is { a: Animation; i: number } => x !== null)
+    : [];
+
+  animEl.replaceChildren(
+    new Option('rest pose', '-1'),
+    ...available.map(({ a, i }) => new Option(`anim ${i} (${a.frameCount}f)`, String(i))),
+  );
+  animEl.onchange = () => {
+    const slot = Number(animEl.value);
+    playing = slot < 0 ? null : (anm?.animations[slot] ?? null);
+    frame = 0;
+    frameTime = 0;
+    if (!playing) viewer!.setModel(buildMeshData(model), sceneTextures);
+  };
+
+  viewer.setModel(buildMeshData(model), sceneTextures);
+
+  const pages = [...new Set(buildMeshData(model).groups.map((g) => g.page))].filter((p) => p !== null);
+  const missing = pages.filter((p) => !sceneTextures.has(p));
+  infoEl.textContent =
+    `${entry.name}.all — ${model.groups.length} groups, page ${pages.join(',')}` +
+    (available.length ? `, ${available.length} animations` : ', no animations') +
+    (missing.length ? ' (texture not in this scene — try another level)' : '');
 }
 
 async function showLevel(index: number): Promise<void> {
@@ -175,6 +208,23 @@ async function open(dir: GameDir): Promise<void> {
   appEl.hidden = false;
 
   viewer ??= new Viewer($<HTMLCanvasElement>('view'));
+  // Animation advances on the engine's fixed tick, then rebuilds the posed
+  // mesh. Rates: the render loop is uncapped, game logic runs at the original
+  // ~59 FPS, and animation plays at its own (unverified) 20 FPS.
+  viewer.onTick = (dt) => {
+    if (!playing || !current || !viewer) return;
+    frameTime += dt;
+    const step = 1 / DEFAULT_ANIMATION_FPS;
+    if (frameTime < step) return;
+    while (frameTime >= step) frameTime -= step;
+    frame = (frame + 1) % Math.max(1, playing.frameCount);
+    if (current.anm) {
+      viewer.setModel(
+        buildPosedMeshData(current.model, current.anm, playing, frame),
+        sceneTextures,
+      );
+    }
+  };
   viewer.start();
 
   await showLevel(0);

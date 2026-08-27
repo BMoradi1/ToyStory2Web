@@ -78,9 +78,6 @@ if (!root || !sceneId) {
   process.exit(1);
 }
 
-// Must be set before any geometry is built, or the filter has no effect.
-(globalThis as { __MODEBIT?: string }).__MODEBIT = process.env.MODEBIT;
-
 // A character model, or a level scene. Characters take their textures from a
 // level's .ngn, since chars* ships none of its own.
 const isModel = /^chars/.test(sceneId);
@@ -128,7 +125,10 @@ const inside = view === '--inside';
 // `--inside` stands the camera in the middle of the level at roughly Buzz's
 // eye height, which is the view the game actually plays from and the one
 // exterior shots never reveal.
-const viewerD = Math.max(sphereR * 2.2, 1);
+// ZOOM pulls the viewer camera in toward the target, so an interior view can
+// be reproduced without hand-picking coordinates.
+const zoom = Number(process.env.ZOOM ?? 1);
+const viewerD = Math.max(sphereR * 2.2, 1) / zoom;
 const eye = viewerCam
   ? [sphereC[0]! + viewerD * 0.6, sphereC[1]! + viewerD * 0.5, sphereC[2]! + viewerD * 0.8]
   : topDown
@@ -188,7 +188,13 @@ for (const group of geo.groups) {
   const tex = group.page === null ? undefined : textures.get(group.page);
   for (let t = group.start; t + 2 < group.start + group.count; t += 3) {
     const a = project(t), b = project(t + 1), c = project(t + 2);
-    if (a.z <= 0.01 || b.z <= 0.01 || c.z <= 0.01) continue;
+    // Reject triangles crossing the near plane rather than projecting them.
+    // A vertex barely in front of the camera projects to an enormous screen
+    // coordinate, drawing a long thin spike — an artefact of this rasteriser,
+    // not of the data. Real clipping would split the triangle; rejecting it is
+    // enough to stop this tool inventing slivers the browser never draws.
+    const near = Number(process.env.NEAR ?? 0.01);
+    if (a.z <= near || b.z <= near || c.z <= near) continue;
     const minX = Math.max(0, Math.floor(Math.min(a.x, b.x, c.x)));
     const maxX = Math.min(W - 1, Math.ceil(Math.max(a.x, b.x, c.x)));
     const minY = Math.max(0, Math.floor(Math.min(a.y, b.y, c.y)));

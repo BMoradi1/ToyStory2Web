@@ -421,9 +421,6 @@ export function buildLevelGeometry(level: DatLevel): LevelGeometry {
     };
 
     for (const face of mesh.faces) {
-      const filter = (globalThis as { __MODEBIT?: string }).__MODEBIT;
-      if (filter === 'set' && (face.mode & 0x8000) === 0) continue;
-      if (filter === 'clear' && (face.mode & 0x8000) !== 0) continue;
       const page = face.textured ? texturePage(face.mode) : null;
       const bucket = bucketFor(page);
 

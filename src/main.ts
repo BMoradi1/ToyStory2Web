@@ -234,6 +234,9 @@ async function open(dir: GameDir): Promise<void> {
 
   try {
     viewer ??= new Viewer($<HTMLCanvasElement>('view'));
+    // Exposed for tools/browser-shot.ts, which places the camera and reads
+    // scene state from outside the page. Harmless for users.
+    (window as unknown as { ts2: object }).ts2 = { get viewer() { return viewer; }, THREE };
   } catch (err) {
     return setStatus(`WebGL failed to start: ${(err as Error).message}`, true);
   }

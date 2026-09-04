@@ -118,6 +118,14 @@ export const MOVE_OVERRIDES = {
   rocketBoots: { lateralFriction: 128, forwardFriction: 32, forwardAccel: 160, topSpeed: 0x800, forwardClamp: 0x800, jumpImpulse: -0x640 },
 } as const satisfies Record<string, Partial<MoveTable>>;
 
+/**
+ * How far below the level's lowest collision the player may fall before the
+ * original gives up and puts them back. From the last branch of the player
+ * update: `if (levelLowestY + 0x2000 < player.y) respawn`, where the level
+ * value is the largest Y in the terrain, computed once at load.
+ */
+export const DEATH_PLANE_MARGIN = 0x2000;
+
 export const TURN = {
   /**
    * Yaw approaches the target by min(|diff|, turnRate) / 8 per tick. The

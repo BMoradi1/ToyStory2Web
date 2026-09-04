@@ -20,10 +20,10 @@
  * `Ground` interface below is the seam, and the only thing implemented against
  * it so far is the floor query, so walls do not yet stop anything.
  */
-import { groundBelow, type CollisionWorld } from '../formats/collision.ts';
+import { groundBelow, slideAlongWalls, type CollisionWorld } from '../formats/collision.ts';
 import {
-  ATTACK, GAME_UNITS_PER_LEVEL_UNIT, MOVE_GROUND, MOVE_OVERRIDES, TURN, VERTICAL,
-  type MoveTable,
+  ATTACK, BODY_HEIGHT, DEATH_PLANE_MARGIN, GAME_UNITS_PER_LEVEL_UNIT, MOVE_GROUND,
+  MOVE_OVERRIDES, TURN, VERTICAL, type MoveTable,
 } from './player-constants.ts';
 import { cos, idiv, sin, YAW_MASK, yawDelta, yawOf } from './trig.ts';
 
@@ -37,13 +37,24 @@ export enum JumpState {
   DoubleJumpReleased = 6,
 }
 
-/** What the controller needs to know about the world. P2.3 will widen this. */
+/** What the controller needs to know about the world. P2.3 replaces this. */
 export interface Ground {
   /**
    * The nearest walkable floor at or below a point, in GAME units, or null.
-   * "Below" is +Y, the original's convention.
+   * "Below" is +Y, the original's convention. The height is NOT rounded: the
+   * caller decides how to sit on it, and rounding here left the player a
+   * fraction of a unit above the surface and so airborne every other tick.
    */
   floorAt(x: number, y: number, z: number): { y: number; slopeY: number } | null;
+  /** Y past which the player counts as having fallen out of the level. */
+  deathY?: number;
+  /**
+   * Slide a horizontal step along any walls it meets, returning where the
+   * player actually ends up. Optional: without it the step is unobstructed.
+   */
+  slide?(
+    from: { x: number; y: number; z: number }, to: { x: number; z: number },
+  ): { x: number; z: number; hit: boolean };
 }
 
 /** One frame of input. Stick components are -1..1, camera-relative. */
@@ -104,6 +115,13 @@ export interface PlayerState {
   laser: number;
   laserCharge: number;
 
+  /**
+   * The player has fallen past the level's death plane and should be put back.
+   * The controller does not know where the spawn is, so it raises this and the
+   * caller decides; the original calls its own respawn from the same place.
+   */
+  fellOut: boolean;
+
   /** Set for one tick when the controller fires a sound event. Named as in the effect table. */
   sounds: string[];
 }
@@ -128,6 +146,7 @@ export function createPlayer(x = 0, y = 0, z = 0, yaw = 0): PlayerState {
     spinCharge: 0,
     laser: 0,
     laserCharge: 0,
+    fellOut: false,
     sounds: [],
   };
 }
@@ -393,8 +412,23 @@ export function stepPlayer(
   // P2.3 replaces this with the real mover. For now the horizontal step is
   // unobstructed and only the floor is respected, so walls do not stop anyone.
   const wasY = p.y;
+  const wasX = p.x, wasZ = p.z;
   p.x += p.vx;
   p.z += p.vz;
+  if (ground.slide) {
+    // Walls. Without this the player walks out of the level, and outside it
+    // there is no floor at all, so the fall never ends — which is what
+    // "eventually I fall down" turned out to be.
+    const slid = ground.slide({ x: wasX, y: wasY, z: wasZ }, { x: p.x, z: p.z });
+    if (slid.hit) {
+      // Keep the velocity consistent with the move that actually happened, or
+      // the next tick accelerates into the wall all over again.
+      p.vx = slid.x - wasX;
+      p.vz = slid.z - wasZ;
+      p.x = slid.x;
+      p.z = slid.z;
+    }
+  }
   p.y += p.vy;
 
   // Sweep rather than sample. Falling at terminal velocity covers 2048 units
@@ -416,7 +450,12 @@ export function stepPlayer(
     } else if (p.fallTimer > 0) {
       p.fallTimer = 0;
     }
-    p.y = floor.y;
+    // Sit at or just inside the surface, never a hair above it. The surface
+    // is continuous while the position is integral, so rounding to nearest
+    // leaves the player fractionally above it half the time — and "above the
+    // floor" reads as airborne, which made walking flicker in and out of
+    // being grounded. Rounding downward (+Y is down) is stable.
+    p.y = Math.ceil(floor.y);
     p.vy = 0;
     p.onGround = true;
     p.coyote = VERTICAL.coyoteTicks;
@@ -440,6 +479,12 @@ export function stepPlayer(
     p.fallTimer = 0;
   }
 
+  // Falling out of the level. The original tests the player against the
+  // lowest point of the terrain plus a margin and respawns them; without it a
+  // player who leaves the collision falls for ever, because there is nothing
+  // outside it to land on.
+  if (ground.deathY !== undefined && p.y > ground.deathY) p.fellOut = true;
+
   runtime.previous = { ...input };
 }
 
@@ -457,11 +502,17 @@ export function groundFromCollision(world: CollisionWorld): Ground {
       // The tolerance lets the query find a floor the player has just stepped
       // slightly into, which happens whenever a tick's fall overshoots it.
       const hit = groundBelow(world, x / scale, y / scale, z / scale, 64);
-      // Round on the way back: the hull's plane solve is floating point, and
-      // the original's arithmetic is integer end to end. Letting a fraction
-      // into the player's position would make every later tick drift away
-      // from what the game did. Half a game unit is 1/64 of a level unit.
-      return hit ? { y: Math.round(hit.y * scale), slopeY: hit.normal.y } : null;
+      return hit ? { y: hit.y * scale, slopeY: hit.normal.y } : null;
+    },
+    deathY: world.lowestY * scale + DEATH_PLANE_MARGIN,
+    slide(from, to) {
+      const r = slideAlongWalls(
+        world,
+        { x: from.x / scale, y: from.y / scale, z: from.z / scale },
+        { x: to.x / scale, z: to.z / scale },
+        BODY_HEIGHT / scale,
+      );
+      return { x: r.x * scale, z: r.z * scale, hit: r.hit };
     },
   };
 }

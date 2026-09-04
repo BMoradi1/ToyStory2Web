@@ -278,7 +278,28 @@
                 model all agree on one coordinate system.
                 Spawn point is a pickup marker for now - the real one is
                 presumably in the level's own code, which is not decoded.
- P2.3 [NEXT]    Collision response against the 44-byte TERRAIN polys.
+ P2.3 [PART DONE] Collision response against the 44-byte TERRAIN polys.
+                Done so far, all geometry rather than read constants:
+                slideAlongWalls() in collision.ts sweeps the horizontal step
+                against unwalkable polys and slides along them, sampling the
+                body at four heights rather than as a point. The death plane
+                IS read from the original (see docs/PLAYER.md): fall 0x2000
+                past the level's lowest terrain Y and you are put back.
+                Measured on level 1, wandering 24 x 600 ticks: on the ground
+                85% of the time, up from 36%.
+                Three defects fixed along the way. The floor height was
+                rounded, which left the player a fraction above the surface
+                and so airborne every other tick. The floor query sampled
+                only the tick's end point instead of sweeping. And the spawn
+                heuristic scored a ring around each marker, which cannot
+                tell a box top from a bedroom - it put Buzz on a surface
+                with 274 cells of floor when the ground floor has 2,245.
+                Still missing, and still wanting the mover read out of
+                FUN_00484380: step height, the real walkable-slope threshold
+                (isWalkable still guesses 45 degrees, though raising it to 89
+                changes floor coverage by 0.2% so it is not urgent), and
+                proper ledge handling. Walking off an edge is still how most
+                falls happen.
                 This is now the thing standing between the controller and
                 a playable level: Buzz walks through walls and off the edge
                 of the world, because the only query implemented is the

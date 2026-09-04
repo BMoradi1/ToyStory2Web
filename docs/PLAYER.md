@@ -317,6 +317,19 @@ The other 20 belong to moves that are not implemented yet — poles, zip lines,
 the grapple, cutscenes. They are in the generated table and simply never
 selected.
 
+## Falling out of the level
+
+The last branch of the player update is a death plane:
+`if (levelLowest + 0x2000 < player.y) respawn`. `levelLowest` is computed once
+at load in `FUN_00489c30` as the largest Y in the terrain — +Y is down, so the
+lowest point of the level — and `0x2000` is 256 level units below it.
+
+This matters more than it looks. Outside the collision hull there is no floor
+at all, so a player who leaves it never lands: the fall query keeps returning
+nothing and they drop for ever. The original never has to think about this
+because its mover keeps you inside the level; a reimplementation without a
+complete mover very much does.
+
 ## Ported
 
 `src/sim/player.ts` is a transcription of the tick above, `src/sim/trig.ts` the

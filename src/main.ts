@@ -385,44 +385,58 @@ async function loadCollision(): Promise<CollisionGroup[] | null> {
 }
 
 /**
- * Choose a marker to spawn at: the one with the most floor around it.
+ * Choose a marker to spawn at: the one standing on the largest floor.
  *
- * Markers all sit over walkable floor, but many are on furniture, and the
- * first one in level 1 is close enough to an edge that walking two ticks in
- * most directions falls off it. Scoring each by how much of a ring around it
- * has floor at roughly the same height picks somewhere you can actually move.
+ * Markers all sit over walkable floor, but most of them are on furniture. An
+ * earlier version of this scored a ring around each marker, which cannot tell
+ * a box top from a bedroom: it picked a surface with 274 cells of connected
+ * floor when the room itself has 2,419, so Buzz spawned on a shelf and walked
+ * off it within seconds. Flood-filling the floor he can actually reach — from
+ * cell to cell, refusing steps taller than `STEP` — measures the thing that
+ * matters instead.
  *
- * This is a stand-in, not the original's spawn, which lives in the level's own
- * code and is not decoded. `radius` is in level units — Buzz is 460 tall, so a
- * ring of 600 is about a body height out.
+ * Still a stand-in, not the original's spawn, which lives in the level's own
+ * code and is not decoded. Units are the file's own.
  */
+const SPAWN_CELL = 200;
+/**
+ * Height change treated as walkable between neighbouring samples. Matches the
+ * floor query's own tolerance: anything taller is a step the controller cannot
+ * climb, so counting it as connected would flood across furniture and stairs
+ * and overstate how much floor there really is.
+ */
+const SPAWN_STEP = 64;
+/** Cap on the flood, so scoring every marker stays cheap. */
+const SPAWN_CAP = 2500;
+
+function walkableArea(world: CollisionWorld, x: number, y: number, z: number): number {
+  const seen = new Set<string>();
+  const stack: [number, number, number][] = [[x, z, y]];
+  let count = 0;
+  while (stack.length > 0 && count < SPAWN_CAP) {
+    const [cx, cz, cy] = stack.pop()!;
+    const key = `${Math.round(cx / SPAWN_CELL)},${Math.round(cz / SPAWN_CELL)}`;
+    if (seen.has(key)) continue;
+    const hit = groundBelow(world, cx, cy - SPAWN_STEP, cz, SPAWN_STEP * 2);
+    if (!hit || Math.abs(hit.y - cy) > SPAWN_STEP) continue;
+    seen.add(key);
+    count++;
+    stack.push([cx + SPAWN_CELL, cz, hit.y], [cx - SPAWN_CELL, cz, hit.y]);
+    stack.push([cx, cz + SPAWN_CELL, hit.y], [cx, cz - SPAWN_CELL, hit.y]);
+  }
+  return count;
+}
+
 function pickSpawnMarker(
   markers: { position: { x: number; y: number; z: number } }[],
   world: CollisionWorld,
-  radius = 600,
-  samples = 12,
-): { marker: { position: { x: number; y: number; z: number } }; ground: { y: number; normal: { x: number; y: number; z: number } }; openness: number } | null {
-  let best: ReturnType<typeof pickSpawnMarker> = null;
+): { marker: { position: { x: number; y: number; z: number } }; ground: { y: number; normal: { x: number; y: number; z: number } }; area: number } | null {
+  let best: { marker: { position: { x: number; y: number; z: number } }; ground: { y: number; normal: { x: number; y: number; z: number } }; area: number } | null = null;
   for (const marker of markers) {
     const ground = groundBelow(world, marker.position.x, marker.position.y, marker.position.z, 4096);
     if (!ground) continue;
-    let open = 0;
-    for (let i = 0; i < samples; i++) {
-      const a = (i * 2 * Math.PI) / samples;
-      const hit = groundBelow(
-        world,
-        marker.position.x + Math.cos(a) * radius,
-        ground.y - radius,
-        marker.position.z + Math.sin(a) * radius,
-        radius,
-      );
-      // Floor within a body height of the marker's own counts as walkable-to;
-      // a drop further than that is a ledge, which is what we are avoiding.
-      if (hit && Math.abs(hit.y - ground.y) < 460) open++;
-    }
-    const openness = open / samples;
-    if (!best || openness > best.openness) best = { marker, ground, openness };
-    if (openness === 1) break;
+    const area = walkableArea(world, marker.position.x, ground.y, marker.position.z);
+    if (!best || area > best.area) best = { marker, ground, area };
   }
   return best;
 }
@@ -447,7 +461,7 @@ async function spawnPlayer(): Promise<void> {
 
   const chosen = pickSpawnMarker(currentLevel.level.markers, currentCollisionWorld);
   if (!chosen) { infoEl.textContent = 'no marker with floor under it'; return; }
-  const { marker, ground, openness } = chosen;
+  const { marker, ground, area } = chosen;
 
   const model = parseAll(await entry.file.read());
   const anm = entry.anm ? parseAnm(await entry.anm.read()) : null;
@@ -467,10 +481,11 @@ async function spawnPlayer(): Promise<void> {
     0,
   );
   playerRuntime = createRuntime();
+  spawnPoint = { x: player.x, y: player.y, z: player.z };
   const slope = (Math.acos(Math.min(1, -ground.normal.y)) * 180) / Math.PI;
   infoEl.textContent =
     `${entry.name} standing on floor ${(ground.y / WORLD_SCALE).toFixed(2)} ` +
-    `(${slope.toFixed(0)}\u00b0 slope), ${(openness * 100).toFixed(0)}% open around it. Enter to play.`;
+    `(${slope.toFixed(0)}\u00b0 slope), ${area} cells of floor to walk on. Enter to play.`;
 }
 
 /**
@@ -506,6 +521,7 @@ function playTick(): void {
   const cam = viewer.camera.position;
   const cameraYaw = p ? yawOf(p.x - cam.x, -(p.z - cam.z)) : 0;
 
+  if (player.fellOut) { void respawn(); return; }
   const held = input.read();
   stepPlayer(player, held, playerRuntime, groundFromCollision(currentCollisionWorld), cameraYaw);
 
@@ -549,6 +565,16 @@ function poseAnimation(hasInput: boolean): void {
     ),
     sceneTextures,
   );
+}
+
+/** Put the player back after falling out of the level, as the original does. */
+let spawnPoint: { x: number; y: number; z: number } | null = null;
+async function respawn(): Promise<void> {
+  if (!player || !spawnPoint) return;
+  const yaw = player.yaw;
+  Object.assign(player, createPlayer(spawnPoint.x, spawnPoint.y, spawnPoint.z, yaw));
+  playerRuntime = createRuntime();
+  infoEl.textContent = 'fell out of the level — put back at the spawn';
 }
 
 /** `space`: start or stop playing, spawning the character if it isn't there. */

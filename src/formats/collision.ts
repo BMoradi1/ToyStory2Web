@@ -182,11 +182,20 @@ export interface CollisionWorld {
   /** Poly indices by grid cell, keyed `gx,gz`. */
   cells: Map<string, number[]>;
   cellSize: number;
+  /**
+   * The lowest point of the hull. +Y is down, so this is the largest Y.
+   *
+   * The original computes the same value at level load and uses it as a death
+   * plane: fall far enough past it and you are put back. Without that a player
+   * who leaves the collision never lands, because outside it there is nothing
+   * to land on.
+   */
+  lowestY: number;
 }
 
 /** Flatten collision groups into a world-space hull with an X/Z lookup grid. */
 export function buildCollisionWorld(groups: CollisionGroup[], cellSize = 1024): CollisionWorld {
-  const world: CollisionWorld = { polys: [], cells: new Map(), cellSize };
+  const world: CollisionWorld = { polys: [], cells: new Map(), cellSize, lowestY: -Infinity };
   for (const group of groups) {
     for (const mesh of group.meshes) {
       for (const poly of mesh.polys) {
@@ -197,6 +206,7 @@ export function buildCollisionWorld(groups: CollisionGroup[], cellSize = 1024): 
         }));
         const index = world.polys.length;
         world.polys.push({ vertices, normal: poly.normal, walkable: isWalkable(poly) });
+        for (const v of vertices) if (v.y > world.lowestY) world.lowestY = v.y;
         const xs = vertices.map((v) => v.x), zs = vertices.map((v) => v.z);
         const x0 = Math.floor(Math.min(...xs) / cellSize), x1 = Math.floor(Math.max(...xs) / cellSize);
         const z0 = Math.floor(Math.min(...zs) / cellSize), z1 = Math.floor(Math.max(...zs) / cellSize);
@@ -252,4 +262,120 @@ export function groundBelow(
     if (!best || surfaceY < best.y) best = { y: surfaceY, normal: n };
   }
   return best;
+}
+
+/** Every poly whose cell the segment from one X/Z point to another touches. */
+function polysAlong(
+  world: CollisionWorld, x0: number, z0: number, x1: number, z1: number,
+): number[] {
+  const cell = world.cellSize;
+  const gx0 = Math.floor(Math.min(x0, x1) / cell), gx1 = Math.floor(Math.max(x0, x1) / cell);
+  const gz0 = Math.floor(Math.min(z0, z1) / cell), gz1 = Math.floor(Math.max(z0, z1) / cell);
+  const out = new Set<number>();
+  for (let gx = gx0; gx <= gx1; gx++) {
+    for (let gz = gz0; gz <= gz1; gz++) {
+      for (const i of world.cells.get(`${gx},${gz}`) ?? []) out.add(i);
+    }
+  }
+  return [...out];
+}
+
+/** Is a 3D point inside a polygon, projected down the axis its normal points along most? */
+function containsProjected(
+  vertices: { x: number; y: number; z: number }[],
+  n: { x: number; y: number; z: number },
+  p: { x: number; y: number; z: number },
+): boolean {
+  // Drop the axis the polygon is most square-on to; the other two keep its area.
+  const ax = Math.abs(n.x), ay = Math.abs(n.y), az = Math.abs(n.z);
+  const pick: (v: { x: number; y: number; z: number }) => [number, number] =
+    ax >= ay && ax >= az ? (v) => [v.y, v.z]
+      : ay >= az ? (v) => [v.x, v.z]
+        : (v) => [v.x, v.y];
+  const [px, py] = pick(p);
+  let inside = false;
+  for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
+    const [ax2, ay2] = pick(vertices[i]!);
+    const [bx2, by2] = pick(vertices[j]!);
+    if ((ay2 > py) !== (by2 > py) && px < ((bx2 - ax2) * (py - ay2)) / (by2 - ay2) + ax2) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+/**
+ * Slide a horizontal step along the walls it runs into.
+ *
+ * This is the minimum that keeps a level playable: without it the player walks
+ * straight through the walls of Andy's room and out of the world, where there
+ * is no floor and the fall never ends. It is NOT the original's mover — that
+ * lives in `FUN_00484380` and carries a step height and a slope threshold that
+ * have not been read yet. Everything here is geometry that follows from the
+ * collision data itself, so there are no invented constants: a wall is a poly
+ * the hull already marks unwalkable, and the player's height is the height of
+ * the model.
+ *
+ * The player is treated as a vertical segment rather than a point, sampled at
+ * a few heights, because a wall that only covers the knees should still stop
+ * someone. There is no radius: the body is a line, so it can come to rest
+ * visually touching a wall, which is better than passing through one and is
+ * the part a real capsule sweep in P2.3 would improve on.
+ *
+ * All arguments and results are in the file's own units, +Y down.
+ */
+export function slideAlongWalls(
+  world: CollisionWorld,
+  from: { x: number; y: number; z: number },
+  to: { x: number; z: number },
+  height: number,
+): { x: number; z: number; hit: boolean } {
+  let x = to.x, z = to.z;
+  const dx0 = to.x - from.x, dz0 = to.z - from.z;
+  if (dx0 === 0 && dz0 === 0) return { x, z, hit: false };
+
+  // Sample up the body. The feet sit a little above the floor so a step the
+  // player is standing on does not read as a wall through their soles.
+  const levels = [0.15, 0.45, 0.8, 1].map((f) => from.y - height * f);
+  let hit = false;
+
+  for (let pass = 0; pass < 2; pass++) {
+    const dx = x - from.x, dz = z - from.z;
+    if (dx === 0 && dz === 0) break;
+    let blocker: { x: number; y: number; z: number } | null = null;
+    let nearest = Infinity;
+
+    for (const index of polysAlong(world, from.x, from.z, x, z)) {
+      const poly = world.polys[index]!;
+      if (poly.walkable) continue;
+      const n = poly.normal;
+      // A wall's normal is close to horizontal; skip ceilings, which should
+      // not stop a walk, and let the floor query own anything floor-like.
+      if (Math.abs(n.y) > 0.7) continue;
+
+      const denom = n.x * dx + n.z * dz;
+      if (denom >= 0) continue; // moving along or away from the face
+
+      const v0 = poly.vertices[0]!;
+      for (const y of levels) {
+        const gap = n.x * (v0.x - from.x) + n.y * (v0.y - y) + n.z * (v0.z - from.z);
+        const t = gap / denom;
+        if (t < 0 || t > 1 || t >= nearest) continue;
+        const at = { x: from.x + dx * t, y, z: from.z + dz * t };
+        if (!containsProjected(poly.vertices, n, at)) continue;
+        nearest = t;
+        blocker = n;
+      }
+    }
+
+    if (!blocker) break;
+    hit = true;
+    // Stop just short of the face, then carry the rest of the step along it.
+    const stopX = from.x + dx * nearest, stopZ = from.z + dz * nearest;
+    const restX = x - stopX, restZ = z - stopZ;
+    const into = restX * blocker.x + restZ * blocker.z;
+    x = stopX + (restX - blocker.x * into);
+    z = stopZ + (restZ - blocker.z * into);
+  }
+  return { x, z, hit };
 }

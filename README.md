@@ -3,6 +3,9 @@
 An open-source reimplementation of the engine behind **Toy Story 2: Buzz
 Lightyear to the Rescue** (Traveller's Tales, 1999), running in the browser.
 
+🤖 Written with Claude Code and Codex under an agentic workflow. 🤖
+
+
 ## Screenshots
 ### Phase 1 level renderer
 <img width="1413" height="937" alt="image" src="https://github.com/user-attachments/assets/2f4abd0a-e8bd-424f-b862-373e684ac664" />

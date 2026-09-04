@@ -78,6 +78,52 @@ export interface NgnScene {
   chunkTypes: Map<number, number>;
 }
 
+/**
+ * Which zone each `level.dat` object is in, taken from the PC scene.
+ *
+ * `level.dat` carries no zone field. The converted scene does, and its
+ * objects are `level.dat`'s: the first instance list is the object table's
+ * first section, and the second list is its second section at four times the
+ * stored scale, in a different order. Objects are matched by exact position
+ * (times four for the second section), which resolves every object in every
+ * scene file that has one. Returns `null` for an object that has no instance.
+ */
+export function assignZones(
+  objects: { position: { x: number; y: number; z: number }; unitScale: number; faceCount: number }[],
+  scene: NgnScene,
+): (number | null)[] {
+  const lists = [scene.instances.filter((i) => i.list === 0), scene.instances.filter((i) => i.list === 1)];
+  const gobjFaces = (inst: NgnInstance) => {
+    const g = scene.gobjs[scene.instances.indexOf(inst)];
+    return g ? g.prims.reduce((n, p) => n + Math.floor(p.indices.length / (p.type === 4 ? 4 : 3)), 0) : -1;
+  };
+  const posKey = (x: number, y: number, z: number) => `${Math.round(x)},${Math.round(y)},${Math.round(z)}`;
+  const byPos = lists.map((list) => {
+    const m = new Map<string, NgnInstance[]>();
+    for (const inst of list) { const k = posKey(...inst.position); (m.get(k) ?? m.set(k, []).get(k)!).push(inst); }
+    return m;
+  });
+  return objects.map((o, i) => {
+    const list = o.unitScale === 1 ? 0 : 1;
+    const key = posKey(o.position.x * o.unitScale, o.position.y * o.unitScale, o.position.z * o.unitScale);
+    // The first list is the first section in order, so the same index is the
+    // same object whenever the positions agree — which sidesteps every case
+    // of two objects sharing a position in different zones.
+    if (list === 0) {
+      const inst = lists[0]![i];
+      if (inst && posKey(...inst.position) === key) return inst.zone;
+    }
+    // Otherwise take an instance at the same position, preferring one with
+    // the same face count, and consume it: a prop the level lists once per
+    // zone appears as several identical objects, and each copy gets one.
+    const pool = byPos[list]!.get(key);
+    if (!pool || pool.length === 0) return null;
+    let pick = pool.findIndex((inst) => gobjFaces(inst) === o.faceCount);
+    if (pick < 0) pick = 0;
+    return pool.splice(pick, 1)[0]!.zone;
+  });
+}
+
 export function parseNgnScene(buffer: ArrayBuffer | Uint8Array): NgnScene {
   const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
   const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);

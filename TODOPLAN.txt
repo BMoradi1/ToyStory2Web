@@ -1,7 +1,7 @@
 ================================================================================
  ToyStory2Web - PROJECT ROADMAP
  Browser reimplementation of Toy Story 2: Buzz Lightyear to the Rescue (1999)
- Last updated: 2026-09-03 (P1.1-P1.4 done; P1.0 opened: object table defect)
+ Last updated: 2026-09-03 (P1.0-P1.4 done; P1.5 ready)
 ================================================================================
 
  HOW TO USE THIS FILE
@@ -174,38 +174,30 @@
                 their parts are not closed shells, and their own material
                 bits are still unread - the .ngn creature chunk (0x106) is
                 where to look.
- P1.0 [ACTIVE]  Fix the second object section - a live defect, and the thing
-                blocking P1.5. level.dat's object table has TWO sections with
-                different record layouts; we read both with the first one's
-                field offsets, so roughly a QUARTER of every level is drawn at
-                the wrong position, angle and scale, with the wrong mesh.
-                Found by checking against level.ngn, which holds two instance
-                lists summing exactly to the object count, the first matching
-                level.dat's leading objects position for position.
-                  - recover section 2's layout using the second instance list
-                    as an oracle (the same method that cracked section 1)
-                  - work out where section 1 ends structurally, so the parser
-                    does not need the .ngn at runtime
-                  - level10/level breaks the pattern; handle it separately
-                Section 2 is drawn as the engine's second pass with its own
-                distance limits, so expect billboards or sprites - which would
-                also explain the unparsed 2D sprite pool at the mesh-pool tail.
+ P1.0 [DONE]    The second object section. Same record layout, stored at a
+                QUARTER scale - positions and mesh vertices both x4. That
+                was the stray planks and blocks around the house. The split
+                is marked by section 4's leading run of pointers; zones come
+                from the .ngn scene via assignZones(). tools/scene-crosscheck
+                validates split, scale and zones on every scene.
+                Edges left: level06/level1 (one object), level10 (two).
 
- P1.5 [BLOCKED] Portal visibility        <- needs an object -> zone mapping.
-                The ALGORITHM is now known exactly, read from toy2.exe and
-                written up in FORMATS.md: per-zone object lists, a portal
-                walk that clips the frustum to each doorway outline and
-                never returns through the portal it came by, zone 0 drawn
-                from anywhere, two passes with different distance limits.
-                The GRAPH is already parsed - level.dat's "zone" quads are
-                the portals, a=from b=to, 15=outside, and level 1's 22 are
-                identical in order to its .ngn scene's portal chunk.
-                What is missing is which zone each object is in: it is the
-                low byte of the .ngn instance flags. This is NOT the hard
-                problem it looked like. The scene's objects correspond to
-                level.dat's ONE FOR ONE, IN ORDER - the earlier 65-72%
-                figure was P1.0's defect, not a correlation problem. Once
-                P1.0 lands, zones transfer straight across by index.
+ P1.5 [READY]   Portal visibility. Everything needed is now in hand:
+                  - the algorithm (FORMATS.md, "Visibility"): per-zone object
+                    lists, walk from the camera's zone through portals whose
+                    outline is in view, clip the frustum to each, never go
+                    back through the portal you came by, always draw zone 0
+                  - the graph: level.portals (from/to, 15 = outside)
+                  - each object's zone: assignZones(level.objects, scene),
+                    where scene = parseNgnScene(level.ngn bytes) - main.ts
+                    already holds those bytes for the textures
+                Implementation sketch: give buildLevelGeometry an optional
+                per-object zone array and have it bucket by zone as well as
+                (page, blend, cull), or emit a per-triangle zone array; then
+                a Viewer.visibleZones set that toggles groups. Start with a
+                zone picker (keys 0-9) drawing the chosen zone + zone 0 +
+                portal-adjacent zones; frustum clipping to portal outlines
+                comes after, and the camera's own zone comes with Buzz (P2).
  P1.6 [ACTIVE]  Parity harness. Half done: tools/render-level.ts now takes
                 --eye/--target/--size/--fovy and matches three.js (vertical
                 FOV, the viewer's clear colour, the same two draw queues and

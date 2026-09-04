@@ -473,15 +473,17 @@ Two findings that will silently corrupt a renderer if missed:
   occasionally exceeding the vertex count. No genuine quad in any scene file
   has an out-of-range 4th index (0 of 102,945).
 
-**The object table has TWO sections, and only the first is decoded.** This is
-a live defect, found 2026-09-03 by checking `level.dat` against the converted
-scene. In every scene file, `.ngn` holds two instance lists whose lengths sum
-to exactly the object count, and the first list's positions and bounding box
-match `level.dat`'s first N objects exactly, in order. Past that point *no*
-position matches: the records after the first section use a **different
-layout**, and the tiler here reads them with the first section's field
-offsets, producing wrong positions, rotations, scales and mesh pointers for
-about a quarter of every level.
+**The object table has TWO sections, and the second is stored at a quarter
+scale.** Both use the same record layout, but every position in the second
+run — and every vertex of the meshes it points at — must be multiplied by 4.
+Read straight, those objects collapse into a small box near the origin with
+meshes a quarter of their size, which is what the stray planks and blocks
+floating around Andy's house were. The two runs are what the PC engine draws
+as its two passes with different distance limits, and the converted `.ngn`
+scene keeps them as two instance lists: the first is the first section in
+order; the second is the second section, times four, in a different order.
+Verified on every scene file: positions match 100% and 98-100% of the
+scene's faces are found in `level.dat` at the object's scale.
 
 | scene | objects | section 1 | section 2 |
 |---|---|---|---|
@@ -491,16 +493,24 @@ about a quarter of every level.
 | `level05/level` | 518 | 376 | 142 |
 | `level07/level` | 468 | 327 | 141 |
 
-15 of 16 scene files follow this exactly. `level10/level` does not (346 + 183
-against 530 objects, and its very first object already mismatches) and needs
-looking at separately.
+**Where the split is.** No record says which section it is in and no count was
+found in the header. What marks it is **section 4**, the list between the
+portals and the object table: 20-byte records of `i32 x, y, z; u32; u32
+pointer` with the pointer last, like the objects themselves. Its leading run
+points at exactly the first-section objects, one each, and then the structure
+changes (later records point back into section 4 — it is a linked structure,
+and its `x y z` are not the object's position; what it is for is still
+unknown). The list has a lead-in of up to a few words depending on what
+precedes it, so the parser tries each. Edge cases: `level06/level1` has one
+second-section object the rule misses, and `level10/level`'s first list is not
+in table order, so its zones fall back to position matching.
 
-The second section is what the engine draws as its **second pass**, with
-different near and far distance limits (see the visibility section) — so it is
-probably billboards or sprites, which would also explain the 2D sprite pool
-sitting unparsed at the tail of the mesh pool. Its record layout is not yet
-known. The converted scene gives an exact oracle for recovering it: the
-positions, in order, are the second instance list.
+**Zones.** `level.dat` carries no zone field; `assignZones` in
+`src/formats/ngnscene.ts` takes them from the scene: first section by index,
+second by position times four, with duplicated objects (a prop listed once per
+zone) each consuming one instance. Assigns every object in 13 of 16 scenes and
+all but one or two in the rest. `tools/scene-crosscheck.ts` reports all of
+this per scene.
 
 **Do not resolve meshes by walking the pool alone.** The pool ends in a 2D
 sprite section we can't parse yet, so a contiguous walk stops early; objects
@@ -508,7 +518,7 @@ pointing past that point must be resolved from their own pointers. Doing only
 the walk silently drops ~27% of level 1's objects — it renders, so the loss is
 easy to miss.
 
-**Validated (first section only, see the defect above):** 16 of 16 real scene files parse, 319,556 triangles across the
+**Validated:** 16 of 16 real scene files parse, 320,257 triangles across the
 game (an earlier figure of 338,650 counted the phantom second halves of
 triangle-group faces). Level 1 yields 1,126 objects over 701 meshes drawing
 1,072 of them, plus 70 markers, 30 paths and 22 zones — matching an

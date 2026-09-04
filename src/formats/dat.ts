@@ -62,6 +62,16 @@ export interface DatObject {
   /** Byte offset of this record (its position field) and the size the tiler chose. */
   offset: number;
   size: number;
+  /**
+   * Model units per stored unit: 1 for the first section of the object table,
+   * 4 for the second. The table holds two runs of identically laid-out
+   * records, and everything in the second run — its positions and the
+   * vertices of the meshes it points at — is stored at a quarter of the
+   * scale. Read straight, those objects land in a small box near the origin
+   * with meshes a quarter of their size: the "phantom" props that were
+   * blamed on the .ngn being a different scene. See docs/FORMATS.md.
+   */
+  unitScale: 1 | 4;
   /** Byte offset of this object's mesh, stored as the record's final field. */
   meshOffset: number;
   position: Vec3;
@@ -352,7 +362,7 @@ export function parseDat(buffer: ArrayBuffer | Uint8Array): DatLevel {
   // the same mesh twice at an identical transform; under this one, none do,
   // and the table ends exactly at the mesh pool instead of 4 bytes short.
   const objects: DatObject[] = table.records.map(({ offset, size }) => ({
-    offset: offset + 4, size,
+    offset: offset + 4, size, unitScale: 1,
     meshOffset: r.u32(offset + size),
     position: r.vec3(offset + 4),
     rotation: size >= 24
@@ -363,6 +373,26 @@ export function parseDat(buffer: ArrayBuffer | Uint8Array): DatLevel {
       : { x: ANGLE_UNITS, y: ANGLE_UNITS, z: ANGLE_UNITS },
     flags: r.u16(offset + (size === 32 ? 28 : Math.min(size - 2, 22))),
   }));
+
+  // --- where the first section of the object table ends.
+  //
+  // Nothing in the record says which section it is in, and no count was found
+  // in the header. What does mark it is section 4, the 20-byte list between
+  // the portals and the objects: records of `x y z, u32, pointer` (pointer
+  // last, like the objects themselves), and its leading run points at
+  // exactly the first-section objects, one each — verified against the PC
+  // scene's own two instance lists in every scene file that has one. The
+  // list is preceded by up to a few words of lead-in — a u32 0 after a path
+  // or portal section, two after a marker section, none when nothing precedes
+  // it — so the start is found by trying each. A scene where no lead-in works
+  // keeps every object at unit scale, which is the old behaviour.
+  const byOffset = new Map(objects.map((o, i) => [o.offset, i]));
+  const resolves = (q: number) => q + 20 <= table.start && byOffset.has(r.u32(q + 16));
+  let q = pos;
+  for (let lead = 0; lead <= 16 && !resolves(q); lead += 4) q = pos + lead;
+  let firstSection = 0;
+  for (; resolves(q); q += 20) firstSection++;
+  if (firstSection > 0) for (let i = firstSection; i < objects.length; i++) objects[i]!.unitScale = 4;
 
   // --- mesh pool: meshes are stored back to back, but resolve them from the
   //     object pointers rather than only by walking forwards. The pool ends in
@@ -529,11 +559,15 @@ export function buildLevelGeometry(level: DatLevel): LevelGeometry {
     objectCount++;
 
     const m = rotationMatrix(object.rotation);
+    // Second-section objects store everything at a quarter scale; the factor
+    // applies to their vertices and to their position alike.
+    const u = object.unitScale;
     const sc = {
-      x: object.scale.x / ANGLE_UNITS,
-      y: object.scale.y / ANGLE_UNITS,
-      z: object.scale.z / ANGLE_UNITS,
+      x: (object.scale.x / ANGLE_UNITS) * u,
+      y: (object.scale.y / ANGLE_UNITS) * u,
+      z: (object.scale.z / ANGLE_UNITS) * u,
     };
+    const px = object.position.x * u, py = object.position.y * u, pz = object.position.z * u;
 
     for (const face of mesh.faces) {
       const bucket = bucketFor({
@@ -555,9 +589,9 @@ export function buildLevelGeometry(level: DatLevel): LevelGeometry {
         if (v) {
           const x = v.x * sc.x, y = v.y * sc.y, z = v.z * sc.z;
           bucket.pos.push(
-            (m[0]! * x + m[1]! * y + m[2]! * z + object.position.x) / WORLD_SCALE,
-            -(m[3]! * x + m[4]! * y + m[5]! * z + object.position.y) / WORLD_SCALE,
-            -(m[6]! * x + m[7]! * y + m[8]! * z + object.position.z) / WORLD_SCALE,
+            (m[0]! * x + m[1]! * y + m[2]! * z + px) / WORLD_SCALE,
+            -(m[3]! * x + m[4]! * y + m[5]! * z + py) / WORLD_SCALE,
+            -(m[6]! * x + m[7]! * y + m[8]! * z + pz) / WORLD_SCALE,
           );
           bucket.col.push(v.r / colourScale, v.g / colourScale, v.b / colourScale);
         }

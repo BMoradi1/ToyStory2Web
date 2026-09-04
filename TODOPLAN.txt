@@ -57,9 +57,11 @@
    whole install by a tools/*-validate.ts script.
 
  AN OPEN DECISION: WHICH FILE IS THE RENDER SOURCE
-   level.dat is the PSX scene and is what this project parses today. The PC
-   executable never reads it: pconv converted each level into an NU-engine
-   scene inside level.ngn, and that is what ships and runs. The scene carries
+   level.dat is the PSX scene and is what this project parses today. pconv
+   converted each level into an NU-engine scene inside level.ngn, and it is
+   the .ngn that the PC renderer draws. (toy2.exe does also load level.dat at
+   runtime, in InitLevelPlay, for something not yet traced - so it is not
+   dead data on PC.) The scene carries
    what level.dat does not - zone assignments, resolved materials, per-vertex
    alpha, float transforms - and is the reason the material table could be
    decoded at all. Rendering from it would unblock visibility immediately and

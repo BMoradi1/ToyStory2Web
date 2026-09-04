@@ -21,6 +21,30 @@ PSX quads are four vertices, but **this build winds them as a plain polygon**,
 That holds for both the model and level formats. PSX hardware is exhaustively documented; PC-only formats
 usually are not, so prefer parsing the PSX-side file wherever both exist.
 
+## Why the disc holds every level twice
+
+Each level ships as both `level.dat` (+ `level.raw`) and `level.ngn`. They are
+the input and the output of one conversion, not two authored versions: the
+`Pconv.cfg` in each directory names `level.dat` as `INPUT_FILE` and
+`level.ngn` as `OUTPUT_FILE`. Both shipped because the retail `data` directory
+**is** the developers' build tree — it also carries `psx.exe`, both PlayStation
+disc executables, a `system.cnf` that boots the European one, the MIPS
+overlays, and their own 4DOS batch scripts (`mkdat.btm`, `mkgfx.btm`,
+`dupeconv.btm`). `level09/Pconv.cfg` still keeps a commented-out build-machine
+path, `e:\PC\TOY2\CD\LEVEL01\level.dat`.
+
+The size gap is textures. `level.raw` is RNC-compressed PlayStation texture
+pages at 469 KB; the `.ngn` carries the same art decoded to 24bpp Windows
+BMPs, which is most of its 7.9 MB.
+
+**Both are read at runtime, though.** `toy2.exe` loads the `.ngn` for the scene
+it draws, and *separately* loads `level*.dat` and `level*.raw` into a buffer in
+`InitLevelPlay` (`FUN_00452fc0` → `FUN_004a6940`, which logs
+`LOAD - Loading file %s`). What the PlayStation scene is used for once the
+graphics come from the `.ngn` has **not** been traced; its consumer is
+`FUN_0043e6e0`, a 2.5 KB function. Do not assume `level.dat` is inert on PC:
+an earlier note here said so and was wrong.
+
 ## The build pipeline, in the developers' own words
 
 Each level directory holds a `Pconv.cfg` consumed by `pconv.exe`. Level 1's:
@@ -577,8 +601,9 @@ section below, read out of the PC executable rather than inferred.
 ### The `.ngn` scene — what the PC build actually draws
 
 `.ngn` is not only textures. pconv converted each level into the NU engine's
-own scene format and appended it after the texture repack; toy2.exe never
-touches `level.dat`. The loader is world.c (`FUN_004c33f0`, chunk loop) and
+own scene format and appended it after the texture repack, and that scene is
+what the PC renderer draws — reached by taking the level's `.raw` texture path
+and swapping the extension for `.ngn`. The loader is world.c (`FUN_004c33f0`, chunk loop) and
 objload.c (`FUN_004cb320`/`4cb4e0`/`4cb970`/`4cbc90`). Every chunk is
 `u32 type, u32 size`, so unknown ones skip cleanly:
 

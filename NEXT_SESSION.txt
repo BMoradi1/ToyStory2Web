@@ -1,0 +1,193 @@
+================================================================================
+ NEXT SESSION - what to hand to which model, and how to pick the work back up
+ Written 2026-09-03, at the end of the session that finished Phase 1.
+================================================================================
+
+ Read TODOPLAN.txt for WHAT to do. This file is about WHO should do it and what
+ you need set up before starting. It is addressed to both the user and to
+ whichever model is running: see "IF YOU ARE THE MODEL READING THIS" below for
+ when to ask to be swapped out, in either direction.
+
+================================================================================
+ THE SHORT ANSWER
+================================================================================
+ Use Fable for reading the 1999 executables. Use Opus for everything else.
+
+ The split is not "hard vs easy". It is whether the work is DECODING - forming
+ a hypothesis about unlabelled data and testing it against an oracle - or
+ IMPLEMENTATION, where the answer is already written down and the job is to
+ type it in correctly.
+
+ Every real find this session came out of decoding, and each one changed the
+ plan rather than following it:
+
+   - the level material table, read from Direct3D render-state calls in
+     toy2.exe rather than guessed from PSX conventions
+   - "the second object section has a different record layout" - wrong. It has
+     the SAME layout at a quarter scale. Seeing that took holding a failed
+     hypothesis loosely
+   - "objects only correlate 65-72% between the two files, so we may need to
+     switch render source" - wrong, and the decision it implied was never
+     needed. The mismatch was our own parser bug
+   - the visibility algorithm, lifted whole out of the portal walk
+
+ The implementation that followed each of those was routine, and Opus did it:
+ blend modes and culling in three.js, zone bucketing and filtering, the
+ collision query, standing Buzz on the floor, the docs.
+
+================================================================================
+ IF YOU ARE THE MODEL READING THIS
+================================================================================
+ You are expected to say when you are the wrong model for what is in front of
+ you. Neither switch is a failure; carrying on regardless is. The switch costs
+ the user one line, so the bar for suggesting it is low - but say it plainly
+ rather than hedging, and say which way.
+
+ Switch does not mean stop. Finish or park what you are on, write down what is
+ settled and what is not, then say what the next model should pick up. The
+ handoff line is the boundary between "what IS this" and "make it so", not the
+ boundary between hard and easy.
+
+ --- ON OPUS, ASK FOR FABLE WHEN ---------------------------------------------
+   - you are about to guess. A constant, a field offset, what a flag bit
+     means, which of two readings is right. Guessing and moving on is how the
+     quarter-scale bug survived from the very first commit to this one
+   - a test of your hypothesis half-works. 60-90% agreement is the signature
+     of a WRONG MODEL, not of noisy data. This session's "objects only
+     correlate 65-72%" was a parser bug, and reading it as a correlation
+     problem produced an architectural decision that never needed making. A
+     clean rule scores ~100% or ~0%; anything in between means look again
+   - you are reading disassembly or decompiled C to find something that has
+     no name yet
+   - two files that describe the same thing disagree and you cannot say which
+     is right
+   - you catch yourself writing "probably", "seems to", or "consistent with"
+     in a doc or a commit message about something you have not tested
+
+ --- ON FABLE, HAND BACK TO OPUS WHEN ----------------------------------------
+   - the unknown now has a written-down answer with a validation number
+     attached, and what remains is wiring it in and checking it looks right
+   - you are about to write renderer code, tools, tests or docs around a fact
+     that is already settled
+   - you have been going for a while without a new hypothesis, and the next
+     step is mechanical: running a validator over every file, updating call
+     sites, tidying an interface
+   Do not hold on to a task because it is nearly done. Hand over at the answer.
+
+ --- HOW THIS ACTUALLY WENT --------------------------------------------------
+ It worked twice in this session, in both directions. Opus, doing routine
+ implementation, hit the 65-72% correlation figure, reported it as an anomaly
+ instead of working around it, and asked. Fable found that it was a parser
+ defect placing a quarter of every level wrong, fixed it, and handed straight
+ back at the point where the rule was known and validated. Neither model
+ finished the task it started. That is the pattern to copy.
+
+================================================================================
+ WHAT TO GIVE FABLE, IN ORDER
+================================================================================
+
+ 1. P2.1 - PLAYER PHYSICS CONSTANTS.  DONE 2026-09-04, by Fable, in one
+    sitting. See docs/PLAYER.md and src/sim/player-constants.ts.
+
+    What worked, for next time: not the assert strings and not the menu text.
+    The sound-effect NAME table (BUZJMP1, BUZWING, BUZSKID...) is indexed by
+    effect number, a second table maps sound EVENTS to effects, and game code
+    fires events. Grep every caller of the event dispatcher for the events
+    that resolve to Buzz's sounds and you land in the controller directly.
+    The same trick should find any other subsystem that makes a noise.
+
+    psx.exe was worth it: the PSX controller is the same code with the same
+    constants, which is what turned "this looks like gravity" into "this is
+    gravity". Note the Recomp seed list is 658 bare ADDRESSES, not names -
+    an earlier version of this file called it a symbol table. It still helps
+    Ghidra find function starts; tools/ghidra/README.md has the commands.
+
+    Two things Ghidra could not read and objdump could: the PC's double-jump
+    impulse and the analog stick magnitude are x87 float code that the
+    decompiler collapses to __ftol(). Both are decoded in PLAYER.md.
+
+ 2. P2.5 - ANIMATION STATE MACHINE.  Mapping buzz.anm's 170 animations onto
+    named states (idle, walk, run, jump, double jump, spin, laser, fall, land)
+    from the animation tables in the decompilation. Same kind of work, smaller.
+    The 20 fps playback rate is still an assumption and should be confirmed
+    from the code at the same time.
+    Leads from P2.1: the controller writes animation requests into the player
+    block at +0x8c (jump state), +0x90 (values 8, 0x1a, 3, 2 seen) and +0x92
+    (set to -1 on skid and stomp-switch), and FUN_004a3e60 runs on every jump.
+    Whatever consumes those fields is the animation state machine.
+
+ 3. THE REMAINING FORMAT UNKNOWNS.  None block anything, all are the same
+    shape of puzzle, and the .ngn scene is an oracle for most of them:
+      - the 2D sprite pool at the tail of level.dat's mesh pool. 98 KB in
+        level 1, and the second object section points into it
+      - section 4's actual meaning. Its leading run is one record per
+        first-section object, which is how the parser finds the section
+        boundary, but later records point back into section 4 itself, so it
+        is a linked structure of some kind
+      - what the extra-pass material (mode bit 0x08) actually draws
+      - level10/level, whose object order does not match its scene, and
+        level06/level1, one object short
+      - .vis and .kp2, still undecoded
+
+================================================================================
+ WHAT DOES NOT NEED FABLE
+================================================================================
+ P2.2 character controller (once the constants exist), P2.3 collision
+ response, P2.4 follow camera, the frustum-clipped portal walk, HUD and menus,
+ the save file, audio, cutscene playback, performance work, and anything in
+ Phase 7. All of these are specified; the difficulty is in getting them right,
+ not in working out what they are.
+
+================================================================================
+ THE METHOD THAT KEEPS PAYING OFF
+================================================================================
+ Every level exists twice on the disc: level.dat is the PlayStation scene and
+ level.ngn contains pconv's conversion of it. That redundancy is the single
+ most useful thing in the install. The converted copy has already resolved
+ what level.dat leaves implicit - materials, zone assignments, per-vertex
+ alpha - so it can be used as an ANSWER KEY for the original.
+
+ Both the material table and the quarter-scale bug were found by joining the
+ two files and looking at where they disagreed. When something in level.dat is
+ ambiguous, reach for the .ngn before reaching for a theory.
+ tools/scene-crosscheck.ts is the harness for this.
+
+ The other habit worth keeping: build the oracle before the feature.
+ tools/render-level.ts rasterises the same geometry offline and
+ tools/browser-shot.ts drives the real viewer headlessly, so a change can be
+ diffed pixel against pixel. The car-quarter bug and the colour-space bug were
+ both invisible by eye and obvious in a diff.
+
+================================================================================
+ SETUP NOTES
+================================================================================
+ GHIDRA.  Installed at /usr/bin/ghidra, headless analyser at
+ /opt/ghidra/support/analyzeHeadless. Projects live in scratch space and do
+ not survive a session; tools/ghidra/README.md has the exact commands to
+ rebuild both the PC and the PSX decompile as one greppable text file each
+ (about 5 minutes total). The dumps are derived from copyrighted binaries
+ and stay out of git.
+
+ THE GAME RUNS.  It is installed with dgVoodoo and can be launched, which is
+ the only way to settle absolute screen brightness. Note the graphics menu has
+ a gamma setting with three positions, so there is no single correct answer -
+ our byte-for-byte output is the neutral one.
+
+ A TRAP THAT COST TWO COMMITS.  Do not run
+
+   pkill -f "vite --port 5173"
+
+ The pattern matches the shell's own command line, so the shell kills itself
+ and everything after it in the chain silently does not run. It swallowed a
+ commit twice before I noticed. Use a pattern that cannot match, such as
+ pkill -f "bin/vite".
+
+ ANOTHER TRAP.  .gitignore has a bare "game/" rule (it guards against a copy
+ of the install landing in the tree). It also ignores src/game/, silently -
+ a module written there never showed in git status. Game logic lives in
+ src/sim/ for that reason. Do not weaken the ignore rule.
+
+ GIT.  The repo is on GitHub and you are not the only one committing to it -
+ branch main was renamed and relicensed mid-session, and three README commits
+ appeared from elsewhere. Fetch before assuming your view of origin/main is
+ current, and never force-push.

@@ -37,7 +37,8 @@
    material system outright - whichever mode bits become blend and cull
    render states ARE the answer, no PSX GPU inference needed.
  - psx.exe / SLUS_008.93 are the same logic for MIPS. Use them to cross-check,
-   with PeriBluGaming/ToyStory2Recomp's 658 named entry points as a map.
+   with PeriBluGaming/ToyStory2Recomp's 658 entry points to seed Ghidra (they
+   are bare addresses, not names).
  - The game runs locally under dgVoodoo. Side-by-side screenshots are
    available whenever wanted; the browser-shot tool makes ours reproducible.
  - A MIPS interpreter would need the engine import surface (100-300
@@ -225,10 +226,21 @@
  charged laser and charged spin around Andy's House with the original feel.
  Every constant comes from the decompiled object core, not from tuning.
 
- P2.1 [READY]   Extract the constants: gravity, walk/run speed, jump and
+ P2.1 [DONE]    Extract the constants: gravity, walk/run speed, jump and
                 double-jump impulses, air control, spin and laser charge
-                timings, hover/fall states. Source: nu3d/objcore.c and the
-                player code in toy2.cpp via Ghidra.
+                timings, hover/fall states.
+                Found: the whole controller is one cluster in toy2.exe
+                (0x433700-0x436d80, entry FUN_00436220), located by
+                following Buzz's sound events (BUZJMP1, BUZWING, BUZSKID)
+                back to their callers. Cross-checked function by function
+                against psx.exe (0x8003af24-0x8003ec30): same code, same
+                constants, two differences (PC ground friction 48 vs 32,
+                PC height-capped double jump). Physics is per 60 Hz tick
+                in units 32x the level file's. Written up in docs/PLAYER.md
+                and typed in src/sim/player-constants.ts. Ghidra scripts
+                to rebuild both decompiles: tools/ghidra/.
+                Not extracted: projectile speeds, the mover's step height
+                and slope limit (P2.3), ledge-grab probe geometry.
  P2.2 [READY]   Character controller on the fixed 16949us tick (Viewer.onTick
                 is already wired). Input: keyboard + gamepad, remappable.
                 Groundwork DONE: key `p` stands the selected character in
@@ -330,7 +342,7 @@
 ================================================================================
  juanmv94/TravellersTalesPSXCollisionViewer - THE format spec for seven TT
    PSX titles on the shared Dave Dootson engine. entv.html is the payload.
- PeriBluGaming/ToyStory2Recomp - MIPS->C recompilation; 658 function entry pts
+ PeriBluGaming/ToyStory2Recomp - MIPS->C recompilation; 658 entry addresses (unnamed)
  lazycurler/ToyStory2Research - decompiled C for zone/boundary/clipping logic
  RibShark/ToyStory2Fix - runtime patcher; source of the 59 FPS and 4:3 facts
    (scripts/ToyStory2Fix.asi in the install is this patch, not game scripts)

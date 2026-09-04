@@ -777,10 +777,11 @@ lines of already-three.js-shaped code, which is the recommended porting target.
 Everything in the `.all`, `.anm` and collision sections above comes from it.
 
 **PeriBluGaming/ToyStory2Recomp** — static MIPS-to-C recompilation of the PSX
-build. Documents no formats by construction, but `seeds/functions.txt` holds
-**658 Ghidra-derived function entry points** into the PSX executable. That is a
-direct attack on the "every overlay import is an unnamed address" problem
-described in the `level.bin` section.
+build. Documents no formats by construction. `seeds/functions.txt` holds 658
+entry points into the PSX executable, but they are **bare JAL target
+addresses with no names** (an earlier note here called them a symbol table;
+it was wrong). They are still useful for seeding Ghidra's function discovery
+on `psx.exe`, which is how `tools/ghidra/` uses them.
 
 **lazycurler/ToyStory2Research** — decompiled C for zone, boundary and clipping
 logic (`gAdjecentZoneLUT`, `gBoundaryLUT`). Game behaviour rather than formats,

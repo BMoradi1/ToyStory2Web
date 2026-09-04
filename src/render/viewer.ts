@@ -318,12 +318,13 @@ export class Viewer {
   followPlayer(distance = 3, height = 1.2, ease = 0.12): number {
     if (!this.player) return 0;
     const p = this.player.position;
-    // `getWorldDirection` gives the object's +Z axis. Characters are authored
-    // facing +Z in the file's space and `buildMeshData` negates Z on the way
-    // in, so an unrotated model faces -Z here — which makes +Z its back, and
-    // exactly where the camera belongs. Deriving it this way rather than from
-    // `rotation.y` by hand keeps the two from disagreeing about the sign.
-    const behind = this.player.getWorldDirection(new THREE.Vector3());
+    // `getWorldDirection` gives the object's +Z axis, and characters are
+    // authored facing +Z — verified by rendering the unrotated model from +Z
+    // and seeing its front, not its back. So +Z is the way it looks and the
+    // camera belongs at the negation of it. Deriving the offset from the
+    // object rather than from `rotation.y` by hand keeps the two from
+    // disagreeing about the sign.
+    const behind = this.player.getWorldDirection(new THREE.Vector3()).negate();
     const want = new THREE.Vector3(p.x + behind.x * distance, p.y + height, p.z + behind.z * distance);
     this.camera.position.lerp(want, ease);
     this.camera.lookAt(p.x, p.y + height * 0.5, p.z);

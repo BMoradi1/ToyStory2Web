@@ -487,14 +487,15 @@ function playTick(): void {
   stepPlayer(player, input.read(), playerRuntime, groundFromCollision(currentCollisionWorld), cameraYaw);
 
   // Game space to renderer space. A game facing of (sin yaw, cos yaw) becomes
-  // (sin yaw, -cos yaw) once Z is negated. The unrotated model already points
-  // at -Z for the same reason, and rotating that by -yaw about Y lands on the
-  // wanted direction, so the renderer angle is the negated sim angle.
+  // (sin yaw, -cos yaw) once Z is negated. Characters are authored facing +Z
+  // and stay that way through buildMeshData's flip, checked by rendering the
+  // unrotated model from +Z and seeing its front, so the rotation that lands
+  // an unrotated +Z on the wanted direction is pi - yaw.
   viewer.setPlayerTransform(
     player.x * GAME_TO_RENDER,
     -player.y * GAME_TO_RENDER,
     -player.z * GAME_TO_RENDER,
-    -toRadians(player.yaw),
+    Math.PI - toRadians(player.yaw),
   );
   viewer.followPlayer();
 }

@@ -392,11 +392,19 @@ export function stepPlayer(
   // --- move ----------------------------------------------------------------
   // P2.3 replaces this with the real mover. For now the horizontal step is
   // unobstructed and only the floor is respected, so walls do not stop anyone.
+  const wasY = p.y;
   p.x += p.vx;
   p.z += p.vz;
   p.y += p.vy;
 
-  const floor = ground.floorAt(p.x, p.y, p.z);
+  // Sweep rather than sample. Falling at terminal velocity covers 2048 units
+  // in a tick, which is the whole of the floor query's tolerance, so asking
+  // only from the position we landed on can step clean over a surface — and
+  // once past it by more than that tolerance the query never returns it
+  // again and the player falls out of the level. Asking from the highest
+  // point of the tick (+Y is down, so the smaller of the two) finds the
+  // topmost floor anywhere under the segment just travelled.
+  const floor = ground.floorAt(p.x, Math.min(wasY, p.y), p.z);
   p.groundY = floor ? floor.y : null;
   if (floor !== null && p.y >= floor.y) {
     // Landing. A flagged hard fall costs velocity and control on the way down.

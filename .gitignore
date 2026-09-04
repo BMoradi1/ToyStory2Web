@@ -1,14 +1,72 @@
-# Game data — never commit. The models, textures, audio and video are
-# Disney/Pixar/Activision property and must be supplied by the user from their
-# own copy, read locally at runtime. See CLAUDE.md.
+# ─── Copyrighted material — never commit ────────────────────────────────────
+#
+# The game's models, textures, audio, video and level data are Disney/Pixar/
+# Activision property. The user supplies their own copy, read locally at
+# runtime; none of it enters git and none of it ships in a build. See CLAUDE.md
+# hard rule 1.
+
+# The game install itself, and any copy of it
 Toy Story 2/
+Toy Story 2 - Buzz Lightyear to the Rescue/
 assets/game/
+game/
+gamedata/
+
+# Disc images and archives a copy might arrive in
 *.iso
 *.cue
+*.bin
+*.img
+*.mds
+*.mdf
+*.nrg
+*.chd
+*.pkg
 
-# Build + dependencies
+# Anything extracted or converted out of the install. These are derivative
+# works of the original assets and are just as unpublishable as the originals.
+out/
+extracted/
+converted/
+*.ngn
+*.anm
+*.dat
+*.cfg
+*.rsb
+*.bmp
+*.tga
+*.tim
+*.vab
+*.vag
+*.str
+*.xa
+*.wav
+*.mp3
+*.ogg
+*.avi
+*.mpg
+*.mpeg
+*.bik
+
+# Screenshots and captures. A render of the game's own geometry and textures
+# reproduces the copyrighted art, so these stay local too.
+Screenshot*.png
+Screenshot*.jpg
+screenshots/
+shots/
+capture*.png
+*-shot.png
+*-frame.png
+
+# ─── Build + dependencies ───────────────────────────────────────────────────
 node_modules/
 dist/
+.vite/
+*.tsbuildinfo
 
-# Extraction output
-out/
+# ─── Editor / OS noise ──────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/

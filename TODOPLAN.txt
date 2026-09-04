@@ -1,7 +1,7 @@
 ================================================================================
  ToyStory2Web - PROJECT ROADMAP
  Browser reimplementation of Toy Story 2: Buzz Lightyear to the Rescue (1999)
- Last updated: 2026-08-27 (level defect solved: mode bit 0x01 = triangle group)
+ Last updated: 2026-09-03 (renderer diagnosis: colour space, opaque overlays, no visibility)
 ================================================================================
 
  HOW TO USE THIS FILE
@@ -72,6 +72,9 @@
           !! Reading those as quads was "the level defect": stray slivers
           !! plus wrong texture regions on 12,650 faces. No sentinel exists.
           !! Resolve meshes from object pointers, not just a pool walk.
+          !! The mesh pointer is the LAST field of an object record. Reading
+          !! it first pairs each mesh with the previous object's transform -
+          !! "the same prop at another size and angle with faces missing".
  [DONE]   .kep / .new - older revisions of level.dat itself (Sept vs Oct 1999)
  [OPEN]   .vis / .kp2 - same container as .dat, 12-byte first-section records,
           no object table or mesh pool. Confirmed NOT a visibility set.
@@ -96,20 +99,86 @@
            texels get their RGB bled from neighbours so mipmaps don't tint
            cutout edges green
  [DONE]    Untextured faces draw vertex colour at 0-255 scale (PSX flat-poly
-           rule); only textured faces use the 0x80-neutral modulation. The
-           /128-everywhere reading clamped window glass to neon cyan.
- [OPEN]    PSX semi-transparency (material & 0x20) - unimplemented; Buzz's
-           helmet is an opaque dome until it is. Levels: mode bits 13/14 mark
-           single-texel flat-colour overlay faces (shadows, glass tint),
-           currently drawn opaque - blend mode undecoded.
+           rule); only textured faces use the 0x80-neutral modulation.
+ [DONE]    Headless browser oracle - tools/browser-shot.ts drives real Chromium
+           over the DevTools pipe, feeds the install to the page's own
+           directory input, places the camera via `ts2.viewer`, screenshots.
+           The offline rasteriser (tools/render-level.ts) only proves the
+           GEOMETRY; this proves what the browser does with it.
+
+ --- RENDERER DIAGNOSIS, 2026-09-03 --------------------------------------------
+ The geometry is right. Browser and offline oracle now draw the same house from
+ the same camera. What is still wrong is everything downstream of geometry, and
+ it was being chased by re-reading the parser. Four defects, in order of proof:
+
+ 1. COLOUR MANAGEMENT. three.js's default outputColorSpace is sRGB, so every
+    vertex colour and DataTexture (tagged NoColorSpace, so treated as linear)
+    is brightened on output: a (0,82,0) vertex reaches the screen as
+    (0,163,0). Measured by raycasting the "green panels" in the browser and
+    sampling the pixel. This is why the browser looks washed out next to the
+    oracle, and why dark overlays glow. The 1999 engine had no colour
+    management; the fix is a raw pass-through.
+ 2. SEMI-TRANSPARENT OVERLAYS DRAWN OPAQUE. The green garage-door and window
+    panels are untextured mode 0x0070 quads with dark vertex colours
+    ((0,82,0)..(0,115,0)); the black rectangles are the same at (0,0,0).
+    1,209 of level 1's 3,080 untextured faces are near-black. On PSX these
+    are blended (shadows = half-blend black, glass = additive green tint);
+    here they draw solid. The flag that selects blending has NOT been found.
+    Ruled out, so do not retest: the mode word (0x0070 is the plain flat
+    mode), vertex-colour bit 15 (set on 2 of 37,329 vertices), object flags
+    (dark faces spread evenly across every low-nibble value), and the aux
+    block (24 meshes, 21 dark faces). Statistics are exhausted; see P2.2.
+ 3. NO VISIBILITY. All 22 zones draw at once. Zone quads are PORTAL PAIRS:
+    each doorway quad appears twice with (a,b) swapped, b=15 meaning outside.
+    Object flags do not encode the zone (tested: flags>>11 groups span 64-100%
+    of the level). The per-zone object list is most likely the 20-byte ref
+    list in section 4, which points at object records - untested.
+ 4. NO CULLING. Everything is double-sided because the culling rule is unknown.
+
+ --- PLAN --------------------------------------------------------------------
+ P2.1 [READY]   Raw colour pipeline. renderer.outputColorSpace = Linear, textures
+                stay NoColorSpace. PSX has no filtering either: nearest min AND
+                mag, no mipmaps - which also retires the key-bleed hack.
+                Acceptance: one pixel sampled through browser-shot matches the
+                oracle's value for the same face to within rounding.
+ P2.2 [READY]   Read the material system out of psx.exe instead of guessing it.
+                Ghidra is installed (/usr/bin/ghidra); run analyzeHeadless on
+                data/psx.exe (MIPS LE, base 0x80010000) seeded with
+                PeriBluGaming/ToyStory2Recomp seeds/functions.txt. Find the
+                routine that walks face groups: it reads u16 mode/count, tests
+                0x10 (flat vs textured) and 0x01 (tri vs quad), and stores GPU
+                primitive codes (0x24/0x2C/0x34/0x3C) into packets. What it
+                does with the other mode bits IS the material table:
+                  - which bit sets GPU code bit 0x02 (semi-transparent)
+                  - which bits become the TPage ABR blend mode (0-3)
+                  - whether nclip (backface) is applied, and on which faces
+                  - what bits 13/14, 0x8000 and the low nibble 0x02/04/08 do
+                Deliverable: a mode-bit -> GPU-behaviour table in FORMATS.md.
+                Same pass answers character material & 0x20 / 0x80.
+                Fallback if the disassembly stalls: a flag explorer in the
+                viewer (isolate/colour faces by mode bit) compared against
+                gameplay footage - slower and less certain.
+ P2.3 [BLOCKED] Blend modes           <- P2.2. Implement the four PSX modes as
+                three.js custom blending (0.5B+0.5F, B+F, B-F, B+0.25F), draw
+                blended faces after opaque ones per object, and split draw
+                groups by (page, blend) instead of page alone. Depth-write off
+                for blended faces. Buzz's helmet is the character test case.
+ P2.4 [BLOCKED] Culling               <- P2.2. Apply the engine's rule per face.
+ P2.5 [READY]   Portal visibility. Build the zone graph from the (a,b) pairs.
+                Find the object->zone mapping: test the section-4 ref list
+                first (group objects by ref-list run, check each run is
+                spatially compact - the same test that ruled out flags).
+                Then draw current zone + portal-adjacent zones only. Needed
+                for correct overdraw AND for the interior camera later.
+ P2.6 [READY]   Oracle discipline. Every renderer change ships with a
+                browser-shot vs render-level comparison from the same camera
+                (add a --eye/--target pair to render-level). No more "it looks
+                right" - the sliver bug survived weeks of that.
+ [OPEN]    140 faces on page 16 (mode 0x1000) in level 1 - page 16 is Buzz's
+           character page; what level faces reference it?
  [OPEN]    hoola.all reports page 0, unlike every other model (16-24)
- [BLOCKED] Material system                  <- needs mesh flags: textured,
-           double-sided, additive, subtractive, 50% translucent
  [READY]   Collision mesh rendering (debug) <- parser done, not yet drawn
  [READY]   Level select UI driven by the install's own directories
- [OPEN]    Zone / room streaming. Reference: lazycurler/ToyStory2Research has
-           decompiled C for zone and boundary logic (gAdjecentZoneLUT,
-           gBoundaryLUT) - behaviour, not formats.
 
 ================================================================================
  PHASE 3 - CHARACTERS AND ANIMATION

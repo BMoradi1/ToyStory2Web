@@ -36,6 +36,10 @@ export interface Path { id: number; points: Vec3[] }
 export interface Zone { corners: [Vec3, Vec3, Vec3, Vec3]; a: number; b: number }
 
 export interface DatObject {
+  /** Byte offset of this record (its position field) and the size the tiler chose. */
+  offset: number;
+  size: number;
+  /** Byte offset of this object's mesh, stored as the record's final field. */
   meshOffset: number;
   position: Vec3;
   /** Rotation in PSX angle units (4096 == 360 degrees). */
@@ -313,8 +317,20 @@ export function parseDat(buffer: ArrayBuffer | Uint8Array): DatLevel {
   const table = findObjectTable(r, pos, meshStart);
   if (!table) throw new Error('level.dat: could not tile the object table');
 
+  // The mesh pointer is the LAST field of a record, not the first. The tiler
+  // frames records as [u32][x y z][rot][scale][flags] because that is how the
+  // pointer/rotation validity checks fall out, but the u32 at the head of a
+  // frame belongs to the PREVIOUS record. Reading it as this record's mesh
+  // pairs every mesh with the transform of the object before it — which is
+  // invisible when neighbours share a transform (most do: multi-part props
+  // are consecutive records) and shows up as a stray part wherever they do
+  // not. Level 1's garage car lost a quarter to the next object's transform
+  // that way. Under the head-pointer reading 8 of 15 clean scene files place
+  // the same mesh twice at an identical transform; under this one, none do,
+  // and the table ends exactly at the mesh pool instead of 4 bytes short.
   const objects: DatObject[] = table.records.map(({ offset, size }) => ({
-    meshOffset: r.u32(offset),
+    offset: offset + 4, size,
+    meshOffset: r.u32(offset + size),
     position: r.vec3(offset + 4),
     rotation: size >= 24
       ? { x: r.u16(offset + 16), y: r.u16(offset + 18), z: r.u16(offset + 20) }

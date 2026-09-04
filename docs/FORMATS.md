@@ -394,8 +394,21 @@ with no offset table:
     marker    i32 x, y, z; i32 flag        always 0x10 in 1999-dated files
     path      u16 count, u16 id; count x { i32 x, y, z }     ids are sparse
     zone      u16 0x0005, u16 0x0041; 4 x { i32 x,y,z }; i32 a, b, c
-    object    u32 meshPtr; i32 x,y,z; [u16 rx,ry,rz]; [u16 sx,sy,sz]; u16 flags
+    object    i32 x,y,z; [u16 rx,ry,rz]; [u16 sx,sy,sz]; u16 flags; u32 meshPtr
     mesh      i32 nverts; nverts x { i16 x,y,z; u16 colour }; face groups; FFFFFFFF
+
+**The mesh pointer is the record's LAST field, not its first.** Both readings
+tile the table identically, because the u32 that ends one record sits at the
+head of the next, so a head-pointer parser pairs every mesh with the transform
+of the object *before* it. That is invisible while neighbours share a transform
+(multi-part props are consecutive records with identical transforms) and shows
+up as a stray part wherever they do not: level 1's garage car is four quarter
+meshes, and the head-pointer reading placed the fourth at the next object's
+position. Evidence for pointer-last: with it, no scene file places the same mesh
+twice at an identical transform (head-pointer does so in 8 of 15 clean files),
+and the table ends exactly at the mesh pool instead of leaving a 4-byte gap
+holding "one more pointer". `level02/level.dat` genuinely repeats whole records
+byte-for-byte and is not a discriminator either way.
 
 **Object records do not store their own size.** They are 20, 24 or 32 bytes and
 must be recovered by tiling the table exactly — walk backwards marking every

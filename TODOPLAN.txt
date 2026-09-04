@@ -1,7 +1,7 @@
 ================================================================================
  ToyStory2Web - PROJECT ROADMAP
  Browser reimplementation of Toy Story 2: Buzz Lightyear to the Rescue (1999)
- Last updated: 2026-09-03 (P1.0-P1.4 done; P1.5 ready)
+ Last updated: 2026-09-03 (Phase 1 complete but for the real-game parity check)
 ================================================================================
 
  HOW TO USE THIS FILE
@@ -182,22 +182,26 @@
                 validates split, scale and zones on every scene.
                 Edges left: level06/level1 (one object), level10 (two).
 
- P1.5 [READY]   Portal visibility. Everything needed is now in hand:
-                  - the algorithm (FORMATS.md, "Visibility"): per-zone object
-                    lists, walk from the camera's zone through portals whose
-                    outline is in view, clip the frustum to each, never go
-                    back through the portal you came by, always draw zone 0
-                  - the graph: level.portals (from/to, 15 = outside)
-                  - each object's zone: assignZones(level.objects, scene),
-                    where scene = parseNgnScene(level.ngn bytes) - main.ts
-                    already holds those bytes for the textures
-                Implementation sketch: give buildLevelGeometry an optional
-                per-object zone array and have it bucket by zone as well as
-                (page, blend, cull), or emit a per-triangle zone array; then
-                a Viewer.visibleZones set that toggles groups. Start with a
-                zone picker (keys 0-9) drawing the chosen zone + zone 0 +
-                portal-adjacent zones; frustum clipping to portal outlines
-                comes after, and the camera's own zone comes with Buzz (P2).
+ P1.5 [DONE]    Portal visibility, the data and filtering half. Geometry is
+                bucketed by zone as well as (page, blend, cull), so a zone is
+                a set of draw groups that can be switched off without
+                touching the buffers - Viewer.setVisibleZones() flips each
+                group's material.visible, which three.js honours per group.
+                reachableZones(portals, from) walks the graph one step: the
+                zone, whatever its portals reach, and zone 0. In the viewer,
+                keys 0-9 stand in a zone and `a` shows the whole level.
+                Verified by eye: zone 5 is the attic, zone 1 the bedroom and
+                landing, each a coherent room rather than a scatter. Level 1
+                is 83 draw groups over 9 zones and 22 portals; standing in
+                zone 5 draws 6,023 of 33,103 triangles.
+ [READY]  Frustum-clipped portal walk. What remains of the engine's real
+          algorithm: recurse through portals whose outline is inside the
+          view, narrowing the frustum to each outline, instead of taking a
+          fixed one-step neighbourhood. Needs the portal corners projected
+          per frame; level.zones already carries them.
+ [BLOCKED] Camera's own zone          <- P2. The engine tracks it as the
+          player crosses portals, so it arrives with the character
+          controller. Until then the zone is picked by hand.
  P1.6 [ACTIVE]  Parity harness. Half done: tools/render-level.ts now takes
                 --eye/--target/--size/--fovy and matches three.js (vertical
                 FOV, the viewer's clear colour, the same two draw queues and

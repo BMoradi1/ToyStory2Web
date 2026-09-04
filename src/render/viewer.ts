@@ -71,6 +71,17 @@ export class Viewer {
 
   private lastLevel: { geometry: LevelGeometry; textures: Map<number, THREE.Texture> } | null = null;
 
+  /**
+   * Zones to draw, or null for all of them.
+   *
+   * The engine never drew a whole level at once: it drew the zone the camera
+   * was in and walked outward through the portals it could see. Until there
+   * is a player to place the camera, this is set by hand — see
+   * `reachableZones` for the graph half of the same idea. Faces whose object
+   * had no zone are always drawn, since hiding them would be a guess.
+   */
+  private zoneFilter: Set<number> | null = null;
+
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -188,6 +199,32 @@ export class Viewer {
     this.current = new THREE.Mesh(buffer, materials);
     this.scene.add(this.current);
     this.frameObject(buffer);
+    // A rebuild makes fresh materials, so reapply whatever filter was set.
+    if (this.zoneFilter) this.setVisibleZones(this.zoneFilter);
+  }
+
+  /**
+   * Show only these zones, or all of them when passed null.
+   *
+   * Toggles each draw group's material rather than rebuilding the geometry:
+   * three.js skips a group whose material is invisible, so this costs
+   * nothing per frame and keeps the buffers intact.
+   */
+  setVisibleZones(zones: Set<number> | null): string {
+    this.zoneFilter = zones;
+    const mesh = this.current;
+    const geometry = this.lastLevel?.geometry;
+    if (!mesh || !geometry || !Array.isArray(mesh.material)) return 'no level loaded';
+    let shown = 0, hidden = 0;
+    geometry.groups.forEach((group, i) => {
+      const material = mesh.material as THREE.Material[];
+      const visible = zones === null || group.zone === null || zones.has(group.zone);
+      if (material[i]) material[i]!.visible = visible;
+      if (visible) shown += group.count / 3; else hidden += group.count / 3;
+    });
+    return zones === null
+      ? `all zones, ${shown} triangles`
+      : `zones ${[...zones].sort((a, b) => a - b).join(',')}: ${shown} triangles drawn, ${hidden} hidden`;
   }
 
   /** How many meshes are actually in the scene. Should be exactly one. */

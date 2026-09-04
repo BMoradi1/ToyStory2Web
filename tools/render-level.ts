@@ -111,6 +111,7 @@ const groups: GeometryGroup[] = geo.groups.map((g) => {
     blend: level.blend ?? 'opaque',
     doubleSided: level.doubleSided ?? true,
     alpha: level.alpha ?? 1,
+    zone: level.zone ?? null,
   };
 });
 

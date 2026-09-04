@@ -433,6 +433,12 @@ export interface GeometryGroup {
   doubleSided: boolean;
   /** Constant vertex alpha: 1 for opaque faces, 0.5 for the PSX half-blend. */
   alpha: number;
+  /**
+   * Which zone these faces belong to, or null if the caller supplied no zone
+   * for the object. Zones are the unit of visibility: the engine draws the
+   * one the camera is in plus whatever it can see through portals.
+   */
+  zone: number | null;
 }
 
 export interface LevelGeometry {
@@ -537,7 +543,39 @@ function rotationMatrix(rot: Vec3): number[] {
   return mul(mul(RY, RX), RZ);
 }
 
-export function buildLevelGeometry(level: DatLevel): LevelGeometry {
+/**
+ * Zones reachable from `from` without leaving the level.
+ *
+ * One step of the engine's portal walk, minus the frustum clipping: the zone
+ * itself, whatever its portals lead to, and zone 0, which the engine draws
+ * from wherever you stand. `depth` widens it; the real renderer recurses until
+ * the clipped frustum goes empty, which needs a camera, so a fixed depth
+ * stands in until there is a player to stand somewhere.
+ */
+export function reachableZones(portals: Zone[], from: number, depth = 1): Set<number> {
+  const seen = new Set<number>([from, 0]);
+  let frontier = [from];
+  for (let step = 0; step < depth; step++) {
+    const next: number[] = [];
+    for (const zone of frontier) {
+      for (const portal of portals) {
+        if (portal.from !== zone || portal.to === OUTSIDE) continue;
+        if (seen.has(portal.to)) continue;
+        seen.add(portal.to);
+        next.push(portal.to);
+      }
+    }
+    frontier = next;
+  }
+  return seen;
+}
+
+export interface GeometryOptions {
+  /** Zone per object, parallel to `level.objects`. See `assignZones`. */
+  zones?: (number | null)[];
+}
+
+export function buildLevelGeometry(level: DatLevel, options: GeometryOptions = {}): LevelGeometry {
   // Bucket triangles by everything that has to be one draw call: texture page,
   // blend mode and cull mode. A page alone is not enough — a wall and the
   // glass in front of it can share a texture and still need different states.
@@ -545,7 +583,7 @@ export function buildLevelGeometry(level: DatLevel): LevelGeometry {
   interface Bucket { pos: number[]; col: number[]; uv: number[]; group: Omit<GeometryGroup, 'start' | 'count'> }
   const buckets = new Map<string, Bucket>();
   const bucketFor = (group: Omit<GeometryGroup, 'start' | 'count'>) => {
-    const key = `${group.page}|${group.blend}|${group.doubleSided}`;
+    const key = `${group.page}|${group.blend}|${group.doubleSided}|${group.zone}`;
     let bucket = buckets.get(key);
     if (!bucket) { bucket = { pos: [], col: [], uv: [], group }; buckets.set(key, bucket); }
     return bucket;
@@ -553,10 +591,11 @@ export function buildLevelGeometry(level: DatLevel): LevelGeometry {
 
   let objectCount = 0;
 
-  for (const object of level.objects) {
+  for (const [index, object] of level.objects.entries()) {
     const mesh = level.meshes.get(object.meshOffset);
     if (!mesh) continue;
     objectCount++;
+    const zone = options.zones?.[index] ?? null;
 
     const m = rotationMatrix(object.rotation);
     // Second-section objects store everything at a quarter scale; the factor
@@ -575,6 +614,7 @@ export function buildLevelGeometry(level: DatLevel): LevelGeometry {
         blend: blendMode(face.mode),
         doubleSided: isDoubleSided(face.mode),
         alpha: faceAlpha(face.mode),
+        zone,
       });
 
       // PSX colour scaling differs by primitive kind: textured polys modulate

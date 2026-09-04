@@ -4,8 +4,9 @@ import {
   type AnmFile, type Animation,
 } from './formats/anm.ts';
 import * as THREE from 'three';
-import { buildLevelGeometry, parseDat } from './formats/dat.ts';
+import { buildLevelGeometry, parseDat, reachableZones, type DatLevel } from './formats/dat.ts';
 import { decodeBmp, parseNgn, type NgnTexture } from './formats/ngn.ts';
+import { assignZones, parseNgnScene } from './formats/ngnscene.ts';
 import {
   findLevels, findModels, gameDirFromDrop, gameDirFromFileList, pickGameDir,
   supportsDirectoryPicker, validateGameDir, type GameDir,
@@ -28,6 +29,9 @@ let levels: ReturnType<typeof findLevels> = [];
 let models: ReturnType<typeof findModels> = [];
 /** Textures from the currently selected scene. Characters borrow these. */
 let sceneTextures = new Map<number, THREE.Texture>();
+
+/** The loaded scene, kept so the zone picker can recompute what to show. */
+let currentLevel: { level: DatLevel; zones: (number | null)[] } | null = null;
 
 /** Currently displayed character, if any, and its animation playback state. */
 let current: { model: AllFile; anm: AnmFile | null } | null = null;
@@ -154,8 +158,13 @@ async function showLevel(index: number): Promise<void> {
 
   let textureCount = 0;
   let gpuTextures = new Map<number, THREE.Texture>();
+  // The .ngn holds the textures and, after them, pconv's converted copy of the
+  // scene. The scene is the only place object zones are recorded, so it is
+  // read here too rather than only for the art.
+  let sceneBytes: Uint8Array | null = null;
   if (level.ngn) {
-    const textures = parseNgn(await level.ngn.read());
+    sceneBytes = await level.ngn.read();
+    const textures = parseNgn(sceneBytes);
     textureCount = textures.length;
     texturesEl.replaceChildren(...(await Promise.all(textures.map(drawTexture))));
     setStatus(`${level.id}: decoding ${textures.length} textures\u2026`);
@@ -184,7 +193,17 @@ async function showLevel(index: number): Promise<void> {
 
       setStatus(`${level.id}: building ${parsed.objects.length} objects\u2026`);
       await yieldToBrowser();
-      const geometry = buildLevelGeometry(parsed);
+      let zones: (number | null)[] = parsed.objects.map(() => null);
+      if (sceneBytes) {
+        try {
+          zones = assignZones(
+            parsed.objects.map((o) => ({ ...o, faceCount: parsed.meshes.get(o.meshOffset)?.faces.length ?? -1 })),
+            parseNgnScene(sceneBytes),
+          );
+        } catch { /* no zones: the level still draws, just all at once */ }
+      }
+      currentLevel = { level: parsed, zones };
+      const geometry = buildLevelGeometry(parsed, { zones });
 
       setStatus(`${level.id}: uploading ${geometry.triangleCount} triangles\u2026`);
       await yieldToBrowser();
@@ -194,11 +213,13 @@ async function showLevel(index: number): Promise<void> {
       await yieldToBrowser();
 
       const textured = geometry.groups.filter((g) => g.page !== null && gpuTextures.has(g.page));
+      const zoneCount = new Set(zones.filter((z) => z !== null)).size;
       summary +=
         `, ${geometry.objectCount}/${parsed.objects.length} objects, ` +
         `${geometry.triangleCount} triangles, ` +
         `${textured.length}/${geometry.groups.length} groups textured, ` +
-        `${parsed.markers.length} markers`;
+        `${parsed.markers.length} markers, ` +
+        `${zoneCount} zones / ${parsed.zones.length} portals`;
     } catch (err) {
       summary += ` — geometry failed: ${(err as Error).message}`;
       setStatus(`${level.id}: geometry failed — ${(err as Error).message}`, true);
@@ -302,11 +323,18 @@ if (import.meta.hot) {
 
 // `c` cycles face culling. Which winding three.js considers front-facing
 // can't be determined offline, so make it one keystroke to find out.
+// `0`-`9` show one zone as the engine would from inside it: the zone itself,
+// zone 0, and whatever its portals lead to. `a` goes back to the whole level.
 window.addEventListener('keydown', (ev) => {
   if (!viewer) return;
   if (ev.key === 'c') infoEl.textContent = `culling: ${viewer.cycleSide()}`;
   if (ev.key === 'g') infoEl.textContent = `draw groups: ${viewer.toggleSingleMaterial()}`;
   if (ev.key === 's') infoEl.textContent = viewer.describeScene();
+  if (ev.key === 'a') infoEl.textContent = viewer.setVisibleZones(null);
+  if (/^[0-9]$/.test(ev.key) && currentLevel) {
+    const zone = Number(ev.key);
+    infoEl.textContent = viewer.setVisibleZones(reachableZones(currentLevel.level.zones, zone));
+  }
 });
 
 const fileInput = $<HTMLInputElement>('pickfile');

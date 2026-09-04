@@ -16,9 +16,11 @@
  * tick count and divided it back out after moving; at a fixed rate that factor
  * is 1, so it is gone from here. See docs/PLAYER.md, "Time base".
  *
- * Scope: this is P2.2, the controller. Collision *response* is P2.3 — the
- * `Ground` interface below is the seam, and the only thing implemented against
- * it so far is the floor query, so walls do not yet stop anything.
+ * Scope: this is P2.2, the controller. Collision *response* is P2.3, and the
+ * `Ground` interface below is the seam. Behind it now sit a floor query, a
+ * wall slide and a death plane — enough to walk around a level without
+ * leaving it — but not the original's mover, so there is no step height and
+ * no ledge handling. See docs/PLAYER.md.
  */
 import { groundBelow, slideAlongWalls, type CollisionWorld } from '../formats/collision.ts';
 import {
@@ -409,8 +411,8 @@ export function stepPlayer(
   accelerate(p, table, hasInput);
 
   // --- move ----------------------------------------------------------------
-  // P2.3 replaces this with the real mover. For now the horizontal step is
-  // unobstructed and only the floor is respected, so walls do not stop anyone.
+  // P2.3 replaces this with the real mover. What is here handles the floor and
+  // slides along walls, but has no step height and no ledge handling.
   const wasY = p.y;
   const wasX = p.x, wasZ = p.z;
   p.x += p.vx;

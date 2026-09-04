@@ -63,25 +63,42 @@ level.
   in doorways. Both are decoded, so the viewer can draw one room and its
   neighbours instead of the whole house.
 - **Characters.** All 68 models load and texture, and all 170 animations play.
+- **Buzz moves.** Press enter and you can walk, run, turn, jump, double jump and
+  spin around Andy's house. Every constant — gravity, the jump impulse, friction,
+  the turn rate, the attack timings — was read out of the PC executable and
+  checked against the PlayStation one, not tuned by feel. He is animated by the
+  game's own animation state machine, a 28-state table of byte scripts that also
+  turned out to settle how fast animations actually play.
 - **Collision.** The hull parses (23,394 polygons across the game), can be drawn
-  over the level, and answers "what is the floor under this point", which is
-  what puts Buzz on the ground in the right place.
+  over the level, answers "what is the floor under this point", and stops him
+  walking through walls. Falling out of the level puts him back, on the
+  original's own death plane.
 - **Two oracles.** An offline rasteriser and a headless browser driver, so a
   change can be checked pixel against pixel rather than by eye. They are how
   most of the bugs above were found.
 
 ## What doesn't work yet
 
-**Gameplay.** There is no character controller, no follow camera, no enemies and
-no pickups — Buzz stands in the level but does not move. That is the next phase,
-and the intent is to take his gravity, jump and attack constants from the
-original code rather than tune them until they feel right.
+**Collision response is unfinished**, and it is the thing you will notice. Walls
+stop you, but there is no step height and no ledge handling, so walking off an
+edge is easy and a fall ends with Buzz put back at the start. The original's
+mover has not been read yet; it holds the step height and the real
+walkable-slope threshold, and until then the slope test guesses 45 degrees.
+The camera is a placeholder that trails behind him and will clip through
+scenery.
+
+**Everything around the moving.** No enemies, no pickups, no HUD, no save file,
+no audio, no cutscenes. The spawn point is a heuristic — the pickup marker
+standing on the largest reachable floor — because the real one lives in the
+level's own code, which is not decoded.
 
 Smaller things, all recorded in [`TODOPLAN.txt`](TODOPLAN.txt): visibility takes
 one step through the portal graph rather than recursing with a clipped view
-frustum; absolute screen brightness has not been compared against the retail
-game; audio and the cutscenes are identified but unimplemented.
+frustum, and absolute screen brightness has not been compared against the retail
+game.
 
+See [`docs/PLAYER.md`](docs/PLAYER.md) for the gameplay research: the physics,
+the animation system, and how each number was found.
 See [`docs/FORMATS.md`](docs/FORMATS.md) for the file-format research — including
 the discovery that this PC release is a converted PlayStation game that shipped
 its entire PSX source data tree, build scripts and all, and that the disc
@@ -109,6 +126,12 @@ Everything here reads an install and writes nothing into it.
     # render a level offline, or drive the real viewer headlessly
     npx tsx tools/render-level.ts "Toy Story 2" level01/level out.png --viewer
     npx tsx tools/browser-shot.ts "Toy Story 2" shot.png     # needs npm run dev
+
+    # step the character controller and check it against the constants
+    npx tsx tools/player-probe.ts
+
+`tools/ghidra/` rebuilds a greppable decompile of either executable, which is
+where the gameplay constants come from.
 
 ## Contributing
 

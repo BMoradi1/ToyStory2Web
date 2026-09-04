@@ -1,7 +1,8 @@
 ================================================================================
  ToyStory2Web - PROJECT ROADMAP
  Browser reimplementation of Toy Story 2: Buzz Lightyear to the Rescue (1999)
- Last updated: 2026-09-03 (Phase 1 complete but for the real-game parity check)
+ Last updated: 2026-09-04 (Phase 1 done; Phase 2 playable - Buzz walks, jumps
+ and is animated from the game's own tables. P2.3's mover is the open front.)
 ================================================================================
 
  HOW TO USE THIS FILE
@@ -11,6 +12,7 @@
 
  STATUS
    [DONE]      finished and verified
+   [PART DONE] usable, with a named gap; the gap is spelled out in the entry
    [ACTIVE]    in progress right now
    [READY]     unblocked, nobody on it
    [BLOCKED]   waiting on a named dependency
@@ -321,9 +323,15 @@
                 and 5 has walkable collision beneath it (70/70, 81/81,
                 77/77), floating a median 1.7-3.3 world units above it.
                 Level 1: 2,363 polys, 29% walkable.
- P2.4 [BLOCKED] Follow camera            <- P2.2. Collision-aware, 4:3 native
-                framing, modes as the original ("camera left/right/mode"
-                strings exist in toy2.exe).
+ P2.4 [READY]   Follow camera. P2.2 is done, so this is unblocked and is now
+                the most visible thing missing: what exists is a placeholder
+                that eases to a fixed offset behind Buzz, has no framing
+                logic and clips straight through scenery.
+                Wanted: collision-aware, 4:3 native framing, and the modes
+                the original has - the strings "camera mode", "camera left"
+                and "camera right" are in toy2.exe and are menu text, so
+                they lead to the input handling and from there to the
+                camera code.
  P2.5 [MOSTLY DONE] Animation state machine.
                 Found in toy2.exe: FUN_004011d0 runs a 28-state machine
                 whose table is at 0x4df3f0, 20 bytes per state (byte-script

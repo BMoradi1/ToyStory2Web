@@ -1,6 +1,7 @@
 ================================================================================
  NEXT SESSION - what to hand to which model, and how to pick the work back up
- Written 2026-09-03, at the end of the session that finished Phase 1.
+ Written 2026-09-03 at the end of Phase 1; updated 2026-09-04, after the
+ session that made Buzz playable.
 ================================================================================
 
  Read TODOPLAN.txt for WHAT to do. This file is about WHO should do it and what
@@ -75,46 +76,55 @@
    Do not hold on to a task because it is nearly done. Hand over at the answer.
 
  --- HOW THIS ACTUALLY WENT --------------------------------------------------
- It worked twice in this session, in both directions. Opus, doing routine
- implementation, hit the 65-72% correlation figure, reported it as an anomaly
- instead of working around it, and asked. Fable found that it was a parser
- defect placing a quarter of every level wrong, fixed it, and handed straight
- back at the point where the rule was known and validated. Neither model
- finished the task it started. That is the pattern to copy.
+ It worked twice in the Phase 1 session, in both directions. Opus, doing
+ routine implementation, hit the 65-72% correlation figure, reported it as an
+ anomaly instead of working around it, and asked. Fable found that it was a
+ parser defect placing a quarter of every level wrong, fixed it, and handed
+ straight back at the point where the rule was known and validated. Neither
+ model finished the task it started. That is the pattern to copy.
+
+ The Phase 2 session is a correction to the rule, and worth reading before
+ trusting it. P2.5, the animation mapping, was written down here as Fable work
+ on the reasoning that finding an unnamed structure by shape is decoding. It
+ took Opus one grep, because the animation state machine sits one call away
+ from a function P2.1 had already named. The lesson is not that the split is
+ wrong; it is that the cost of LOOKING is much lower than the cost of decoding,
+ so look first and route afterwards. Spend ten minutes before declaring
+ something a Fable job.
+
+ The same session also shows the failure the split is meant to catch, in the
+ other direction. Opus assumed which way character models face, "verified" it
+ with a test that could not fail (the camera was placed behind Buzz by
+ construction, so of course it saw his back), and shipped him running
+ backwards. Nothing about that needed a stronger model - it needed a test that
+ could come out either way. When a check confirms what you already believe,
+ ask what result would have disproved it.
 
 ================================================================================
  WHAT TO GIVE FABLE, IN ORDER
 ================================================================================
 
- 1. P2.1 - PLAYER PHYSICS CONSTANTS.  DONE 2026-09-04, by Fable, in one
-    sitting. See docs/PLAYER.md and src/sim/player-constants.ts.
+ 1. P2.3 - THE MOVER.  The one thing standing between this and a game that
+    behaves. Walls stop Buzz now, but that was written from the geometry, not
+    from the original: there is no step height, no ledge handling, and the
+    walkable-slope test still guesses 45 degrees.
 
-    What worked, for next time: not the assert strings and not the menu text.
-    The sound-effect NAME table (BUZJMP1, BUZWING, BUZSKID...) is indexed by
-    effect number, a second table maps sound EVENTS to effects, and game code
-    fires events. Grep every caller of the event dispatcher for the events
-    that resolve to Buzz's sounds and you land in the controller directly.
-    The same trick should find any other subsystem that makes a noise.
+    Read FUN_00484380 (4.7 KB), reached through FUN_004855f0, which splits a
+    step into two halves when |v|^2 > 0x400000. Wanted out of it: the step
+    height, the real slope threshold, how a slide along a wall is computed,
+    and whether the player has a radius or is a point. Everything else in
+    src/formats/collision.ts is already shaped to take them.
 
-    psx.exe was worth it: the PSX controller is the same code with the same
-    constants, which is what turned "this looks like gravity" into "this is
-    gravity". Note the Recomp seed list is 658 bare ADDRESSES, not names -
-    an earlier version of this file called it a symbol table. It still helps
-    Ghidra find function starts; tools/ghidra/README.md has the commands.
+    Worth knowing before starting: the slope threshold is NOT urgent for
+    coverage. Raising it from 45 to 89 degrees changes how much of level 1
+    has walkable floor by 0.2%. It matters for whether slopes slide, not for
+    whether the floor exists.
 
-    Two things Ghidra could not read and objdump could: the PC's double-jump
-    impulse and the analog stick magnitude are x87 float code that the
-    decompiler collapses to __ftol(). Both are decoded in PLAYER.md.
-
- 2. P2.5 - ANIMATION STATE MACHINE.  Mapping buzz.anm's 170 animations onto
-    named states (idle, walk, run, jump, double jump, spin, laser, fall, land)
-    from the animation tables in the decompilation. Same kind of work, smaller.
-    The 20 fps playback rate is still an assumption and should be confirmed
-    from the code at the same time.
-    Leads from P2.1: the controller writes animation requests into the player
-    block at +0x8c (jump state), +0x90 (values 8, 0x1a, 3, 2 seen) and +0x92
-    (set to -1 on skid and stomp-switch), and FUN_004a3e60 runs on every jump.
-    Whatever consumes those fields is the animation state machine.
+ 2. P2.4 - THE FOLLOW CAMERA.  Not obviously a decoding job, and it may not
+    need Fable at all - but the original's camera has modes and framing rules
+    and it is worth ten minutes finding out whether they are in a table like
+    the animation states were. The strings "camera mode", "camera left" and
+    "camera right" are menu text in toy2.exe and lead to the input handling.
 
  3. THE REMAINING FORMAT UNKNOWNS.  None block anything, all are the same
     shape of puzzle, and the .ngn scene is an oracle for most of them:
@@ -132,9 +142,10 @@
 ================================================================================
  WHAT DOES NOT NEED FABLE
 ================================================================================
- P2.2 character controller - DONE 2026-09-04 by Opus, straight from
- docs/PLAYER.md, which is the pattern working as intended: the decoding was
- the hard part and the port was transcription. P2.3 collision
+ P2.2 character controller and P2.5 animation - both DONE 2026-09-04 by Opus.
+ P2.2 was the pattern working as intended: the decoding was the hard part and
+ the port was transcription off docs/PLAYER.md. P2.5 was meant to be Fable's
+ and turned out not to need it (see above). The rest of P2.3 collision
  response, P2.4 follow camera, the frustum-clipped portal walk, HUD and menus,
  the save file, audio, cutscene playback, performance work, and anything in
  Phase 7. All of these are specified; the difficulty is in getting them right,

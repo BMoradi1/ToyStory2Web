@@ -1,3 +1,4 @@
+
 # ToyStory2Web
 
 An open-source reimplementation of the engine behind **Toy Story 2: Buzz
@@ -11,7 +12,7 @@ Lightyear to the Rescue** (Traveller's Tales, 1999), running in the browser.
 <img width="1413" height="937" alt="image" src="https://github.com/user-attachments/assets/2f4abd0a-e8bd-424f-b862-373e684ac664" />
 
 <img width="1351" height="881" alt="image" src="https://github.com/user-attachments/assets/26728f2a-0acb-4eb9-bcd6-a8d6b3a316ba" />
-
+<img width="844" height="720" alt="chrome-capture-2026-09-03" src="https://github.com/user-attachments/assets/2154a78e-b3a9-467e-9e19-d0df8d4069a7" />
 
 
 ## This repository contains no game assets

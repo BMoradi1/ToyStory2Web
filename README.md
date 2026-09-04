@@ -47,13 +47,17 @@ parsing it end to end and validating the result.
 
 ## License
 
-The code in this repository is licensed under the **GNU General Public License,
-version 3 or later** — see [`LICENSE`](LICENSE).
+The code in this repository is licensed under the **MIT License** — see
+[`LICENSE`](LICENSE). Take the parsers and build something with them; that is
+what they are for. The file formats documented in
+[`docs/FORMATS.md`](docs/FORMATS.md) cost more to work out than the viewer did,
+and nobody else should have to spend that month twice.
 
-That covers the engine, the parsers and the research prose: work written from
+MIT covers the engine, the parsers and the research prose: work written from
 scratch here. It cannot and does not grant you any right to the game's data,
-which is not ours to license. Reverse-engineering notes describe a file format;
-they do not come with permission to copy what is stored in it.
+which is not ours to license — including the permission to "sell copies" that
+the licence grants for *this software*. Reverse-engineering notes describe a
+file format; they do not come with permission to copy what is stored in it.
 
 ## Legal
 

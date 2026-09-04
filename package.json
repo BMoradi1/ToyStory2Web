@@ -2,7 +2,7 @@
   "name": "toystory2web",
   "version": "0.0.1",
   "private": true,
-  "license": "GPL-3.0-or-later",
+  "license": "MIT",
   "type": "module",
   "description": "Open-source browser reimplementation of the Toy Story 2 (1999) engine. Ships no game assets.",
   "scripts": {

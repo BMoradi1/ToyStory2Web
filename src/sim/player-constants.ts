@@ -22,9 +22,6 @@ export const YAW_FULL = 4096;
 /** Buzz's mesh height in game units (460 level units), for scale sanity checks. */
 export const BODY_HEIGHT = 460 * GAME_UNITS_PER_LEVEL_UNIT;
 
-/** Height of the player origin above the floor when standing. */
-export const REST_HEIGHT = 0x100;
-
 /**
  * Vertical. `k` is 2 on land and 4 in water; the original divides the raw
  * constants by k or k^2, which is how the water values below arise.
@@ -122,13 +119,21 @@ export const MOVE_OVERRIDES = {
 } as const satisfies Record<string, Partial<MoveTable>>;
 
 export const TURN = {
-  /** Yaw approaches the target by min(|diff|, turnRate) / 8 per tick. */
+  /**
+   * Yaw approaches the target by min(|diff|, turnRate) / 8 per tick. The
+   * division truncates, so the approach stalls once the difference is under 8
+   * and the facing settles up to 7 units (0.6 degrees) short. That residue is
+   * in the original too.
+   */
   divisor: 8,
   /** A target further away than this (132 degrees) snaps the yaw instantly. */
   snapThreshold: 0x5dd,
   /** A snap on the ground starts a skid this long, with BUZSKID. */
   skidTicks: 0x1a,
-  /** Analog stick: per-axis dead zone and full-scale magnitude. */
+  /**
+   * Analog stick: per-axis dead zone and full-scale magnitude. The magnitude
+   * scales the movement table's TOP SPEED, not its acceleration.
+   */
   stickDeadZone: 0x1800,
   stickFullScale: 0x4000,
 } as const;

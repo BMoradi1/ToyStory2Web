@@ -13,6 +13,13 @@ import {
   supportsDirectoryPicker, validateGameDir, type GameDir,
 } from './loader/gamedir.ts';
 import { Viewer } from './render/viewer.ts';
+import { InputSource } from './sim/input.ts';
+import { GAME_UNITS_PER_LEVEL_UNIT } from './sim/player-constants.ts';
+import {
+  createPlayer, createRuntime, groundFromCollision, stepPlayer,
+  type PlayerRuntime, type PlayerState,
+} from './sim/player.ts';
+import { toRadians, yawOf } from './sim/trig.ts';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -272,8 +279,23 @@ async function open(dir: GameDir): Promise<void> {
   try {
     viewer ??= new Viewer($<HTMLCanvasElement>('view'));
     // Exposed for tools/browser-shot.ts, which places the camera and reads
-    // scene state from outside the page. Harmless for users.
-    (window as unknown as { ts2: object }).ts2 = { get viewer() { return viewer; }, THREE };
+    // scene state from outside the page. Harmless for users. `drive` pushes
+    // synthetic input through the real controller so the play path can be
+    // exercised headlessly, without a keyboard.
+    (window as unknown as { ts2: object }).ts2 = {
+      get viewer() { return viewer; },
+      THREE,
+      get player() { return player; },
+      spawnPlayer,
+      togglePlay,
+      drive(held: Partial<import('./sim/player.ts').PlayerInput>, ticks = 1) {
+        if (!player || !playerRuntime || !currentCollisionWorld || !viewer) return null;
+        const ground = groundFromCollision(currentCollisionWorld);
+        const full = { moveX: 0, moveY: 0, jump: false, spin: false, fire: false, ...held };
+        for (let i = 0; i < ticks; i++) stepPlayer(player, full, playerRuntime, ground, 0);
+        return { ...player };
+      },
+    };
   } catch (err) {
     return setStatus(`WebGL failed to start: ${(err as Error).message}`, true);
   }
@@ -282,6 +304,7 @@ async function open(dir: GameDir): Promise<void> {
   // mesh. The render loop is uncapped, game logic runs at the original ~59 FPS,
   // and animation plays at its own (unverified) 20 FPS.
   viewer.onTick = (dt) => {
+    if (viewer?.playMode) playTick();
     if (!playing || !current || !viewer) return;
     frameTime += dt;
     const step = 1 / DEFAULT_ANIMATION_FPS;
@@ -346,6 +369,49 @@ async function loadCollision(): Promise<CollisionGroup[] | null> {
 }
 
 /**
+ * Choose a marker to spawn at: the one with the most floor around it.
+ *
+ * Markers all sit over walkable floor, but many are on furniture, and the
+ * first one in level 1 is close enough to an edge that walking two ticks in
+ * most directions falls off it. Scoring each by how much of a ring around it
+ * has floor at roughly the same height picks somewhere you can actually move.
+ *
+ * This is a stand-in, not the original's spawn, which lives in the level's own
+ * code and is not decoded. `radius` is in level units — Buzz is 460 tall, so a
+ * ring of 600 is about a body height out.
+ */
+function pickSpawnMarker(
+  markers: { position: { x: number; y: number; z: number } }[],
+  world: CollisionWorld,
+  radius = 600,
+  samples = 12,
+): { marker: { position: { x: number; y: number; z: number } }; ground: { y: number; normal: { x: number; y: number; z: number } }; openness: number } | null {
+  let best: ReturnType<typeof pickSpawnMarker> = null;
+  for (const marker of markers) {
+    const ground = groundBelow(world, marker.position.x, marker.position.y, marker.position.z, 4096);
+    if (!ground) continue;
+    let open = 0;
+    for (let i = 0; i < samples; i++) {
+      const a = (i * 2 * Math.PI) / samples;
+      const hit = groundBelow(
+        world,
+        marker.position.x + Math.cos(a) * radius,
+        ground.y - radius,
+        marker.position.z + Math.sin(a) * radius,
+        radius,
+      );
+      // Floor within a body height of the marker's own counts as walkable-to;
+      // a drop further than that is a ledge, which is what we are avoiding.
+      if (hit && Math.abs(hit.y - ground.y) < 460) open++;
+    }
+    const openness = open / samples;
+    if (!best || openness > best.openness) best = { marker, ground, openness };
+    if (openness === 1) break;
+  }
+  return best;
+}
+
+/**
  * `p`: stand the selected character on the floor of the level.
  *
  * The spawn point is a pickup marker, because those are the one thing in the
@@ -363,20 +429,90 @@ async function spawnPlayer(): Promise<void> {
   await loadCollision();
   if (!currentCollisionWorld) { infoEl.textContent = 'no collision for this scene'; return; }
 
-  const marker = currentLevel.level.markers[0];
-  if (!marker) { infoEl.textContent = 'no marker to spawn at'; return; }
-  const ground = groundBelow(currentCollisionWorld, marker.position.x, marker.position.y, marker.position.z, 4096);
-  if (!ground) { infoEl.textContent = 'no floor under the first marker'; return; }
+  const chosen = pickSpawnMarker(currentLevel.level.markers, currentCollisionWorld);
+  if (!chosen) { infoEl.textContent = 'no marker with floor under it'; return; }
+  const { marker, ground, openness } = chosen;
 
   const model = parseAll(await entry.file.read());
   viewer.setPlayer(buildMeshData(model), sceneTextures);
   // The hull is in PlayStation axes: +Y down, 256 units to the world unit.
   viewer.setPlayerPosition(marker.position.x / WORLD_SCALE, -ground.y / WORLD_SCALE, -marker.position.z / WORLD_SCALE);
   viewer.lookAtPlayer();
+
+  // The sim runs 32x finer than the file, so scale on the way in. Standing on
+  // the floor means y equal to the surface: the model's origin is at its feet.
+  player = createPlayer(
+    marker.position.x * GAME_UNITS_PER_LEVEL_UNIT,
+    ground.y * GAME_UNITS_PER_LEVEL_UNIT,
+    marker.position.z * GAME_UNITS_PER_LEVEL_UNIT,
+    0,
+  );
+  playerRuntime = createRuntime();
   const slope = (Math.acos(Math.min(1, -ground.normal.y)) * 180) / Math.PI;
   infoEl.textContent =
-    `${entry.name} standing at marker 0, floor ${(ground.y / WORLD_SCALE).toFixed(2)} ` +
-    `(${slope.toFixed(0)}\u00b0 slope), ${(( ground.y - marker.position.y) / WORLD_SCALE).toFixed(2)} below the marker`;
+    `${entry.name} standing on floor ${(ground.y / WORLD_SCALE).toFixed(2)} ` +
+    `(${slope.toFixed(0)}\u00b0 slope), ${(openness * 100).toFixed(0)}% open around it. Enter to play.`;
+}
+
+/**
+ * Play mode: the character controller driving Buzz around the level.
+ *
+ * The sim works in the original's units and axes — 32 per level unit, +Y down,
+ * 12-bit yaw — and the renderer works in level units / 256 with Y up and Z
+ * negated. All of that conversion happens here, in one place, so neither side
+ * has to know about the other's conventions.
+ */
+const GAME_TO_RENDER = 1 / (GAME_UNITS_PER_LEVEL_UNIT * WORLD_SCALE);
+
+let player: PlayerState | null = null;
+let playerRuntime: PlayerRuntime | null = null;
+const input = new InputSource();
+
+/** `space` etc. must reach the game, not scroll the page, but only while playing. */
+function setPlaying(on: boolean): void {
+  if (!viewer) return;
+  viewer.playMode = on;
+  if (on) input.attach(); else input.detach();
+}
+
+function playTick(): void {
+  if (!viewer || !player || !playerRuntime || !currentCollisionWorld) return;
+
+  // The camera's bearing to the player, converted back into the file's space:
+  // the renderer negates Z, so undo that before asking for a yaw.
+  const p = viewer.playerPosition;
+  const cam = viewer.camera.position;
+  const cameraYaw = p ? yawOf(p.x - cam.x, -(p.z - cam.z)) : 0;
+
+  stepPlayer(player, input.read(), playerRuntime, groundFromCollision(currentCollisionWorld), cameraYaw);
+
+  // Game space to renderer space. A game facing of (sin yaw, cos yaw) becomes
+  // (sin yaw, -cos yaw) once Z is negated. The unrotated model already points
+  // at -Z for the same reason, and rotating that by -yaw about Y lands on the
+  // wanted direction, so the renderer angle is the negated sim angle.
+  viewer.setPlayerTransform(
+    player.x * GAME_TO_RENDER,
+    -player.y * GAME_TO_RENDER,
+    -player.z * GAME_TO_RENDER,
+    -toRadians(player.yaw),
+  );
+  viewer.followPlayer();
+}
+
+/** `space`: start or stop playing, spawning the character if it isn't there. */
+async function togglePlay(): Promise<void> {
+  if (!viewer) return;
+  if (viewer.playMode) {
+    setPlaying(false);
+    infoEl.textContent = 'play stopped';
+    return;
+  }
+  if (!player) {
+    await spawnPlayer();
+    if (!player) return;
+  }
+  setPlaying(true);
+  infoEl.textContent = 'playing — WASD or stick to move, space to jump, J spin, K fire';
 }
 
 /** `k`: show or hide the collision hull, reading TERRAIN.ALL the first time. */
@@ -397,6 +533,10 @@ async function toggleCollision(): Promise<void> {
 // zone 0, and whatever its portals lead to. `a` goes back to the whole level.
 window.addEventListener('keydown', (ev) => {
   if (!viewer) return;
+  // Enter toggles play; while playing, the movement keys belong to the game
+  // and the inspection shortcuts would collide with them.
+  if (ev.key === 'Enter') { void togglePlay(); return; }
+  if (viewer.playMode) return;
   if (ev.key === 'c') infoEl.textContent = `culling: ${viewer.cycleSide()}`;
   if (ev.key === 'g') infoEl.textContent = `draw groups: ${viewer.toggleSingleMaterial()}`;
   if (ev.key === 's') infoEl.textContent = viewer.describeScene();

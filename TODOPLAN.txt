@@ -241,8 +241,29 @@
                 to rebuild both decompiles: tools/ghidra/.
                 Not extracted: projectile speeds, the mover's step height
                 and slope limit (P2.3), ledge-grab probe geometry.
- P2.2 [READY]   Character controller on the fixed 16949us tick (Viewer.onTick
-                is already wired). Input: keyboard + gamepad, remappable.
+ P2.2 [DONE]    Character controller on the fixed 60 Hz tick.
+                src/sim/player.ts is a transcription of FUN_00436220 and
+                what it calls: the jump state machine, gravity and the
+                release cut, the double jump both ways, friction and the
+                speed clamps, the exponential turn with its snap and skid,
+                and the attack timers. src/sim/trig.ts is the 12-bit angle
+                system - the game's 4096-entry sine table is exactly
+                round(sin(i*2pi/4096)*0x4000), checked entry by entry, so
+                it is generated rather than shipped. src/sim/input.ts is
+                keyboard + gamepad with remappable bindings.
+                Verified twice. tools/player-probe.ts runs the controller
+                headlessly against the closed-form values the constants
+                predict: 24/24, including a jump apex of exactly 17664
+                game units. Then the same jump in level 1 on real collision
+                gives the same 17664, and all four directions move the
+                right way relative to the camera.
+                Two corrections came out of the port: the analog magnitude
+                scales the movement table's TOP SPEED, not acceleration,
+                and the jump apex is v^2/2g - v/2 rather than v^2/2g,
+                because gravity applies on the jump tick too.
+                Enter toggles play. The trailing camera is a placeholder
+                for P2.4 and is only there because controls are
+                camera-relative.
                 Groundwork DONE: key `p` stands the selected character in
                 the level on real collision. Viewer.setPlayer keeps the
                 level and adds the character beside it (setModel replaces
@@ -257,7 +278,18 @@
                 model all agree on one coordinate system.
                 Spawn point is a pickup marker for now - the real one is
                 presumably in the level's own code, which is not decoded.
- P2.3 [ACTIVE]  Collision response against the 44-byte TERRAIN polys:
+ P2.3 [NEXT]    Collision response against the 44-byte TERRAIN polys.
+                This is now the thing standing between the controller and
+                a playable level: Buzz walks through walls and off the edge
+                of the world, because the only query implemented is the
+                floor one. The seam is the `Ground` interface in
+                src/sim/player.ts - widen it and replace the single
+                floorAt call at the end of stepPlayer.
+                Read FUN_00484380 (4.7 KB, called via FUN_004855f0, which
+                splits the step in two when |v|^2 > 0x400000). It holds the
+                step height, wall slide and slope limit, none of which were
+                extracted in P2.1.
+                Original notes follow:
                 single-sided, stored unit normal for slope limits, walkable
                 = normal.y within the original's threshold.
                 Debug draw is DONE - key `k` in the viewer, green walkable

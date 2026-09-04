@@ -37,6 +37,7 @@ onto the page instead. Nothing is uploaded either way.
 
 | key | what it does |
 |---|---|
+| `enter` | play: drive Buzz around the level, on the original's physics |
 | `0`-`9` | stand in that zone: draw it, zone 0, and whatever its doorways lead to |
 | `a` | show the whole level again |
 | `k` | overlay the collision hull — green where Buzz can stand, red where he cannot |
@@ -44,6 +45,12 @@ onto the page instead. Nothing is uploaded either way.
 | `c` | cycle back-face culling, to check the winding by eye |
 | `g` | collapse the level to a single material |
 | `s` | report what is actually in the scene |
+
+While playing: **WASD** or a gamepad stick to move, **space** to jump (again at
+the top for a double jump), **J** to spin, **K** for the laser. Movement is
+camera-relative, as the original's is. Walls do not stop you yet — collision
+response is the next piece of work — so it is possible to walk out of the
+level and fall.
 
 ## What works today
 

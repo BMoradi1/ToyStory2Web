@@ -56,8 +56,10 @@ Yaw is a 12-bit angle, 4096 per revolution, with the sine table at
 `(x, z)`.
 
 For scale: Buzz's mesh is 460 level units tall with the origin at his feet,
-so **one body height is 14,720 game units**. The controller keeps the origin
-256 game units (8 level units) above the floor.
+so **one body height is 14,720 game units**. Standing therefore means the
+player's Y equals the floor's. Whether the original carries a small standing
+offset is not known — that lives in the mover (`FUN_00484380`), which is
+P2.3's to read.
 
 ## The player object
 
@@ -133,11 +135,17 @@ All from `FUN_004340d0` (PSX `FUN_8003bba4`, identical). `k = 2` normally,
 | double-jump window          | jump state 2 (button released) and `vy > -0x400` (rising slower than that, i.e. near the apex or falling), no hit stun, coyote expired, no charged spin, no hard-fall stun | one double jump per airborne period |
 | double jump from a walk-off  | also allowed in jump state 0 once a fall has been flagged (0x50): a rescue jump after falling 60 ticks without having jumped | |
 
-Derived: first jump apex = 1536^2 / (2*64) = 18,432 (1.25 body heights, 24
-ticks up). PSX double jump adds 10,368 for 28,800 total; the PC caps the total
-at 27,264 by computing the impulse from the height already gained. If you
-never release the button the jump is state 1 for its whole rise and no double
-jump is possible; the release cut is what makes short hops.
+Derived: the rise takes 24 ticks and reaches **17,664** units, 1.20 body
+heights. Note that is not the textbook `v^2 / 2g` = 18,432: the first-jump
+branch clears the on-ground flag and the gravity test runs after it, so
+gravity applies on the jump tick too and the first step moves at 1,472 rather
+than 1,536. The sum of the actual steps is `v^2/2g - v/2`, exactly 768 lower.
+Anything predicting jump heights from the continuous formula will be wrong by
+that much.
+
+The PC's double jump tops out 27,264 above takeoff. If you never release the
+button the jump stays in state 1 for its whole rise and no double jump is
+possible; the release cut is what makes short hops.
 
 Hard fall: after **60 ticks** of falling with `vy > 0x80`, the scream event
 fires and the fall is flagged (0x50). Landing from a flagged fall zeroes
@@ -189,8 +197,22 @@ State overrides of the table (PC values; PSX identical except [1] above):
 | rocket boots (`FUN_004a4f80`)| 128 | 32  | 160 | 0x800, [5] 0x800 | -0x640 |
 
 Analog: `FUN_00433f40` returns `min(0x4000, sqrt(x^2 + y^2))` of the stick
-with a per-axis dead zone of 0x1800, and [2] is scaled by that over 0x4000.
-Digital input is 0x4000.
+with a per-axis dead zone of 0x1800, and the caller scales **[4], the top
+speed**, by that over 0x4000 — not [2], the acceleration. So a half-pressed
+stick reaches half speed at the same rate rather than creeping up to full
+speed. Digital input is 0x4000.
+
+The stick's angle goes through an 8-sector lookup with interpolation
+(`0x4f5ab4`), which reads like a response curve but is the **identity**: its
+nine entries are 0, 512, ... 4096. So the target yaw is a plain `atan2` of the
+stick plus the camera's bearing to the player, and nothing needs porting but
+that sum. Digital input uses a 16-entry direction table at `0x4f5ac8` keyed by
+the four direction bits (0x10 up, 0x20 right, 0x40 down, 0x80 left), holding
+the eight compass angles with 0 = away from the camera.
+
+The sine table at `0x4fe788` is 4096 `i16` with `0x4000` as 1.0, and every one
+of its entries equals `round(sin(i * 2pi / 4096) * 0x4000)`. It can therefore
+be generated rather than shipped, with bit-identical results.
 
 Turning (`FUN_004346c0`, PSX `FUN_8003c3a0`): each tick yaw moves toward the
 target by `min(|diff|, 0x300) * dt / 8`, an exponential approach with an
@@ -246,6 +268,14 @@ Only two were found in the controller: forward friction (32 on PSX, 48 on PC)
 and the PC's height-capped double jump. Everything else, including every mask
 and threshold, matches. The PSX build has no float code; the PC port's two
 `sqrt` calls (double jump and stick magnitude) are the port's additions.
+
+## Ported
+
+`src/sim/player.ts` is a transcription of the tick above, `src/sim/trig.ts` the
+angle system, `src/sim/input.ts` the keyboard and pad. `tools/player-probe.ts`
+runs the controller headlessly and checks the motion it produces against the
+closed-form values these constants predict; it is the regression test for any
+later change.
 
 ## Not extracted
 

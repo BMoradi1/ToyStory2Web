@@ -132,7 +132,9 @@
 ================================================================================
  WHAT DOES NOT NEED FABLE
 ================================================================================
- P2.2 character controller (once the constants exist), P2.3 collision
+ P2.2 character controller - DONE 2026-09-04 by Opus, straight from
+ docs/PLAYER.md, which is the pattern working as intended: the decoding was
+ the hard part and the port was transcription. P2.3 collision
  response, P2.4 follow camera, the frustum-clipped portal walk, HUD and menus,
  the save file, audio, cutscene playback, performance work, and anything in
  Phase 7. All of these are specified; the difficulty is in getting them right,

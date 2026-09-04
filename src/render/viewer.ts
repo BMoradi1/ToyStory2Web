@@ -271,6 +271,65 @@ export class Viewer {
     this.player?.position.set(x, y, z);
   }
 
+  /**
+   * Move and turn the character. Renderer units; `facing` in radians.
+   *
+   * The sim's yaw is in the file's space, where a facing is `(sin, cos)` in
+   * `(x, z)`. `buildLevelGeometry` negates Z on the way to the renderer, so the
+   * caller converts and this only sets what it is given.
+   */
+  setPlayerTransform(x: number, y: number, z: number, facing: number): void {
+    if (!this.player) return;
+    this.player.position.set(x, y, z);
+    this.player.rotation.set(0, facing, 0);
+  }
+
+  /** Where the character is, or null if there isn't one. */
+  get playerPosition(): THREE.Vector3 | null {
+    return this.player ? this.player.position : null;
+  }
+
+  /**
+   * Drive the camera instead of the orbit controls.
+   *
+   * Play mode exists because the controls and a follow camera both want to own
+   * the camera, and letting them share it makes the view fight the player.
+   */
+  set playMode(on: boolean) {
+    this.play = on;
+    this.controls.enabled = !on;
+  }
+
+  get playMode(): boolean { return this.play; }
+  private play = false;
+
+  /**
+   * Trail the camera behind the character.
+   *
+   * A placeholder for P2.4, which is the real follow camera: this one only
+   * eases toward a fixed offset behind the current facing and has none of the
+   * original's framing, collision or look-ahead. It is here because the
+   * controls are camera-relative, so the controller needs *some* camera to be
+   * relative to.
+   *
+   * Returns the camera's bearing to the character in renderer space, which is
+   * what the controller turns into a target yaw.
+   */
+  followPlayer(distance = 3, height = 1.2, ease = 0.12): number {
+    if (!this.player) return 0;
+    const p = this.player.position;
+    // `getWorldDirection` gives the object's +Z axis. Characters are authored
+    // facing +Z in the file's space and `buildMeshData` negates Z on the way
+    // in, so an unrotated model faces -Z here — which makes +Z its back, and
+    // exactly where the camera belongs. Deriving it this way rather than from
+    // `rotation.y` by hand keeps the two from disagreeing about the sign.
+    const behind = this.player.getWorldDirection(new THREE.Vector3());
+    const want = new THREE.Vector3(p.x + behind.x * distance, p.y + height, p.z + behind.z * distance);
+    this.camera.position.lerp(want, ease);
+    this.camera.lookAt(p.x, p.y + height * 0.5, p.z);
+    return Math.atan2(p.x - this.camera.position.x, p.z - this.camera.position.z);
+  }
+
   /** Frame the camera on the character, from behind and slightly above. */
   lookAtPlayer(distance = 6): void {
     if (!this.player) return;
@@ -457,7 +516,7 @@ export class Viewer {
       this.accumulator -= TICK_SECONDS;
     }
 
-    this.controls.update();
+    if (!this.play) this.controls.update();
     this.renderer.render(this.scene, this.camera);
   }
 }

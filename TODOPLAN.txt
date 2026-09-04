@@ -1,7 +1,7 @@
 ================================================================================
  ToyStory2Web - PROJECT ROADMAP
  Browser reimplementation of Toy Story 2: Buzz Lightyear to the Rescue (1999)
- Last updated: 2026-09-03 (P1.1-P1.4 done; P1.5 blocked on one decision)
+ Last updated: 2026-09-03 (P1.1-P1.4 done; P1.0 opened: object table defect)
 ================================================================================
 
  HOW TO USE THIS FILE
@@ -56,7 +56,14 @@
  - Parsers stay pure (Uint8Array in, plain data out), validated across the
    whole install by a tools/*-validate.ts script.
 
- AN OPEN DECISION: WHICH FILE IS THE RENDER SOURCE
+ A DECISION THAT NO LONGER NEEDS MAKING
+   Rendering from level.ngn instead of level.dat was on the table because the
+   .ngn carries zone assignments the .dat appeared to lack. It turned out the
+   two files correspond one for one in order, so zones transfer by index and
+   level.dat stays the render source. The .ngn remains invaluable as an
+   ORACLE - it is how the material table and the object-table defect were
+   both found - and worth reaching for whenever level.dat is ambiguous.
+   Recorded so it is not reopened:
    level.dat is the PSX scene and is what this project parses today. pconv
    converted each level into an NU-engine scene inside level.ngn, and it is
    the .ngn that the PC renderer draws. (toy2.exe does also load level.dat at
@@ -167,6 +174,23 @@
                 their parts are not closed shells, and their own material
                 bits are still unread - the .ngn creature chunk (0x106) is
                 where to look.
+ P1.0 [ACTIVE]  Fix the second object section - a live defect, and the thing
+                blocking P1.5. level.dat's object table has TWO sections with
+                different record layouts; we read both with the first one's
+                field offsets, so roughly a QUARTER of every level is drawn at
+                the wrong position, angle and scale, with the wrong mesh.
+                Found by checking against level.ngn, which holds two instance
+                lists summing exactly to the object count, the first matching
+                level.dat's leading objects position for position.
+                  - recover section 2's layout using the second instance list
+                    as an oracle (the same method that cracked section 1)
+                  - work out where section 1 ends structurally, so the parser
+                    does not need the .ngn at runtime
+                  - level10/level breaks the pattern; handle it separately
+                Section 2 is drawn as the engine's second pass with its own
+                distance limits, so expect billboards or sprites - which would
+                also explain the unparsed 2D sprite pool at the mesh-pool tail.
+
  P1.5 [BLOCKED] Portal visibility        <- needs an object -> zone mapping.
                 The ALGORITHM is now known exactly, read from toy2.exe and
                 written up in FORMATS.md: per-zone object lists, a portal
@@ -176,19 +200,12 @@
                 The GRAPH is already parsed - level.dat's "zone" quads are
                 the portals, a=from b=to, 15=outside, and level 1's 22 are
                 identical in order to its .ngn scene's portal chunk.
-                What is missing is which zone each object is in. It is the
-                low byte of the .ngn instance flags, but our geometry comes
-                from level.dat, the two files order their objects
-                differently, and matching by position resolves only 65-72%
-                (a quarter of level.dat's objects sit thousands of units
-                from any scene instance). Do NOT retry position matching.
-                Two ways forward:
-                  (a) correlate by mesh identity instead of position;
-                  (b) build render geometry from the .ngn scene rather than
-                      level.dat - what the PC executable itself does, and it
-                      brings zones, materials and per-vertex alpha with it.
-                (b) is the bigger change and worth a decision before either
-                is attempted; see the note under PHASE 1.
+                What is missing is which zone each object is in: it is the
+                low byte of the .ngn instance flags. This is NOT the hard
+                problem it looked like. The scene's objects correspond to
+                level.dat's ONE FOR ONE, IN ORDER - the earlier 65-72%
+                figure was P1.0's defect, not a correlation problem. Once
+                P1.0 lands, zones transfer straight across by index.
  P1.6 [ACTIVE]  Parity harness. Half done: tools/render-level.ts now takes
                 --eye/--target/--size/--fovy and matches three.js (vertical
                 FOV, the viewer's clear colour, the same two draw queues and

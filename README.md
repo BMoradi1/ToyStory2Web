@@ -44,3 +44,24 @@ Read [`CLAUDE.md`](CLAUDE.md) first — it covers the asset rules and the
 conventions parsers follow. The short version: never commit game data, treat the
 install directory as read-only, and never claim a format is understood without
 parsing it end to end and validating the result.
+
+## License
+
+The code in this repository is licensed under the **GNU General Public License,
+version 3 or later** — see [`LICENSE`](LICENSE).
+
+That covers the engine, the parsers and the research prose: work written from
+scratch here. It cannot and does not grant you any right to the game's data,
+which is not ours to license. Reverse-engineering notes describe a file format;
+they do not come with permission to copy what is stored in it.
+
+## Legal
+
+This project is not affiliated with, authorised by, endorsed by, or in any way
+connected to Disney, Pixar, Activision, or Traveller's Tales. "Toy Story 2" and
+"Buzz Lightyear" are trademarks of their respective owners, used here only to
+name the game whose files this software reads.
+
+No game assets are distributed here, in the repository or in any build. Running
+this requires a copy of the game that you already own; the files are read from
+your own machine, in your own browser, and are never uploaded anywhere.

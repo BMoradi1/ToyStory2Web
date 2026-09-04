@@ -47,7 +47,7 @@ Do not use these comments to identify levels.
 
 | Ext | What it is | Confidence |
 |---|---|---|
-| `.ngn` | PC container, holds 24bpp Windows BMPs | **Solved** |
+| `.ngn` | PC container: 24bpp BMPs **plus the converted NU scene** | **Solved** |
 | `rtlibs/*.dll` | MPEG-1 system streams (cutscenes), misnamed | **Solved** |
 | `.wav` | 267 standard audio files | **Solved** |
 | `level.bin` | MIPS R3000 overlay code | **Identified**, not decoded |
@@ -526,25 +526,98 @@ Prospector is page 23 and needs `level03`.
 **Still unimplemented:** PSX semi-transparency (`material & 0x20`), which is why
 Buzz's helmet renders as an opaque dome rather than a clear bubble.
 
-**Bits 13/14 — partly understood.** Face groups with `mode & 0x6000` set are
-flat-colour-via-texel faces: their UVs pin all corners to a single texel or a
-tiny rect (`fd c4 fd c4 fd c4 fd c4`), so the whole face takes one colour from
-the page. In level 1 they sample greys and browns — which reads as shadow and
-glass-tint overlays, i.e. the PSX semi-transparent pass — and 39 of the 243
-sample the pure-green key, faces the original hardware would draw fully
-transparent. The blend mode those bits select is not yet decoded; the faces
-currently render opaque.
+**Bits 13/14, 0x8000 and the low nibble** are resolved in the material
+section below, read out of the PC executable rather than inferred.
 
-**Still unknown:** `mode & 0x8000` (real and systematic, meaning unknown; it
-often co-occurs with the triangle bit but is not equivalent to it), bits 1-3 of
-the low nibble, character flag bit `0x80`, and the 2D sprite pool at the
-mesh-pool tail.
+### The `.ngn` scene — what the PC build actually draws
 
-**Still unknown:** the 20-byte ref list (its positions sit near but not on the
-objects it points at, and only ~72% of pointers resolve); `Object.flags`; the
-`mode` low nibble and bit `0x8000`; the `aux` block; zone `a`/`b`; the sprite
-pool at the mesh-pool tail; and **which region of `level.raw` a texture page id
-refers to** — which is why levels currently render with vertex colours.
+`.ngn` is not only textures. pconv converted each level into the NU engine's
+own scene format and appended it after the texture repack; toy2.exe never
+touches `level.dat`. The loader is world.c (`FUN_004c33f0`, chunk loop) and
+objload.c (`FUN_004cb320`/`4cb4e0`/`4cb970`/`4cbc90`). Every chunk is
+`u32 type, u32 size`, so unknown ones skip cleanly:
+
+    top level   0x100 gobj sets   0x101 instances   0x102 point arrays
+                0x103 (idx,a,b)   0x104 textures    0x105 name table
+                0x106 creatures   0x10a ?           0 = end
+    gobj        0x40 name  0x41 texture names  0x42 materials
+                0x43 vertex array (f32 xyz, A,R,G,B bytes)  0x44 primitives
+    instance    3 x vec3 f32 (position, rotation, scale), u32 gobj, [u32 flags]
+    material    u32 fieldBits, u32 size, optional fields; field 0x40 is the
+                u32 RENDER FLAGS the engine maps straight onto Direct3D
+
+One gobj per `level.dat` object (level 1: 1,126 of each), and 3,878 of 3,988
+sampled faces match a `level.dat` face by exact vertex position at unit scale.
+Parser: `src/formats/ngnscene.ts`. The creature models (`0x106`) are also in
+here, converted from `.all` — a second source for character materials.
+
+### Material system — SOLVED, from toy2.exe
+
+Two facts from the executable, then a join. First, the material render-flag
+word (`FUN_004b6760` → the state cache `FUN_004b6320`):
+
+    material 0x02  ALPHABLENDENABLE, SRCBLEND=SRCALPHA, DESTBLEND=INVSRCALPHA,
+                   ZWRITEENABLE=0                      (normal translucency)
+    material 0x10  blend SRCALPHA / ONE, no z-write    (additive)
+    material 0x20  blend ZERO / INVSRCCOLOR, no z-write (subtractive stand-in)
+    material 0x08  CULLMODE=NONE                       (double-sided)
+    material 0x04  draw the gobj a second time with a global material
+                   (`FUN_004b85e0`, DAT_009f5fe4); its look is not yet known
+    default        CULLMODE=2 (D3DCULL_CW) — everything is ONE-SIDED unless
+                   the material says otherwise (`FUN_004ce8b0` sets 0x20)
+
+Second, the join (`tools/material-table.ts`, 16 scene files, ~136,000
+faces): which material flags and vertex alpha pconv assigned to each face
+mode. The low byte decodes as:
+
+    bit  0x01  triangle group (structural; see the face-layout note)
+    bit  0x02  DOUBLE-SIDED  → material 0x08. Exact: every low byte with
+               this bit carries material 0x08, none without it does.
+    bit  0x04  no render effect found
+    bit  0x08  EXTRA PASS    → material 0x04, opaque. Bits 13/14 only ever
+               occur together with this bit; they are not separate flags.
+    bit  0x10  untextured (4-byte faces)
+    bit  0x20  ADDITIVE when 0x40 is clear (material 0x10); no effect otherwise
+    bit  0x40  OPAQUE (vertex alpha 255). CLEAR → semi-transparent: vertex
+               alpha 0x80 with material 0x02 (normal) or 0x10 (additive if
+               0x20). Exception: with 0x08 set the face is opaque + extra pass.
+    bit  0x80  no render effect found
+    bits 8-12  texture page, as before; bit 15 no effect on materials
+
+So the PSX semi-transparent pass is the faces with low byte `0x00-0x06` and
+`0x20-0x26` (`0x30/0x31` untextured additive). They carry alpha 0x80, which
+under SRCALPHA/INVSRCALPHA is the PSX `0.5B + 0.5F` mode and under
+SRCALPHA/ONE is `B + 0.5F`. The subtractive material (0x20) appears on 3
+faces game-wide (low byte `0x40`).
+
+**Culling winding.** With everything one-sided by default, which winding is
+the front matters. Under the pickup markers, 196 of 199 floor faces have their
+right-hand-rule normal (`(v1-v0) x (v2-v0)`, in the file's own +Y-down space)
+pointing UP. `buildLevelGeometry` maps the file space by a proper rotation
+(negate Y and Z), which preserves winding, so **`THREE.FrontSide` is correct**
+and only bit-0x02 faces are `DoubleSide`.
+
+**Vertex colour scale, confirmed independently.** The `.ngn` stores textured
+faces' colours unchanged (ngn/dat ratio 0.97) and untextured faces' colours
+HALVED (0.44-0.49); the engine then doubles every vertex colour with a clamp
+(`FUN_004cb970`). Net effect: textured faces modulate at 0x80-neutral,
+untextured faces draw at 0-255 — the rule already in use here. One anomaly to
+keep in view: faces on pages 7-0xb come out at ratio ~1.84, as if pconv
+doubled them; unexplained.
+
+**What this changes in the earlier diagnosis.** The dark green garage-door
+and window panes (mode `0x0070`) are opaque dark green in the original too;
+the colour-management brightening was the whole defect there. The faces
+that must blend are the alpha-0x80 group above. Material 0x02 also appears on
+a minority of otherwise opaque `0x60`/`0x61` faces — most likely faces whose
+texture region contains the colour key, so the cutout goes through alpha
+blending with vertex alpha 255 (inference, not read from code).
+
+**Still unknown:** the 20-byte ref list (not positional under either record
+pairing — test membership, not distance); `Object.flags`; the `aux` block;
+zone `a`/`b` beyond "portal pair"; the sprite pool at the mesh-pool tail; what
+the extra-pass global material looks like; and chunks `0x102`/`0x103`/`0x105`
+of the `.ngn` scene, which look like paths, portals and a name table.
 
 ### `.vis` / `.kp2` / `.kep` / `.new`
 

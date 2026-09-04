@@ -1,7 +1,7 @@
 ================================================================================
  ToyStory2Web - PROJECT ROADMAP
  Browser reimplementation of Toy Story 2: Buzz Lightyear to the Rescue (1999)
- Last updated: 2026-09-03 (restructured around a level-1 vertical slice)
+ Last updated: 2026-09-03 (P1.1 done: material table read from toy2.exe)
 ================================================================================
 
  HOW TO USE THIS FILE
@@ -57,9 +57,10 @@
    whole install by a tools/*-validate.ts script.
 
  MAIN RISK
-   How much of toy2.exe is NU engine boilerplate versus game logic is
-   unmeasured until the first Ghidra pass. That pass is the next task; it
-   also unblocks three renderer items at once.
+   How much of toy2.exe is game logic versus NU engine: the first Ghidra
+   pass found 1,307 functions, cleanly split by assert strings into nu3d/*
+   (engine) and toy2/* (game). The render side read easily; the gameplay
+   side is untested.
 
 ================================================================================
  FOUNDATIONS                                                             [DONE]
@@ -102,31 +103,40 @@
  DIAGNOSIS (2026-09-03) - geometry is right; everything downstream is not:
  1. Colour management. three.js outputs sRGB, so vertex colours and
     DataTextures are brightened: (0,82,0) reaches the screen as (0,163,0).
- 2. Semi-transparent overlays drawn opaque. The green garage-door and window
-    panels are untextured mode 0x0070 quads with dark vertex colours; black
-    rectangles are the same at (0,0,0). 1,209 of level 1's 3,080 untextured
-    faces are near-black. The blend selector is NOT in the mode word,
-    vertex-colour bit 15, object flags or the aux block - do not retest.
+    This alone is the "green panels": those mode 0x0070 panes are opaque
+    dark green in the original too (confirmed from the PC scene data).
+ 2. Semi-transparent overlays drawn opaque. The faces that must blend are
+    the ones with mode low byte 0x00-0x06 / 0x20-0x26 (vertex alpha 0x80);
+    black half-blend shadows and additive glows. See FORMATS.md "Material
+    system" for the full bit table.
  3. No visibility: all 22 zones draw at once. Zone quads are PORTAL PAIRS
     (each doorway twice, (a,b) swapped, b=15 = outside).
- 4. No culling: everything is double-sided because the rule is unknown.
+ 4. No culling. Everything is one-sided in the original except bit-0x02
+    faces; THREE.FrontSide is the right winding (verified on 199 floors).
 
- P1.1 [READY]   Material table from toy2.exe. Ghidra headless on the x86
-                build. Find the level draw path (the face-group walker that
-                tests mode & 0x10 and & 0x01), follow each remaining bit to
-                the D3D render state it sets: blend enable + src/dst factors,
-                cull mode, texture-stage colour op, z-write. Cross-check the
-                same routine in psx.exe (GPU code bit 0x02, TPage ABR).
-                Deliverable: mode bit -> behaviour table in FORMATS.md, and
-                the same for character material & 0x20 / 0x80.
-                Fallback: a flag explorer in the viewer against footage.
+ P1.1 [DONE]    Material table from toy2.exe. The PC build draws the NU scene
+                inside level.ngn, not level.dat; pconv resolved every face
+                mode into a material whose render-flag word the exe maps onto
+                D3D states. Read the state cache (FUN_004b6320) and the flag
+                mapping (FUN_004b6760) in Ghidra, then joined the .ngn scene
+                to level.dat by vertex position across 16 files. Result in
+                FORMATS.md; reproducible with tools/material-table.ts.
+                Ghidra project + full decompile dump live in the session
+                scratchpad, not the repo; rebuild with analyzeHeadless on
+                toy2.exe (about 3 minutes) if needed again.
  P1.2 [READY]   Raw colour pipeline: linear output, nearest min AND mag, no
                 mipmaps (retires the key-bleed hack). Acceptance: one pixel
                 sampled through browser-shot matches the oracle.
- P1.3 [BLOCKED] Blend modes            <- P1.1. Blended faces after opaque,
-                per object, depth-write off; draw groups split by
-                (page, blend). Buzz's helmet is the character test case.
- P1.4 [BLOCKED] Culling                <- P1.1.
+ P1.3 [READY]   Blend modes. Split draw groups by (page, blend class):
+                opaque; normal (SRCALPHA/INVSRCALPHA, alpha 0.5, no depth
+                write); additive (SRCALPHA/ONE, alpha 0.5, no depth write).
+                Draw blended groups after opaque ones. Vertex alpha comes
+                from mode: 0x40 clear -> 0.5, else 1. Buzz's helmet is the
+                character test case (material & 0x20 there, unverified
+                against the .ngn creature copies).
+ P1.4 [READY]   Culling: THREE.FrontSide everywhere, DoubleSide only where
+                mode & 0x02. Characters: check the .ngn creature materials
+                (chunk 0x106) before assuming the same bit.
  P1.5 [READY]   Portal visibility. Zone graph from the (a,b) pairs; find the
                 object -> zone mapping (candidate: the 20-byte ref list in
                 section 4 - it is NOT positional under either record

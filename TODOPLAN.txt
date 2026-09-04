@@ -231,6 +231,20 @@
                 player code in toy2.cpp via Ghidra.
  P2.2 [READY]   Character controller on the fixed 16949us tick (Viewer.onTick
                 is already wired). Input: keyboard + gamepad, remappable.
+                Groundwork DONE: key `p` stands the selected character in
+                the level on real collision. Viewer.setPlayer keeps the
+                level and adds the character beside it (setModel replaces
+                the scene, which is right for inspecting a model and wrong
+                for standing one on a floor), and collision.ts gained
+                buildCollisionWorld/groundBelow - the hull flattened to
+                world space and bucketed on an X/Z grid, so a ground query
+                touches a handful of polys instead of 23,000.
+                Confirmed in one picture: Buzz on the garage floor beside
+                the car, feet on the boards at the height the collision
+                reports. Geometry, textures, collision and the character
+                model all agree on one coordinate system.
+                Spawn point is a pickup marker for now - the real one is
+                presumably in the level's own code, which is not decoded.
  P2.3 [ACTIVE]  Collision response against the 44-byte TERRAIN polys:
                 single-sided, stored unit normal for slope limits, walkable
                 = normal.y within the original's threshold.

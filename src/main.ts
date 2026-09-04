@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { buildLevelGeometry, parseDat, reachableZones, type DatLevel } from './formats/dat.ts';
 import { decodeBmp, parseNgn, type NgnTexture } from './formats/ngn.ts';
 import { assignZones, parseNgnScene } from './formats/ngnscene.ts';
+import { parseCollision, type CollisionGroup } from './formats/collision.ts';
 import {
   findLevels, findModels, gameDirFromDrop, gameDirFromFileList, pickGameDir,
   supportsDirectoryPicker, validateGameDir, type GameDir,
@@ -32,6 +33,9 @@ let sceneTextures = new Map<number, THREE.Texture>();
 
 /** The loaded scene, kept so the zone picker can recompute what to show. */
 let currentLevel: { level: DatLevel; zones: (number | null)[] } | null = null;
+/** The scene's collision hull, loaded lazily the first time it is shown. */
+let currentCollision: CollisionGroup[] | null = null;
+let currentTerrainFile: { read(): Promise<Uint8Array> } | null = null;
 
 /** Currently displayed character, if any, and its animation playback state. */
 let current: { model: AllFile; anm: AnmFile | null } | null = null;
@@ -155,6 +159,11 @@ async function showLevel(index: number): Promise<void> {
 
   texturesEl.replaceChildren();
   infoEl.textContent = 'reading…';
+  // Collision is a separate file and only wanted on demand, so keep the handle
+  // and drop whatever the previous scene had.
+  currentCollision = null;
+  currentTerrainFile = level.terrain;
+  viewer?.setCollision(null);
 
   let textureCount = 0;
   let gpuTextures = new Map<number, THREE.Texture>();
@@ -323,6 +332,24 @@ if (import.meta.hot) {
 
 // `c` cycles face culling. Which winding three.js considers front-facing
 // can't be determined offline, so make it one keystroke to find out.
+/** `k`: show or hide the collision hull, reading TERRAIN.ALL the first time. */
+async function toggleCollision(): Promise<void> {
+  if (!viewer) return;
+  if (viewer.collisionShown) { infoEl.textContent = viewer.setCollision(null); return; }
+  if (!currentCollision) {
+    if (!currentTerrainFile) { infoEl.textContent = 'no collision file for this scene'; return; }
+    infoEl.textContent = 'reading collision…';
+    try {
+      const parsed = parseCollision(parseAll(await currentTerrainFile.read()));
+      currentCollision = parsed.groups;
+    } catch (err) {
+      infoEl.textContent = `collision failed: ${(err as Error).message}`;
+      return;
+    }
+  }
+  infoEl.textContent = viewer.setCollision(currentCollision);
+}
+
 // `0`-`9` show one zone as the engine would from inside it: the zone itself,
 // zone 0, and whatever its portals lead to. `a` goes back to the whole level.
 window.addEventListener('keydown', (ev) => {
@@ -331,6 +358,7 @@ window.addEventListener('keydown', (ev) => {
   if (ev.key === 'g') infoEl.textContent = `draw groups: ${viewer.toggleSingleMaterial()}`;
   if (ev.key === 's') infoEl.textContent = viewer.describeScene();
   if (ev.key === 'a') infoEl.textContent = viewer.setVisibleZones(null);
+  if (ev.key === 'k') void toggleCollision();
   if (/^[0-9]$/.test(ev.key) && currentLevel) {
     const zone = Number(ev.key);
     infoEl.textContent = viewer.setVisibleZones(reachableZones(currentLevel.level.zones, zone));

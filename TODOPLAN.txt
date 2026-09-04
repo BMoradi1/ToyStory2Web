@@ -231,10 +231,17 @@
                 player code in toy2.cpp via Ghidra.
  P2.2 [READY]   Character controller on the fixed 16949us tick (Viewer.onTick
                 is already wired). Input: keyboard + gamepad, remappable.
- P2.3 [READY]   Collision response against the 44-byte TERRAIN polys:
+ P2.3 [ACTIVE]  Collision response against the 44-byte TERRAIN polys:
                 single-sided, stored unit normal for slope limits, walkable
-                = normal.y within the original's threshold. Debug draw of
-                the collision mesh first (parser done, not yet drawn).
+                = normal.y within the original's threshold.
+                Debug draw is DONE - key `k` in the viewer, green walkable
+                and red not. It confirmed what had never been checked: the
+                collision file and level.dat share a coordinate system and
+                scale exactly (no quarter-scale surprise), the hull sits on
+                the drawn geometry, and every pickup marker in levels 1, 2
+                and 5 has walkable collision beneath it (70/70, 81/81,
+                77/77), floating a median 1.7-3.3 world units above it.
+                Level 1: 2,363 polys, 29% walkable.
  P2.4 [BLOCKED] Follow camera            <- P2.2. Collision-aware, 4:3 native
                 framing, modes as the original ("camera left/right/mode"
                 strings exist in toy2.exe).

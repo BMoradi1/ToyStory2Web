@@ -168,13 +168,15 @@ export interface LevelScene {
   id: string;
   ngn: GameFile | null;
   dat: GameFile | null;
+  /** `TERRAIN.ALL` for `level`, `TERR1.ALL` for `level1`: the scene's collision. */
+  terrain: GameFile | null;
 }
 
 export function findLevels(dir: GameDir): LevelScene[] {
   const scenes = new Map<string, LevelScene>();
   const want = (id: string): LevelScene => {
     let scene = scenes.get(id);
-    if (!scene) { scene = { id, ngn: null, dat: null }; scenes.set(id, scene); }
+    if (!scene) { scene = { id, ngn: null, dat: null, terrain: null }; scenes.set(id, scene); }
     return scene;
   };
 
@@ -185,6 +187,15 @@ export function findLevels(dir: GameDir): LevelScene[] {
     const scene = want(`${levelDir}/${base}`);
     if (ext === 'ngn') scene.ngn = file;
     else scene.dat = file;
+  }
+
+  // Collision sits in its own file per scene: TERRAIN.ALL beside level.dat and
+  // TERR1.ALL beside level1.dat. Paths are lowercased by the loader.
+  for (const [path, file] of dir) {
+    const m = /^data\/(level\d+)\/(terrain|terr1)\.all$/.exec(path);
+    if (!m) continue;
+    const scene = scenes.get(`${m[1]}/${m[2] === 'terrain' ? 'level' : 'level1'}`);
+    if (scene) scene.terrain = file;
   }
 
   // A scene needs geometry to be a scene. `level00` holds four .ngn texture

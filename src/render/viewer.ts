@@ -15,7 +15,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { MeshData } from '../formats/all.ts';
-import type { GeometryGroup, LevelGeometry } from '../formats/dat.ts';
+import { WORLD_SCALE, type GeometryGroup, type LevelGeometry } from '../formats/dat.ts';
+import { isWalkable, type CollisionGroup } from '../formats/collision.ts';
 
 /** The original's frame pacing, in seconds. Game logic steps at this rate. */
 // Take every colour literally. three.js otherwise treats a `THREE.Color` as
@@ -43,6 +44,7 @@ export class Viewer {
   onTick: ((dt: number) => void) | null = null;
 
   private current: THREE.Mesh | null = null;
+  private collision: THREE.LineSegments | null = null;
 
   /**
    * Cull override, for diagnosis. `null` means each face group decides.
@@ -226,6 +228,65 @@ export class Viewer {
       ? `all zones, ${shown} triangles`
       : `zones ${[...zones].sort((a, b) => a - b).join(',')}: ${shown} triangles drawn, ${hidden} hidden`;
   }
+
+  /**
+   * Draw the collision hull as wireframe over the level: green where Buzz can
+   * stand, red where he cannot.
+   *
+   * Collision is a separate file from the geometry (`TERRAIN.ALL` beside
+   * `level.dat`) with no shared index, so the only check that they describe
+   * the same world is to look at them together. They do: the two share a
+   * coordinate system and scale, and every pickup marker in every level tested
+   * has walkable collision under it.
+   */
+  setCollision(groups: CollisionGroup[] | null): string {
+    if (this.collision) {
+      this.scene.remove(this.collision);
+      this.collision.geometry.dispose();
+      (this.collision.material as THREE.Material).dispose();
+      this.collision = null;
+    }
+    if (!groups) return 'collision hidden';
+
+    const points: number[] = [];
+    const colors: number[] = [];
+    let polys = 0, walk = 0;
+    for (const group of groups) {
+      for (const mesh of group.meshes) {
+        for (const poly of mesh.polys) {
+          polys++;
+          const ok = isWalkable(poly);
+          if (ok) walk++;
+          // PSX axes are +Y down and +Z into the screen, the same convention
+          // buildLevelGeometry undoes, so apply the same mapping here or the
+          // hull lands mirrored through the floor.
+          const vs = poly.vertices.map((v) => [
+            (v.x + group.position.x) / WORLD_SCALE,
+            -(v.y + group.position.y) / WORLD_SCALE,
+            -(v.z + group.position.z) / WORLD_SCALE,
+          ]);
+          for (let i = 0; i < vs.length; i++) {
+            const a = vs[i]!, b = vs[(i + 1) % vs.length]!;
+            points.push(a[0]!, a[1]!, a[2]!, b[0]!, b[1]!, b[2]!);
+            for (let k = 0; k < 2; k++) {
+              if (ok) colors.push(0.2, 0.9, 0.3); else colors.push(0.9, 0.25, 0.2);
+            }
+          }
+        }
+      }
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(points), 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(colors), 3));
+    this.collision = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({
+      vertexColors: true, transparent: true, opacity: 0.6, depthTest: true,
+    }));
+    this.scene.add(this.collision);
+    return `collision: ${polys} polys, ${walk} walkable (${(100 * walk / (polys || 1)).toFixed(0)}%)`;
+  }
+
+  /** Whether the collision overlay is currently in the scene. */
+  get collisionShown(): boolean { return this.collision !== null; }
 
   /** How many meshes are actually in the scene. Should be exactly one. */
   describeScene(): string {

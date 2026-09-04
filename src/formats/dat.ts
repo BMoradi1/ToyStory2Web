@@ -374,6 +374,12 @@ export interface GeometryGroup {
   count: number;
   /** `.ngn` texture slot id, or null for untextured faces. */
   page: number | null;
+  /** How these faces combine with the frame buffer. */
+  blend: BlendMode;
+  /** Drawn from both sides, rather than back-face culled. */
+  doubleSided: boolean;
+  /** Constant vertex alpha: 1 for opaque faces, 0.5 for the PSX half-blend. */
+  alpha: number;
 }
 
 export interface LevelGeometry {
@@ -400,6 +406,53 @@ export interface LevelGeometry {
  */
 export function texturePage(mode: number): number {
   return (mode >> 8) & 0x1f;
+}
+
+/** How a face combines with what is already in the frame buffer. */
+export type BlendMode = 'opaque' | 'normal' | 'additive' | 'subtractive';
+
+/**
+ * Blend mode for a face group.
+ *
+ * Read out of the PC build rather than guessed: pconv turned every face mode
+ * into an NU material, and toy2.exe maps that material's flags onto Direct3D
+ * states (docs/FORMATS.md, "Material system"). A face is semi-transparent
+ * unless bit `0x40` (opaque) or bit `0x08` (extra pass) is set, and the kind
+ * of blend is chosen by bit `0x20`. Semi-transparent faces carry vertex alpha
+ * 0x80, which is the PSX half-blend.
+ *
+ * Verified on 129,452 faces across all 16 scene files, where the material
+ * these rules predict is the material pconv actually assigned 96% of the
+ * time; almost all of the rest are colour-key cutouts, which the original
+ * drew through alpha blending and this renderer draws with `alphaTest`.
+ *
+ * The one real exception is mode low byte `0x40`, which is subtractive
+ * despite having the opaque bit set. It occurs on 3 faces in the whole game.
+ */
+export function blendMode(mode: number): BlendMode {
+  if ((mode & 0xff) === 0x40) return 'subtractive';
+  if ((mode & 0x48) !== 0) return 'opaque';
+  return (mode & 0x20) !== 0 ? 'additive' : 'normal';
+}
+
+/**
+ * Is this face group drawn from both sides?
+ *
+ * Everything else is single-sided: the engine's default cull mode is
+ * `D3DCULL_CW` and only material flag `0x08` clears it, which is exactly what
+ * mode bit `0x02` selects. Exact across the whole game — every mode low byte
+ * carrying `0x02` got the no-cull material, and none without it did.
+ */
+export function isDoubleSided(mode: number): boolean {
+  return (mode & 0x02) !== 0;
+}
+
+/**
+ * Vertex alpha for a face group, as the PSX stored it.
+ * Semi-transparent faces are a flat half-blend; everything else is solid.
+ */
+export function faceAlpha(mode: number): number {
+  return blendMode(mode) === 'opaque' ? 1 : 0.5;
 }
 
 /**
@@ -432,12 +485,16 @@ function rotationMatrix(rot: Vec3): number[] {
 }
 
 export function buildLevelGeometry(level: DatLevel): LevelGeometry {
-  // Bucket triangles by texture page so each page becomes one draw group.
-  // `null` collects untextured faces and anything whose mode we don't trust.
-  const buckets = new Map<number | null, { pos: number[]; col: number[]; uv: number[] }>();
-  const bucketFor = (page: number | null) => {
-    let bucket = buckets.get(page);
-    if (!bucket) { bucket = { pos: [], col: [], uv: [] }; buckets.set(page, bucket); }
+  // Bucket triangles by everything that has to be one draw call: texture page,
+  // blend mode and cull mode. A page alone is not enough — a wall and the
+  // glass in front of it can share a texture and still need different states.
+  // `null` collects untextured faces.
+  interface Bucket { pos: number[]; col: number[]; uv: number[]; group: Omit<GeometryGroup, 'start' | 'count'> }
+  const buckets = new Map<string, Bucket>();
+  const bucketFor = (group: Omit<GeometryGroup, 'start' | 'count'>) => {
+    const key = `${group.page}|${group.blend}|${group.doubleSided}`;
+    let bucket = buckets.get(key);
+    if (!bucket) { bucket = { pos: [], col: [], uv: [], group }; buckets.set(key, bucket); }
     return bucket;
   };
 
@@ -456,8 +513,12 @@ export function buildLevelGeometry(level: DatLevel): LevelGeometry {
     };
 
     for (const face of mesh.faces) {
-      const page = face.textured ? texturePage(face.mode) : null;
-      const bucket = bucketFor(page);
+      const bucket = bucketFor({
+        page: face.textured ? texturePage(face.mode) : null,
+        blend: blendMode(face.mode),
+        doubleSided: isDoubleSided(face.mode),
+        alpha: faceAlpha(face.mode),
+      });
 
       // PSX colour scaling differs by primitive kind: textured polys modulate
       // the texel by colour/128 (0x80 neutral, up to 2x brightening), but
@@ -493,9 +554,15 @@ export function buildLevelGeometry(level: DatLevel): LevelGeometry {
   // Concatenate the buckets, recording each one's range. Copy through typed
   // arrays rather than `push(...bucket)` — spreading a bucket passes every
   // number as a separate argument, which overflows the stack on larger levels.
-  // Untextured last, so textured pages take the low material indices.
-  const order = [...buckets.keys()].sort((a, b) =>
-    a === null ? 1 : b === null ? -1 : a - b);
+  // Opaque buckets first, then the blended ones, so a renderer that honours
+  // group order draws them in the right sequence without sorting. Within each
+  // half, untextured last so textured pages take the low material indices.
+  const order = [...buckets.values()].sort((a, b) => {
+    const opaque = (g: Bucket) => (g.group.blend === 'opaque' ? 0 : 1);
+    if (opaque(a) !== opaque(b)) return opaque(a) - opaque(b);
+    if ((a.group.page === null) !== (b.group.page === null)) return a.group.page === null ? 1 : -1;
+    return (a.group.page ?? 0) - (b.group.page ?? 0);
+  });
 
   let totalPos = 0, totalUv = 0;
   for (const bucket of buckets.values()) { totalPos += bucket.pos.length; totalUv += bucket.uv.length; }
@@ -506,13 +573,12 @@ export function buildLevelGeometry(level: DatLevel): LevelGeometry {
   const groups: GeometryGroup[] = [];
 
   let posOffset = 0, uvOffset = 0;
-  for (const page of order) {
-    const bucket = buckets.get(page)!;
+  for (const bucket of order) {
     if (bucket.pos.length === 0) continue;
     positions.set(bucket.pos, posOffset);
     colors.set(bucket.col, posOffset);
     uvs.set(bucket.uv, uvOffset);
-    groups.push({ start: posOffset / 3, count: bucket.pos.length / 3, page });
+    groups.push({ ...bucket.group, start: posOffset / 3, count: bucket.pos.length / 3 });
     posOffset += bucket.pos.length;
     uvOffset += bucket.uv.length;
   }

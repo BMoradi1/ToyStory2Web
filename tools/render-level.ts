@@ -12,10 +12,10 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 import { parseNgn, type NgnTexture } from '../src/formats/ngn.ts';
-import { parseDat, buildLevelGeometry } from '../src/formats/dat.ts';
+import { parseDat, buildLevelGeometry, type GeometryGroup } from '../src/formats/dat.ts';
 import { parseAll, buildMeshData } from '../src/formats/all.ts';
 
-const W = 900, H = 700;
+let W = 900, H = 700;
 
 /** Decode a 24bpp Windows BMP into RGB rows ordered top-down. */
 function decodeBmp(bmp: Uint8Array): { w: number; h: number; px: Uint8Array } | null {
@@ -72,11 +72,24 @@ function writePng(path: string, w: number, h: number, rgb: Uint8Array): void {
   ]));
 }
 
-const [, , root, sceneId, outPath = 'level.png', view = '', texScene = 'level01/level'] = process.argv;
+const argv = process.argv.slice(2);
+const flag = (name: string) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : undefined; };
+const positional = argv.filter((a, i) => !a.startsWith('--') && !(argv[i - 1] ?? '').startsWith('--'));
+const [root, sceneId, outPath = 'level.png', texScene = 'level01/level'] = positional;
+const view = argv.find((a) => a === '--top' || a === '--inside' || a === '--viewer') ?? '';
 if (!root || !sceneId) {
-  console.error('usage: npx tsx tools/render-level.ts <game dir> <levelNN/base|charsN/name> <out.png> [--top] [texScene]');
+  console.error('usage: npx tsx tools/render-level.ts <game dir> <levelNN/base|charsN/name> <out.png>\n' +
+    '         [--top|--inside|--viewer] [texScene] [--eye x,y,z --target x,y,z] [--size WxH] [--fovy deg]');
   process.exit(1);
 }
+// An explicit camera, so a shot can be reproduced exactly in the browser and
+// diffed against it. Geometry alone is not proof: the parsers have hard
+// oracles, but a material or a blend mode can only be checked by looking.
+const eyeArg = flag('--eye')?.split(',').map(Number);
+const targetArg = flag('--target')?.split(',').map(Number);
+const sizeArg = flag('--size')?.split('x').map(Number);
+if (sizeArg && sizeArg.length === 2) { W = sizeArg[0]!; H = sizeArg[1]!; }
+const fovY = Number(flag('--fovy') ?? 60);
 
 // A character model, or a level scene. Characters take their textures from a
 // level's .ngn, since chars* ships none of its own.
@@ -85,6 +98,21 @@ const base = isModel ? `${root}/data/${texScene}` : `${root}/data/${sceneId}`;
 const geo = isModel
   ? buildMeshData(parseAll(readFileSync(`${root}/data/${sceneId}.all`)))
   : buildLevelGeometry(parseDat(readFileSync(`${base}.dat`)));
+
+// Character meshes carry no decoded material bits yet, so they fall back to
+// opaque and double-sided — the same treatment the viewer gives them, and the
+// reason this tool can render both kinds through one path.
+const groups: GeometryGroup[] = geo.groups.map((g) => {
+  const level = g as Partial<GeometryGroup>;
+  return {
+    start: g.start,
+    count: g.count,
+    page: g.page,
+    blend: level.blend ?? 'opaque',
+    doubleSided: level.doubleSided ?? true,
+    alpha: level.alpha ?? 1,
+  };
+});
 
 // Decode the same textures the browser binds, keyed by slot.
 const textures = new Map<number, { w: number; h: number; px: Uint8Array }>();
@@ -129,14 +157,16 @@ const inside = view === '--inside';
 // be reproduced without hand-picking coordinates.
 const zoom = Number(process.env.ZOOM ?? 1);
 const viewerD = Math.max(sphereR * 2.2, 1) / zoom;
-const eye = viewerCam
-  ? [sphereC[0]! + viewerD * 0.6, sphereC[1]! + viewerD * 0.5, sphereC[2]! + viewerD * 0.8]
-  : topDown
-    ? [centre[0]!, centre[1]! + radius * 2.4, centre[2]! + 0.001]
-    : inside
-      ? [centre[0]!, lo[1]! + radius * 0.12, centre[2]!]
-      : [centre[0]! + radius * 1.5, centre[1]! + radius * 1.1, centre[2]! + radius * 1.5];
-const target = inside ? [centre[0]! + radius, lo[1]! + radius * 0.12, centre[2]! + radius] : centre;
+const eye = eyeArg && eyeArg.length === 3 ? eyeArg
+  : viewerCam
+    ? [sphereC[0]! + viewerD * 0.6, sphereC[1]! + viewerD * 0.5, sphereC[2]! + viewerD * 0.8]
+    : topDown
+      ? [centre[0]!, centre[1]! + radius * 2.4, centre[2]! + 0.001]
+      : inside
+        ? [centre[0]!, lo[1]! + radius * 0.12, centre[2]!]
+        : [centre[0]! + radius * 1.5, centre[1]! + radius * 1.1, centre[2]! + radius * 1.5];
+const target = targetArg && targetArg.length === 3 ? targetArg
+  : inside ? [centre[0]! + radius, lo[1]! + radius * 0.12, centre[2]!] : centre;
 
 // Basis looking from eye at centre.
 const fwd = [0, 1, 2].map((a) => target[a]! - eye[a]!);
@@ -154,7 +184,10 @@ const up = [
   right[0]! * fwd[1]! - right[1]! * fwd[0]!,
 ];
 
-const focal = W / 2 / Math.tan((60 * Math.PI) / 180 / 2);
+// three.js takes a VERTICAL field of view, so the focal length comes from the
+// height. Deriving it from the width instead silently widens the shot and
+// makes every comparison against the browser meaningless.
+const focal = H / 2 / Math.tan((fovY * Math.PI) / 180 / 2);
 
 // Optional: emulate a real GPU depth buffer. WebGL stores a hyperbolic,
 // quantised depth value, so precision collapses as the near/far ratio grows.
@@ -172,7 +205,11 @@ const encodeDepth = (z: number): number => {
   // Map to [0,1] so it INCREASES with distance, matching the depth test below.
   return Math.round(((ndc + 1) / 2) * DEPTH_BITS);
 };
-const colour = new Uint8Array(W * H * 3).fill(20);
+// The viewer's own clear colour, so a diff against a browser screenshot shows
+// only real disagreement instead of a constant offset everywhere.
+const CLEAR = [0x14, 0x16, 0x1a];
+const colour = new Uint8Array(W * H * 3);
+for (let i = 0; i < colour.length; i++) colour[i] = CLEAR[i % 3]!;
 const depth = new Float32Array(W * H).fill(Infinity);
 
 function project(i: number) {
@@ -184,9 +221,34 @@ function project(i: number) {
 }
 
 let drawn = 0;
-for (const group of geo.groups) {
-  const tex = group.page === null ? undefined : textures.get(group.page);
-  for (let t = group.start; t + 2 < group.start + group.count; t += 3) {
+// Opaque groups first with depth writes, then the blended ones back to front
+// with depth writes off — the same two queues three.js keeps, so the two
+// renderers can be compared pixel for pixel.
+const passes: GeometryGroup[][] = [
+  groups.filter((g) => g.blend === 'opaque'),
+  groups.filter((g) => g.blend !== 'opaque'),
+];
+
+for (const [pass, groups] of passes.entries()) {
+  const blendedPass = pass === 1;
+  // Back to front within the blended pass, by triangle depth.
+  const work: { group: GeometryGroup; t: number; z: number }[] = [];
+  for (const group of groups) {
+    for (let t = group.start; t + 2 < group.start + group.count; t += 3) {
+      let z = 0;
+      if (blendedPass) {
+        for (let k = 0; k < 3; k++) {
+          const v = [p[(t + k) * 3]! - eye[0]!, p[(t + k) * 3 + 1]! - eye[1]!, p[(t + k) * 3 + 2]! - eye[2]!];
+          z += (v[0]! * fwd[0]! + v[1]! * fwd[1]! + v[2]! * fwd[2]!) / 3;
+        }
+      }
+      work.push({ group, t, z });
+    }
+  }
+  if (blendedPass) work.sort((a, b) => b.z - a.z);
+
+  for (const { group, t } of work) {
+    const tex = group.page === null ? undefined : textures.get(group.page);
     const a = project(t), b = project(t + 1), c = project(t + 2);
     // Reject triangles crossing the near plane rather than projecting them.
     // A vertex barely in front of the camera projects to an enormous screen
@@ -201,11 +263,13 @@ for (const group of geo.groups) {
     const maxY = Math.min(H - 1, Math.ceil(Math.max(a.y, b.y, c.y)));
     const area = (b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y);
     if (Math.abs(area) < 1e-9) continue;
-    // Backface culling by winding sign. CULL=front keeps counter-clockwise
-    // triangles, CULL=back keeps clockwise; unset draws everything, which is
-    // what `side: DoubleSide` does in the viewer today.
-    if (cullMode === 'front' && area > 0) continue;
-    if (cullMode === 'back' && area < 0) continue;
+    // Back-face culling. This rasteriser measures y downward while WebGL
+    // measures it up, which flips the sign of the signed area, so a triangle
+    // that WebGL calls front-facing lands here with a NEGATIVE area. CULL
+    // overrides the per-face rule for diagnosis, matching Viewer.cycleSide.
+    const side = cullMode || (group.doubleSided ? 'none' : 'front');
+    if (side === 'front' && area > 0) continue;
+    if (side === 'back' && area < 0) continue;
     drawn++;
     for (let y = minY; y <= maxY; y++) {
       for (let x = minX; x <= maxX; x++) {
@@ -217,10 +281,13 @@ for (const group of geo.groups) {
         const idx = y * W + x;
         const dz = encodeDepth(z);
         if (dz >= depth[idx]!) continue;
-        depth[idx] = dz;
+        // Blended faces test depth but do not write it, so one translucent
+        // surface never hides another.
+        if (!blendedPass) depth[idx] = dz;
         const pick = (arr: Float32Array, off: number) =>
           (u0 * arr[t * 3 + off]! / a.z + u2 * arr[(t + 1) * 3 + off]! / b.z + v2 * arr[(t + 2) * 3 + off]! / c.z) * z;
         let r: number, g: number, bl: number;
+        let alpha = group.alpha;
         if (tex) {
           const pickUv = (off: number) =>
             (u0 * geo.uvs[t * 2 + off]! / a.z + u2 * geo.uvs[(t + 1) * 2 + off]! / b.z + v2 * geo.uvs[(t + 2) * 2 + off]! / c.z) * z;
@@ -242,6 +309,16 @@ for (const group of geo.groups) {
         } else {
           r = pick(geo.colors, 0) * 255; g = pick(geo.colors, 1) * 255; bl = pick(geo.colors, 2) * 255;
         }
+        if (blendedPass) {
+          const dr = colour[idx * 3]!, dg = colour[idx * 3 + 1]!, db = colour[idx * 3 + 2]!;
+          if (group.blend === 'additive') {
+            r = dr + r * alpha; g = dg + g * alpha; bl = db + bl * alpha;
+          } else if (group.blend === 'subtractive') {
+            r = dr * (1 - r / 255); g = dg * (1 - g / 255); bl = db * (1 - bl / 255);
+          } else {
+            r = dr * (1 - alpha) + r * alpha; g = dg * (1 - alpha) + g * alpha; bl = db * (1 - alpha) + bl * alpha;
+          }
+        }
         colour[idx * 3] = Math.max(0, Math.min(255, r));
         colour[idx * 3 + 1] = Math.max(0, Math.min(255, g));
         colour[idx * 3 + 2] = Math.max(0, Math.min(255, bl));
@@ -250,6 +327,6 @@ for (const group of geo.groups) {
   }
 }
 writePng(outPath, W, H, colour);
-console.log(`${sceneId}: cull=${cullMode || 'none'}, ${geo.triangleCount} tris, ${geo.groups.length} groups ` +
-  `(pages ${geo.groups.map((g) => g.page ?? 'none').join(',')}), ` +
+console.log(`${sceneId}: cull=${cullMode || 'per face'}, ${geo.triangleCount} tris, ${groups.length} groups ` +
+  `(pages ${groups.map((g) => g.page ?? 'none').join(',')}), ` +
   `${textures.size} textures, ${drawn} rasterised -> ${outPath}`);

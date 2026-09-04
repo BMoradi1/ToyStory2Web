@@ -613,6 +613,17 @@ a minority of otherwise opaque `0x60`/`0x61` faces — most likely faces whose
 texture region contains the colour key, so the cutout goes through alpha
 blending with vertex alpha 255 (inference, not read from code).
 
+**Rendering these rules.** `buildLevelGeometry` buckets faces by (page, blend,
+cull) and emits the opaque buckets first. Two deliberate divergences from the
+original: colour-key cutouts are drawn in the opaque queue with an alpha test
+rather than blended with depth writes off, which removes a dependence on exact
+back-to-front order; and the extra-pass material is not implemented, because
+what the global material it draws with actually looks like has not been read
+out of the executable yet. Also note that three.js must have colour management
+turned off entirely, not merely a linear output transform — otherwise it still
+converts `THREE.Color` values, and a byte no longer survives the trip to the
+screen unchanged.
+
 **Still unknown:** the 20-byte ref list (not positional under either record
 pairing — test membership, not distance); `Object.flags`; the `aux` block;
 zone `a`/`b` beyond "portal pair"; the sprite pool at the mesh-pool tail; what

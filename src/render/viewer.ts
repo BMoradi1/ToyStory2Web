@@ -15,9 +15,18 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { MeshData } from '../formats/all.ts';
-import type { LevelGeometry } from '../formats/dat.ts';
+import type { GeometryGroup, LevelGeometry } from '../formats/dat.ts';
 
 /** The original's frame pacing, in seconds. Game logic steps at this rate. */
+// Take every colour literally. three.js otherwise treats a `THREE.Color` as
+// sRGB and converts it into a linear working space, then converts back on
+// output. Both halves are wrong here: the vertex colours and texture bytes in
+// this game are already the values the 1999 engine handed to the frame buffer.
+// Left on, the round trip brightened everything — a vertex colour of (0,82,0)
+// reached the screen as (0,163,0) — and it still applied to `THREE.Color`
+// values such as the background even once the output transform was off.
+THREE.ColorManagement.enabled = false;
+
 export const TICK_SECONDS = 16949 / 1_000_000;
 export const NATIVE_ASPECT = 4 / 3;
 
@@ -36,23 +45,17 @@ export class Viewer {
   private current: THREE.Mesh | null = null;
 
   /**
-   * Face culling mode.
+   * Cull override, for diagnosis. `null` means each face group decides.
    *
-   * Rendering everything double-sided draws interior faces through walls and
-   * lets them overdraw what should be visible — "extra polygons in some places
-   * and missing ones in others". Offline rasterisation confirms that culling
-   * one winding gives solid geometry; which of three.js's two names
-   * corresponds to that winding can't be settled offline, because the
-   * rasteriser works in y-down screen space and WebGL in y-up NDC, so the sign
-   * of the signed area flips between them. Hence a toggle.
-   *
-   * Default is double-sided because CHARACTERS need it: measured offline, both
-   * culling conventions punch holes through 13-15% of Buzz's silhouette, so
-   * his parts are not closed shells. Level geometry does benefit from culling,
-   * which is why this is switchable rather than fixed — the real answer is
-   * almost certainly per-face, via the material bits that are still undecoded.
+   * Level faces are single-sided unless their mode carries bit `0x02`: the
+   * engine's default is `D3DCULL_CW` and only the no-cull material clears it
+   * (docs/FORMATS.md). Which winding is the front was settled from the data —
+   * under the pickup markers, 196 of 199 floor faces have their right-hand
+   * normal pointing up, and `buildLevelGeometry` maps file space to WebGL
+   * space by a proper rotation, which preserves winding. So `FrontSide` is
+   * correct and this override exists only to check that claim by eye.
    */
-  side: THREE.Side = THREE.DoubleSide;
+  sideOverride: THREE.Side | null = null;
 
   /**
    * Diagnostic: draw the whole mesh with ONE material and no draw groups.
@@ -71,6 +74,8 @@ export class Viewer {
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    // No output transform either: see the ColorManagement note above.
+    this.renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
 
     this.scene.background = new THREE.Color(0x14161a);
     this.camera = new THREE.PerspectiveCamera(60, NATIVE_ASPECT, 0.1, 10_000);
@@ -126,10 +131,14 @@ export class Viewer {
       // queue, which sorts per draw group rather than per pixel — with one
       // group per texture page, surfaces then draw over each other in the
       // wrong order and the level looks scrambled.
+      // Characters stay double-sided: measured offline, both culling
+      // conventions punch holes through 13-15% of Buzz's silhouette, so his
+      // parts are not closed shells. Their own material bits are not decoded
+      // yet — the `.ngn` creature chunk is the place to look.
       materials.push(new THREE.MeshBasicMaterial({
         map: texture ?? null,
         vertexColors: true,
-        side: this.side,
+        side: this.sideOverride ?? THREE.DoubleSide,
         alphaTest: 0.5,
       }));
     }
@@ -163,7 +172,7 @@ export class Viewer {
 
     if (this.singleMaterial) {
       this.current = new THREE.Mesh(buffer, new THREE.MeshBasicMaterial({
-        vertexColors: true, side: this.side, wireframe: false,
+        vertexColors: true, side: this.sideOverride ?? THREE.FrontSide, wireframe: false,
       }));
       this.scene.add(this.current);
       this.frameObject(buffer);
@@ -172,20 +181,8 @@ export class Viewer {
 
     const materials: THREE.Material[] = [];
     for (const group of geometry.groups) {
-      const texture = group.page === null ? undefined : textures.get(group.page);
       buffer.addGroup(group.start, group.count, materials.length);
-      // Cutout, not blended. `alphaTest` discards colour-keyed texels while
-      // the material stays in the OPAQUE queue, so depth testing works per
-      // pixel. Marking these `transparent` instead moves them to the blended
-      // queue, which sorts per draw group rather than per pixel — with one
-      // group per texture page, surfaces then draw over each other in the
-      // wrong order and the level looks scrambled.
-      materials.push(new THREE.MeshBasicMaterial({
-        map: texture ?? null,
-        vertexColors: true,
-        side: this.side,
-        alphaTest: 0.5,
-      }));
+      materials.push(this.materialFor(group, textures.get(group.page ?? -1)));
     }
 
     this.current = new THREE.Mesh(buffer, materials);
@@ -214,17 +211,49 @@ export class Viewer {
     return this.singleMaterial ? 'single material, no draw groups' : 'one material per texture page';
   }
 
-  /** Cycle back-face -> front-face -> double-sided, returning the new name. */
+  /**
+   * Cycle the cull override: per-face (the real rule) -> front -> back -> both.
+   * Rebuilds rather than patching materials, since the per-face state differs
+   * from group to group.
+   */
   cycleSide(): string {
-    this.side = this.side === THREE.BackSide ? THREE.FrontSide
-      : this.side === THREE.FrontSide ? THREE.DoubleSide : THREE.BackSide;
-    const mesh = this.current;
-    if (mesh) {
-      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-      for (const m of materials) { (m as THREE.MeshBasicMaterial).side = this.side; m.needsUpdate = true; }
+    this.sideOverride = this.sideOverride === null ? THREE.FrontSide
+      : this.sideOverride === THREE.FrontSide ? THREE.BackSide
+        : this.sideOverride === THREE.BackSide ? THREE.DoubleSide : null;
+    if (this.lastLevel) this.setLevel(this.lastLevel.geometry, this.lastLevel.textures);
+    return this.sideOverride === null ? 'per face (front, or both where mode bit 0x02 is set)'
+      : this.sideOverride === THREE.FrontSide ? 'forced front-face'
+        : this.sideOverride === THREE.BackSide ? 'forced back-face' : 'forced double-sided';
+  }
+
+  private materialFor(group: GeometryGroup, texture?: THREE.Texture): THREE.Material {
+    const common = {
+      map: texture ?? null,
+      vertexColors: true,
+      side: this.sideOverride ?? (group.doubleSided ? THREE.DoubleSide : THREE.FrontSide),
+    };
+    if (group.blend === 'opaque') {
+      return new THREE.MeshBasicMaterial({ ...common, alphaTest: 0.5 });
     }
-    return this.side === THREE.BackSide ? 'back-face culled'
-      : this.side === THREE.FrontSide ? 'front-face culled' : 'double-sided';
+    const blended = {
+      ...common,
+      transparent: true,
+      opacity: group.alpha,
+      depthWrite: false,
+    };
+    if (group.blend === 'additive') {
+      return new THREE.MeshBasicMaterial({ ...blended, blending: THREE.AdditiveBlending });
+    }
+    if (group.blend === 'subtractive') {
+      // ZERO / INVSRCCOLOR: the frame buffer is darkened by the face colour.
+      return new THREE.MeshBasicMaterial({
+        ...blended,
+        blending: THREE.CustomBlending,
+        blendSrc: THREE.ZeroFactor,
+        blendDst: THREE.OneMinusSrcColorFactor,
+      });
+    }
+    return new THREE.MeshBasicMaterial({ ...blended, blending: THREE.NormalBlending });
   }
 
   private clearModel(): void {

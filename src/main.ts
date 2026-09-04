@@ -91,10 +91,14 @@ async function loadTextures(textures: NgnTexture[]): Promise<Map<number, THREE.T
     if (!image) continue;
 
     const texture = new THREE.DataTexture(image.rgba, image.width, image.height, THREE.RGBAFormat);
-    // 256x256 art drawn for a 1999 console: keep it crisp.
+    // Point sampling both ways, and no mip chain. These are 256x256 images
+    // drawn for a 1999 console whose hardware had no filtering at all, so
+    // smoothing them is not a better picture of the same thing — it is a
+    // different one. It also removes the whole class of bug where a filtered
+    // or minified texel mixes the transparency key into the art.
     texture.magFilter = THREE.NearestFilter;
-    texture.minFilter = THREE.LinearMipmapLinearFilter;
-    texture.generateMipmaps = true;
+    texture.minFilter = THREE.NearestFilter;
+    texture.generateMipmaps = false;
     texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
     // Rows come back top-down and UVs index from the top, so no flip.
     texture.flipY = false;

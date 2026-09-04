@@ -159,10 +159,13 @@ export function decodeBmp(
   }
 
   // Bleed edge colours into keyed texels. Their RGB is invisible at full
-  // resolution (alpha 0), but mipmap generation averages RGB and alpha
-  // independently, so pure-green key pixels tint every minified cutout edge
-  // green. Replacing a keyed texel's RGB with the mean of its non-keyed
-  // neighbours makes the mip chain average toward the art instead of the key.
+  // resolution (alpha 0), but any filtering that averages neighbouring texels
+  // averages RGB and alpha independently, so pure-green key pixels tint every
+  // cutout edge green. Replacing a keyed texel's RGB with the mean of its
+  // non-keyed neighbours makes such an average tend toward the art instead.
+  // The viewer now samples point-wise with no mip chain, so nothing reads
+  // these bytes today; this keeps the decoded image correct for any consumer
+  // that does filter it.
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const o = (y * width + x) * 4;

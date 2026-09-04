@@ -1,7 +1,7 @@
 ================================================================================
  ToyStory2Web - PROJECT ROADMAP
  Browser reimplementation of Toy Story 2: Buzz Lightyear to the Rescue (1999)
- Last updated: 2026-09-03 (P1.1 done: material table read from toy2.exe)
+ Last updated: 2026-09-03 (P1.1-P1.4 done: materials, colour, blending, culling)
 ================================================================================
 
  HOW TO USE THIS FILE
@@ -100,7 +100,8 @@
  Done means: level 1 matches a screenshot of the real game from the same
  camera, to within texture filtering.
 
- DIAGNOSIS (2026-09-03) - geometry is right; everything downstream is not:
+ DIAGNOSIS (2026-09-03) - geometry was right; the four defects below were
+ all downstream of it, and 1, 2 and 4 are now fixed:
  1. Colour management. three.js outputs sRGB, so vertex colours and
     DataTextures are brightened: (0,82,0) reaches the screen as (0,163,0).
     This alone is the "green panels": those mode 0x0070 panes are opaque
@@ -124,27 +125,50 @@
                 Ghidra project + full decompile dump live in the session
                 scratchpad, not the repo; rebuild with analyzeHeadless on
                 toy2.exe (about 3 minutes) if needed again.
- P1.2 [READY]   Raw colour pipeline: linear output, nearest min AND mag, no
-                mipmaps (retires the key-bleed hack). Acceptance: one pixel
-                sampled through browser-shot matches the oracle.
- P1.3 [READY]   Blend modes. Split draw groups by (page, blend class):
-                opaque; normal (SRCALPHA/INVSRCALPHA, alpha 0.5, no depth
-                write); additive (SRCALPHA/ONE, alpha 0.5, no depth write).
-                Draw blended groups after opaque ones. Vertex alpha comes
-                from mode: 0x40 clear -> 0.5, else 1. Buzz's helmet is the
-                character test case (material & 0x20 there, unverified
-                against the .ngn creature copies).
- P1.4 [READY]   Culling: THREE.FrontSide everywhere, DoubleSide only where
-                mode & 0x02. Characters: check the .ngn creature materials
-                (chunk 0x106) before assuming the same bit.
+ P1.2 [DONE]    Raw colour pipeline. THREE.ColorManagement is OFF and output
+                is LinearSRGB, so a stored byte reaches the screen unchanged;
+                leaving either on brightened everything, and colour
+                management still applied to THREE.Color values (the scene
+                background) after the output transform was disabled.
+                Textures are nearest for BOTH min and mag with no mip chain.
+                Verified: untextured faces render at exactly their stored
+                colour ((8,8,8) and (25,0,0) sampled pixel-exact), and the
+                browser matches the offline oracle from the same camera on
+                93% of flat interior pixels within 1/255, the rest being
+                edge antialiasing, which the oracle does not do.
+ P1.3 [DONE]    Blend modes. Draw groups are split by (page, blend,
+                cull) rather than page alone - a wall and the glass in front
+                of it can share a texture and still need different states.
+                Opaque groups are emitted first, then normal
+                (SRCALPHA/INVSRCALPHA), additive (SRCALPHA/ONE) and the
+                three subtractive faces in the whole game, all at alpha 0.5
+                with depth writes off. Level 1: 32,285 opaque, 464 additive,
+                354 normal triangles. Cutouts stay in the OPAQUE queue with
+                alphaTest instead - a deliberate divergence, since the
+                original drew them blended with no depth writes, which needs
+                exact back-to-front order to look right.
+ P1.4 [DONE]    Culling. THREE.FrontSide, DoubleSide only where mode & 0x02
+                (607 triangles in level 1). Roughly half of level 1's
+                triangles are now culled. Characters stay double-sided:
+                their parts are not closed shells, and their own material
+                bits are still unread - the .ngn creature chunk (0x106) is
+                where to look.
  P1.5 [READY]   Portal visibility. Zone graph from the (a,b) pairs; find the
                 object -> zone mapping (candidate: the 20-byte ref list in
                 section 4 - it is NOT positional under either record
                 pairing, so test membership, not distance). Draw current
                 zone + portal-adjacent only.
- P1.6 [READY]   Parity harness: a script that takes the same camera in the
-                real game (dgVoodoo screenshot) and in browser-shot, and
-                diffs. Run on every renderer change.
+ P1.6 [ACTIVE]  Parity harness. Half done: tools/render-level.ts now takes
+                --eye/--target/--size/--fovy and matches three.js (vertical
+                FOV, the viewer's clear colour, the same two draw queues and
+                the same per-face culling), so browser and oracle can be
+                diffed pixel for pixel from one camera. What is still
+                missing is the other half - the same camera in the REAL
+                game via dgVoodoo, which is the only thing that can settle
+                absolute brightness. Worth doing early: with colour
+                management off the level is much darker than it was, and
+                that is believed right but not yet confirmed against the
+                retail game.
  [OPEN]  140 faces on page 16 (mode 0x1000) in level 1 - Buzz's page.
  [OPEN]  hoola.all reports page 0, unlike every other model (16-24).
  [OPEN]  Zone / room streaming details: lazycurler/ToyStory2Research has the

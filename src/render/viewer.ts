@@ -45,6 +45,7 @@ export class Viewer {
 
   private current: THREE.Mesh | null = null;
   private collision: THREE.LineSegments | null = null;
+  private player: THREE.Mesh | null = null;
 
   /**
    * Cull override, for diagnosis. `null` means each face group decides.
@@ -227,6 +228,56 @@ export class Viewer {
     return zones === null
       ? `all zones, ${shown} triangles`
       : `zones ${[...zones].sort((a, b) => a - b).join(',')}: ${shown} triangles drawn, ${hidden} hidden`;
+  }
+
+  /**
+   * Put a character into the level, rather than replacing it.
+   *
+   * `setModel` swaps the whole scene for one model, which is right for
+   * inspecting a character and wrong for standing one on a floor. This keeps
+   * the level and adds the character beside it; pass null to take it away.
+   * Position is in renderer units, and the model's own origin is between its
+   * feet, so the position is where it stands.
+   */
+  setPlayer(mesh: MeshData | null, textures?: Map<number, THREE.Texture>): void {
+    if (this.player) {
+      this.scene.remove(this.player);
+      this.player.geometry.dispose();
+      for (const m of this.player.material as THREE.Material[]) m.dispose();
+      this.player = null;
+    }
+    if (!mesh || mesh.triangleCount === 0) return;
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(mesh.positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(mesh.colors, 3));
+    geometry.setAttribute('uv', new THREE.BufferAttribute(mesh.uvs, 2));
+    const materials: THREE.Material[] = [];
+    for (const group of mesh.groups) {
+      geometry.addGroup(group.start, group.count, materials.length);
+      materials.push(new THREE.MeshBasicMaterial({
+        map: (group.page === null ? undefined : textures?.get(group.page)) ?? null,
+        vertexColors: true,
+        side: THREE.DoubleSide,
+        alphaTest: 0.5,
+      }));
+    }
+    this.player = new THREE.Mesh(geometry, materials);
+    this.scene.add(this.player);
+  }
+
+  /** Move the character. Renderer units. */
+  setPlayerPosition(x: number, y: number, z: number): void {
+    this.player?.position.set(x, y, z);
+  }
+
+  /** Frame the camera on the character, from behind and slightly above. */
+  lookAtPlayer(distance = 6): void {
+    if (!this.player) return;
+    const p = this.player.position;
+    this.camera.position.set(p.x + distance * 0.7, p.y + distance * 0.5, p.z + distance * 0.7);
+    this.controls.target.set(p.x, p.y + 1, p.z);
+    this.controls.update();
   }
 
   /**

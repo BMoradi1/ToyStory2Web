@@ -163,3 +163,93 @@ export function parseCollision(file: AllFile): { groups: CollisionGroup[]; skipp
 export function isWalkable(poly: CollisionPoly, maxSlopeDegrees = 45): boolean {
   return poly.normal.y <= -Math.cos((maxSlopeDegrees * Math.PI) / 180);
 }
+
+/**
+ * A collision hull prepared for queries.
+ *
+ * The stored polys are per-group and in model space, which is the wrong shape
+ * for asking "what is under this point". This flattens them into world space
+ * once and buckets them into a grid on the X/Z plane, so a query touches a
+ * handful of polys instead of all 23,000.
+ *
+ * Everything here stays in the file's own PlayStation axes: units are 1/256 of
+ * a world unit and **+Y is down**, so "below" means a larger Y. Converting to
+ * the renderer's axes is the caller's job, and doing it here would mean two
+ * conventions in one module.
+ */
+export interface CollisionWorld {
+  polys: { vertices: { x: number; y: number; z: number }[]; normal: { x: number; y: number; z: number }; walkable: boolean }[];
+  /** Poly indices by grid cell, keyed `gx,gz`. */
+  cells: Map<string, number[]>;
+  cellSize: number;
+}
+
+/** Flatten collision groups into a world-space hull with an X/Z lookup grid. */
+export function buildCollisionWorld(groups: CollisionGroup[], cellSize = 1024): CollisionWorld {
+  const world: CollisionWorld = { polys: [], cells: new Map(), cellSize };
+  for (const group of groups) {
+    for (const mesh of group.meshes) {
+      for (const poly of mesh.polys) {
+        const vertices = poly.vertices.map((v) => ({
+          x: v.x + group.position.x,
+          y: v.y + group.position.y,
+          z: v.z + group.position.z,
+        }));
+        const index = world.polys.length;
+        world.polys.push({ vertices, normal: poly.normal, walkable: isWalkable(poly) });
+        const xs = vertices.map((v) => v.x), zs = vertices.map((v) => v.z);
+        const x0 = Math.floor(Math.min(...xs) / cellSize), x1 = Math.floor(Math.max(...xs) / cellSize);
+        const z0 = Math.floor(Math.min(...zs) / cellSize), z1 = Math.floor(Math.max(...zs) / cellSize);
+        for (let gx = x0; gx <= x1; gx++) {
+          for (let gz = z0; gz <= z1; gz++) {
+            const key = `${gx},${gz}`;
+            const cell = world.cells.get(key);
+            if (cell) cell.push(index); else world.cells.set(key, [index]);
+          }
+        }
+      }
+    }
+  }
+  return world;
+}
+
+/** Does the X/Z point fall inside the polygon, projected onto the X/Z plane? */
+function containsXZ(vertices: { x: number; z: number }[], x: number, z: number): boolean {
+  let inside = false;
+  for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
+    const a = vertices[i]!, b = vertices[j]!;
+    if ((a.z > z) !== (b.z > z) && x < ((b.x - a.x) * (z - a.z)) / (b.z - a.z) + a.x) inside = !inside;
+  }
+  return inside;
+}
+
+/**
+ * The nearest walkable surface at or below a point, or null if there is none.
+ *
+ * "Below" is +Y, the PlayStation convention the file uses. `tolerance` allows
+ * for standing slightly inside a surface, which happens when a controller
+ * steps and then queries from its new position.
+ */
+export function groundBelow(
+  world: CollisionWorld,
+  x: number,
+  y: number,
+  z: number,
+  tolerance = 64,
+): { y: number; normal: { x: number; y: number; z: number } } | null {
+  const cell = world.cells.get(`${Math.floor(x / world.cellSize)},${Math.floor(z / world.cellSize)}`);
+  if (!cell) return null;
+  let best: { y: number; normal: { x: number; y: number; z: number } } | null = null;
+  for (const index of cell) {
+    const poly = world.polys[index]!;
+    if (!poly.walkable) continue;
+    if (!containsXZ(poly.vertices, x, z)) continue;
+    // Plane through the first vertex: n . (p - v0) = 0, solved for y.
+    const v0 = poly.vertices[0]!, n = poly.normal;
+    if (Math.abs(n.y) < 1e-6) continue;
+    const surfaceY = v0.y - (n.x * (x - v0.x) + n.z * (z - v0.z)) / n.y;
+    if (surfaceY < y - tolerance) continue;
+    if (!best || surfaceY < best.y) best = { y: surfaceY, normal: n };
+  }
+  return best;
+}

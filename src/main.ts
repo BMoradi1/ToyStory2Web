@@ -4,10 +4,10 @@ import {
   type AnmFile, type Animation,
 } from './formats/anm.ts';
 import * as THREE from 'three';
-import { buildLevelGeometry, parseDat, reachableZones, type DatLevel } from './formats/dat.ts';
+import { WORLD_SCALE, buildLevelGeometry, parseDat, reachableZones, type DatLevel } from './formats/dat.ts';
 import { decodeBmp, parseNgn, type NgnTexture } from './formats/ngn.ts';
 import { assignZones, parseNgnScene } from './formats/ngnscene.ts';
-import { parseCollision, type CollisionGroup } from './formats/collision.ts';
+import { buildCollisionWorld, groundBelow, parseCollision, type CollisionGroup, type CollisionWorld } from './formats/collision.ts';
 import {
   findLevels, findModels, gameDirFromDrop, gameDirFromFileList, pickGameDir,
   supportsDirectoryPicker, validateGameDir, type GameDir,
@@ -35,6 +35,7 @@ let sceneTextures = new Map<number, THREE.Texture>();
 let currentLevel: { level: DatLevel; zones: (number | null)[] } | null = null;
 /** The scene's collision hull, loaded lazily the first time it is shown. */
 let currentCollision: CollisionGroup[] | null = null;
+let currentCollisionWorld: CollisionWorld | null = null;
 let currentTerrainFile: { read(): Promise<Uint8Array> } | null = null;
 
 /** Currently displayed character, if any, and its animation playback state. */
@@ -162,8 +163,10 @@ async function showLevel(index: number): Promise<void> {
   // Collision is a separate file and only wanted on demand, so keep the handle
   // and drop whatever the previous scene had.
   currentCollision = null;
+  currentCollisionWorld = null;
   currentTerrainFile = level.terrain;
   viewer?.setCollision(null);
+  viewer?.setPlayer(null);
 
   let textureCount = 0;
   let gpuTextures = new Map<number, THREE.Texture>();
@@ -332,20 +335,60 @@ if (import.meta.hot) {
 
 // `c` cycles face culling. Which winding three.js considers front-facing
 // can't be determined offline, so make it one keystroke to find out.
+/** Read and cache the scene's collision, or null if it has none. */
+async function loadCollision(): Promise<CollisionGroup[] | null> {
+  if (currentCollision) return currentCollision;
+  if (!currentTerrainFile) return null;
+  const parsed = parseCollision(parseAll(await currentTerrainFile.read()));
+  currentCollision = parsed.groups;
+  currentCollisionWorld = buildCollisionWorld(parsed.groups);
+  return currentCollision;
+}
+
+/**
+ * `p`: stand the selected character on the floor of the level.
+ *
+ * The spawn point is a pickup marker, because those are the one thing in the
+ * file known to sit over walkable floor — every one of them does, in every
+ * level checked. The real spawn is presumably in the level's own code, which
+ * is not decoded, so this is a stand-in that is at least always somewhere a
+ * player could be.
+ */
+async function spawnPlayer(): Promise<void> {
+  if (!viewer || !currentLevel) return;
+  const entry = models[modelEl.selectedIndex];
+  if (!entry) { infoEl.textContent = 'no character selected'; return; }
+
+  infoEl.textContent = 'placing character…';
+  await loadCollision();
+  if (!currentCollisionWorld) { infoEl.textContent = 'no collision for this scene'; return; }
+
+  const marker = currentLevel.level.markers[0];
+  if (!marker) { infoEl.textContent = 'no marker to spawn at'; return; }
+  const ground = groundBelow(currentCollisionWorld, marker.position.x, marker.position.y, marker.position.z, 4096);
+  if (!ground) { infoEl.textContent = 'no floor under the first marker'; return; }
+
+  const model = parseAll(await entry.file.read());
+  viewer.setPlayer(buildMeshData(model), sceneTextures);
+  // The hull is in PlayStation axes: +Y down, 256 units to the world unit.
+  viewer.setPlayerPosition(marker.position.x / WORLD_SCALE, -ground.y / WORLD_SCALE, -marker.position.z / WORLD_SCALE);
+  viewer.lookAtPlayer();
+  const slope = (Math.acos(Math.min(1, -ground.normal.y)) * 180) / Math.PI;
+  infoEl.textContent =
+    `${entry.name} standing at marker 0, floor ${(ground.y / WORLD_SCALE).toFixed(2)} ` +
+    `(${slope.toFixed(0)}\u00b0 slope), ${(( ground.y - marker.position.y) / WORLD_SCALE).toFixed(2)} below the marker`;
+}
+
 /** `k`: show or hide the collision hull, reading TERRAIN.ALL the first time. */
 async function toggleCollision(): Promise<void> {
   if (!viewer) return;
   if (viewer.collisionShown) { infoEl.textContent = viewer.setCollision(null); return; }
-  if (!currentCollision) {
-    if (!currentTerrainFile) { infoEl.textContent = 'no collision file for this scene'; return; }
-    infoEl.textContent = 'reading collision…';
-    try {
-      const parsed = parseCollision(parseAll(await currentTerrainFile.read()));
-      currentCollision = parsed.groups;
-    } catch (err) {
-      infoEl.textContent = `collision failed: ${(err as Error).message}`;
-      return;
-    }
+  infoEl.textContent = 'reading collision…';
+  try {
+    if (!(await loadCollision())) { infoEl.textContent = 'no collision file for this scene'; return; }
+  } catch (err) {
+    infoEl.textContent = `collision failed: ${(err as Error).message}`;
+    return;
   }
   infoEl.textContent = viewer.setCollision(currentCollision);
 }
@@ -359,6 +402,7 @@ window.addEventListener('keydown', (ev) => {
   if (ev.key === 's') infoEl.textContent = viewer.describeScene();
   if (ev.key === 'a') infoEl.textContent = viewer.setVisibleZones(null);
   if (ev.key === 'k') void toggleCollision();
+  if (ev.key === 'p') void spawnPlayer();
   if (/^[0-9]$/.test(ev.key) && currentLevel) {
     const zone = Number(ev.key);
     infoEl.textContent = viewer.setVisibleZones(reachableZones(currentLevel.level.zones, zone));

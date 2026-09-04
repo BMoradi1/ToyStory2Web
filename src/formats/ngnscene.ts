@@ -45,9 +45,38 @@ export interface NgnInstance {
   scale: [number, number, number];
   gobj: number;
   flags: number;
+  /**
+   * Which zone this object lives in, 0-63. The engine files every object into
+   * a per-zone list at load and then draws only the zones it can reach
+   * (world.c `FUN_004c3240`, which passes exactly this byte).
+   */
+  zone: number;
+  /** `(flags >> 16) & 0xf`. The engine keeps it; what it selects is unread. */
+  effect: number;
+  /** 0 or 1: which of the two instance lists this came from. The renderer
+   *  draws them as separate passes with different distance limits. */
+  list: number;
 }
 
-export interface NgnScene { gobjs: NgnGobj[]; instances: NgnInstance[]; chunkTypes: Map<number, number> }
+/**
+ * A portal: a polygon standing in a doorway, joining two zones.
+ *
+ * The engine walks these to decide what to draw. Standing in zone `from`, it
+ * draws that zone's objects, then for each portal out of it clips the view
+ * frustum to the portal's outline and recurses into `to` — never back through
+ * the portal it arrived by. `to === OUTSIDE` ends the walk.
+ */
+export interface NgnPortal { from: number; to: number; points: [number, number, number][] }
+
+/** A portal leading nowhere. The loader rewrites 15 to this. */
+export const OUTSIDE = -1;
+
+export interface NgnScene {
+  gobjs: NgnGobj[];
+  instances: NgnInstance[];
+  portals: NgnPortal[];
+  chunkTypes: Map<number, number>;
+}
 
 export function parseNgnScene(buffer: ArrayBuffer | Uint8Array): NgnScene {
   const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
@@ -142,7 +171,11 @@ export function parseNgnScene(buffer: ArrayBuffer | Uint8Array): NgnScene {
     return [g, p];
   }
 
-  const scene: NgnScene = { gobjs: [], instances: [], chunkTypes: new Map() };
+  const scene: NgnScene = { gobjs: [], instances: [], portals: [], chunkTypes: new Map() };
+  // Chunk 0x102 holds bare point arrays; 0x103 says which array stands in
+  // which doorway. They are stored apart and only mean anything together.
+  const pointArrays: [number, number, number][][] = [];
+  let listIndex = 0;
   let p = 0;
   while (p + 8 <= bytes.length) {
     const type = u32(p), size = u32(p + 4);
@@ -164,14 +197,40 @@ export function parseNgnScene(buffer: ArrayBuffer | Uint8Array): NgnScene {
       const count = u32(p), rec = u32(p + 4);
       let q = p + 8;
       for (let i = 0; i < count; i++) {
+        const flags = rec > 0x28 ? u32(q + 40) : 0;
         scene.instances.push({
           position: [f32(q), f32(q + 4), f32(q + 8)],
           rotation: [f32(q + 12), f32(q + 16), f32(q + 20)],
           scale: [f32(q + 24), f32(q + 28), f32(q + 32)],
           gobj: u32(q + 36),
-          flags: rec > 0x28 ? u32(q + 40) : 0,
+          flags,
+          zone: flags & 0xff,
+          effect: (flags >> 16) & 0xf,
+          list: listIndex,
         });
         q += rec;
+      }
+      listIndex++;
+    } else if (type === 0x102) {
+      // u32 count; per array: u32 pointCount, then that many 3 x f32 points.
+      const count = u32(p);
+      let q = p + 4;
+      for (let i = 0; i < count; i++) {
+        const n = u32(q);
+        q += 4;
+        const points: [number, number, number][] = [];
+        for (let k = 0; k < n; k++) points.push([f32(q + k * 12), f32(q + k * 12 + 4), f32(q + k * 12 + 8)]);
+        q += n * 12;
+        pointArrays.push(points);
+      }
+    } else if (type === 0x103) {
+      // u32 count; per portal: u32 pointArray, u32 from, u32 to.
+      const count = u32(p);
+      let q = p + 4;
+      for (let i = 0; i < count; i++) {
+        const array = u32(q), from = u32(q + 4), to = u32(q + 8);
+        q += 12;
+        scene.portals.push({ from, to: to === 15 ? OUTSIDE : to, points: pointArrays[array] ?? [] });
       }
     }
     p += size;

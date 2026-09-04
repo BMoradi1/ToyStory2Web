@@ -471,7 +471,52 @@ four failures.
 plausible pickup heights, which reads as collectible placements — but there is
 no per-marker type field, so the *kind* would have to come from `level.bin`.
 Paths are polylines tracing loops around rooms (patrol routes, platform rails).
-Zones are planar quads standing in doorways (triggers or portals).
+
+**The zone quads are PORTALS** — see the visibility section below. `a` and `b`
+are the zones either side, and they are named `from`/`to` in the parser.
+
+### Visibility — the algorithm, read from toy2.exe
+
+Every object belongs to a **zone**, numbered 0-63, and the engine draws only
+the zones it can reach from the one the camera is in. At load, world.c files
+each object into a per-zone linked list (`FUN_004c3240`); portals go into a
+second list on the same table (`FUN_004bc2c0`, 64 entries of two list heads).
+Then, per frame (`FUN_004cddd0` → `FUN_004bc460`):
+
+    clear every portal's visited mark
+    walk(camera zone); walk(zone 0)      -- zone 0 is drawn from anywhere
+
+    walk(zone, arrivedThrough):
+      if arrivedThrough: if already visited, stop; clip the view frustum to
+        its outline; mark it visited
+      draw this zone's objects, minus those failing a distance or frustum test
+      for each portal out of this zone:
+        skip it if it leads back where we came from, or leads OUTSIDE
+        skip it if its outline is outside the current frustum
+        walk(portal.to, portal)
+
+So it is an ordinary portal renderer, with the frustum narrowing at each
+doorway, and a recursion limit. `to == 15` means outside; the loader rewrites
+it to -1. Objects are drawn in two passes with different distance limits,
+which is what the two instance lists in the `.ngn` scene are for.
+
+**Where each object's zone lives.** In the `.ngn` scene's instance record: the
+low byte of the flags word at `+0x28` (`zone = flags & 0xff`, and
+`(flags >> 16) & 0xf` is a second field the engine keeps whose meaning is
+unread). Level 1 uses zones 0-8; level 2 uses 0-4, and in both, zone 0's
+objects are spread over the whole level, matching its always-drawn role.
+
+**This is the one thing not yet usable, and here is why.** Our geometry comes
+from `level.dat`, whose object records carry no zone — the low nibble of
+`Object.flags` was tested and does not match. The two files hold the same
+number of objects (1,126 in level 1, 588 in level 2) but are ordered
+differently, and matching them by position resolves only 65-72%: about a
+quarter of `level.dat`'s objects sit thousands of units from any scene
+instance, so the scene is not simply a permutation of it. Two ways forward,
+neither attempted: find the correlation some other way (mesh identity rather
+than position), or build the render geometry from the `.ngn` scene instead of
+`level.dat`, which is after all what the PC executable does and would bring
+zones, materials and per-vertex alpha with it.
 
 ### Texture mapping — SOLVED
 

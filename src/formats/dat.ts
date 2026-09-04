@@ -33,7 +33,30 @@ export interface Vec3 { x: number; y: number; z: number }
 
 export interface Marker { position: Vec3; flag: number }
 export interface Path { id: number; points: Vec3[] }
-export interface Zone { corners: [Vec3, Vec3, Vec3, Vec3]; a: number; b: number }
+/**
+ * A portal: a quad standing in a doorway, joining two zones.
+ *
+ * Not a trigger volume, as an earlier pass here guessed. The PC engine files
+ * every object into a per-zone list and draws only what it can reach: from the
+ * zone the camera is in, it draws that zone's objects, then for each portal
+ * leading out of it clips the view frustum to the portal's outline and
+ * recurses into `to`, never returning through the portal it arrived by. Zone 0
+ * is drawn as well from wherever you stand. See docs/FORMATS.md.
+ *
+ * These quads come in pairs, the same doorway listed from each side. Level 1's
+ * 22 are byte-for-byte the same set, in the same order, as the portal chunk of
+ * its converted `.ngn` scene, which is what the PC build actually reads.
+ */
+export interface Zone {
+  corners: [Vec3, Vec3, Vec3, Vec3];
+  /** Zone this portal leads out of, 0-63. */
+  from: number;
+  /** Zone it leads into, or `OUTSIDE`. */
+  to: number;
+}
+
+/** A portal leading nowhere: the walk stops rather than recursing. */
+export const OUTSIDE = 15;
 
 export interface DatObject {
   /** Byte offset of this record (its position field) and the size the tiler chose. */
@@ -299,12 +322,12 @@ export function parseDat(buffer: ArrayBuffer | Uint8Array): DatLevel {
     pos += 4 + count * 12;
   }
 
-  // --- zones: planar quads sitting in doorways; triggers or portals
+  // --- portals: planar quads standing in doorways, listed from both sides
   const zones: Zone[] = [];
   while (pos + ZONE_SIZE <= r.length && r.u16(pos) === ZONE_MAGIC && r.u16(pos + 2) === ZONE_TAG) {
     zones.push({
       corners: [r.vec3(pos + 4), r.vec3(pos + 16), r.vec3(pos + 28), r.vec3(pos + 40)],
-      a: r.i32(pos + 52), b: r.i32(pos + 56),
+      from: r.i32(pos + 52), to: r.i32(pos + 56),
     });
     pos += ZONE_SIZE;
   }

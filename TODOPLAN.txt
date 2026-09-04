@@ -1,7 +1,7 @@
 ================================================================================
  ToyStory2Web - PROJECT ROADMAP
  Browser reimplementation of Toy Story 2: Buzz Lightyear to the Rescue (1999)
- Last updated: 2026-09-03 (P1.1-P1.4 done: materials, colour, blending, culling)
+ Last updated: 2026-09-03 (P1.1-P1.4 done; P1.5 blocked on one decision)
 ================================================================================
 
  HOW TO USE THIS FILE
@@ -55,6 +55,18 @@
    than transcribing it. That keeps the project publishable.
  - Parsers stay pure (Uint8Array in, plain data out), validated across the
    whole install by a tools/*-validate.ts script.
+
+ AN OPEN DECISION: WHICH FILE IS THE RENDER SOURCE
+   level.dat is the PSX scene and is what this project parses today. The PC
+   executable never reads it: pconv converted each level into an NU-engine
+   scene inside level.ngn, and that is what ships and runs. The scene carries
+   what level.dat does not - zone assignments, resolved materials, per-vertex
+   alpha, float transforms - and is the reason the material table could be
+   decoded at all. Rendering from it would unblock visibility immediately and
+   match the retail build exactly. Against that: level.dat is the original
+   data, the parsers and every validation here are built on it, and the PSX
+   version is the more faithful target for an engine reimplementation.
+   Nothing needs deciding until P1.5, but P1.5 cannot finish without it.
 
  MAIN RISK
    How much of toy2.exe is game logic versus NU engine: the first Ghidra
@@ -153,11 +165,28 @@
                 their parts are not closed shells, and their own material
                 bits are still unread - the .ngn creature chunk (0x106) is
                 where to look.
- P1.5 [READY]   Portal visibility. Zone graph from the (a,b) pairs; find the
-                object -> zone mapping (candidate: the 20-byte ref list in
-                section 4 - it is NOT positional under either record
-                pairing, so test membership, not distance). Draw current
-                zone + portal-adjacent only.
+ P1.5 [BLOCKED] Portal visibility        <- needs an object -> zone mapping.
+                The ALGORITHM is now known exactly, read from toy2.exe and
+                written up in FORMATS.md: per-zone object lists, a portal
+                walk that clips the frustum to each doorway outline and
+                never returns through the portal it came by, zone 0 drawn
+                from anywhere, two passes with different distance limits.
+                The GRAPH is already parsed - level.dat's "zone" quads are
+                the portals, a=from b=to, 15=outside, and level 1's 22 are
+                identical in order to its .ngn scene's portal chunk.
+                What is missing is which zone each object is in. It is the
+                low byte of the .ngn instance flags, but our geometry comes
+                from level.dat, the two files order their objects
+                differently, and matching by position resolves only 65-72%
+                (a quarter of level.dat's objects sit thousands of units
+                from any scene instance). Do NOT retry position matching.
+                Two ways forward:
+                  (a) correlate by mesh identity instead of position;
+                  (b) build render geometry from the .ngn scene rather than
+                      level.dat - what the PC executable itself does, and it
+                      brings zones, materials and per-vertex alpha with it.
+                (b) is the bigger change and worth a decision before either
+                is attempted; see the note under PHASE 1.
  P1.6 [ACTIVE]  Parity harness. Half done: tools/render-level.ts now takes
                 --eye/--target/--size/--fovy and matches three.js (vertical
                 FOV, the viewer's clear colour, the same two draw queues and

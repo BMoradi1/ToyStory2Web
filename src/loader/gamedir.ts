@@ -214,12 +214,24 @@ export function findLevels(dir: GameDir): LevelScene[] {
  * the `.anm` beside it. Bone `i` of the animation drives mesh group `i` of the
  * model, so the two files are only meaningful together.
  */
-export function findModels(dir: GameDir): { name: string; file: GameFile; anm: GameFile | null }[] {
-  const models: { name: string; file: GameFile; anm: GameFile | null }[] = [];
+export function findModels(
+  dir: GameDir,
+): { name: string; dir: string; file: GameFile; anm: GameFile | null }[] {
+  const models: { name: string; dir: string; file: GameFile; anm: GameFile | null }[] = [];
   for (const [path, file] of dir) {
     const m = /^data\/(chars\d*)\/([^/]+)\.all$/.exec(path);
     if (!m) continue;
-    models.push({ name: m[2]!, file, anm: dir.get(`data/${m[1]}/${m[2]}.anm`) ?? null });
+    models.push({
+      name: m[2]!, dir: m[1]!, file, anm: dir.get(`data/${m[1]}/${m[2]}.anm`) ?? null,
+    });
   }
+  // The same character can appear in more than one `chars` directory, and the
+  // copies are not equivalent: `chars5/buzz.all` ships with no `.anm` beside
+  // it while `chars/buzz.all` has all 35 animations. Left as two entries both
+  // called "buzz" the picker silently lands on whichever sorts first, which is
+  // how the player ended up unanimated. Qualify a name as soon as it repeats.
+  const seen = new Map<string, number>();
+  for (const m of models) seen.set(m.name, (seen.get(m.name) ?? 0) + 1);
+  for (const m of models) if ((seen.get(m.name) ?? 0) > 1) m.name = `${m.dir}/${m.name}`;
   return models.sort((a, b) => a.name.localeCompare(b.name));
 }

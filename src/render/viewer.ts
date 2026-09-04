@@ -266,6 +266,36 @@ export class Viewer {
     this.scene.add(this.player);
   }
 
+  /**
+   * Replace the character's geometry, keeping where it stands and which way it
+   * faces. Posing rebuilds the vertex buffers every tick, so this swaps them on
+   * the existing object rather than making a new one and losing its transform.
+   */
+  setPlayerPose(mesh: MeshData, textures?: Map<number, THREE.Texture>): void {
+    if (!this.player || mesh.triangleCount === 0) return;
+    const { position, rotation } = this.player;
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(mesh.positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(mesh.colors, 3));
+    geometry.setAttribute('uv', new THREE.BufferAttribute(mesh.uvs, 2));
+    const materials: THREE.Material[] = [];
+    for (const group of mesh.groups) {
+      geometry.addGroup(group.start, group.count, materials.length);
+      materials.push(new THREE.MeshBasicMaterial({
+        map: (group.page === null ? undefined : textures?.get(group.page)) ?? null,
+        vertexColors: true,
+        side: THREE.DoubleSide,
+        alphaTest: 0.5,
+      }));
+    }
+    this.player.geometry.dispose();
+    for (const m of this.player.material as THREE.Material[]) m.dispose();
+    this.player.geometry = geometry;
+    this.player.material = materials;
+    this.player.position.copy(position);
+    this.player.rotation.copy(rotation);
+  }
+
   /** Move the character. Renderer units. */
   setPlayerPosition(x: number, y: number, z: number): void {
     this.player?.position.set(x, y, z);

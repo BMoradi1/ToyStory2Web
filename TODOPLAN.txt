@@ -303,10 +303,29 @@
  P2.4 [BLOCKED] Follow camera            <- P2.2. Collision-aware, 4:3 native
                 framing, modes as the original ("camera left/right/mode"
                 strings exist in toy2.exe).
- P2.5 [READY]   Animation state machine: map buzz.anm indices to states
-                (idle, walk, run, jump, double jump, spin, laser, fall,
-                land) from the decomp's animation tables. Playback rate:
-                the 20 FPS assumption must be confirmed from the code.
+ P2.5 [MOSTLY DONE] Animation state machine.
+                Found in toy2.exe: FUN_004011d0 runs a 28-state machine
+                whose table is at 0x4df3f0, 20 bytes per state (byte-script
+                pointer, animation slot A, slot B, playback rate, flag).
+                The script is a list of frame numbers with opcodes for
+                footfalls, sound events, looping and ending; a 16.16 cursor
+                walks it. Generated wholesale into
+                src/sim/player-animation-data.ts; the interpreter and the
+                state selection are in src/sim/player-animation.ts.
+                Two findings that corrected earlier docs: there is NO single
+                playback rate (the 20 FPS assumption was wrong - fixed
+                states run 15 or 30 script steps/sec and locomotion is
+                driven by the player's actual speed), and each state names
+                TWO slots because the animations are layered, the second
+                supplying the bones whose tracks are -3 in the first.
+                buildPosedMeshData now takes that second layer; without it
+                a third of Buzz vanishes (284 triangles posed vs 417).
+                Working now: idle, walk/run, jump, fall, land, double jump,
+                spin, hard fall. The remaining 20 states belong to moves
+                that do not exist yet (poles, zip lines, grapple, cutscenes)
+                and are in the table but never selected.
+                Left to do: the laser and charged-spin states, and the
+                footfall/sound opcodes are counted but not yet played.
  P2.6 [READY]   Skeleton from gfx joints (0x011F) - parser done, unused.
 
 ================================================================================

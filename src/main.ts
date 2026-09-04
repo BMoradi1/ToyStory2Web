@@ -20,6 +20,9 @@ import {
   type PlayerRuntime, type PlayerState,
 } from './sim/player.ts';
 import { toRadians, yawOf } from './sim/trig.ts';
+import {
+  createAnimation, stepAnimation, type AnimationPlayback,
+} from './sim/player-animation.ts';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -286,6 +289,13 @@ async function open(dir: GameDir): Promise<void> {
       get viewer() { return viewer; },
       THREE,
       get player() { return player; },
+      get anim() { return playerAnim; },
+      get hasAnm() { return playerModel?.anm ? playerModel.anm.animations.length : null; },
+      get modelInfo() {
+        const e = models[modelEl.selectedIndex];
+        return { index: modelEl.selectedIndex, name: e?.name, hasAnmFile: !!e?.anm,
+                 total: models.length, withAnm: models.filter((m) => m.anm).length };
+      },
       spawnPlayer,
       togglePlay,
       drive(held: Partial<import('./sim/player.ts').PlayerInput>, ticks = 1) {
@@ -329,8 +339,14 @@ async function open(dir: GameDir): Promise<void> {
     infoEl.textContent = `${levels[0]!.id} failed to load`;
   }
 
-  const buzz = models.findIndex((m) => m.name.toLowerCase() === 'buzz');
+  // Buzz is the playable character, so default to him — and to the copy that
+  // has animations, since more than one `chars` directory can hold a model of
+  // the same name and only one of them is the full one.
+  const isBuzz = (n: string) => n.toLowerCase() === 'buzz' || n.toLowerCase().endsWith('/buzz');
+  const buzz = models.findIndex((m) => isBuzz(m.name) && m.anm !== null);
+  const anyBuzz = models.findIndex((m) => isBuzz(m.name));
   if (buzz >= 0) modelEl.selectedIndex = buzz;
+  else if (anyBuzz >= 0) modelEl.selectedIndex = anyBuzz;
 
   // Everything worked — only now take the panel down.
   dropEl.hidden = true;
@@ -434,6 +450,9 @@ async function spawnPlayer(): Promise<void> {
   const { marker, ground, openness } = chosen;
 
   const model = parseAll(await entry.file.read());
+  const anm = entry.anm ? parseAnm(await entry.anm.read()) : null;
+  playerModel = { model, anm };
+  playerAnim = createAnimation();
   viewer.setPlayer(buildMeshData(model), sceneTextures);
   // The hull is in PlayStation axes: +Y down, 256 units to the world unit.
   viewer.setPlayerPosition(marker.position.x / WORLD_SCALE, -ground.y / WORLD_SCALE, -marker.position.z / WORLD_SCALE);
@@ -466,6 +485,9 @@ const GAME_TO_RENDER = 1 / (GAME_UNITS_PER_LEVEL_UNIT * WORLD_SCALE);
 
 let player: PlayerState | null = null;
 let playerRuntime: PlayerRuntime | null = null;
+/** The character's model and animations, kept so each tick can re-pose it. */
+let playerModel: { model: AllFile; anm: AnmFile | null } | null = null;
+let playerAnim: AnimationPlayback | null = null;
 const input = new InputSource();
 
 /** `space` etc. must reach the game, not scroll the page, but only while playing. */
@@ -484,7 +506,8 @@ function playTick(): void {
   const cam = viewer.camera.position;
   const cameraYaw = p ? yawOf(p.x - cam.x, -(p.z - cam.z)) : 0;
 
-  stepPlayer(player, input.read(), playerRuntime, groundFromCollision(currentCollisionWorld), cameraYaw);
+  const held = input.read();
+  stepPlayer(player, held, playerRuntime, groundFromCollision(currentCollisionWorld), cameraYaw);
 
   // Game space to renderer space. A game facing of (sin yaw, cos yaw) becomes
   // (sin yaw, -cos yaw) once Z is negated. Characters are authored facing +Z
@@ -498,6 +521,34 @@ function playTick(): void {
     Math.PI - toRadians(player.yaw),
   );
   viewer.followPlayer();
+  poseAnimation(Math.hypot(held.moveX, held.moveY) > 0);
+}
+
+/**
+ * Re-pose the character for this tick.
+ *
+ * The state machine hands back two animation slots and a frame. Both slots are
+ * passed to the poser because Buzz's animations are layered — a state pairs a
+ * legs set with an upper-body set, and a bone missing from the first is taken
+ * from the second. Posing rebuilds the mesh, which is 927 vertices, so it is
+ * cheap enough to do every tick.
+ */
+function poseAnimation(hasInput: boolean): void {
+  if (!viewer || !player || !playerAnim || !playerModel?.anm) return;
+  const speed = Math.hypot(player.vx, player.vz);
+  const { slotA, slotB, frame } = stepAnimation(playerAnim, player, hasInput, speed);
+
+  const anm = playerModel.anm;
+  const primary = anm.animations[slotA];
+  if (!primary) return;
+  const secondary = slotB === slotA ? null : anm.animations[slotB];
+  viewer.setPlayerPose(
+    buildPosedMeshData(
+      playerModel.model, anm, primary, frame % Math.max(1, primary.frameCount),
+      secondary ? { animation: secondary, frame: frame % Math.max(1, secondary.frameCount) } : null,
+    ),
+    sceneTextures,
+  );
 }
 
 /** `space`: start or stop playing, spawning the character if it isn't there. */

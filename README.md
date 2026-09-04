@@ -48,9 +48,10 @@ onto the page instead. Nothing is uploaded either way.
 
 While playing: **WASD** or a gamepad stick to move, **space** to jump (again at
 the top for a double jump), **J** to spin, **K** for the laser. Movement is
-camera-relative, as the original's is. Walls do not stop you yet — collision
-response is the next piece of work — so it is possible to walk out of the
-level and fall.
+camera-relative, as the original's is, and Buzz is animated from the game's own
+animation state machine. Walls do not stop you yet — collision response is the
+next piece of work — so it is possible to walk into scenery or out of the
+level.
 
 ## What works today
 

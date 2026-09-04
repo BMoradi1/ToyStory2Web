@@ -269,10 +269,61 @@ and the PC's height-capped double jump. Everything else, including every mask
 and threshold, matches. The PSX build has no float code; the PC port's two
 `sqrt` calls (double jump and stick magnitude) are the port's additions.
 
+## Animation
+
+Animation is not "pick a clip and play it". `FUN_004011d0` runs a state machine
+whose 28 states live in a table at **0x4df3f0**, 20 bytes each: a pointer to a
+**byte script**, animation slot A, animation slot B, a playback rate, and a
+flag. The script is a list of frame numbers with opcodes mixed in:
+
+| byte | meaning |
+|---|---|
+| `< 0x80` | a frame number within the animation |
+| `0x81`, `0x82` | footfall, left and right |
+| `0x83`-`0x86` | fire sound event 0x30, 0x10, 0x17, 0x43 |
+| `0xfe` | end; drop back to the resting state |
+| `0xff n` | loop back to script index `n` |
+
+A 16.16 cursor walks that list and the state's rate is its step per tick, so
+`0x10000` is one script entry per tick and `0x4000` is one every four. **A
+negative rate means the step is the player's speed times its magnitude**,
+which is how the walk cycle stays in step with the ground instead of sliding.
+That also settles a question docs/FORMATS.md left open: there is no single
+animation frame rate, and the 20 fps figure inherited from prior art is not
+right. Fixed-rate states run at 15 or 30 script steps per second and
+locomotion runs at whatever the legs are doing.
+
+**Each state names two animation slots because Buzz's animations are
+layered.** Slot A is the primary and slot B supplies the bones whose tracks
+are absent from it — the `-3` track offsets already described in FORMATS.md.
+The engine plays slot B first and slot A over it. Playing one alone is not a
+degraded version of the pair, it is a broken one: slot 0 alone poses 284
+triangles where the pair poses 417, so a third of Buzz simply disappears.
+
+The states the controller can currently reach:
+
+| state | slots | what it is |
+|---|---|---|
+| 0 | 0 + 1 | walk and run, speed-driven, two footfall opcodes |
+| 1 | 2 + 3 | idle, a 16-frame loop |
+| 2 | 4 + 5 | jump, rising |
+| 3 | 4 + 5 | falling, a later stretch of the same script |
+| 4 | 4 + 5 | landing, four frames then end |
+| 8 | 22 + 27 | double jump |
+| 9 | 9 | spin, forced by the spin timer |
+| 0xc | 15 | hard fall |
+
+The other 20 belong to moves that are not implemented yet — poles, zip lines,
+the grapple, cutscenes. They are in the generated table and simply never
+selected.
+
 ## Ported
 
 `src/sim/player.ts` is a transcription of the tick above, `src/sim/trig.ts` the
-angle system, `src/sim/input.ts` the keyboard and pad. `tools/player-probe.ts`
+angle system, `src/sim/input.ts` the keyboard and pad.
+`src/sim/player-animation.ts` is the state machine and script interpreter, and
+`src/sim/player-animation-data.ts` is the table above, generated from the
+executable rather than typed in. `tools/player-probe.ts`
 runs the controller headlessly and checks the motion it produces against the
 closed-form values these constants predict; it is the regression test for any
 later change.

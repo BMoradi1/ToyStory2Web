@@ -221,6 +221,15 @@ export function poseMatrix(pose: BonePose): number[] {
  */
 export function buildPosedMeshData(
   model: AllFile, file: AnmFile, animation: Animation, frame: number,
+  /**
+   * Second layer. Buzz's animations pair a legs set with an upper-body set,
+   * and a bone absent from `animation` (a `-3` track) is posed from here
+   * instead. The engine does the same thing by playing both slots, the lower
+   * layer first — see the state table in src/sim/player-animation-data.ts.
+   * Without it, playing one half of a pair drops the other half's parts
+   * entirely rather than leaving them at rest.
+   */
+  layer?: { animation: Animation; frame: number } | null,
 ): MeshData {
   const buckets = new Map<number | null, { pos: number[]; col: number[]; uv: number[] }>();
   const bucketFor = (page: number | null) => {
@@ -234,7 +243,8 @@ export function buildPosedMeshData(
     if (group.type !== GroupType.GfxMesh) continue;
     bone++;
 
-    const pose = poseBone(file, animation, frame, bone);
+    const pose = poseBone(file, animation, frame, bone)
+      ?? (layer ? poseBone(file, layer.animation, layer.frame, bone) : null);
     if (!pose) continue;
     const m = poseMatrix(pose);
     const t = pose.translation;

@@ -336,9 +336,18 @@ and `slime`) means the track lives in another animation: those files are
 **layered**, pairing full-body animations with upper-body-only and legs-only
 sets.
 
-**Frame rate is not in the files.** The 20 fps figure is inherited from prior
-art, unverified, and kept tunable. Supporting hint only: 107 of 170 frame counts
-are multiples of 12.
+**Frame rate is not in the files, and there is no single one.** The 20 fps
+figure inherited from prior art is wrong. Playback is driven by a per-state
+table in the executable (see docs/PLAYER.md, "Animation"): a 16.16 cursor
+steps through a byte script of frame numbers, at 15 or 30 script steps per
+second for fixed-rate states, and at a rate proportional to the player's speed
+for the locomotion ones. Supporting hint only: 107 of 170 frame counts are
+multiples of 12.
+
+**The layered animations pair up in that same table.** Each state names two
+slots, and the second supplies exactly the bones whose tracks are `-3` in the
+first. So a `-3` is not a hole to leave at rest — it is a reference to the
+paired animation, and posing one slot alone drops those parts entirely.
 
 **Known gap:** at least one animation poses to empty geometry, presumably a
 layered slot whose tracks all live elsewhere. Not yet chased down.

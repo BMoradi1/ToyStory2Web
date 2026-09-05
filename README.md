@@ -67,7 +67,8 @@ level.
   neighbours instead of the whole house.
 - **Characters.** All 68 models load and texture, and all 170 animations play.
 - **Buzz moves.** Press enter and you can walk, run, turn, jump, double jump and
-  spin around Andy's house, with the game's own follow camera behind you. Every constant — gravity, the jump impulse, friction,
+  spin around Andy's house, with the game's own follow camera behind you.
+  Every constant — gravity, the jump impulse, friction,
   the turn rate, the attack timings — was read out of the PC executable and
   checked against the PlayStation one, not tuned by feel. He is animated by the
   game's own animation state machine, a 28-state table of byte scripts that also

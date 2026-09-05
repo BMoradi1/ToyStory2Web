@@ -68,11 +68,12 @@ level.
   in doorways. Both are decoded, so the viewer can draw one room and its
   neighbours instead of the whole house.
 - **Characters.** All 68 models load and texture, and all 170 animations play.
-- **Collectibles.** The pickup points in each level are placed and can be
-  collected, using the engine's own reach — an ellipsoid measured from Buzz's
-  middle that is twice as tall as it is wide, so you can grab one overhead but
-  must be nearly on top of one beside you. The shapes standing in for them are
-  placeholders: the real coin art lives in a sprite pool that is not decoded.
+- **Collectibles.** Coins, health, extra lives and the five Pizza Planet
+  tokens of each level are placed where the game places them and collected
+  with the engine's own reach test. The game has no "type" field for these:
+  it decides what an object is by counting its polygons, and that rule is
+  ported as found. The shapes standing in for them are placeholders: the real
+  coin art lives in a sprite pool that is not decoded.
 - **Sound.** Buzz's effects play from your install's own `data/sfx`, found by
   the names the engine itself uses — a table of 61 strings inside the
   executable that match the files on disc exactly.

@@ -349,7 +349,7 @@ export class Viewer {
    * the game draws. These are small spinning octahedra in its place, and are
    * deliberately not trying to look like the original.
    */
-  setPickups(positions: { x: number; y: number; z: number }[]): void {
+  setPickups(positions: { x: number; y: number; z: number; colour?: number }[]): void {
     if (this.pickups) {
       this.scene.remove(this.pickups);
       this.pickups.geometry.dispose();
@@ -365,6 +365,11 @@ export class Viewer {
       positions.length,
     );
     mesh.frustumCulled = false;
+    // One colour per kind of pickup, so a token reads differently from a coin
+    // even though both are the same stand-in shape.
+    const colour = new THREE.Color();
+    positions.forEach((p, i) => mesh.setColorAt(i, colour.set(p.colour ?? 0xffd24a)));
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     this.pickups = mesh;
     this.scene.add(mesh);
     this.updatePickups(new Set());

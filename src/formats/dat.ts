@@ -110,7 +110,64 @@ export interface DatFace {
 
 export interface DatMesh { offset: number; end: number; vertices: DatVertex[]; faces: DatFace[] }
 
+/**
+ * A placement: one of the 20-byte records the engine's level loader
+ * (`FUN_0043e6e0` in toy2.exe) walks to put objects in the world. The object
+ * table the renderer reads is what these point at; the engine's own logic —
+ * pickups, tokens, camera triggers — never touches an object except through
+ * one of these, addressed by its index in `DatLevel.objectIds`.
+ */
+export interface DatPlacement {
+  /** Byte offset of the record. The loader hands these out as object handles. */
+  offset: number;
+  /**
+   * 0 for the first table, 1 for the second. The tables are the two sections
+   * of the object table: the first at unit scale, the second at a quarter.
+   */
+  table: 0 | 1;
+  /** Level units, as stored; equal to the placed object's own position. */
+  position: Vec3;
+  /**
+   * i16 at +12. Made positive at load. For a pickup the engine shifts it right
+   * by 3 to get the reach code (see src/sim/pickups.ts); what else it means
+   * is not known.
+   */
+  param: number;
+  /**
+   * Byte at +14. Nonzero on every real record — a zero here ends the table.
+   * Bit 0x08 selects the 32-byte object record with the mesh pointer at
+   * +0x1c (every placement seen has it); 0x20 marks an object with a second
+   * mesh pointer; 0x80 is rewritten to 0x40 at load.
+   */
+  flags: number;
+  /** Byte at +15. Small integers, purpose unknown. */
+  aux: number;
+  /** Byte offset of the object record this places, i.e. a `DatObject.offset`. */
+  objectOffset: number;
+  /** Index into `DatLevel.objects`, or -1 if the pointer resolved to nothing. */
+  objectIndex: number;
+}
+
+/** Where each section of the file starts, for tools that read what the parser skips. */
+export interface DatSections {
+  markers: number; paths: number; zones: number;
+  /** Section 4: the 20-byte refs the loader indexes objects by. Not parsed. */
+  section4: number;
+  objectTable: number; meshPool: number;
+}
+
 export interface DatLevel {
+  sections: DatSections;
+  /** Both placement tables, first then second, in file order. */
+  placements: DatPlacement[];
+  /**
+   * The engine's object-id space: `objectIds[id]` is the index of the
+   * placement that id names, or -1 for an unused id. Level code refers to
+   * objects by these ids — the Pizza Planet token lists in toy2.exe are lists
+   * of them — and the pickup scan takes every used id from a per-level
+   * starting point (0x30 for most levels) upward.
+   */
+  objectIds: number[];
   markers: Marker[];
   paths: Path[];
   zones: Zone[];
@@ -336,6 +393,7 @@ export function parseDat(buffer: ArrayBuffer | Uint8Array): DatLevel {
   // point from this list, and a garbage marker puts Buzz outside the world.
   const markers: Marker[] = [];
   let pos = 8;
+  const sections: DatSections = { markers: 8, paths: 0, zones: 0, section4: 0, objectTable: 0, meshPool: 0 };
   for (let i = 0; i < markerCount && pos + 16 <= r.length; i++) {
     markers.push({ position: r.vec3(pos), kind: r.i32(pos + 12) });
     pos += 16;
@@ -347,6 +405,7 @@ export function parseDat(buffer: ArrayBuffer | Uint8Array): DatLevel {
   }
 
   // --- paths: polylines, read until the zone signature appears
+  sections.paths = pos;
   const paths: Path[] = [];
   while (pos + 4 <= r.length) {
     if (r.u16(pos) === ZONE_MAGIC && r.u16(pos + 2) === ZONE_TAG) break;
@@ -360,6 +419,7 @@ export function parseDat(buffer: ArrayBuffer | Uint8Array): DatLevel {
   }
 
   // --- portals: planar quads standing in doorways, listed from both sides
+  sections.zones = pos;
   const zones: Zone[] = [];
   while (pos + ZONE_SIZE <= r.length && r.u16(pos) === ZONE_MAGIC && r.u16(pos + 2) === ZONE_TAG) {
     zones.push({
@@ -369,13 +429,18 @@ export function parseDat(buffer: ArrayBuffer | Uint8Array): DatLevel {
     pos += ZONE_SIZE;
   }
 
-  // --- section 4 (20-byte refs) is skipped; its meaning is unknown and it
-  //     isn't needed to render. We search forward from here for the rest.
+  // --- section 4: the placement tables and the object-id list. Not needed to
+  //     render, so a file this cannot be read from still parses; see
+  //     readPlacements for the layout.
+  sections.section4 = walkRecordStream(r) ?? pos;
+  const { placements, objectIds } = readPlacements(r, sections.section4);
   const meshStart = findMeshStart(r, pos);
   if (meshStart === null) throw new Error('level.dat: could not locate the mesh pool');
+  sections.meshPool = meshStart;
 
   const table = findObjectTable(r, pos, meshStart);
   if (!table) throw new Error('level.dat: could not tile the object table');
+  sections.objectTable = table.start;
 
   // The mesh pointer is the LAST field of a record, not the first. The tiler
   // frames records as [u32][x y z][rot][scale][flags] because that is how the
@@ -438,7 +503,115 @@ export function parseDat(buffer: ArrayBuffer | Uint8Array): DatLevel {
     if (mesh) meshes.set(object.meshOffset, mesh);
   }
 
-  return { markers, paths, zones, objects, meshes };
+  // Placements point at object records by the offset of their position field,
+  // which is exactly what `DatObject.offset` records.
+  const objectAt = new Map(objects.map((o, i) => [o.offset, i]));
+  for (const p of placements) p.objectIndex = objectAt.get(p.objectOffset) ?? -1;
+
+  return { sections, placements, objectIds, markers, paths, zones, objects, meshes };
+}
+
+/**
+ * Where the record stream ends, the way the loader finds it.
+ *
+ * `FUN_0043e6e0` does not know about markers, paths and portals as such. It
+ * reads the header u32 as a record count and walks that many records from
+ * offset 4, each `i16 n, i16 tag` and a body whose size the tag decides:
+ *
+ *     tag <  0      ((3n + 1) / 2 + 4) x u32     never seen in a file
+ *     tag == 0x3f   4n + 1 x u32                  the marker block: n x 16 bytes
+ *     otherwise     3n + 1 x u32                  paths (tag < 0x40) and portals (>= 0x41)
+ *
+ * So the marker block is just the first record, and the loader divides every
+ * portal's coordinates by four as it goes. This is the only reliable way to
+ * find what follows: a boss arena has no markers and no paths, and one scene
+ * (`level05/level1`) opens with two paths that read as a marker count. Null
+ * if the walk leaves the file.
+ */
+function walkRecordStream(r: Reader): number | null {
+  const count = r.i32(0);
+  if (count < 0 || count > 4096) return null;
+  let pos = 4;
+  for (let i = 0; i < count; i++) {
+    if (pos + 4 > r.length) return null;
+    const n = r.i16(pos), tag = r.i16(pos + 2);
+    if (n < 0) return null;
+    const words = tag < 0 ? Math.trunc((n * 3 + 1) / 2) + 4 : tag === 0x3f ? n * 4 + 1 : n * 3 + 1;
+    pos += words * 4;
+  }
+  return pos <= r.length ? pos : null;
+}
+
+/**
+ * Section 4, read the way `FUN_0043e6e0` reads it:
+ *
+ *     i32 extra; extra x 128 bytes        (0 in every file examined)
+ *     table A: 20-byte records until one whose byte +14 is zero
+ *     i32 count; (count + 1) x u32 offset (the object-id list, ids 0..count)
+ *     table B: 20-byte records until one whose byte +14 is zero
+ *
+ * The u32 list entries are byte offsets of records in either table, or zero for
+ * an id nothing uses. The loader turns each into a pointer, and everything the
+ * game does to an object by id goes through this list. An earlier reading of
+ * this section as "20-byte refs whose leading run maps first-section objects"
+ * was the first table seen without its terminator and list.
+ *
+ * Returns empty results rather than throwing: a scene with no placements is
+ * still worth drawing.
+ */
+function readPlacements(r: Reader, pos: number): { placements: DatPlacement[]; objectIds: number[] } {
+  const none = { placements: [] as DatPlacement[], objectIds: [] as number[] };
+  if (pos < 0 || pos + 4 > r.length) return none;
+  const extra = r.i32(pos);
+  if (extra < 0 || extra > 64) return none;
+  pos += 4 + extra * 128;
+
+  const placements: DatPlacement[] = [];
+  const readTable = (table: 0 | 1): boolean => {
+    while (pos + 20 <= r.length) {
+      const flags = r.bytes[pos + 14]!;
+      if (flags === 0) { pos += 20; return true; }
+      placements.push({
+        offset: pos, table, position: r.vec3(pos),
+        param: r.i16(pos + 12), flags, aux: r.bytes[pos + 15]!,
+        objectOffset: r.u32(pos + 16), objectIndex: -1,
+      });
+      pos += 20;
+    }
+    return false;
+  };
+  if (!readTable(0) || pos + 4 > r.length) return none;
+
+  const count = r.i32(pos);
+  if (count < 0 || count > 4096 || pos + 4 + (count + 1) * 4 > r.length) return none;
+  const listAt = pos + 4;
+  pos = listAt + (count + 1) * 4;
+  readTable(1);
+
+  const byOffset = new Map(placements.map((p, i) => [p.offset, i]));
+  const objectIds: number[] = [];
+  for (let id = 0; id <= count; id++) {
+    const offset = r.u32(listAt + id * 4);
+    objectIds.push(offset === 0 ? -1 : (byOffset.get(offset) ?? -1));
+  }
+  return { placements, objectIds };
+}
+
+/**
+ * The engine's "class" of a mesh: its polygon count as `FUN_0043e2d0` counts
+ * it, which is what `FUN_0044e520` switches on to decide what a pickup is —
+ * a 36-polygon mesh is a Pizza Planet token, an 18-polygon one an extra
+ * life, and so on (src/sim/pickups.ts). There is no type field anywhere; the
+ * count is the type. Face groups whose low mode bits fall in 8..0xe count
+ * double, the rest once.
+ */
+export function meshPolyCount(mesh: DatMesh): number {
+  let n = 0;
+  for (const face of mesh.faces) {
+    const kind = face.mode & 0x1f;
+    n += kind >= 8 && kind <= 0xe && kind !== 0xd ? 2 : 1;
+  }
+  return n;
 }
 
 // --- Renderable output ------------------------------------------------------

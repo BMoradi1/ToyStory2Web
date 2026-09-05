@@ -425,6 +425,92 @@ code fires it for a skid. Rather than play a confidently wrong sound, the sim
 names effects directly and the event table waits for someone to settle it.
 What is lost meanwhile: per-sound pitch and volume, and 3D falloff.
 
+## Pickups and Pizza Planet tokens
+
+Read from `FUN_00447db0` (building the list at level load), `FUN_004a0f80`
+(the per-tick touch test) and `FUN_0044e520` (what a touched object is), and
+ported in `src/sim/pickups.ts`.
+
+**The list.** One flat array of sixteen-byte records: `i32 x, y, z` in level
+units, a byte id, a byte reach code, and an `i16` floor height that
+`FUN_00486310` — the engine's floor-under-a-point query — fills in from ten
+units above the pickup (`0x7fff` if it finds nothing or the floor is more than
+`0x1800` below). Two sources feed it:
+
+- every marker in `level.dat`, as a **coin**: id `0x10`, reach code `0x11`;
+- every used **object id** from the level's starting id upward — `0x30`
+  normally, `0x60` for levels 4, 10, 11 and 14, `0x50` for level 5 — with
+  the id itself as the id and the placement's `param >> 3` as the reach
+  (docs/FORMATS.md explains the id list).
+
+**The touch test** runs over the list each tick, for records the renderer
+flagged as near enough to draw:
+
+    dx = (player.x >> 5 - x) >> 3
+    dy = ((player.y >> 5) - 0xe6 - y) >> 3        230 level units up: his middle
+    dz = (player.z >> 5 - z) >> 3
+    hit when dx² + dy² + dz² < ((reach & 0x7f) + 14)²
+
+A sphere, not the tall ellipsoid in `FUN_004100f0` — that one is the
+object-and-enemy test, which an earlier note here wrongly called the pickup
+test. A coin is taken from 31 x 8 = 248 level units, a token (param 216, code
+27) from 328. After a hit the record is disabled by writing `INT_MIN` into its
+y, and a class object is also hidden (`FUN_004ccb20(id, 0, 0, 0)` scales it to
+nothing).
+
+**What a touched object is.** Ids below `0x30` are coins. Otherwise
+`FUN_0044e520` looks up the object's mesh and switches on its **polygon
+count** as `FUN_0043e2d0` counts it (face groups with mode `& 0x1f` in 8..0xe
+count double). There is no type field anywhere; the count is the type:
+
+| polygons | category | effect in `FUN_004a0f80` |
+|---|---|---|
+| 0x24, 0x48 | 2 token | sets bit `slot` of `(&DAT_0052f0d7)[level]`, plays the reveal |
+| 0x20 | 0 health | +4, capped at 14, 0xb4-tick flash |
+| 0x12 | 3 extra life | +1, capped at 9 |
+| 6 | 4 camera trigger | `FUN_00402610(id)` switches camera mode; record stays live |
+| 0x27 | 5 rocket boots | `FUN_004a4d60` |
+| 0x14 | 8 hover boots | `FUN_004a4b70`; the object comes back after 400 ticks |
+| 100 | 6 | `DAT_00882938 += 5`, capped 10 — ammunition of some kind, regenerating |
+| 0x1e | 7 | `DAT_00882964 += 10`, capped 30 — likewise |
+| 0x3c | 1 | `FUN_004a50d0(record)` |
+| 0x1f, 0x32, 0x50 | 9 | a counter, `DAT_00830d4c++` — the find-five-items tasks |
+| 0x13 | 10 | `DAT_0053c824 = 0x4b0`, a 20-second timer |
+| anything else | -1 | nothing |
+
+Coins: +1 capped at 99, and at exactly 50 event `0x4f` fires. The polygon
+count as a type is a real hazard for any other mesh that happens to share a
+count: level 10 has a 2 x 3 grid of 18-polygon props that the switch would
+call extra lives, and it is only the level's starting id of `0x60` that keeps
+them out of the list.
+
+**Tokens start hidden.** Each level's init function calls
+`FUN_004a0c80(list, spare)` with five object ids — the executable's lists are
+in `src/sim/level-data.ts`, one per non-boss level — and hides every one of
+them, disabling its pickup record, along with five consecutive spare copies
+from `spare` up (level 1's five stand in a row at the level's edge, table A ids
+`0x48..0x4c`). `FUN_004a0db0(slot, quiet)` reveals one: it re-enables the
+record at the object's current position and either cuts the camera to it for
+0xb4 ticks or, if quiet, just scales it back to full size. The list order is
+the task order on the level's status screen; a slot whose saved bit is already
+set gets a spare swapped in (`FUN_004cd0c0`). What reveals each slot is the
+level's own script, which is not decoded — the viewer reveals all five at
+once. Validation: all ten lists resolve to five 36-polygon objects in the
+scene `sceneForLevel` names, and nothing else does.
+
+**Which scene is which level.** `InitLevelPlay` (`FUN_00452fc0`) builds the
+directory as `level%02d` from the level number, except that numbers above ten
+subtract ten and switch to the `level1.*` scene. Levels 1..10 are
+`level01/level`..`level10/level`; 11..15 are `level01/level1`..`level05/level1`.
+The token lists confirm it: level 11's ids are tokens only in
+`level01/level1.dat`.
+
+**The spawn table** at `0x4f59a4` (`i32 x, y, z; i16 yaw`, sixteen bytes per
+level, entry 0 unused) is in `src/sim/level-data.ts`. The y is a seed: the
+engine drops a ground ray from `0x400` above it. Checked against the collision
+of each level's scene, all fifteen have floor within a few units of the seed
+except level 10, which starts 1,030 units above its floor.
+
 ## Ported
 
 The mover is in `src/formats/collision.ts` as `sweepSphere`, behind the
@@ -439,7 +525,10 @@ Not yet ported: the slide push on slopes past 42.9 degrees, and the split
 step, neither of which changes behaviour measurably at these speeds.
 
 `src/sim/player.ts` is a transcription of the tick above, `src/sim/trig.ts` the
-angle system, `src/sim/input.ts` the keyboard and pad.
+angle system, `src/sim/input.ts` the keyboard and pad. `src/sim/pickups.ts` is
+the pickup list and touch test, `src/sim/level-data.ts` the spawn table, token
+lists and level-to-scene mapping, and `tools/level-objects.ts` checks the
+token lists against the scene files.
 `src/sim/player-animation.ts` is the state machine and script interpreter, and
 `src/sim/player-animation-data.ts` is the table above, generated from the
 executable rather than typed in. `src/sim/camera.ts` is the follow camera and
@@ -452,8 +541,7 @@ later change.
 
 Projectile speeds and lifetimes; the exact ledge-grab probe geometry
 (`FUN_00435f30` probes 0x3600 below the origin and one third of a unit
-forward, low confidence); the spawn table's meaning beyond level 1 (the y is
-only a seed for a ground ray, the ray starts 0x400 above it); the "line"
+forward, low confidence); the "line"
 collision the mover also runs (`FUN_00480660`, a linked list at `0x7290f4` of
 up to 32 vertical segments, tested like walls) — level 1's terrain file has no
 infinite-wall groups, so where those lines come from is open.

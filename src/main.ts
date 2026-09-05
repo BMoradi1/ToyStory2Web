@@ -22,7 +22,8 @@ import {
 import { toRadians, yawOf } from './sim/trig.ts';
 import { createCamera, stepCamera, cameraTarget, type CameraState } from './sim/camera.ts';
 import { SoundBank, PLAYER_EFFECTS } from './audio/sfx.ts';
-import { createPickups, stepPickups, type PickupState } from './sim/pickups.ts';
+import { createPickups, PickupKind, revealToken, stepPickups, type PickupState } from './sim/pickups.ts';
+import { levelNumber, SPAWN_TABLE } from './sim/level-data.ts';
 import {
   createAnimation, stepAnimation, type AnimationPlayback,
 } from './sim/player-animation.ts';
@@ -297,7 +298,13 @@ async function open(dir: GameDir): Promise<void> {
       get hasAnm() { return playerModel?.anm ? playerModel.anm.animations.length : null; },
       get sound() { return sound ? { enabled: sound.enabled, ready: sound.ready } : null; },
       get pickups() {
-        return pickups ? { total: pickups.items.length, taken: pickups.taken } : null;
+        return pickups ? {
+          total: pickups.items.length, taken: pickups.taken, coins: pickups.coins,
+          health: pickups.health, lives: pickups.lives, tokens: pickups.tokens,
+          kinds: pickups.items.reduce<Record<string, number>>((acc, it) => {
+            const k = PickupKind[it.kind] ?? String(it.kind); acc[k] = (acc[k] ?? 0) + 1; return acc;
+          }, {}),
+        } : null;
       },
       /** Put the player on the nearest uncollected pickup. For the harness. */
       goToPickup() {
@@ -305,14 +312,17 @@ async function open(dir: GameDir): Promise<void> {
         let best = -1, bestD = Infinity;
         for (let i = 0; i < pickups.items.length; i++) {
           const it = pickups.items[i]!;
-          if (it.collected) continue;
-          const d = Math.hypot(it.x - player.x, it.z - player.z);
+          // A camera trigger is never consumed, so it would be "nearest" for ever.
+          if (it.collected || !it.enabled || it.kind === PickupKind.Camera) continue;
+          // Pickups are stored in level units; the player is in game units.
+          const d = Math.hypot(it.x * GAME_UNITS_PER_LEVEL_UNIT - player.x, it.z * GAME_UNITS_PER_LEVEL_UNIT - player.z);
           if (d < bestD) { bestD = d; best = i; }
         }
         if (best < 0) return null;
         const it = pickups.items[best]!;
-        player.x = it.x; player.z = it.z; player.y = it.y;
-        return { index: best, wasAway: Math.round(bestD / 32) };
+        player.x = it.x * GAME_UNITS_PER_LEVEL_UNIT; player.z = it.z * GAME_UNITS_PER_LEVEL_UNIT;
+        player.y = it.y * GAME_UNITS_PER_LEVEL_UNIT;
+        return { index: best, kind: PickupKind[it.kind], wasAway: Math.round(bestD / 32) };
       },
       get modelInfo() {
         const e = models[modelEl.selectedIndex];
@@ -468,13 +478,35 @@ function pickSpawnMarker(
 }
 
 /**
+ * The level's own start point, if this scene is the one the game starts a
+ * level in and the executable's table has floor under it.
+ *
+ * `SPAWN_TABLE` is per level number; `levelNumber` says which scene a level
+ * plays in. Scenes that are no level's start fall back to the marker
+ * heuristic below. The y in the table is a seed for a ground ray, not a
+ * resting height.
+ */
+function tableSpawn(
+  sceneId: string, world: CollisionWorld,
+): { x: number; z: number; yaw: number; ground: { y: number; normal: { x: number; y: number; z: number } } } | null {
+  const level = levelNumber(sceneId);
+  if (level === null) return null;
+  const spawn = SPAWN_TABLE[level];
+  if (!spawn) return null;
+  const S = GAME_UNITS_PER_LEVEL_UNIT;
+  // The original starts its ray 0x400 above the seed; the same allowance here.
+  const ground = groundBelow(world, spawn.x / S, spawn.y / S - 0x400 / S, spawn.z / S, 0x400 / S);
+  if (!ground) return null;
+  return { x: spawn.x, z: spawn.z, yaw: spawn.yaw, ground };
+}
+
+/**
  * `p`: stand the selected character on the floor of the level.
  *
- * The spawn point is a pickup marker, because those are the one thing in the
- * file known to sit over walkable floor — every one of them does, in every
- * level checked. The real spawn is presumably in the level's own code, which
- * is not decoded, so this is a stand-in that is at least always somewhere a
- * player could be.
+ * The start point is the executable's spawn table where that applies (see
+ * `tableSpawn`). Otherwise it is a pickup marker, because those are the one
+ * thing in the file known to sit over walkable floor — every one of them does,
+ * in every level checked.
  */
 async function spawnPlayer(): Promise<void> {
   if (!viewer || !currentLevel) return;
@@ -485,9 +517,20 @@ async function spawnPlayer(): Promise<void> {
   await loadCollision();
   if (!currentCollisionWorld) { infoEl.textContent = 'no collision for this scene'; return; }
 
-  const chosen = pickSpawnMarker(currentLevel.level.markers, currentCollisionWorld);
-  if (!chosen) { infoEl.textContent = 'no marker with floor under it'; return; }
-  const { marker, ground, area } = chosen;
+  const sceneId = levels[levelEl.selectedIndex]?.id ?? '';
+  const fromTable = tableSpawn(sceneId, currentCollisionWorld);
+  let start: { x: number; z: number; yaw: number; ground: { y: number; normal: { x: number; y: number; z: number } } };
+  let area = -1;
+  if (fromTable) {
+    start = fromTable;
+  } else {
+    const chosen = pickSpawnMarker(currentLevel.level.markers, currentCollisionWorld);
+    if (!chosen) { infoEl.textContent = 'no marker with floor under it'; return; }
+    const S = GAME_UNITS_PER_LEVEL_UNIT;
+    start = { x: chosen.marker.position.x * S, z: chosen.marker.position.z * S, yaw: 0, ground: chosen.ground };
+    area = chosen.area;
+  }
+  const { ground } = start;
 
   const model = parseAll(await entry.file.read());
   const anm = entry.anm ? parseAnm(await entry.anm.read()) : null;
@@ -495,28 +538,31 @@ async function spawnPlayer(): Promise<void> {
   playerAnim = createAnimation();
   viewer.setPlayer(buildMeshData(model), sceneTextures);
   // The hull is in PlayStation axes: +Y down, 256 units to the world unit.
-  viewer.setPlayerPosition(marker.position.x / WORLD_SCALE, -ground.y / WORLD_SCALE, -marker.position.z / WORLD_SCALE);
+  viewer.setPlayerPosition(start.x * GAME_TO_RENDER, -ground.y / WORLD_SCALE, -start.z * GAME_TO_RENDER);
 
   // The sim runs 32x finer than the file, so scale on the way in. Standing on
   // the floor means y equal to the surface: the model's origin is at its feet.
-  player = createPlayer(
-    marker.position.x * GAME_UNITS_PER_LEVEL_UNIT,
-    ground.y * GAME_UNITS_PER_LEVEL_UNIT,
-    marker.position.z * GAME_UNITS_PER_LEVEL_UNIT,
-    0,
-  );
+  player = createPlayer(start.x, ground.y * GAME_UNITS_PER_LEVEL_UNIT, start.z, start.yaw);
   playerRuntime = createRuntime();
   camera = createCamera(player);
-  // One collectible per marker. See src/sim/pickups.ts for what a marker is.
-  pickups = createPickups(currentLevel.level.markers);
-  viewer.setPickups(pickups.items.map((i) => ({
-    x: i.x * GAME_TO_RENDER, y: -i.y * GAME_TO_RENDER, z: -i.z * GAME_TO_RENDER,
+  // Coins from the markers, everything else from the object-id list. See
+  // src/sim/pickups.ts. The five tokens start hidden in the original and are
+  // revealed one by one as the level's tasks are done; the tasks are not
+  // implemented, so they are all revealed here.
+  pickups = createPickups(currentLevel.level, levelNumber(sceneId) ?? 0);
+  for (let slot = 0; slot < 5; slot++) revealToken(pickups, slot);
+  const S = GAME_UNITS_PER_LEVEL_UNIT;
+  viewer.setPickups(pickups.items.filter((i) => i.enabled).map((i) => ({
+    x: i.x * S * GAME_TO_RENDER, y: -i.y * S * GAME_TO_RENDER, z: -i.z * S * GAME_TO_RENDER,
+    colour: PICKUP_COLOURS[i.kind] ?? 0x9a9a9a,
   })));
+  pickupDrawIndex = pickups.items.map((i) => (i.enabled ? 0 : -1));
+  for (let i = 0, n = 0; i < pickupDrawIndex.length; i++) if (pickupDrawIndex[i] === 0) pickupDrawIndex[i] = n++;
   spawnPoint = { x: player.x, y: player.y, z: player.z };
   const slope = (Math.acos(Math.min(1, -ground.normal.y)) * 180) / Math.PI;
   infoEl.textContent =
     `${entry.name} standing on floor ${(ground.y / WORLD_SCALE).toFixed(2)} ` +
-    `(${slope.toFixed(0)}\u00b0 slope), ${area} cells of floor to walk on. Enter to play.`;
+    `(${slope.toFixed(0)}\u00b0 slope), ${fromTable ? "the level's own start point" : `${area} cells of floor to walk on`}. Enter to play.`;
 }
 
 /**
@@ -538,7 +584,19 @@ let camera: CameraState | null = null;
 /** Effects, read from the install. Silent until play starts. */
 let sound: SoundBank | null = null;
 let pickups: PickupState | null = null;
+/** Drawn instance for each pickup, or -1 for one that is not drawn (hidden tokens, spares). */
+let pickupDrawIndex: number[] = [];
 let pickupSpin = 0;
+/** Stand-in colours: coins gold, tokens red, health green, lives blue, the rest grey. */
+const PICKUP_COLOURS: Partial<Record<PickupKind, number>> = {
+  [PickupKind.Coin]: 0xffd24a,
+  [PickupKind.Token]: 0xe0312d,
+  [PickupKind.Health]: 0x4fd65a,
+  [PickupKind.Life]: 0x4a8cff,
+  [PickupKind.Camera]: 0x303030,
+  [PickupKind.RocketBoots]: 0xff8c1a,
+  [PickupKind.HoverBoots]: 0xc86bff,
+};
 const input = new InputSource();
 
 /** `space` etc. must reach the game, not scroll the page, but only while playing. */
@@ -595,10 +653,13 @@ function playTick(): void {
     if (taken.length > 0) sound?.play('PICKUP1');
     pickupSpin = (pickupSpin + 0.06) % (Math.PI * 2);
     const gone = new Set<number>();
-    for (let i = 0; i < pickups.items.length; i++) if (pickups.items[i]!.collected) gone.add(i);
+    for (let i = 0; i < pickups.items.length; i++) {
+      if (pickups.items[i]!.collected && pickupDrawIndex[i]! >= 0) gone.add(pickupDrawIndex[i]!);
+    }
     viewer.updatePickups(gone, pickupSpin);
     if (taken.length > 0) {
-      infoEl.textContent = `${pickups.taken}/${pickups.items.length} collected`;
+      const slots = [0, 1, 2, 3, 4].filter((s) => pickups!.tokens & (1 << s)).length;
+      infoEl.textContent = `coins ${pickups.coins}  health ${pickups.health}/14  lives ${pickups.lives}  tokens ${slots}/5`;
     }
   }
   poseAnimation(Math.hypot(held.moveX, held.moveY) > 0);

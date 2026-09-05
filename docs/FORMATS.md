@@ -519,17 +519,48 @@ scene's faces are found in `level.dat` at the object's scale.
 | `level05/level` | 518 | 376 | 142 |
 | `level07/level` | 468 | 327 | 141 |
 
-**Where the split is.** No record says which section it is in and no count was
-found in the header. What marks it is **section 4**, the list between the
-portals and the object table: 20-byte records of `i32 x, y, z; u32; u32
-pointer` with the pointer last, like the objects themselves. Its leading run
-points at exactly the first-section objects, one each, and then the structure
-changes (later records point back into section 4 — it is a linked structure,
-and its `x y z` are not the object's position; what it is for is still
-unknown). The list has a lead-in of up to a few words depending on what
-precedes it, so the parser tries each. Edge cases: `level06/level1` has one
-second-section object the rule misses, and `level10/level`'s first list is not
-in table order, so its zones fall back to position matching.
+**Where the split is, and what section 4 actually is.** Section 4 — the
+bytes between the portals and the object table — is how the engine addresses
+objects, read from the loader `FUN_0043e6e0` in toy2.exe and now parsed:
+
+    i32 extra; extra x 128 bytes          0 in every file examined
+    table A   20-byte placements, ended by a record whose byte +14 is 0
+    i32 count; (count + 1) x u32          the object-id list
+    table B   20-byte placements, ended the same way
+
+    placement  i32 x, y, z; i16 param; u8 flags; u8 aux; u32 objectPtr
+
+A placement's `objectPtr` is the offset of an object record's position field,
+and its `x y z` repeat that object's position. Table A places the first
+section of the object table, one record each, and table B the second — so the
+split is the first table's length, which is exactly what the earlier "leading
+run" reading was seeing without its terminator. The object-id list is the part
+that matters: entry `id` is the offset of a placement (in either table) or 0,
+and **everything the game does to an object by number goes through this
+list** — the Pizza Planet token ids in the executable, the pickup scan, the
+camera triggers, the level scripts that show and hide props. The parser
+exposes both as `placements` and `objectIds` (index = id, value = placement
+index or -1). `tools/level-objects.ts` lists them.
+
+**The record stream has one rule, and the marker block is a record.** The
+loader does not know markers, paths and portals as three sections. It reads
+the header u32 as a record count and walks that many `i16 n, i16 tag` records
+from offset 4: tag `0x3f` is `4n + 1` words (the marker block, n x 16 bytes),
+a negative tag `(3n + 1) / 2 + 4` words (never seen in a file), anything else
+`3n + 1` words — paths carry tags below `0x40`, portals `0x41` upward, and the
+loader divides portal coordinates by four as it reads them. This is the only
+dependable way to find section 4: a boss arena has neither markers nor paths
+(section 4 starts at offset 8), and `level05/level1.dat` opens with two paths
+whose first word reads as a marker count. The parser now walks the stream
+this way to place section 4 and keeps its own marker/path/portal readers for
+the content.
+
+**Flags.** Every placement seen has bit `0x08` set, which selects the 32-byte
+object form with the mesh pointer at `+0x1c`; `0x20` marks an object with a
+second mesh pointer at `+0x20` and is rewritten to `0x40` at load; `0x80` is
+rewritten to `0x40`. The `param` short is made positive at load and, for a
+pickup, shifted right by three to give its reach — see the pickups section of
+docs/PLAYER.md, which is where the id list earns its keep.
 
 **Zones.** `level.dat` carries no zone field; `assignZones` in
 `src/formats/ngnscene.ts` takes them from the scene: first section by index,
@@ -556,15 +587,14 @@ byte-identical 1998 file copied into four directories** (md5 `bf2414e3…`),
 using an older revision with a `0x14` marker constant. One stale artefact, not
 four failures.
 
-**Markers are pickup points, and they are all one kind.** Every marker in every
-scene that parses cleanly carries `0x10` — 743 across the game — so the field
-is not a type and the collectibles it places are all the same thing. Two things
-say coins rather than Pizza Planet tokens: a level holds five tokens and these
-run to seventy, and the scenes with none at all are `level03`, `level06` and
-`level09`, which are precisely the boss arenas. What distinguishes a token is
-not in this file, not in the converted scene (only 1 of level 1's 70 markers
-has an instance at the same spot, by coincidence), and not in `creatures.cfg`,
-whose 63 entries are all characters. That leaves the level's own code.
+**Markers are coins — confirmed from the executable.** Every marker in every
+scene that parses cleanly carries `0x10` — 743 across the game — and the
+pickup-list builder `FUN_00447db0` copies each marker into a pickup record
+with id `0x10` and reach code `0x11`, which the touch handler treats as a
+coin: +1 to the counter, capped at 99, a fanfare at 50. The scenes with none
+are `level03`, `level06` and `level09`, the boss arenas. Pizza Planet tokens
+are not markers at all; they are objects, named by id in the executable's
+per-level lists and typed by their polygon count (docs/PLAYER.md).
 
 The geometry backs the reading up. All 70 of level 1's markers have walkable
 floor beneath them, and they float above it — 159 units at the lowest, 415 at
@@ -580,10 +610,9 @@ The `kind` field catches them: anything but `0x10` means the scene was misread,
 and the parser now returns no markers rather than nonsense. That is worth more
 than tidiness, because the viewer picks its spawn point from this list.
 
-**Interpretation, unconfirmed:** markers spread evenly over walkable floor at
-plausible pickup heights, which reads as collectible placements — but there is
-no per-marker type field, so the *kind* would have to come from `level.bin`.
-Paths are polylines tracing loops around rooms (patrol routes, platform rails).
+Paths are polylines tracing loops around rooms (patrol routes, platform
+rails); the loader files each by its tag into a table of 64 slots, with tag
+`0x40` records kept in a separate list.
 
 **The zone quads are PORTALS** — see the visibility section below. `a` and `b`
 are the zones either side, and they are named `from`/`to` in the parser.

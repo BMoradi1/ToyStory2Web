@@ -278,8 +278,9 @@
                 the car, feet on the boards at the height the collision
                 reports. Geometry, textures, collision and the character
                 model all agree on one coordinate system.
-                Spawn point is a pickup marker for now - the real one is
-                presumably in the level's own code, which is not decoded.
+                Spawn point: the executable's own table now (0x4f59a4,
+                src/sim/level-data.ts), checked against every level's
+                floor; a marker only for scenes that are no level's start.
  P2.3 [DONE]    Collision response: the original's swept sphere.
                 The player is a SPHERE of radius 4000 game units centred
                 radius+0xc0 above the origin, not a point with a floor
@@ -371,22 +372,32 @@
                 Also absent: music (audio/*.wav, one 8 MB track per area)
                 and any positional mixing.
 
- P2.8 [PART DONE] Pickups. src/sim/pickups.ts places one collectible per
-                marker and collects it with the original's own proximity
-                test from FUN_004100f0 - an ellipsoid measured from 0x1cc0
-                above the player's origin (his middle, not his feet) whose
-                vertical delta is halved, so the reach is twice as tall as
-                it is wide, plus a base radius of 100 level units.
-                Confirmed sensible: all 70 of level 1's markers have floor
-                under them and float 159-415 units above it against Buzz's
-                460, so 36 are collectible standing and the rest need a
-                jump.
-                Provisional: the visual is a stand-in octahedron. The real
-                coin comes from the 2D sprite pool at the tail of the mesh
-                pool, 98 KB in level 1, still undecoded.
-                Unknown: what makes a Pizza Planet token different from a
-                coin. It is not in the marker, the scene or creatures.cfg,
-                so it is in the level's own MIPS overlay - the Fable job.
+ P2.8 [DONE]    Pickups, decoded from toy2.exe and ported (src/sim/pickups.ts,
+                docs/PLAYER.md "Pickups and Pizza Planet tokens").
+                The list: coins from level.dat's markers (id 0x10, reach
+                code 0x11 = 248 level units) plus every used OBJECT ID from
+                the level's starting id up (0x30, or 0x50/0x60 on some
+                levels), each typed by the POLYGON COUNT of its mesh - 36
+                is a token, 32 health, 18 a life, 6 a camera trigger, 39
+                rocket boots, 20 hover boots. There is no type field; the
+                count is the type. The touch test is a plain sphere from
+                230 level units above the origin, ((code & 0x7f) + 14) << 3
+                units across - NOT the ellipsoid in FUN_004100f0, which is
+                the enemy test and was wrongly cited here before.
+                Object ids are level.dat section 4's id list, now parsed
+                (DatLevel.objectIds -> placements). All ten of the
+                executable's token lists resolve to five tokens in the
+                scene the level plays in; tools/level-objects.ts checks it.
+                Tokens start hidden in the original and are revealed by
+                the level's tasks, which are not ported: the viewer reveals
+                all five. Counters (coins 99, health 14, lives 9, token
+                bits) live in PickupState for now, not the player block.
+                Headless check on level 1: table spawn, 20 coins, 2 lives
+                and a token collected by walking onto them.
+                Still a stand-in visual (octahedra, coloured by kind); the
+                real coin sprite pool is undecoded, and a collected class
+                object should hide its level mesh, which the renderer
+                cannot do per object yet.
 
  P2.6 [READY]   Skeleton from gfx joints (0x011F) - parser done, unused.
 
@@ -396,14 +407,15 @@
  Done means: Andy's House start to finish, tokens collected, saved.
 
  P3.1 [READY]   creatures.cfg parser - id -> name -> model/anim directory.
- P3.2 [BLOCKED] Entity placement          <- P3.1. Markers (70 in level 1,
-                evenly spread on walkable floor, no type field) are almost
-                certainly pickups; the KIND must come from the level logic.
+ P3.2 [BLOCKED] Entity placement          <- P3.1. Pickups are placed (P2.8);
+                what is left is enemies and moving props, which the level
+                scripts drive by object id through the same id list.
                 Paths (30) are patrol/platform rails.
  P3.3 [BLOCKED] Level 1 logic             <- P2. Port the behaviour of level
                 1's overlay (109 calls to 41 engine functions - small) and
                 the matching x86 code: enemies, moving platforms, triggers.
- P3.4 [BLOCKED] Pizza Planet tokens (5), Hamm's coins, HUD, pause and menus.
+ P3.4 [BLOCKED] Token tasks (what reveals each of the 5 slots: the level
+                scripts), HUD for the P2.8 counters, pause and menus.
  P3.5 [BLOCKED] Mr. Potato Head parts -> Cosmic Shield, Disk Launcher,
                 Rocket Boots, Grappling Hook (+ a fifth).
  P3.6 [READY]   Save format: Toy200.sav / Toy299.sav are samples in the

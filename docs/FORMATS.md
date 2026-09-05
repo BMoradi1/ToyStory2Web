@@ -566,6 +566,13 @@ not in this file, not in the converted scene (only 1 of level 1's 70 markers
 has an instance at the same spot, by coincidence), and not in `creatures.cfg`,
 whose 63 entries are all characters. That leaves the level's own code.
 
+The geometry backs the reading up. All 70 of level 1's markers have walkable
+floor beneath them, and they float above it — 159 units at the lowest, 415 at
+the median, against Buzz's height of 460. That is chest height: 36 of the 70
+are inside the engine's own collect radius for a player standing underneath,
+and the rest sit within a jump. Coins hanging at chest height over the floor,
+some needing a hop, is exactly the shape of this game.
+
 **The count at +4 is not always the marker count.** Three scenes —
 `level02/level1`, `level05/level1`, `level06/level1` — have something else
 there, and reading it as markers gives positions scattered outside the level.

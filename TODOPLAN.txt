@@ -371,6 +371,23 @@
                 Also absent: music (audio/*.wav, one 8 MB track per area)
                 and any positional mixing.
 
+ P2.8 [PART DONE] Pickups. src/sim/pickups.ts places one collectible per
+                marker and collects it with the original's own proximity
+                test from FUN_004100f0 - an ellipsoid measured from 0x1cc0
+                above the player's origin (his middle, not his feet) whose
+                vertical delta is halved, so the reach is twice as tall as
+                it is wide, plus a base radius of 100 level units.
+                Confirmed sensible: all 70 of level 1's markers have floor
+                under them and float 159-415 units above it against Buzz's
+                460, so 36 are collectible standing and the rest need a
+                jump.
+                Provisional: the visual is a stand-in octahedron. The real
+                coin comes from the 2D sprite pool at the tail of the mesh
+                pool, 98 KB in level 1, still undecoded.
+                Unknown: what makes a Pizza Planet token different from a
+                coin. It is not in the marker, the scene or creatures.cfg,
+                so it is in the level's own MIPS overlay - the Fable job.
+
  P2.6 [READY]   Skeleton from gfx joints (0x011F) - parser done, unused.
 
 ================================================================================

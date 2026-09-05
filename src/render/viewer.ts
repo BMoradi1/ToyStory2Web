@@ -337,6 +337,56 @@ export class Viewer {
   get playMode(): boolean { return this.play; }
   private play = false;
 
+  private pickups: THREE.InstancedMesh | null = null;
+  private pickupAt: THREE.Vector3[] = [];
+
+  /**
+   * Show collectibles at these renderer-space positions.
+   *
+   * The shapes are a STAND-IN. The real coins are drawn from the 2D sprite
+   * pool at the tail of `level.dat`'s mesh pool, which is 98 KB in level 1 and
+   * is not decoded (docs/FORMATS.md), so there is no way yet to draw the thing
+   * the game draws. These are small spinning octahedra in its place, and are
+   * deliberately not trying to look like the original.
+   */
+  setPickups(positions: { x: number; y: number; z: number }[]): void {
+    if (this.pickups) {
+      this.scene.remove(this.pickups);
+      this.pickups.geometry.dispose();
+      (this.pickups.material as THREE.Material).dispose();
+      this.pickups = null;
+    }
+    this.pickupAt = positions.map((p) => new THREE.Vector3(p.x, p.y, p.z));
+    if (positions.length === 0) return;
+
+    const mesh = new THREE.InstancedMesh(
+      new THREE.OctahedronGeometry(0.09),
+      new THREE.MeshBasicMaterial({ color: 0xffd24a }),
+      positions.length,
+    );
+    mesh.frustumCulled = false;
+    this.pickups = mesh;
+    this.scene.add(mesh);
+    this.updatePickups(new Set());
+  }
+
+  /** Redraw the collectibles, hiding the ones already taken. */
+  updatePickups(taken: ReadonlySet<number>, spin = 0): void {
+    const mesh = this.pickups;
+    if (!mesh) return;
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), spin);
+    const one = new THREE.Vector3(1, 1, 1);
+    const gone = new THREE.Vector3(0, 0, 0);
+    for (let i = 0; i < this.pickupAt.length; i++) {
+      // Scaling a taken one to nothing keeps the instance count fixed, which
+      // is cheaper than rebuilding the buffer every time one is collected.
+      m.compose(this.pickupAt[i]!, q, taken.has(i) ? gone : one);
+      mesh.setMatrixAt(i, m);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+  }
+
   /**
    * Put the camera somewhere and point it somewhere, both in renderer units.
    *

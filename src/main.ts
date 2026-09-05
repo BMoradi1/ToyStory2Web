@@ -22,6 +22,7 @@ import {
 import { toRadians, yawOf } from './sim/trig.ts';
 import { createCamera, stepCamera, cameraTarget, type CameraState } from './sim/camera.ts';
 import { SoundBank, PLAYER_EFFECTS } from './audio/sfx.ts';
+import { createPickups, stepPickups, type PickupState } from './sim/pickups.ts';
 import {
   createAnimation, stepAnimation, type AnimationPlayback,
 } from './sim/player-animation.ts';
@@ -295,6 +296,24 @@ async function open(dir: GameDir): Promise<void> {
       get anim() { return playerAnim; },
       get hasAnm() { return playerModel?.anm ? playerModel.anm.animations.length : null; },
       get sound() { return sound ? { enabled: sound.enabled, ready: sound.ready } : null; },
+      get pickups() {
+        return pickups ? { total: pickups.items.length, taken: pickups.taken } : null;
+      },
+      /** Put the player on the nearest uncollected pickup. For the harness. */
+      goToPickup() {
+        if (!player || !pickups) return null;
+        let best = -1, bestD = Infinity;
+        for (let i = 0; i < pickups.items.length; i++) {
+          const it = pickups.items[i]!;
+          if (it.collected) continue;
+          const d = Math.hypot(it.x - player.x, it.z - player.z);
+          if (d < bestD) { bestD = d; best = i; }
+        }
+        if (best < 0) return null;
+        const it = pickups.items[best]!;
+        player.x = it.x; player.z = it.z; player.y = it.y;
+        return { index: best, wasAway: Math.round(bestD / 32) };
+      },
       get modelInfo() {
         const e = models[modelEl.selectedIndex];
         return { index: modelEl.selectedIndex, name: e?.name, hasAnmFile: !!e?.anm,
@@ -488,6 +507,11 @@ async function spawnPlayer(): Promise<void> {
   );
   playerRuntime = createRuntime();
   camera = createCamera(player);
+  // One collectible per marker. See src/sim/pickups.ts for what a marker is.
+  pickups = createPickups(currentLevel.level.markers);
+  viewer.setPickups(pickups.items.map((i) => ({
+    x: i.x * GAME_TO_RENDER, y: -i.y * GAME_TO_RENDER, z: -i.z * GAME_TO_RENDER,
+  })));
   spawnPoint = { x: player.x, y: player.y, z: player.z };
   const slope = (Math.acos(Math.min(1, -ground.normal.y)) * 180) / Math.PI;
   infoEl.textContent =
@@ -513,6 +537,8 @@ let playerAnim: AnimationPlayback | null = null;
 let camera: CameraState | null = null;
 /** Effects, read from the install. Silent until play starts. */
 let sound: SoundBank | null = null;
+let pickups: PickupState | null = null;
+let pickupSpin = 0;
 const input = new InputSource();
 
 /** `space` etc. must reach the game, not scroll the page, but only while playing. */
@@ -560,6 +586,21 @@ function playTick(): void {
     );
   }
   for (const effect of player.sounds) sound?.play(effect);
+
+  if (pickups) {
+    const taken = stepPickups(pickups, player);
+    // PICKUP1 is the engine's own name for a collect; which of PICKUP1 and
+    // PICKUP5 belongs to which collectible is in the sound EVENT table, which
+    // is not ported (docs/PLAYER.md).
+    if (taken.length > 0) sound?.play('PICKUP1');
+    pickupSpin = (pickupSpin + 0.06) % (Math.PI * 2);
+    const gone = new Set<number>();
+    for (let i = 0; i < pickups.items.length; i++) if (pickups.items[i]!.collected) gone.add(i);
+    viewer.updatePickups(gone, pickupSpin);
+    if (taken.length > 0) {
+      infoEl.textContent = `${pickups.taken}/${pickups.items.length} collected`;
+    }
+  }
   poseAnimation(Math.hypot(held.moveX, held.moveY) > 0);
 }
 

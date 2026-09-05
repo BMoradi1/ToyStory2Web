@@ -104,24 +104,30 @@
  WHAT TO GIVE FABLE, IN ORDER
 ================================================================================
 
- 1. P2.3 - THE MOVER.  The one thing standing between this and a game that
-    behaves. Walls stop Buzz now, but that was written from the geometry, not
-    from the original: there is no step height, no ledge handling, and the
-    walkable-slope test still guesses 45 degrees.
+ 1. P2.3 - THE MOVER.  READ, 2026-09-04, by Fable. Everything needed to port
+    it is in docs/PLAYER.md under "Collision: the mover", with the constants
+    in player-constants.ts as COLLISION. This is now Opus work: transcription
+    of a written-down algorithm, exactly like P2.2 was.
 
-    Read FUN_00484380 (4.7 KB), reached through FUN_004855f0, which splits a
-    step into two halves when |v|^2 > 0x400000. Wanted out of it: the step
-    height, the real slope threshold, how a slide along a wall is computed,
-    and whether the player has a radius or is a point. Everything else in
-    src/formats/collision.ts is already shaped to take them.
+    The one thing worth knowing before porting: the walls/ledges problem was
+    never a missing constant. The original has no step height at all. It
+    sweeps a sphere of radius 4000 and lets it roll over edges; "on ground"
+    means "touched a poly flatter than 60 degrees this tick", not "a floor
+    query found something under me". Port that shape and the ledge and step
+    behaviour fall out of it.
 
-    Worth knowing before starting: the slope threshold is NOT urgent for
-    coverage. Raising it from 45 to 89 degrees changes how much of level 1
-    has walkable floor by 0.2%. It matters for whether slopes slide, not for
-    whether the floor exists.
+    How it was read, for next time: the PC mover's one float call is sqrt of
+    the step length, so the whole thing is integer apart from that and the
+    decompile is complete. The PSX twin has no FPU so it confirms the same
+    without objdump. The radius was the only value not visible in the mover
+    itself - it is a per-object field set to 4000 at level load, found by
+    grepping for writes into the object-state block on the PSX side, where the
+    stride made the address arithmetic obvious.
 
- 2. P2.4 - THE FOLLOW CAMERA.  Not obviously a decoding job, and it may not
-    need Fable at all - but the original's camera has modes and framing rules
+ 2. P2.4 - THE FOLLOW CAMERA.  Checked: the four camera functions
+    (FUN_004020f0, FUN_00402290, FUN_00402610, FUN_004027f0, 400-540 bytes
+    each) contain no float code, so their decompile is complete. Opus work.
+    It may not need Fable at all - but the original's camera has modes and framing rules
     and it is worth ten minutes finding out whether they are in a table like
     the animation states were. The strings "camera mode", "camera left" and
     "camera right" are menu text in toy2.exe and lead to the input handling.

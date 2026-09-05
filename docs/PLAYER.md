@@ -317,7 +317,81 @@ The other 20 belong to moves that are not implemented yet — poles, zip lines,
 the grapple, cutscenes. They are in the generated table and simply never
 selected.
 
+## Collision: the mover, read from toy2.exe
+
+The player is a **swept sphere**. There is no step height and no capsule; the
+sphere rolls over anything lower than its radius and the floor query handles
+the rest. All of this was read from `FUN_004855f0` -> `FUN_00484380` ->
+`FUN_00482a00` -> `FUN_00481fb0` on PC and checked against the PSX twins
+(`FUN_80046b70`+`FUN_80046e50`, `FUN_80041ec0`), which carry the same
+constants. Confidence: **high** for every number below.
+
+| constant | value | where |
+|---|---|---|
+| sphere radius | **4000** game units (125 level units) | written into every collision-object record at level load, `FUN_00489c30` |
+| sphere centre above the origin | radius + **0xc0** | the mover lifts by it before colliding and lowers after; the origin rests 0xc0 below the floor surface |
+| edge test radius | radius + **0x40** | `FUN_00481fb0` passes it to the edge/vertex tests |
+| ground vs wall | contact normal `y < -0x2000` (2.14, i.e. flatter than **60°**) is ground, else wall | `FUN_00482a00`, return 1 vs 2 |
+| slope slide begins | ground normal `y >= -11999` (steeper than **42.9°**) | top of `FUN_00484380` |
+| slide push | `n.x * 4096 / (((L + 0xc80) * -n.y) >> 5)` per axis, `L` = step length; for slopes past 75.5° the divisor uses 0x1000 in place of `-n.y` | same |
+| split step | `|v|^2 > 0x400000` runs two half-steps | `FUN_004855f0` |
+| broadphase reach | `L + 0x1880 + (radius * 8000 >> 12)`, cap 240 polys | `FUN_00484380` |
+| response iterations | 4 if under 11 candidate polys, else 3; stop early once a pass finds nothing | same |
+| contact skin | start distance `- 0x20`, end distance `- 0x60` (`- 0x80` on a moving object), both `>> 3` | `FUN_00482a00` |
+| wall push-out | position and velocity `+= n * 3 >> 9`, then `+= n / 0x60`; velocity `*= 15/16` on the same tick | same |
+| stuck | position unchanged against a wall for **0x14** ticks flags a touch | end of the mover |
+| safe position | recorded every tick standing on ground with normal `y < -0xf3c` (flatter than **76°**) whose surface type is not 0..3 | `FUN_004a28f0`; the respawn reads it |
+
+The per-tick algorithm, for the player (object 0), in game units, +Y down:
+
+1. If `|v|^2 > 0x400000` do everything below twice with `v/2`, OR-ing the
+   result flags. `L = sqrt(v.x^2 + v.y^2 + v.z^2)` (the one x87 call, an
+   integer sqrt on PSX).
+2. Lift: `pos.y -= radius + 0xc0`. Everything now refers to the sphere centre.
+3. If on ground last tick and its normal is steeper than 42.9°, add the slide
+   push to `v` (table above). Note the divisor grows with `L`: the push is
+   strongest from rest.
+4. Gather candidate polys within the broadphase reach from the static grid and
+   every dynamic object. If none, `pos += v`, clear the flags, done.
+5. Otherwise iterate. Each pass first re-tests the previous ground poly alone
+   (`FUN_00483ef0`): a hit counts as "touching" and bends `v` to hug that
+   surface, which is what keeps you attached going down a slope or over a
+   bump. Then the full response over all candidates:
+   - For each poly, signed distances of the sweep's start and end from the
+     plane offset by the radius: `d = ((p - v0) . n >> 14) - radius`. A
+     crossing (`d0 >= 0 > d1`) that lands inside the face (point-in-triangle
+     on the dominant axis) is a hit at `t = d0 / (d0 - d1)`. A quad is two
+     triangles with two stored normals; word 20 == 0x7fff marks a triangle.
+   - Sweeps that end within 0x101 of the plane also run edge tests with
+     radius + 0x40 and a vertex test, so the sphere can catch a corner.
+   - Take the nearest hit. Move to it with the skin pulled back, then split
+     by the normal: **ground** (`n.y < -0x2000`) projects the remaining
+     velocity onto the plane and records the poly and normal as the ground;
+     **wall** pushes out along the normal and projects the velocity off it,
+     with a double-strength projection if a wall was already hit this tick,
+     to stop wedging in corners.
+   - A ground hit sets on-ground; a wall hit clears it.
+6. Lower: `pos.y += radius + 0xc0`. Decay the platform-push accumulator by 3/4.
+
+Two consequences for the port. First, "on ground" is not a slope test on a
+floor query; it is a contact this tick with a poly flatter than 60°. Second,
+there is nothing to stop the player's head: the mover only carries the one
+sphere, and the separate floor query (`FUN_00486520`, "highest up-facing poly
+at or below, from 0x400 above the origin") has a ceiling branch that the
+controller uses for head-bumps, not the mover.
+
+Collision-object record, 0x30 bytes at `0x729178` (PC keeps two, PSX four):
+`+0x00` last-contact flags (poly's object id | 0x4000 second triangle |
+0x2000 edge hit), `+0x04` last ground poly, `+0x08` `+0x0c` last ground normal,
+`+0x0e` ground kind (1 static, 2 moving), `+0x18..+0x1c` platform push
+accumulator, `+0x24` stuck counter, `+0x2c` radius, `+0x2e` surface type
+byte (0xff none). The controller's `+0x8e` on-ground word is the pair of
+result bytes the mover writes: low byte touched-anything, high byte on-ground.
+
 ## Falling out of the level
+
+Where you come back is the safe position above, not the level's spawn:
+`FUN_00414110` copies it into the player block on respawn.
 
 The last branch of the player update is a death plane:
 `if (levelLowest + 0x2000 < player.y) respawn`. `levelLowest` is computed once
@@ -343,8 +417,10 @@ later change.
 
 ## Not extracted
 
-Projectile speeds and lifetimes; the mover's step height, wall slide and slope
-limit (`FUN_00484380`, 4.7 KB, P2.3's problem); the exact ledge-grab probe
-geometry (`FUN_00435f30` probes 0x3600 below the origin and one third of a
-unit forward, low confidence); the spawn table's meaning beyond level 1 (the
-y is only a seed for a ground ray, the ray starts 0x400 above it).
+Projectile speeds and lifetimes; the exact ledge-grab probe geometry
+(`FUN_00435f30` probes 0x3600 below the origin and one third of a unit
+forward, low confidence); the spawn table's meaning beyond level 1 (the y is
+only a seed for a ground ray, the ray starts 0x400 above it); the "line"
+collision the mover also runs (`FUN_00480660`, a linked list at `0x7290f4` of
+up to 32 vertical segments, tested like walls) — level 1's terrain file has no
+infinite-wall groups, so where those lines come from is open.

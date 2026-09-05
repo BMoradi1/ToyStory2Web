@@ -280,7 +280,28 @@
                 model all agree on one coordinate system.
                 Spawn point is a pickup marker for now - the real one is
                 presumably in the level's own code, which is not decoded.
- P2.3 [PART DONE] Collision response against the 44-byte TERRAIN polys.
+ P2.3 [READY TO PORT] Collision response. The mover is READ (2026-09-04,
+                Fable): docs/PLAYER.md "Collision: the mover" has the whole
+                algorithm and every constant, checked PC against PSX. The
+                player is a swept SPHERE of radius 4000 (125 level units),
+                centred radius+0xc0 above the origin; ground is a contact
+                whose normal is flatter than 60 degrees, a wall anything
+                steeper; slopes past 42.9 degrees push you down them; there
+                is no step height - the sphere rolls over anything under
+                its radius. Constants are typed in player-constants.ts as
+                COLLISION, and isWalkable now uses the real 60.
+                What to build, in src/formats/collision.ts behind the
+                Ground interface: (1) the swept sphere-vs-poly test, face
+                then edges at radius+0x40; (2) the response: nearest hit,
+                skin pull-back, ground/wall split by n.y, velocity
+                projection, wall push-out; (3) the pass loop with the
+                previous-ground re-test that keeps the player glued going
+                downhill; (4) the slide push; (5) respawn at the recorded
+                safe position rather than the spawn. Replace slideAlongWalls
+                and the floorAt landing with it. tools/player-probe.ts and
+                the wander test in the mover commit are the regression
+                checks; the jump apex must stay 17664.
+                Previously done (keep until the port lands):
                 Done so far, all geometry rather than read constants:
                 slideAlongWalls() in collision.ts sweeps the horizontal step
                 against unwalkable polys and slides along them, sampling the

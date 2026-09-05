@@ -153,14 +153,17 @@ export function parseCollision(file: AllFile): { groups: CollisionGroup[]; skipp
 }
 
 /**
- * Is this surface standable?
+ * Is this surface ground rather than wall?
  *
- * PSX +Y points down, so a floor's normal points along -Y. `maxSlope` is in
- * degrees. Across the game roughly a quarter of collision faces are flat floor
- * and only a fifth are sloped at all, so Buzz will be on `y = -1` almost
- * always.
+ * PSX +Y points down, so a floor's normal points along -Y. The threshold is
+ * the original's: its contact response treats a normal with y below -0x2000
+ * in 2.14 (cos 60 degrees) as ground and anything steeper as a wall
+ * (docs/PLAYER.md, "Collision"). An earlier version guessed 45 degrees; the
+ * difference is 69 polys in level 1 and 0.1% of its floor coverage, but the
+ * value is now read rather than assumed. Between 42.9 and 60 degrees the
+ * original still counts you as standing but pushes you down the slope.
  */
-export function isWalkable(poly: CollisionPoly, maxSlopeDegrees = 45): boolean {
+export function isWalkable(poly: CollisionPoly, maxSlopeDegrees = 60): boolean {
   return poly.normal.y <= -Math.cos((maxSlopeDegrees * Math.PI) / 180);
 }
 

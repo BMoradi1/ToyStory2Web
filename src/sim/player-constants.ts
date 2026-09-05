@@ -119,6 +119,44 @@ export const MOVE_OVERRIDES = {
 } as const satisfies Record<string, Partial<MoveTable>>;
 
 /**
+ * The mover's shape and thresholds, from FUN_00484380 / FUN_00482a00 /
+ * FUN_00481fb0 and their PSX twins. Game units; normals are 2.14 fixed point
+ * with 0x4000 as 1.0, and +Y is down so an up-facing normal has negative y.
+ * See docs/PLAYER.md, "Collision: the mover".
+ */
+export const COLLISION = {
+  /** Swept-sphere radius, written into every collision-object record at level load. */
+  radius: 4000,
+  /** The sphere centre sits this much above the origin in addition to the radius. */
+  centreLift: 0xc0,
+  /** Edge and vertex tests use radius + this. */
+  edgeRadiusExtra: 0x40,
+  /** Contact normal y (2.14) below this is ground, at or above it is a wall: cos 60 deg. */
+  groundNormalY: -0x2000,
+  /** Standing on ground with normal y at or above this (steeper than 42.9 deg) adds a slide push. */
+  slideNormalY: -11999,
+  /** Past this (steeper than 75.5 deg) the slide divisor uses 0x1000 in place of -n.y. */
+  steepNormalY: -0x1000,
+  /** Added to the step length in the slide divisor. */
+  slideLengthBias: 0xc80,
+  /** A step with |v|^2 above this is done as two half-steps. */
+  splitStepSq: 0x400000,
+  /** Broadphase reach is L + this + (radius * 8000 >> 12). */
+  broadphaseBias: 0x1880,
+  /** Response passes: this many if fewer than 11 candidate polys, one fewer otherwise. */
+  passes: 4,
+  passesWhenCrowded: 3,
+  /** Contact skin: start and end distances are pulled back by these, then >> 3. */
+  skinStart: 0x20,
+  skinEnd: 0x60,
+  skinEndMoving: 0x80,
+  /** Ticks pressed motionless against a wall before the mover reports a touch. */
+  stuckTicks: 0x14,
+  /** Ground flatter than this (2.14) on a normal surface records the respawn position. */
+  safeNormalY: -0xf3c,
+} as const;
+
+/**
  * How far below the level's lowest collision the player may fall before the
  * original gives up and puts them back. From the last branch of the player
  * update: `if (levelLowestY + 0x2000 < player.y) respawn`, where the level

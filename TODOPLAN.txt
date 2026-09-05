@@ -307,15 +307,23 @@
                 Earlier fixes kept: the quad strip-order parse (see
                 docs/FORMATS.md), the death plane, the spawn heuristic.
 
- P2.4 [READY]   Follow camera. P2.2 is done, so this is unblocked and is now
-                the most visible thing missing: what exists is a placeholder
-                that eases to a fixed offset behind Buzz, has no framing
-                logic and clips straight through scenery.
-                Wanted: collision-aware, 4:3 native framing, and the modes
-                the original has - the strings "camera mode", "camera left"
-                and "camera right" are in toy2.exe and are menu text, so
-                they lead to the input handling and from there to the
-                camera code.
+ P2.4 [PART DONE] Follow camera. src/sim/camera.ts, driven from the sim in
+                the original's units, with the viewer only placing what it
+                is handed.
+                Read from FUN_004045e0 and the initialiser FUN_00403450:
+                distance 1200 level units behind (0x4b0, eased at 32/tick),
+                512 game units above the player, looking 0x1000 above his
+                origin, and a yaw that lags the player's by diff/(0x2a*2)
+                per tick - diff/(0x60*2) while skidding - taking the short
+                way round at triple rate past 0x600. Occlusion is a sphere
+                sweep from the player out to the wanted spot, so the camera
+                pulls in rather than clipping through scenery.
+                NOT ported, listed at the foot of the module: the four
+                camera modes and their menu bindings, auto-centring after
+                0xf0 still ticks, look-ahead and the height ramp, the pitch
+                field (+0x2e - a fixed height stands in), and the
+                level-specific cases.
+
  P2.5 [MOSTLY DONE] Animation state machine.
                 Found in toy2.exe: FUN_004011d0 runs a 28-state machine
                 whose table is at 0x4df3f0, 20 bytes per state (byte-script

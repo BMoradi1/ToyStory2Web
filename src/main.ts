@@ -20,6 +20,7 @@ import {
   type PlayerRuntime, type PlayerState,
 } from './sim/player.ts';
 import { toRadians, yawOf } from './sim/trig.ts';
+import { createCamera, stepCamera, cameraTarget, type CameraState } from './sim/camera.ts';
 import {
   createAnimation, stepAnimation, type AnimationPlayback,
 } from './sim/player-animation.ts';
@@ -470,7 +471,6 @@ async function spawnPlayer(): Promise<void> {
   viewer.setPlayer(buildMeshData(model), sceneTextures);
   // The hull is in PlayStation axes: +Y down, 256 units to the world unit.
   viewer.setPlayerPosition(marker.position.x / WORLD_SCALE, -ground.y / WORLD_SCALE, -marker.position.z / WORLD_SCALE);
-  viewer.lookAtPlayer();
 
   // The sim runs 32x finer than the file, so scale on the way in. Standing on
   // the floor means y equal to the surface: the model's origin is at its feet.
@@ -481,6 +481,7 @@ async function spawnPlayer(): Promise<void> {
     0,
   );
   playerRuntime = createRuntime();
+  camera = createCamera(player);
   spawnPoint = { x: player.x, y: player.y, z: player.z };
   const slope = (Math.acos(Math.min(1, -ground.normal.y)) * 180) / Math.PI;
   infoEl.textContent =
@@ -503,6 +504,7 @@ let playerRuntime: PlayerRuntime | null = null;
 /** The character's model and animations, kept so each tick can re-pose it. */
 let playerModel: { model: AllFile; anm: AnmFile | null } | null = null;
 let playerAnim: AnimationPlayback | null = null;
+let camera: CameraState | null = null;
 const input = new InputSource();
 
 /** `space` etc. must reach the game, not scroll the page, but only while playing. */
@@ -515,13 +517,10 @@ function setPlaying(on: boolean): void {
 function playTick(): void {
   if (!viewer || !player || !playerRuntime || !currentCollisionWorld) return;
 
-  // The camera's bearing to the player, converted back into the file's space:
-  // the renderer negates Z, so undo that before asking for a yaw.
-  const p = viewer.playerPosition;
-  const cam = viewer.camera.position;
-  const cameraYaw = p ? yawOf(p.x - cam.x, -(p.z - cam.z)) : 0;
-
   if (player.fellOut) { void respawn(); return; }
+  // The camera's bearing to the player, taken from the sim camera rather than
+  // the rendered one, so the controls do not depend on how the view is drawn.
+  const cameraYaw = camera ? yawOf(player.x - camera.x, player.z - camera.z) : 0;
   const held = input.read();
   stepPlayer(player, held, playerRuntime, groundFromCollision(currentCollisionWorld), cameraYaw);
 
@@ -536,7 +535,14 @@ function playTick(): void {
     -player.z * GAME_TO_RENDER,
     Math.PI - toRadians(player.yaw),
   );
-  viewer.followPlayer();
+  if (camera) {
+    stepCamera(camera, player, currentCollisionWorld);
+    const look = cameraTarget(player);
+    viewer.placeCamera(
+      camera.x * GAME_TO_RENDER, -camera.y * GAME_TO_RENDER, -camera.z * GAME_TO_RENDER,
+      look.x * GAME_TO_RENDER, -look.y * GAME_TO_RENDER, -look.z * GAME_TO_RENDER,
+    );
+  }
   poseAnimation(Math.hypot(held.moveX, held.moveY) > 0);
 }
 

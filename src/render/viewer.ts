@@ -314,7 +314,11 @@ export class Viewer {
     this.player.rotation.set(0, facing, 0);
   }
 
-  /** Where the character is, or null if there isn't one. */
+  /**
+   * Where the character is, or null if there isn't one. Nothing in the app
+   * reads this; it is here for the headless harness, which checks the camera
+   * against the character from outside the page.
+   */
   get playerPosition(): THREE.Vector3 | null {
     return this.player ? this.player.position : null;
   }
@@ -334,40 +338,16 @@ export class Viewer {
   private play = false;
 
   /**
-   * Trail the camera behind the character.
+   * Put the camera somewhere and point it somewhere, both in renderer units.
    *
-   * A placeholder for P2.4, which is the real follow camera: this one only
-   * eases toward a fixed offset behind the current facing and has none of the
-   * original's framing, collision or look-ahead. It is here because the
-   * controls are camera-relative, so the controller needs *some* camera to be
-   * relative to.
-   *
-   * Returns the camera's bearing to the character in renderer space, which is
-   * what the controller turns into a target yaw.
+   * The follow logic lives in the sim (src/sim/camera.ts), because it is the
+   * original's and works in the original's units; this only places what it is
+   * given. There is deliberately no smoothing here — the lag is part of the
+   * camera's behaviour and belongs with the rest of it.
    */
-  followPlayer(distance = 3, height = 1.2, ease = 0.12): number {
-    if (!this.player) return 0;
-    const p = this.player.position;
-    // `getWorldDirection` gives the object's +Z axis, and characters are
-    // authored facing +Z — verified by rendering the unrotated model from +Z
-    // and seeing its front, not its back. So +Z is the way it looks and the
-    // camera belongs at the negation of it. Deriving the offset from the
-    // object rather than from `rotation.y` by hand keeps the two from
-    // disagreeing about the sign.
-    const behind = this.player.getWorldDirection(new THREE.Vector3()).negate();
-    const want = new THREE.Vector3(p.x + behind.x * distance, p.y + height, p.z + behind.z * distance);
-    this.camera.position.lerp(want, ease);
-    this.camera.lookAt(p.x, p.y + height * 0.5, p.z);
-    return Math.atan2(p.x - this.camera.position.x, p.z - this.camera.position.z);
-  }
-
-  /** Frame the camera on the character, from behind and slightly above. */
-  lookAtPlayer(distance = 6): void {
-    if (!this.player) return;
-    const p = this.player.position;
-    this.camera.position.set(p.x + distance * 0.7, p.y + distance * 0.5, p.z + distance * 0.7);
-    this.controls.target.set(p.x, p.y + 1, p.z);
-    this.controls.update();
+  placeCamera(x: number, y: number, z: number, atX: number, atY: number, atZ: number): void {
+    this.camera.position.set(x, y, z);
+    this.camera.lookAt(atX, atY, atZ);
   }
 
   /**

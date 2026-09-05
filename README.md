@@ -67,7 +67,7 @@ level.
   neighbours instead of the whole house.
 - **Characters.** All 68 models load and texture, and all 170 animations play.
 - **Buzz moves.** Press enter and you can walk, run, turn, jump, double jump and
-  spin around Andy's house. Every constant — gravity, the jump impulse, friction,
+  spin around Andy's house, with the game's own follow camera behind you. Every constant — gravity, the jump impulse, friction,
   the turn rate, the attack timings — was read out of the PC executable and
   checked against the PlayStation one, not tuned by feel. He is animated by the
   game's own animation state machine, a 28-state table of byte scripts that also
@@ -84,9 +84,10 @@ level.
 
 ## What doesn't work yet
 
-**The camera** is a placeholder that eases to a fixed spot behind Buzz, has no
-framing logic and clips straight through scenery. It is the most visible thing
-missing.
+**The camera** follows properly now — the original's distance, height and yaw
+lag, and it pulls in rather than clipping through scenery — but its four modes,
+auto-centring and look-ahead are not ported, so it will not always frame a
+jump the way the real game does.
 
 **Everything around the moving.** No enemies, no pickups, no HUD, no save file,
 no audio, no cutscenes. The spawn point is a heuristic — the pickup marker

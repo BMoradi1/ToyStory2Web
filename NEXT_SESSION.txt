@@ -104,18 +104,16 @@
  WHAT TO GIVE FABLE, IN ORDER
 ================================================================================
 
- 1. P2.4 - THE FOLLOW CAMERA.  P2.3 is done (the swept sphere is ported and
-    the floor holds), so this is now the top of the list and the most visible
-    thing missing: the camera eases to a fixed offset behind Buzz, has no
-    framing logic, and clips through scenery.
+ 1. WHAT IS LEFT OF PHASE 2.  P2.1 through P2.5 are done or part done; the
+    remaining pieces are all ordinary work and none of them need Fable.
 
- 1b. WHAT WAS CHECKED ABOUT IT: the four camera functions
-    (FUN_004020f0, FUN_00402290, FUN_00402610, FUN_004027f0, 400-540 bytes
-    each) contain no float code, so their decompile is complete. Opus work.
-    It may not need Fable at all - but the original's camera has modes and framing rules
-    and it is worth ten minutes finding out whether they are in a table like
-    the animation states were. The strings "camera mode", "camera left" and
-    "camera right" are menu text in toy2.exe and lead to the input handling.
+    The camera's four modes, auto-centring and look-ahead (FUN_004045e0 is
+    4.7 KB and only its skeleton is ported - the module lists exactly what was
+    left out). The twenty animation states that belong to moves that do not
+    exist yet. The footfall and sound opcodes, which are counted but not
+    played and are the cheapest audio hook in the project.
+
+    Then Phase 3 and beyond: pickups, the HUD, enemies, the save file.
 
  3. THE REMAINING FORMAT UNKNOWNS.  None block anything, all are the same
     shape of puzzle, and the .ngn scene is an oracle for most of them:

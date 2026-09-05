@@ -31,7 +31,21 @@ const ANGLE_UNITS = 4096;
 
 export interface Vec3 { x: number; y: number; z: number }
 
-export interface Marker { position: Vec3; flag: number }
+/**
+ * A pickup point.
+ *
+ * `kind` is 16 for every marker in every scene that parses cleanly — 743 of
+ * them across the game — so it is not a type discriminator; the collectibles
+ * these place are all one thing. Two things point at coins rather than Pizza
+ * Planet tokens: there are far too many for the five tokens a level holds, and
+ * the three scenes with none at all are `level03`, `level06` and `level09`,
+ * which are the boss arenas. Whatever distinguishes a token is not in this
+ * file — see docs/FORMATS.md.
+ */
+export interface Marker { position: Vec3; kind: number }
+
+/** Every marker in a correctly-read scene carries this. See `Marker`. */
+export const MARKER_KIND = 16;
 export interface Path { id: number; points: Vec3[] }
 /**
  * A portal: a quad standing in a doorway, joining two zones.
@@ -311,12 +325,25 @@ export function parseDat(buffer: ArrayBuffer | Uint8Array): DatLevel {
 
   const markerCount = r.u16(4);
 
-  // --- markers: evenly spread over walkable floor, almost certainly pickups
+  // --- markers: pickup points, evenly spread over walkable floor
+  //
+  // The count at +4 is not always the marker count. Three of the game's twenty
+  // scenes (level02/level1, level05/level1, level06/level1) have something
+  // else there, and reading it as markers yields positions scattered outside
+  // the level. They are caught by their `kind`: a real marker always carries
+  // 16, so a scene that produces anything else has been misread and is treated
+  // as having none. That matters beyond tidiness — the viewer picks a spawn
+  // point from this list, and a garbage marker puts Buzz outside the world.
   const markers: Marker[] = [];
   let pos = 8;
   for (let i = 0; i < markerCount && pos + 16 <= r.length; i++) {
-    markers.push({ position: r.vec3(pos), flag: r.i32(pos + 12) });
+    markers.push({ position: r.vec3(pos), kind: r.i32(pos + 12) });
     pos += 16;
+  }
+  const markersValid = markers.every((m) => m.kind === MARKER_KIND);
+  if (!markersValid) {
+    markers.length = 0;
+    pos = 8;
   }
 
   // --- paths: polylines, read until the zone signature appears

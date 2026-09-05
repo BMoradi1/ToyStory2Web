@@ -441,7 +441,7 @@ with no offset table:
     header(8) | markers | paths | zone quads | ref list | objects | mesh pool
 
     header    u32 nextPathSlot, u16 markerCount, u16 pathSlotCount (63)
-    marker    i32 x, y, z; i32 flag        always 0x10 in 1999-dated files
+    marker    i32 x, y, z; i32 kind        always 0x10 in 1999-dated files
     path      u16 count, u16 id; count x { i32 x, y, z }     ids are sparse
     zone      u16 0x0005, u16 0x0041; 4 x { i32 x,y,z }; i32 a, b, c
     object    i32 x,y,z; [u16 rx,ry,rz]; [u16 sx,sy,sz]; u16 flags; u32 meshPtr
@@ -555,6 +555,23 @@ The four files that fail (`level07`–`level10`'s `level1.dat`) are **one
 byte-identical 1998 file copied into four directories** (md5 `bf2414e3…`),
 using an older revision with a `0x14` marker constant. One stale artefact, not
 four failures.
+
+**Markers are pickup points, and they are all one kind.** Every marker in every
+scene that parses cleanly carries `0x10` — 743 across the game — so the field
+is not a type and the collectibles it places are all the same thing. Two things
+say coins rather than Pizza Planet tokens: a level holds five tokens and these
+run to seventy, and the scenes with none at all are `level03`, `level06` and
+`level09`, which are precisely the boss arenas. What distinguishes a token is
+not in this file, not in the converted scene (only 1 of level 1's 70 markers
+has an instance at the same spot, by coincidence), and not in `creatures.cfg`,
+whose 63 entries are all characters. That leaves the level's own code.
+
+**The count at +4 is not always the marker count.** Three scenes —
+`level02/level1`, `level05/level1`, `level06/level1` — have something else
+there, and reading it as markers gives positions scattered outside the level.
+The `kind` field catches them: anything but `0x10` means the scene was misread,
+and the parser now returns no markers rather than nonsense. That is worth more
+than tidiness, because the viewer picks its spawn point from this list.
 
 **Interpretation, unconfirmed:** markers spread evenly over walkable floor at
 plausible pickup heights, which reads as collectible placements — but there is

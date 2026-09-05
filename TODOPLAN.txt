@@ -411,11 +411,17 @@
                 what is left is enemies and moving props, which the level
                 scripts drive by object id through the same id list.
                 Paths (30) are patrol/platform rails.
- P3.3 [BLOCKED] Level 1 logic             <- P2. Port the behaviour of level
-                1's overlay (109 calls to 41 engine functions - small) and
-                the matching x86 code: enemies, moving platforms, triggers.
- P3.4 [BLOCKED] Token tasks (what reveals each of the 5 slots: the level
-                scripts), HUD for the P2.8 counters, pause and menus.
+ P3.3 [READY]   Level 1 logic             <- P2. The x86 level scripts are
+                now defined and decompiled (docs/LEVELS.md): init
+                FUN_004171d0 and a 4 KB per-zone tick FUN_00417680, built
+                from shared task helpers. Portable now: the token slot
+                semantics, Hamm's coin task (talk with 50+), the hint NPC,
+                the dialogue-closes-then-reveal flow. Needs creatures first:
+                the R.C. race, the sheep, the tin robot boss.
+ P3.4 [PART]    Token tasks: DECODED (docs/LEVELS.md - slot 0 Hamm's 50
+                coins, 1 find-five, 2 challenge, 3 puzzle token revealed at
+                init, 4 boss; per-level table with ids). Not implemented.
+                HUD for the P2.8 counters, pause and menus: not started.
  P3.5 [BLOCKED] Mr. Potato Head parts -> Cosmic Shield, Disk Launcher,
                 Rocket Boots, Grappling Hook (+ a fifth).
  P3.6 [READY]   Save format: Toy200.sav / Toy299.sav are samples in the

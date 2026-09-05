@@ -415,15 +415,14 @@ is exactly what is on disc. That half is certain, and it is what
 `src/audio/sfx.ts` uses: the sim names an effect and the audio layer finds the
 file.
 
-**Events** are the layer above: 200 records at `0x502950`, sixteen bytes each,
-holding an effect plus a pitch, a volume and a falloff, and game code fires
-event numbers rather than effects. This is **not ported**. The effect field is
-stored with an off-by-one and a sign convention I have not pinned down —
-entries with the high bit set take a different call path that masks with
-`0x7fff` — and mapping event 0x12 through it lands on the spin sound where the
-code fires it for a skid. Rather than play a confidently wrong sound, the sim
-names effects directly and the event table waits for someone to settle it.
-What is lost meanwhile: per-sound pitch and volume, and 3D falloff.
+**Events** are the layer above: 200 records at `0x502950`, sixteen bytes
+each, holding an effect plus a pitch, volume and falloff, and game code fires
+event numbers rather than effects. Decoded in docs/LEVELS.md ("Sound events,
+resolved"): the effect field is a **1-based** index, 1..61 into the global
+name table and 87 upward into the level's own table, and the apparent
+off-by-one was the caller subtracting one before the player added it back.
+Not yet ported — `src/audio/sfx.ts` still takes effect names — but nothing
+now stands in the way except the pitch field's scale.
 
 ## Pickups and Pizza Planet tokens
 

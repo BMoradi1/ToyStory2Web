@@ -65,6 +65,33 @@ export const TOKEN_LISTS: Readonly<Record<number, { ids: readonly number[]; spar
 };
 
 /**
+ * What each token slot is, on every level (docs/LEVELS.md). The list order in
+ * `TOKEN_LISTS` is this order.
+ */
+export enum TokenSlot {
+  /** Talk to Hamm holding fifty coins. */
+  HammCoins = 0,
+  /** Return five lost things to their owner. */
+  FindFive = 1,
+  /** A race or timed challenge set by a character. */
+  Challenge = 2,
+  /** A token placed behind a puzzle or obstacle. */
+  Puzzle = 3,
+  Boss = 4,
+}
+
+/**
+ * Slots a level's init reveals before play starts, quietly
+ * (`FUN_004a0db0(slot, 1)`): the puzzle token on every non-boss level but 4,
+ * whose paint-mixing puzzle reveals it from the tick instead. The other four
+ * are revealed by their tasks, which are level script and not ported.
+ */
+export function tokenSlotsAtStart(level: number): readonly TokenSlot[] {
+  if (!(level in TOKEN_LISTS) || level === 4) return [];
+  return [TokenSlot.Puzzle];
+}
+
+/**
  * The first object id the pickup scan (`FUN_00447db0`) considers. Every used
  * id from here up is a pickup or trigger; ids below are scenery the level
  * code drives by hand. 0x30 unless the level says otherwise.

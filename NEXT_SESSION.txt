@@ -116,16 +116,20 @@
 
     Then Phase 3 and beyond: the HUD, enemies, the save file.
 
- 2. THE LEVEL SCRIPTS (Fable).  2026-09-05 settled how the engine addresses
-    objects: level.dat section 4 is an id -> placement list, an object's
-    type is its polygon count, and each level's init function hands
-    FUN_004a0c80 five token ids. What is NOT decoded is what each level's
-    script does with those ids: what reveals each token slot (50 coins is
-    one - event 0x4f fires at exactly 50 - the others are races, find-five
-    counters and bosses), which ids are enemies and moving props, and the
-    camera-trigger modes. The 15 init functions sit at the token call
-    sites (0x4171d8 for level 1 .. 0x42faac) and Ghidra had not defined
-    functions around most of them - start by defining them.
+ 2. THE LEVEL SCRIPTS - now defined and readable (2026-09-05, docs/LEVELS.md).
+    Init/tick per level via two jump tables, tasks via shared helpers, the
+    five token slots mean the same thing everywhere. What a Fable pass should
+    do next, in order:
+      - the creature system: FUN_00406cd0's per-type behaviour switch and
+        the entity array at DAT_0052c840 (0x9c bytes each; flags at +0x40,
+        0x200 = talked to). Every task that is not Hamm's needs it.
+      - the two per-level tables every init loads (FUN_004025c0 - ten
+        4-int records; FUN_004335d0 - path-riding objects) and the camera
+        trigger modes (FUN_00402610).
+      - the sound event table's pitch scale, then Opus ports playEvent().
+      - the wall-line list DAT_007290f4: read in three places, never
+        written by name in the dump, so it is filled through a pointer -
+        find the writer.
 
  3. THE REMAINING FORMAT UNKNOWNS.  None block anything, all are the same
     shape of puzzle, and the .ngn scene is an oracle for most of them:

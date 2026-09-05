@@ -34,6 +34,27 @@ game install.
 To re-dump without re-analysing, run the same command with `-process <name>
 -noanalysis` instead of `-import`.
 
+### Code the first pass misses
+
+Ghidra only defines functions it can reach, and toy2.exe reaches its level
+scripts (0x416000..0x431000, about 110 KB) through two jump-table switches
+it did not resolve, and its creature behaviours through pointers stored by
+`FUN_00406cd0`. The first dump had 19 KB of that range. `DefineFuncs.java`
+takes a file of addresses and creates a function at each, then analysis
+follows their calls:
+
+    $HL $SCR/pc toy2 -process toy2.exe -analysisTimeoutPerFile 900 \
+        -scriptPath $SCRIPTS -preScript DefineFuncs.java addresses.txt \
+        -postScript DumpAll.java $SCR/toy2_all.c
+
+The address list used: the 25 immediates `FUN_00406cd0` stores, plus every
+16-byte-aligned address in the range whose preceding byte is padding
+(`0x90`/`0xcc`) — MSVC aligns function starts, so that catches the switch
+cases. 158 addresses, 154 became functions, and the dump grew from 1,318 to
+1,413. Run it from a directory that does NOT contain a stale copy of the
+scripts: Ghidra resolves a script name against the current directory first
+and then fails to compile the copy it finds there.
+
 Notes:
 
 - The PS-X EXE header says the initial PC is 0x8006a244 and the text loads at

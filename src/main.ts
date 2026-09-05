@@ -23,7 +23,7 @@ import { toRadians, yawOf } from './sim/trig.ts';
 import { createCamera, stepCamera, cameraTarget, type CameraState } from './sim/camera.ts';
 import { SoundBank, PLAYER_EFFECTS } from './audio/sfx.ts';
 import { createPickups, PickupKind, revealToken, stepPickups, type PickupState } from './sim/pickups.ts';
-import { levelNumber, SPAWN_TABLE } from './sim/level-data.ts';
+import { levelNumber, SPAWN_TABLE, tokenSlotsAtStart } from './sim/level-data.ts';
 import {
   createAnimation, stepAnimation, type AnimationPlayback,
 } from './sim/player-animation.ts';
@@ -331,6 +331,7 @@ async function open(dir: GameDir): Promise<void> {
       },
       spawnPlayer,
       togglePlay,
+      revealTokens: revealAllTokens,
       drive(held: Partial<import('./sim/player.ts').PlayerInput>, ticks = 1) {
         if (!player || !playerRuntime || !currentCollisionWorld || !viewer) return null;
         const ground = groundFromCollision(currentCollisionWorld);
@@ -547,10 +548,23 @@ async function spawnPlayer(): Promise<void> {
   camera = createCamera(player);
   // Coins from the markers, everything else from the object-id list. See
   // src/sim/pickups.ts. The five tokens start hidden in the original and are
-  // revealed one by one as the level's tasks are done; the tasks are not
-  // implemented, so they are all revealed here.
-  pickups = createPickups(currentLevel.level, levelNumber(sceneId) ?? 0);
-  for (let slot = 0; slot < 5; slot++) revealToken(pickups, slot);
+  // revealed one by one as the level's tasks are done (docs/LEVELS.md). Only
+  // the one the level's own init reveals is shown; the tasks are not
+  // implemented, so the rest stay hidden until `ts2.revealTokens()`.
+  const level = levelNumber(sceneId) ?? 0;
+  pickups = createPickups(currentLevel.level, level);
+  for (const slot of tokenSlotsAtStart(level)) revealToken(pickups, slot);
+  drawPickups();
+  spawnPoint = { x: player.x, y: player.y, z: player.z };
+  const slope = (Math.acos(Math.min(1, -ground.normal.y)) * 180) / Math.PI;
+  infoEl.textContent =
+    `${entry.name} standing on floor ${(ground.y / WORLD_SCALE).toFixed(2)} ` +
+    `(${slope.toFixed(0)}\u00b0 slope), ${fromTable ? "the level's own start point" : `${area} cells of floor to walk on`}. Enter to play.`;
+}
+
+/** Hand the viewer the pickups that are currently visible. */
+function drawPickups(): void {
+  if (!viewer || !pickups) return;
   const S = GAME_UNITS_PER_LEVEL_UNIT;
   viewer.setPickups(pickups.items.filter((i) => i.enabled).map((i) => ({
     x: i.x * S * GAME_TO_RENDER, y: -i.y * S * GAME_TO_RENDER, z: -i.z * S * GAME_TO_RENDER,
@@ -558,11 +572,13 @@ async function spawnPlayer(): Promise<void> {
   })));
   pickupDrawIndex = pickups.items.map((i) => (i.enabled ? 0 : -1));
   for (let i = 0, n = 0; i < pickupDrawIndex.length; i++) if (pickupDrawIndex[i] === 0) pickupDrawIndex[i] = n++;
-  spawnPoint = { x: player.x, y: player.y, z: player.z };
-  const slope = (Math.acos(Math.min(1, -ground.normal.y)) * 180) / Math.PI;
-  infoEl.textContent =
-    `${entry.name} standing on floor ${(ground.y / WORLD_SCALE).toFixed(2)} ` +
-    `(${slope.toFixed(0)}\u00b0 slope), ${fromTable ? "the level's own start point" : `${area} cells of floor to walk on`}. Enter to play.`;
+}
+
+/** Show every token, as if all five tasks were done. For the harness and for looking around. */
+function revealAllTokens(): void {
+  if (!pickups) return;
+  for (let slot = 0; slot < 5; slot++) revealToken(pickups, slot);
+  drawPickups();
 }
 
 /**

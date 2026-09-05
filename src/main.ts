@@ -567,14 +567,21 @@ function poseAnimation(hasInput: boolean): void {
   );
 }
 
-/** Put the player back after falling out of the level, as the original does. */
+/**
+ * Put the player back after falling out of the level.
+ *
+ * The original respawns at the last place you stood safely, not at the level's
+ * spawn, so a fall costs you the ledge rather than all your progress. The
+ * controller records that position every tick; this only has to read it.
+ */
 let spawnPoint: { x: number; y: number; z: number } | null = null;
 async function respawn(): Promise<void> {
-  if (!player || !spawnPoint) return;
-  const yaw = player.yaw;
-  Object.assign(player, createPlayer(spawnPoint.x, spawnPoint.y, spawnPoint.z, yaw));
+  if (!player) return;
+  const safe = { x: player.safeX, y: player.safeY, z: player.safeZ, yaw: player.safeYaw };
+  const back = spawnPoint && !Number.isFinite(safe.x) ? spawnPoint : safe;
+  Object.assign(player, createPlayer(back.x, back.y, back.z, safe.yaw));
   playerRuntime = createRuntime();
-  infoEl.textContent = 'fell out of the level — put back at the spawn';
+  infoEl.textContent = 'fell out of the level — put back where you last stood';
 }
 
 /** `space`: start or stop playing, spawning the character if it isn't there. */

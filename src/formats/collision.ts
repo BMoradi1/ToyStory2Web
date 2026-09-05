@@ -341,77 +341,286 @@ function containsProjected(
 }
 
 /**
- * Slide a horizontal step along the walls it runs into.
+ * Sweep a sphere through the hull and slide it along whatever it hits.
  *
- * This is the minimum that keeps a level playable: without it the player walks
- * straight through the walls of Andy's room and out of the world, where there
- * is no floor and the fall never ends. It is NOT the original's mover — that
- * lives in `FUN_00484380` and carries a step height and a slope threshold that
- * have not been read yet. Everything here is geometry that follows from the
- * collision data itself, so there are no invented constants: a wall is a poly
- * the hull already marks unwalkable, and the player's height is the height of
- * the model.
+ * This is the original's mover, ported from `FUN_00484380` and the response in
+ * `FUN_00482a00` — see docs/PLAYER.md, "Collision: the mover", for how it was
+ * read and which constant came from where. The shape matters more than any one
+ * number: the player is a **sphere**, not a point with a floor query under it,
+ * and "on ground" means "touched something flatter than 60 degrees this tick".
+ * That single change is what gives ledges, steps and slopes their behaviour —
+ * a sphere of this radius rolls over anything shorter than itself, so there is
+ * no step height to look for.
  *
- * The player is treated as a vertical segment rather than a point, sampled at
- * a few heights, because a wall that only covers the knees should still stop
- * someone. There is no radius: the body is a line, so it can come to rest
- * visually touching a wall, which is better than passing through one and is
- * the part a real capsule sweep in P2.3 would improve on.
+ * Positions and velocity are in GAME units (32 per level unit, +Y down), which
+ * is what the constants are in; the hull is in level units and is scaled as it
+ * is read. `from` is the sphere CENTRE, so the caller lifts and lowers.
  *
- * All arguments and results are in the file's own units, +Y down.
+ * Faithful to the original: the radius, the 60-degree ground threshold, the
+ * contact skin, the pass count, the split step, and the broadphase reach.
+ * Approximated: the exact push-out arithmetic. The original nudges out along
+ * the normal in two fixed-point steps and damps velocity by 15/16 on the same
+ * tick; this uses a plain slide with the same skin, which lands in the same
+ * place for everything reachable but will differ when wedged in a corner.
  */
-export function slideAlongWalls(
+export interface SphereSweep {
+  /** Final sphere centre, game units. */
+  x: number; y: number; z: number;
+  /** Velocity after sliding, game units per tick. */
+  vx: number; vy: number; vz: number;
+  /** Touched a surface flatter than the ground threshold. */
+  onGround: boolean;
+  /** Touched anything at all. */
+  touched: boolean;
+  /** Normal of the flattest ground contact, or null. */
+  groundNormal: { x: number; y: number; z: number } | null;
+}
+
+/** Smallest root of `a t^2 + b t + c` in `(0, maxT]`, or null. */
+function lowestRoot(a: number, b: number, c: number, maxT: number): number | null {
+  if (Math.abs(a) < 1e-12) return null;
+  const det = b * b - 4 * a * c;
+  if (det < 0) return null;
+  const root = Math.sqrt(det);
+  let t0 = (-b - root) / (2 * a);
+  let t1 = (-b + root) / (2 * a);
+  if (t0 > t1) { const swap = t0; t0 = t1; t1 = swap; }
+  if (t0 >= 0 && t0 <= maxT) return t0;
+  if (t1 >= 0 && t1 <= maxT) return t1;
+  return null;
+}
+
+interface Vec3 { x: number; y: number; z: number }
+const sub = (a: Vec3, b: Vec3): Vec3 => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z });
+const dot = (a: Vec3, b: Vec3): number => a.x * b.x + a.y * b.y + a.z * b.z;
+const scaled = (a: Vec3, k: number): Vec3 => ({ x: a.x * k, y: a.y * k, z: a.z * k });
+const lengthSq = (a: Vec3): number => dot(a, a);
+
+/**
+ * Earliest contact of a moving sphere with one triangle.
+ *
+ * Face first, then the three edges, then the three vertices, which is the
+ * standard decomposition and matches what the original does in
+ * `FUN_00481fb0`: it tests the face, and when the sweep ends close to the
+ * plane it also runs edge and vertex tests so the sphere can catch a corner.
+ */
+function sweepTriangle(
+  from: Vec3, velocity: Vec3, radius: number,
+  a: Vec3, b: Vec3, c: Vec3, n: Vec3,
+): { t: number; normal: Vec3 } | null {
+  const along = dot(velocity, n);
+  const startDistance = dot(sub(from, a), n);
+
+  let best: { t: number; normal: Vec3 } | null = null;
+  const keep = (t: number, normal: Vec3) => {
+    if (t < 0 || t > 1) return;
+    if (!best || t < best.t) best = { t, normal };
+  };
+
+  // Face. Only surfaces we are in front of and moving toward can be hit;
+  // starting behind one means we are already through it and pushing back out
+  // would teleport the player to the far side.
+  if (along < 0 && startDistance >= 0) {
+    const t = (radius - startDistance) / along;
+    const at = { x: from.x + velocity.x * t, y: from.y + velocity.y * t, z: from.z + velocity.z * t };
+    const touch = sub(at, scaled(n, radius));
+    if (containsProjected([a, b, c], n, touch)) keep(Math.max(0, t), n);
+  }
+
+  const speedSq = lengthSq(velocity);
+  if (speedSq > 1e-12) {
+    // Vertices.
+    for (const v of [a, b, c]) {
+      const d = sub(from, v);
+      const t = lowestRoot(speedSq, 2 * dot(velocity, d), lengthSq(d) - radius * radius, 1);
+      if (t === null) continue;
+      const at = { x: from.x + velocity.x * t, y: from.y + velocity.y * t, z: from.z + velocity.z * t };
+      const away = sub(at, v);
+      const len = Math.sqrt(lengthSq(away)) || 1;
+      keep(t, scaled(away, 1 / len));
+    }
+    // Edges.
+    for (const [p, q] of [[a, b], [b, c], [c, a]] as [Vec3, Vec3][]) {
+      const edge = sub(q, p);
+      const toStart = sub(from, p);
+      const edgeSq = lengthSq(edge);
+      if (edgeSq < 1e-12) continue;
+      const edgeDotV = dot(edge, velocity);
+      const edgeDotS = dot(edge, toStart);
+      const qa = edgeSq * -speedSq + edgeDotV * edgeDotV;
+      const qb = edgeSq * (2 * dot(velocity, toStart)) - 2 * edgeDotV * edgeDotS;
+      const qc = edgeSq * (radius * radius - lengthSq(toStart)) + edgeDotS * edgeDotS;
+      const t = lowestRoot(qa, qb, qc, 1);
+      if (t === null) continue;
+      const f = (edgeDotV * t - edgeDotS) / edgeSq;
+      if (f < 0 || f > 1) continue;
+      const on = { x: p.x + edge.x * f, y: p.y + edge.y * f, z: p.z + edge.z * f };
+      const at = { x: from.x + velocity.x * t, y: from.y + velocity.y * t, z: from.z + velocity.z * t };
+      const away = sub(at, on);
+      const len = Math.sqrt(lengthSq(away)) || 1;
+      keep(t, scaled(away, 1 / len));
+    }
+  }
+  return best;
+}
+
+/** Closest point to `p` on triangle `abc`. */
+function closestOnTriangle(p: Vec3, a: Vec3, b: Vec3, c: Vec3): Vec3 {
+  const ab = sub(b, a), ac = sub(c, a), ap = sub(p, a);
+  const d1 = dot(ab, ap), d2 = dot(ac, ap);
+  if (d1 <= 0 && d2 <= 0) return a;
+  const bp = sub(p, b);
+  const d3 = dot(ab, bp), d4 = dot(ac, bp);
+  if (d3 >= 0 && d4 <= d3) return b;
+  const vc = d1 * d4 - d3 * d2;
+  if (vc <= 0 && d1 >= 0 && d3 <= 0) {
+    const v = d1 / (d1 - d3);
+    return { x: a.x + ab.x * v, y: a.y + ab.y * v, z: a.z + ab.z * v };
+  }
+  const cp = sub(p, c);
+  const d5 = dot(ab, cp), d6 = dot(ac, cp);
+  if (d6 >= 0 && d5 <= d6) return c;
+  const vb = d5 * d2 - d1 * d6;
+  if (vb <= 0 && d2 >= 0 && d6 <= 0) {
+    const w = d2 / (d2 - d6);
+    return { x: a.x + ac.x * w, y: a.y + ac.y * w, z: a.z + ac.z * w };
+  }
+  const va = d3 * d6 - d5 * d4;
+  if (va <= 0 && d4 - d3 >= 0 && d5 - d6 >= 0) {
+    const w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+    return { x: b.x + (c.x - b.x) * w, y: b.y + (c.y - b.y) * w, z: b.z + (c.z - b.z) * w };
+  }
+  const denom = 1 / (va + vb + vc);
+  const v = vb * denom, w = vc * denom;
+  return { x: a.x + ab.x * v + ac.x * w, y: a.y + ab.y * v + ac.y * w, z: a.z + ab.z * v + ac.z * w };
+}
+
+/**
+ * Move a sphere by a velocity, resolving contacts. See `SphereSweep`.
+ *
+ * `scale` is game units per hull unit; the hull is stored in level units and
+ * the mover works in game units.
+ */
+export function sweepSphere(
   world: CollisionWorld,
   from: { x: number; y: number; z: number },
-  to: { x: number; z: number },
-  height: number,
-): { x: number; z: number; hit: boolean } {
-  let x = to.x, z = to.z;
-  const dx0 = to.x - from.x, dz0 = to.z - from.z;
-  if (dx0 === 0 && dz0 === 0) return { x, z, hit: false };
+  velocity: { x: number; y: number; z: number },
+  radius: number,
+  options: { scale?: number; passes?: number; groundNormalY?: number; skin?: number } = {},
+): SphereSweep {
+  const scale = options.scale ?? 32;
+  const groundY = options.groundNormalY ?? -0.5;
+  const skin = options.skin ?? 4;
 
-  // Sample up the body. The feet sit a little above the floor so a step the
-  // player is standing on does not read as a wall through their soles.
-  const levels = [0.15, 0.45, 0.8, 1].map((f) => from.y - height * f);
-  let hit = false;
+  let position: Vec3 = { x: from.x, y: from.y, z: from.z };
+  let remaining: Vec3 = { x: velocity.x, y: velocity.y, z: velocity.z };
+  let onGround = false, touched = false;
+  let groundNormal: Vec3 | null = null;
 
-  for (let pass = 0; pass < 2; pass++) {
-    const dx = x - from.x, dz = z - from.z;
-    if (dx === 0 && dz === 0) break;
-    let blocker: { x: number; y: number; z: number } | null = null;
-    let nearest = Infinity;
-
-    for (const index of polysAlong(world, from.x, from.z, x, z)) {
-      const poly = world.polys[index]!;
-      if (poly.walkable) continue;
-      const n = poly.normal;
-      // A wall's normal is close to horizontal; skip ceilings, which should
-      // not stop a walk, and let the floor query own anything floor-like.
-      if (Math.abs(n.y) > 0.7) continue;
-
-      const denom = n.x * dx + n.z * dz;
-      if (denom >= 0) continue; // moving along or away from the face
-
-      const v0 = poly.vertices[0]!;
-      for (const y of levels) {
-        const gap = n.x * (v0.x - from.x) + n.y * (v0.y - y) + n.z * (v0.z - from.z);
-        const t = gap / denom;
-        if (t < 0 || t > 1 || t >= nearest) continue;
-        const at = { x: from.x + dx * t, y, z: from.z + dz * t };
-        if (!containsProjected(poly.vertices, n, at)) continue;
-        nearest = t;
-        blocker = n;
+  // Broadphase once, over the whole step plus the sphere, in hull units.
+  const reach = (radius + Math.sqrt(lengthSq(remaining))) / scale + 2;
+  const candidates: number[] = [];
+  {
+    const x0 = Math.min(position.x, position.x + remaining.x) / scale - reach;
+    const x1 = Math.max(position.x, position.x + remaining.x) / scale + reach;
+    const z0 = Math.min(position.z, position.z + remaining.z) / scale - reach;
+    const z1 = Math.max(position.z, position.z + remaining.z) / scale + reach;
+    const gx0 = Math.floor(x0 / world.cellSize), gx1 = Math.floor(x1 / world.cellSize);
+    const gz0 = Math.floor(z0 / world.cellSize), gz1 = Math.floor(z1 / world.cellSize);
+    const seen = new Set<number>();
+    for (let gx = gx0; gx <= gx1; gx++) {
+      for (let gz = gz0; gz <= gz1; gz++) {
+        for (const i of world.cells.get(`${gx},${gz}`) ?? []) {
+          if (!seen.has(i)) { seen.add(i); candidates.push(i); }
+        }
       }
     }
-
-    if (!blocker) break;
-    hit = true;
-    // Stop just short of the face, then carry the rest of the step along it.
-    const stopX = from.x + dx * nearest, stopZ = from.z + dz * nearest;
-    const restX = x - stopX, restZ = z - stopZ;
-    const into = restX * blocker.x + restZ * blocker.z;
-    x = stopX + (restX - blocker.x * into);
-    z = stopZ + (restZ - blocker.z * into);
   }
-  return { x, z, hit };
+
+  const passes = options.passes ?? (candidates.length < 11 ? 4 : 3);
+  for (let pass = 0; pass < passes; pass++) {
+    if (lengthSq(remaining) < 1e-9) break;
+
+    let hit: { t: number; normal: Vec3 } | null = null;
+    for (const index of candidates) {
+      const poly = world.polys[index]!;
+      const v = poly.vertices;
+      const a = scaled(v[0]!, scale), b = scaled(v[1]!, scale), c = scaled(v[2]!, scale);
+      const found = sweepTriangle(position, remaining, radius, a, b, c, poly.normal);
+      if (found && (!hit || found.t < hit.t)) hit = found;
+    }
+    if (!hit) break;
+
+    touched = true;
+    // Advance to just short of the contact, so the next pass starts outside.
+    const travel = Math.max(0, hit.t - skin / (Math.sqrt(lengthSq(remaining)) || 1));
+    position = {
+      x: position.x + remaining.x * travel,
+      y: position.y + remaining.y * travel,
+      z: position.z + remaining.z * travel,
+    };
+    let rest: Vec3 = {
+      x: remaining.x * (1 - travel),
+      y: remaining.y * (1 - travel),
+      z: remaining.z * (1 - travel),
+    };
+    // Slide: drop the component into the surface, from both what is left of
+    // this step and from the velocity the caller gets back.
+    const into = dot(rest, hit.normal);
+    rest = sub(rest, scaled(hit.normal, into));
+    remaining = rest;
+
+    if (hit.normal.y < groundY) {
+      onGround = true;
+      if (!groundNormal || hit.normal.y < groundNormal.y) groundNormal = hit.normal;
+    }
+  }
+
+  position = { x: position.x + remaining.x, y: position.y + remaining.y, z: position.z + remaining.z };
+
+  // Resting contact, and pushing back out of anything we have sunk into.
+  //
+  // A sweep alone cannot hold a player on the floor: standing still there is
+  // no velocity, so nothing is swept, nothing is hit, and the player is
+  // "airborne" — then gravity pulls them in, they land, and the next tick they
+  // are airborne again. Left alone that flickers on and off the ground every
+  // other tick. The original avoids it by re-testing the poly it was standing
+  // on at the top of every response pass and counting a hit as contact; this
+  // is the same idea done against all the candidates, which also covers
+  // stepping from one poly to the next.
+  for (const index of candidates) {
+    const poly = world.polys[index]!;
+    const v = poly.vertices;
+    const a = scaled(v[0]!, scale), b = scaled(v[1]!, scale), c = scaled(v[2]!, scale);
+    const near = closestOnTriangle(position, a, b, c);
+    const away = sub(position, near);
+    const distance = Math.sqrt(lengthSq(away));
+    if (distance > radius + skin) continue;
+    // Only count a surface we are on the outside of; the far side of a floor
+    // is the underside of a ceiling and must not hold anyone up.
+    if (dot(away, poly.normal) <= 0) continue;
+    touched = true;
+    if (distance < radius && distance > 1e-6) {
+      const push = radius - distance;
+      position = {
+        x: position.x + (away.x / distance) * push,
+        y: position.y + (away.y / distance) * push,
+        z: position.z + (away.z / distance) * push,
+      };
+    }
+    if (poly.normal.y < groundY) {
+      onGround = true;
+      if (!groundNormal || poly.normal.y < groundNormal.y) groundNormal = poly.normal;
+    }
+  }
+
+  // The velocity handed back is the step actually taken, so the next tick does
+  // not accelerate into a wall it is already against.
+  const moved = sub(position, from);
+  return {
+    x: position.x, y: position.y, z: position.z,
+    vx: moved.x, vy: moved.y, vz: moved.z,
+    onGround, touched, groundNormal,
+  };
 }
+

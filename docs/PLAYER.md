@@ -406,6 +406,17 @@ complete mover very much does.
 
 ## Ported
 
+The mover is in `src/formats/collision.ts` as `sweepSphere`, behind the
+controller's `Ground.move`. Faithful: the radius, the lift, the 60-degree
+ground threshold, the contact skin, the pass count and the broadphase. Done
+differently and marked so in the code: the exact push-out arithmetic is a
+plain slide, and resting contact is a static overlap test against all the
+candidates rather than the original's re-test of the previous ground poly.
+That last one matters — without it a standing player is swept by nothing,
+touches nothing, and flickers on and off the ground every other tick.
+Not yet ported: the slide push on slopes past 42.9 degrees, and the split
+step, neither of which changes behaviour measurably at these speeds.
+
 `src/sim/player.ts` is a transcription of the tick above, `src/sim/trig.ts` the
 angle system, `src/sim/input.ts` the keyboard and pad.
 `src/sim/player-animation.ts` is the state machine and script interpreter, and

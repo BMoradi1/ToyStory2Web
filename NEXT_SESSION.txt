@@ -104,39 +104,12 @@
  WHAT TO GIVE FABLE, IN ORDER
 ================================================================================
 
- 1. P2.3 - THE MOVER.  READ, 2026-09-04, by Fable. Everything needed to port
-    it is in docs/PLAYER.md under "Collision: the mover", with the constants
-    in player-constants.ts as COLLISION. This is now Opus work: transcription
-    of a written-down algorithm, exactly like P2.2 was.
+ 1. P2.4 - THE FOLLOW CAMERA.  P2.3 is done (the swept sphere is ported and
+    the floor holds), so this is now the top of the list and the most visible
+    thing missing: the camera eases to a fixed offset behind Buzz, has no
+    framing logic, and clips through scenery.
 
-    The one thing worth knowing before porting: the walls/ledges problem was
-    never a missing constant. The original has no step height at all. It
-    sweeps a sphere of radius 4000 and lets it roll over edges; "on ground"
-    means "touched a poly flatter than 60 degrees this tick", not "a floor
-    query found something under me". Port that shape and the ledge and step
-    behaviour fall out of it.
-
-    Read this before touching collision again. "Still falling through the
-    floor" after the mover was read turned out to be a PARSER bug, not a
-    physics one: quad vertices are stored in strip order and were being used
-    as a perimeter, making most of them bow-ties. Two lessons. First, the
-    thing that finally exposed it was one exact reproduction - spawn, hold
-    forward, dump every poly whose bounding box covers the loss point - and
-    noticing a floor whose box contained the point while the polygon test
-    said no. Second, a wrong census nearly sent this the wrong way: a quick
-    re-walk of the file used the wrong header size and "found" 782 dropped
-    polys; the real parser drops none. Replicate the real walk before
-    trusting a number about it.
-
-    How it was read, for next time: the PC mover's one float call is sqrt of
-    the step length, so the whole thing is integer apart from that and the
-    decompile is complete. The PSX twin has no FPU so it confirms the same
-    without objdump. The radius was the only value not visible in the mover
-    itself - it is a per-object field set to 4000 at level load, found by
-    grepping for writes into the object-state block on the PSX side, where the
-    stride made the address arithmetic obvious.
-
- 2. P2.4 - THE FOLLOW CAMERA.  Checked: the four camera functions
+ 1b. WHAT WAS CHECKED ABOUT IT: the four camera functions
     (FUN_004020f0, FUN_00402290, FUN_00402610, FUN_004027f0, 400-540 bytes
     each) contain no float code, so their decompile is complete. Opus work.
     It may not need Fable at all - but the original's camera has modes and framing rules

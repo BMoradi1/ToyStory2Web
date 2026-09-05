@@ -11,7 +11,7 @@
  *   npx tsx tools/player-probe.ts
  */
 import {
-  createPlayer, createRuntime, flatGround, JumpState, NO_INPUT, stepPlayer,
+  createPlayer, createRuntime, flatGround, JumpState, NO_GROUND, NO_INPUT, stepPlayer,
   type PlayerInput, type PlayerState,
 } from '../src/sim/player.ts';
 import { MOVE_GROUND, VERTICAL } from '../src/sim/player-constants.ts';
@@ -93,7 +93,7 @@ check('no double jump while held', heldJump.peak, apex);
 {
   const p = createPlayer(0, 0, 0, 0);
   const rt = createRuntime();
-  const ground = { floorAt: () => null };
+  const ground = NO_GROUND;
   for (let i = 0; i < 600; i++) stepPlayer(p, NO_INPUT, rt, ground, 0);
   check('terminal velocity', p.vy, VERTICAL.terminalVelocity);
   check('hard fall flagged', p.fallTimer, 0x50);
@@ -175,9 +175,8 @@ check('no double jump while held', heldJump.peak, apex);
 {
   const { p, rt } = settled();
   // Step off a floor that vanishes, then jump a few ticks later.
-  let hasFloor = true;
-  const ground = { floorAt: () => (hasFloor ? { y: FLOOR, slopeY: -1 } : null) };
-  hasFloor = false;
+  // Step off a floor that has already vanished, then jump a few ticks later.
+  const ground = NO_GROUND;
   for (let i = 0; i < 3; i++) stepPlayer(p, NO_INPUT, rt, ground, 0);
   const before = p.vy;
   stepPlayer(p, held({ jump: true }), rt, ground, 0);

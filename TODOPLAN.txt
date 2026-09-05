@@ -280,82 +280,33 @@
                 model all agree on one coordinate system.
                 Spawn point is a pickup marker for now - the real one is
                 presumably in the level's own code, which is not decoded.
- P2.3 [READY TO PORT] Collision response.
-                THE FLOOR BUG IS FIXED and it was never the mover: the
-                collision file stores a quad's four vertices in
-                triangle-strip order, and the parser read them as a
-                perimeter, so 1,189 of level 1's 1,904 quads were bow-ties
-                and a point-in-polygon test called their left and right
-                lobes "outside". A third of every large floor was a hole.
-                Quads are now split into their two triangles with their
-                own normals, as the original does. Floor coverage over
-                collision went 93.9% -> 100%; wander fall-outs 74 -> 3;
-                walking forward in the browser for eight seconds stays
-                grounded 100% with no vertical movement.
-                The mover is READ (2026-09-04,
-                Fable): docs/PLAYER.md "Collision: the mover" has the whole
-                algorithm and every constant, checked PC against PSX. The
-                player is a swept SPHERE of radius 4000 (125 level units),
-                centred radius+0xc0 above the origin; ground is a contact
-                whose normal is flatter than 60 degrees, a wall anything
-                steeper; slopes past 42.9 degrees push you down them; there
-                is no step height - the sphere rolls over anything under
-                its radius. Constants are typed in player-constants.ts as
-                COLLISION, and isWalkable now uses the real 60.
-                What to build, in src/formats/collision.ts behind the
-                Ground interface: (1) the swept sphere-vs-poly test, face
-                then edges at radius+0x40; (2) the response: nearest hit,
-                skin pull-back, ground/wall split by n.y, velocity
-                projection, wall push-out; (3) the pass loop with the
-                previous-ground re-test that keeps the player glued going
-                downhill; (4) the slide push; (5) respawn at the recorded
-                safe position rather than the spawn. Replace slideAlongWalls
-                and the floorAt landing with it. tools/player-probe.ts and
-                the wander test in the mover commit are the regression
-                checks; the jump apex must stay 17664.
-                Previously done (keep until the port lands):
-                Done so far, all geometry rather than read constants:
-                slideAlongWalls() in collision.ts sweeps the horizontal step
-                against unwalkable polys and slides along them, sampling the
-                body at four heights rather than as a point. The death plane
-                IS read from the original (see docs/PLAYER.md): fall 0x2000
-                past the level's lowest terrain Y and you are put back.
-                Measured on level 1, wandering 24 x 600 ticks: on the ground
-                85% of the time, up from 36%.
-                Three defects fixed along the way. The floor height was
-                rounded, which left the player a fraction above the surface
-                and so airborne every other tick. The floor query sampled
-                only the tick's end point instead of sweeping. And the spawn
-                heuristic scored a ring around each marker, which cannot
-                tell a box top from a bedroom - it put Buzz on a surface
-                with 274 cells of floor when the ground floor has 2,245.
-                Still missing, and still wanting the mover read out of
-                FUN_00484380: step height, the real walkable-slope threshold
-                (isWalkable still guesses 45 degrees, though raising it to 89
-                changes floor coverage by 0.2% so it is not urgent), and
-                proper ledge handling. Walking off an edge is still how most
-                falls happen.
-                This is now the thing standing between the controller and
-                a playable level: Buzz walks through walls and off the edge
-                of the world, because the only query implemented is the
-                floor one. The seam is the `Ground` interface in
-                src/sim/player.ts - widen it and replace the single
-                floorAt call at the end of stepPlayer.
-                Read FUN_00484380 (4.7 KB, called via FUN_004855f0, which
-                splits the step in two when |v|^2 > 0x400000). It holds the
-                step height, wall slide and slope limit, none of which were
-                extracted in P2.1.
-                Original notes follow:
-                single-sided, stored unit normal for slope limits, walkable
-                = normal.y within the original's threshold.
-                Debug draw is DONE - key `k` in the viewer, green walkable
-                and red not. It confirmed what had never been checked: the
-                collision file and level.dat share a coordinate system and
-                scale exactly (no quarter-scale surprise), the hull sits on
-                the drawn geometry, and every pickup marker in levels 1, 2
-                and 5 has walkable collision beneath it (70/70, 81/81,
-                77/77), floating a median 1.7-3.3 world units above it.
-                Level 1: 2,363 polys, 29% walkable.
+ P2.3 [DONE]    Collision response: the original's swept sphere.
+                The player is a SPHERE of radius 4000 game units centred
+                radius+0xc0 above the origin, not a point with a floor
+                query under it, and "on ground" is a contact with a poly
+                flatter than 60 degrees. sweepSphere() in collision.ts;
+                the controller reaches it through Ground.move.
+                Ledges, steps and slopes all fall out of that shape - the
+                sphere rolls over anything shorter than its radius, so
+                there is no step height to look for.
+                Measured on level 1: holding forward for 900 ticks is
+                airborne for 1 of them and ends standing; wandering 24 x
+                600 ticks is grounded 92% (was 36% before any of this)
+                with zero fall-outs; six seconds of walking in the browser
+                is grounded 100% with no vertical movement. Probe 24/24,
+                jump apex still exactly 17664.
+                Respawn now returns you to the last safe standing spot,
+                as the original does, not the level spawn.
+                Faithful: radius, lift, ground threshold, skin, pass count,
+                broadphase. Different and marked in the code: the push-out
+                is a plain slide rather than the original's two-step
+                fixed-point nudge, and resting contact is a static overlap
+                test rather than a re-test of the previous ground poly.
+                Not ported, no measurable effect at these speeds: the
+                slide push on slopes past 42.9 degrees, and the split step.
+                Earlier fixes kept: the quad strip-order parse (see
+                docs/FORMATS.md), the death plane, the spawn heuristic.
+
  P2.4 [READY]   Follow camera. P2.2 is done, so this is unblocked and is now
                 the most visible thing missing: what exists is a placeholder
                 that eases to a fixed offset behind Buzz, has no framing

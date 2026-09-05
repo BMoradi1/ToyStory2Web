@@ -69,23 +69,21 @@ level.
   checked against the PlayStation one, not tuned by feel. He is animated by the
   game's own animation state machine, a 28-state table of byte scripts that also
   turned out to settle how fast animations actually play.
-- **Collision.** The hull parses (23,394 polygons across the game), can be drawn
-  over the level, answers "what is the floor under this point", and stops him
-  walking through walls. Falling out of the level puts him back, on the
-  original's own death plane.
+- **Collision.** The hull parses (23,394 polygons across the game) and can be
+  drawn over the level. Movement uses the original's own mover, a swept sphere:
+  walls stop you, ledges and steps behave, and being on the ground means
+  touching something flatter than 60 degrees rather than finding a floor
+  underfoot. Fall out of the level and you are put back where you last stood
+  safely, as the original does.
 - **Two oracles.** An offline rasteriser and a headless browser driver, so a
   change can be checked pixel against pixel rather than by eye. They are how
   most of the bugs above were found.
 
 ## What doesn't work yet
 
-**Collision response is unfinished**, and it is the thing you will notice. Walls
-stop you, but there is no step height and no ledge handling, so walking off an
-edge is easy and a fall ends with Buzz put back at the start. The original's
-mover has not been read yet; it holds the step height and the real
-walkable-slope threshold, and until then the slope test guesses 45 degrees.
-The camera is a placeholder that trails behind him and will clip through
-scenery.
+**The camera** is a placeholder that eases to a fixed spot behind Buzz, has no
+framing logic and clips straight through scenery. It is the most visible thing
+missing.
 
 **Everything around the moving.** No enemies, no pickups, no HUD, no save file,
 no audio, no cutscenes. The spawn point is a heuristic — the pickup marker

@@ -22,9 +22,9 @@
  * leaving it — but not the original's mover, so there is no step height and
  * no ledge handling. See docs/PLAYER.md.
  */
-import { groundBelow, slideAlongWalls, type CollisionWorld } from '../formats/collision.ts';
+import { sweepSphere, type CollisionWorld } from '../formats/collision.ts';
 import {
-  ATTACK, BODY_HEIGHT, DEATH_PLANE_MARGIN, GAME_UNITS_PER_LEVEL_UNIT, MOVE_GROUND,
+  ATTACK, COLLISION, DEATH_PLANE_MARGIN, GAME_UNITS_PER_LEVEL_UNIT, MOVE_GROUND,
   MOVE_OVERRIDES, TURN, VERTICAL, type MoveTable,
 } from './player-constants.ts';
 import { cos, idiv, sin, YAW_MASK, yawDelta, yawOf } from './trig.ts';
@@ -39,24 +39,27 @@ export enum JumpState {
   DoubleJumpReleased = 6,
 }
 
-/** What the controller needs to know about the world. P2.3 replaces this. */
+/**
+ * What the controller needs of the world.
+ *
+ * `move` is the original's mover: it sweeps the player's sphere along the
+ * velocity and reports where it ended up and what it touched. Note there is no
+ * floor query here. In the original, being on the ground is not "is there a
+ * floor under me" — it is "did the sweep touch something flatter than 60
+ * degrees this tick", which is what makes ledges, steps and slopes behave.
+ */
 export interface Ground {
-  /**
-   * The nearest walkable floor at or below a point, in GAME units, or null.
-   * "Below" is +Y, the original's convention. The height is NOT rounded: the
-   * caller decides how to sit on it, and rounding here left the player a
-   * fraction of a unit above the surface and so airborne every other tick.
-   */
-  floorAt(x: number, y: number, z: number): { y: number; slopeY: number } | null;
+  move(
+    from: { x: number; y: number; z: number },
+    velocity: { x: number; y: number; z: number },
+  ): {
+    x: number; y: number; z: number;
+    vx: number; vy: number; vz: number;
+    onGround: boolean;
+    groundNormal: { x: number; y: number; z: number } | null;
+  };
   /** Y past which the player counts as having fallen out of the level. */
   deathY?: number;
-  /**
-   * Slide a horizontal step along any walls it meets, returning where the
-   * player actually ends up. Optional: without it the step is unobstructed.
-   */
-  slide?(
-    from: { x: number; y: number; z: number }, to: { x: number; z: number },
-  ): { x: number; z: number; hit: boolean };
 }
 
 /** One frame of input. Stick components are -1..1, camera-relative. */
@@ -92,8 +95,8 @@ export interface PlayerState {
   jumpState: JumpState;
   /** +0x8e: the mover found floor this tick. */
   onGround: boolean;
-  /** +0x84: floor height under the player, or null when there is none. */
-  groundY: number | null;
+  /** +0x08/+0x0c of the collision record: the ground contact's normal, or null. */
+  groundNormal: { x: number; y: number; z: number } | null;
   /** +0x9c: reloads to 6 on the ground, counts down in the air. */
   coyote: number;
   /** +0x98: reduces jump and acceleration while nonzero. */
@@ -118,6 +121,14 @@ export interface PlayerState {
   laserCharge: number;
 
   /**
+   * `DAT_0052f34c`: the last place the player stood on ground flat enough to
+   * be safe. The original respawns here rather than at the level's spawn, so
+   * a fall costs you the ledge you fell from, not the whole level.
+   */
+  safeX: number; safeY: number; safeZ: number;
+  safeYaw: number;
+
+  /**
    * The player has fallen past the level's death plane and should be put back.
    * The controller does not know where the spawn is, so it raises this and the
    * caller decides; the original calls its own respawn from the same place.
@@ -136,7 +147,7 @@ export function createPlayer(x = 0, y = 0, z = 0, yaw = 0): PlayerState {
     forwardSpeed: 0, lateralSpeed: 0,
     jumpState: JumpState.Grounded,
     onGround: false,
-    groundY: null,
+    groundNormal: null,
     coyote: 0,
     hitStun: 0,
     animPhase: 0,
@@ -148,6 +159,8 @@ export function createPlayer(x = 0, y = 0, z = 0, yaw = 0): PlayerState {
     spinCharge: 0,
     laser: 0,
     laserCharge: 0,
+    safeX: x, safeY: y, safeZ: z,
+    safeYaw: yaw,
     fellOut: false,
     sounds: [],
   };
@@ -411,58 +424,40 @@ export function stepPlayer(
   accelerate(p, table, hasInput);
 
   // --- move ----------------------------------------------------------------
-  // P2.3 replaces this with the real mover. What is here handles the floor and
-  // slides along walls, but has no step height and no ledge handling.
-  const wasY = p.y;
-  const wasX = p.x, wasZ = p.z;
-  p.x += p.vx;
-  p.z += p.vz;
-  if (ground.slide) {
-    // Walls. Without this the player walks out of the level, and outside it
-    // there is no floor at all, so the fall never ends — which is what
-    // "eventually I fall down" turned out to be.
-    const slid = ground.slide({ x: wasX, y: wasY, z: wasZ }, { x: p.x, z: p.z });
-    if (slid.hit) {
-      // Keep the velocity consistent with the move that actually happened, or
-      // the next tick accelerates into the wall all over again.
-      p.vx = slid.x - wasX;
-      p.vz = slid.z - wasZ;
-      p.x = slid.x;
-      p.z = slid.z;
-    }
-  }
-  p.y += p.vy;
+  // The mover. The sphere centre sits radius + centreLift above the origin, so
+  // lift into that space, sweep, and lower back; standing therefore leaves the
+  // origin centreLift below the surface, which is what the original does.
+  const wasOnGround = p.onGround;
+  const lift = COLLISION.radius + COLLISION.centreLift;
+  const swept = ground.move(
+    { x: p.x, y: p.y - lift, z: p.z },
+    { x: p.vx, y: p.vy, z: p.vz },
+  );
 
-  // Sweep rather than sample. Falling at terminal velocity covers 2048 units
-  // in a tick, which is the whole of the floor query's tolerance, so asking
-  // only from the position we landed on can step clean over a surface — and
-  // once past it by more than that tolerance the query never returns it
-  // again and the player falls out of the level. Asking from the highest
-  // point of the tick (+Y is down, so the smaller of the two) finds the
-  // topmost floor anywhere under the segment just travelled.
-  const floor = ground.floorAt(p.x, Math.min(wasY, p.y), p.z);
-  p.groundY = floor ? floor.y : null;
-  if (floor !== null && p.y >= floor.y) {
+  p.x = Math.round(swept.x);
+  p.y = Math.round(swept.y + lift);
+  p.z = Math.round(swept.z);
+  p.vx = Math.round(swept.vx);
+  p.vz = Math.round(swept.vz);
+  p.groundNormal = swept.groundNormal;
+
+  if (swept.onGround) {
     // Landing. A flagged hard fall costs velocity and control on the way down.
-    if (p.fallTimer === 0x50) {
+    if (!wasOnGround && p.fallTimer === 0x50) {
       p.fallTimer = -VERTICAL.hardFallStunTicks;
-      p.vx = 0; p.vy = 0; p.vz = 0;
+      p.vx = 0; p.vz = 0;
       p.animPhase = 0x1a;
       p.sounds.push('SPLAT');
     } else if (p.fallTimer > 0) {
       p.fallTimer = 0;
     }
-    // Sit at or just inside the surface, never a hair above it. The surface
-    // is continuous while the position is integral, so rounding to nearest
-    // leaves the player fractionally above it half the time — and "above the
-    // floor" reads as airborne, which made walking flicker in and out of
-    // being grounded. Rounding downward (+Y is down) is stable.
-    p.y = Math.ceil(floor.y);
+    // Downward velocity is spent: the sweep already slid it along the surface.
     p.vy = 0;
     p.onGround = true;
     p.coyote = VERTICAL.coyoteTicks;
     p.jumpedFromGround = false;
   } else {
+    p.vy = Math.round(swept.vy);
     p.onGround = false;
     if (p.coyote > 0) p.coyote -= 1;
   }
@@ -479,6 +474,15 @@ export function stepPlayer(
     }
   } else if (p.fallTimer !== 0x50 || p.onGround) {
     p.fallTimer = 0;
+  }
+
+  // Remember where it is safe to come back to. The original records this
+  // whenever you are standing on ground flatter than 76 degrees on an ordinary
+  // surface, and its respawn reads it instead of the level's spawn point.
+  if (p.onGround && p.groundNormal !== null
+      && p.groundNormal.y < COLLISION.safeNormalY / 0x4000
+      && isPlain(p)) {
+    p.safeX = p.x; p.safeY = p.y; p.safeZ = p.z; p.safeYaw = p.yaw;
   }
 
   // Falling out of the level. The original tests the player against the
@@ -500,29 +504,43 @@ export function stepPlayer(
 export function groundFromCollision(world: CollisionWorld): Ground {
   const scale = GAME_UNITS_PER_LEVEL_UNIT;
   return {
-    floorAt(x, y, z) {
-      // The tolerance lets the query find a floor the player has just stepped
-      // slightly into, which happens whenever a tick's fall overshoots it.
-      const hit = groundBelow(world, x / scale, y / scale, z / scale, 64);
-      return hit ? { y: hit.y * scale, slopeY: hit.normal.y } : null;
+    move(from, velocity) {
+      return sweepSphere(world, from, velocity, COLLISION.radius, {
+        scale,
+        groundNormalY: COLLISION.groundNormalY / 0x4000,
+      });
     },
     deathY: world.lowestY * scale + DEATH_PLANE_MARGIN,
-    slide(from, to) {
-      const r = slideAlongWalls(
-        world,
-        { x: from.x / scale, y: from.y / scale, z: from.z / scale },
-        { x: to.x / scale, z: to.z / scale },
-        BODY_HEIGHT / scale,
-      );
-      return { x: r.x * scale, z: r.z * scale, hit: r.hit };
-    },
   };
 }
 
-/** A world with no floor anywhere, for testing the controller in isolation. */
-export const NO_GROUND: Ground = { floorAt: () => null };
+/** Empty space, for testing the controller in isolation. */
+export const NO_GROUND: Ground = {
+  move: (from, v) => ({
+    x: from.x + v.x, y: from.y + v.y, z: from.z + v.z,
+    vx: v.x, vy: v.y, vz: v.z, onGround: false, groundNormal: null,
+  }),
+};
 
-/** A flat floor at `y`, for testing. */
+/**
+ * An endless flat floor that the player's origin comes to rest on at `y`.
+ *
+ * The plane the sphere actually touches is one `centreLift` above that, since
+ * the origin sits that far inside the surface when standing.
+ */
 export function flatGround(y: number): Ground {
-  return { floorAt: () => ({ y, slopeY: -1 }) };
+  const restCentre = y - COLLISION.radius - COLLISION.centreLift;
+  return {
+    move(from, v) {
+      const end = { x: from.x + v.x, y: from.y + v.y, z: from.z + v.z };
+      if (end.y < restCentre) {
+        return { ...end, vx: v.x, vy: v.y, vz: v.z, onGround: false, groundNormal: null };
+      }
+      return {
+        x: end.x, y: restCentre, z: end.z,
+        vx: v.x, vy: restCentre - from.y, vz: v.z,
+        onGround: true, groundNormal: { x: 0, y: -1, z: 0 },
+      };
+    },
+  };
 }

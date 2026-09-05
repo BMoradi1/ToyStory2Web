@@ -339,6 +339,44 @@ export class Viewer {
 
   private pickups: THREE.InstancedMesh | null = null;
   private pickupAt: THREE.Vector3[] = [];
+  private creatures: THREE.InstancedMesh | null = null;
+
+  /**
+   * Mark where the level's creatures start, in renderer space. A cone per
+   * placement, pointing the way it faces, coloured by the caller. A stand-in
+   * like the pickups: the creature models load fine (`.all` + `.anm`) but
+   * nothing poses or moves them yet, so a marker is more honest than a frozen
+   * model.
+   */
+  setCreatures(placements: { x: number; y: number; z: number; yaw: number; colour: number }[]): void {
+    if (this.creatures) {
+      this.scene.remove(this.creatures);
+      this.creatures.geometry.dispose();
+      (this.creatures.material as THREE.Material).dispose();
+      this.creatures = null;
+    }
+    if (placements.length === 0) return;
+    const geometry = new THREE.ConeGeometry(0.2, 0.6, 8);
+    // Lay the cone on its side so its point is the facing direction.
+    geometry.rotateX(Math.PI / 2);
+    const mesh = new THREE.InstancedMesh(geometry, new THREE.MeshBasicMaterial({ color: 0xffffff }), placements.length);
+    mesh.frustumCulled = false;
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const one = new THREE.Vector3(1, 1, 1);
+    const colour = new THREE.Color();
+    placements.forEach((p, i) => {
+      // Raise it off the floor a little so it is not buried in the geometry.
+      q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), p.yaw);
+      m.compose(new THREE.Vector3(p.x, p.y + 0.3, p.z), q, one);
+      mesh.setMatrixAt(i, m);
+      mesh.setColorAt(i, colour.set(p.colour));
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    this.creatures = mesh;
+    this.scene.add(mesh);
+  }
 
   /**
    * Show collectibles at these renderer-space positions.

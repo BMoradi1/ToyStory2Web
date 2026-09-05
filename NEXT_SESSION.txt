@@ -120,9 +120,15 @@
     Init/tick per level via two jump tables, tasks via shared helpers, the
     five token slots mean the same thing everywhere. What a Fable pass should
     do next, in order:
-      - the creature system: FUN_00406cd0's per-type behaviour switch and
-        the entity array at DAT_0052c840 (0x9c bytes each; flags at +0x40,
-        0x200 = talked to). Every task that is not Hamm's needs it.
+      - (the creature system is DECODED 2026-09-05: docs/CREATURES.md.
+        Placements come from levelNN/level.raw record 0x23 - the .raw is
+        an RNC method-2 packet, unpacker ported and CRC-validated - and
+        behaviour is a word-code interpreter over 44 scripts in the exe,
+        extracted to src/sim/creature-data.ts. The eight handlers the
+        first pass missed are defined now. What Fable could still do
+        here: find where entity +0x84 (per-state hit ellipsoids) and the
+        per-type animation slot are set - probably the creature model
+        loader - and what record 0x24 is.)
       - the two per-level tables every init loads (FUN_004025c0 - ten
         4-int records; FUN_004335d0 - path-riding objects) and the camera
         trigger modes (FUN_00402610).
@@ -145,6 +151,16 @@
 ================================================================================
  WHAT DOES NOT NEED FABLE
 ================================================================================
+ THE CREATURE PORT (P3.2b) - an Opus job now. docs/CREATURES.md gives the
+ entity, the tick, the 12-step update and every opcode with its exact
+ arithmetic; src/sim/creature-data.ts has the scripts and tables. Port order:
+ the interpreter and mover (no C handlers) and run level 1's Zurg toys
+ (script 1) against the collision world; then damage/contact so the laser
+ and spin kill them; then the four level 1 handlers (sheep, tin robot,
+ hover bot, RC) which close the token tasks. Draw them with their .all
+ models posed by the anim script frame once the slot mapping is known;
+ until then the markers stand in.
+
  P2.2 character controller and P2.5 animation - both DONE 2026-09-04 by Opus.
  P2.2 was the pattern working as intended: the decoding was the hard part and
  the port was transcription off docs/PLAYER.md. P2.5 was meant to be Fable's
@@ -153,6 +169,53 @@
  the save file, audio, cutscene playback, performance work, and anything in
  Phase 7. All of these are specified; the difficulty is in getting them right,
  not in working out what they are.
+
+ MUSIC - decoded 2026-09-05, ready for Opus to wire up.  Nothing left to
+ find; this is a wiring job against src/audio/sfx.ts's GameDir handle.
+
+   Files: audio/<name>.wav in the install root (NOT data/), plain PCM WAV,
+   about 8 MB each. Twenty-two names, in the order of the table at 0x4eccd8
+   (FUN_00413150 builds "audio\" + name + ".wav" and hands it to a
+   DirectShow thread, FUN_00436ce0 -> FUN_00413240):
+
+     0 house     1 neighbou  2 buzvred   3 constr    4 alley
+     5 slime     6 als_toyb  7 spacelnd  8 buzvbuz   9 elev
+    10 als_pent 11 buzvzurg 12 convey   13 tarmac   14 buzvpros
+    15 miniboss 16 minirace 17 over     18 complete 19 ygafim
+    20 titlescr 21 levcomp
+
+   Index 0..14 IS level-1: the level's track is the table entry at the
+   0-based level index (DAT_0052ad8a), so level 1 plays house and level 15
+   buzvpros. music21.wav and fullhouse.wav on disc are unreferenced.
+
+   Selection (FUN_0049eac0, called from each level's tick):
+     if the mini-boss timer DAT_0052c832 != 0     -> 15 miniboss
+     else if racing (DAT_0052c830 != 0 and the race state DAT_0052f2f8 is
+        2, i.e. started and not finished)          -> 16 minirace
+     else                                          -> the level track
+   Each branch only restarts when the current track (DAT_00559c68) differs,
+   so it is a "want this playing" call, safe every tick. The creature code
+   sets the mini-boss timer to 0x5a (90 ticks) while a mini-boss is live.
+
+   Looping: FUN_0047d880(track) plays looped (loop flag 1) - all of the
+   above plus 19 ygafim on the front-end menus and 18 complete on the
+   game-complete screen. FUN_0047d7f0(track) plays once: 17 over on game
+   over, 20 titlescr on the title, 21 levcomp on the level-complete screen.
+   Starting a track stops whatever is playing first. Pause/resume replays
+   the stored current track.
+
+   Volume: the options slider is 0..64 (DAT_005282c8). FUN_0049ae40 maps it
+   through a 151-entry curve at 0x4fd668 (index = slider*150/64) giving
+   DirectShow volume in 1/100 dB: -10000 (silent) at 0, -1126 at slider
+   ~26, -103 at ~51, 0 from ~60 up. For the Web Audio gain use
+   10^(dB/2000). Sound effects use a separate slider.
+
+   Suggested port: a MusicPlayer next to SoundBank with play(track, loop)
+   and a want(track) that no-ops when it is already the current track;
+   decode with decodeAudioData (8 MB WAV is fine) or stream through an
+   <audio> element from a blob URL, which avoids holding the decoded PCM.
+   main.ts calls want(level-1) after spawn, and the race/mini-boss overrides
+   land when those systems exist.
 
 ================================================================================
  THE METHOD THAT KEEPS PAYING OFF

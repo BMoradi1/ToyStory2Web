@@ -24,6 +24,9 @@ import { createCamera, stepCamera, cameraTarget, type CameraState } from './sim/
 import { SoundBank, PLAYER_EFFECTS } from './audio/sfx.ts';
 import { createPickups, PickupKind, revealToken, stepPickups, type PickupState } from './sim/pickups.ts';
 import { levelNumber, SPAWN_TABLE, tokenSlotsAtStart } from './sim/level-data.ts';
+import { unpackRaw } from './formats/rnc.ts';
+import { CREATURE_LIST_TYPE, parseCreatureList, parseCreatureNames, type CreaturePlacement } from './formats/creatures.ts';
+import { AI_SCRIPTS } from './sim/creature-data.ts';
 import {
   createAnimation, stepAnimation, type AnimationPlayback,
 } from './sim/player-animation.ts';
@@ -47,6 +50,9 @@ let sceneTextures = new Map<number, THREE.Texture>();
 
 /** The loaded scene, kept so the zone picker can recompute what to show. */
 let currentLevel: { level: DatLevel; zones: (number | null)[] } | null = null;
+/** The scene's creature placements from its `.raw` packet, and the names from creatures.cfg. */
+let currentCreatures: CreaturePlacement[] = [];
+let creatureNames = new Map<number, string>();
 /** The scene's collision hull, loaded lazily the first time it is shown. */
 let currentCollision: CollisionGroup[] | null = null;
 let currentCollisionWorld: CollisionWorld | null = null;
@@ -238,6 +244,20 @@ async function showLevel(index: number): Promise<void> {
       setStatus(`${level.id}: ready`);
       await yieldToBrowser();
 
+      // Creatures come from the RNC packet beside the scene, record type
+      // 0x23. Drawn as markers: the behaviour system is decoded
+      // (docs/CREATURES.md) but not yet ported.
+      currentCreatures = [];
+      if (level.raw) {
+        try {
+          const record = unpackRaw(await level.raw.read()).find((r) => r.type === CREATURE_LIST_TYPE);
+          if (record) currentCreatures = parseCreatureList(record.data);
+        } catch (err) {
+          console.warn(`${level.id}: creature list failed: ${(err as Error).message}`);
+        }
+      }
+      drawCreatures();
+
       const textured = geometry.groups.filter((g) => g.page !== null && gpuTextures.has(g.page));
       const zoneCount = new Set(zones.filter((z) => z !== null)).size;
       summary +=
@@ -245,7 +265,8 @@ async function showLevel(index: number): Promise<void> {
         `${geometry.triangleCount} triangles, ` +
         `${textured.length}/${geometry.groups.length} groups textured, ` +
         `${parsed.markers.length} markers, ` +
-        `${zoneCount} zones / ${parsed.zones.length} portals`;
+        `${zoneCount} zones / ${parsed.zones.length} portals, ` +
+        `${currentCreatures.length} creatures`;
     } catch (err) {
       summary += ` — geometry failed: ${(err as Error).message}`;
       setStatus(`${level.id}: geometry failed — ${(err as Error).message}`, true);
@@ -266,6 +287,8 @@ async function open(dir: GameDir): Promise<void> {
 
   levels = findLevels(dir);
   models = findModels(dir);
+  const cfg = dir.get('data/creatures.cfg');
+  creatureNames = cfg ? parseCreatureNames(new TextDecoder('latin1').decode(await cfg.read())) : new Map();
   sound = new SoundBank(dir);
   if (levels.length === 0) return setStatus('No levels found under data/.', true);
 
@@ -305,6 +328,13 @@ async function open(dir: GameDir): Promise<void> {
             const k = PickupKind[it.kind] ?? String(it.kind); acc[k] = (acc[k] ?? 0) + 1; return acc;
           }, {}),
         } : null;
+      },
+      get creatures() {
+        return currentCreatures.map((c) => ({
+          slot: c.slot, type: c.type, name: creatureNames.get(c.type) ?? null, script: c.script,
+          scriptWords: AI_SCRIPTS[c.script]?.length ?? null,
+          x: c.x, y: c.y, z: c.z, yaw: c.yaw, health: c.health,
+        }));
       },
       /** Put the player on the nearest uncollected pickup. For the harness. */
       goToPickup() {
@@ -572,6 +602,27 @@ function drawPickups(): void {
   })));
   pickupDrawIndex = pickups.items.map((i) => (i.enabled ? 0 : -1));
   for (let i = 0, n = 0; i < pickupDrawIndex.length; i++) if (pickupDrawIndex[i] === 0) pickupDrawIndex[i] = n++;
+}
+
+/**
+ * Colour by what the creature is to Buzz: red for the things that hurt him
+ * (health under 100 and a respawn timer, which is how the level data marks an
+ * enemy), green for the cast he talks to, grey for the rest.
+ */
+function creatureColour(c: CreaturePlacement): number {
+  if (c.health >= 100) return 0x60d060;
+  if (c.respawn > 0) return 0xe04040;
+  return 0xa0a0a0;
+}
+
+/** Hand the viewer the creature start positions. */
+function drawCreatures(): void {
+  if (!viewer) return;
+  const S = GAME_UNITS_PER_LEVEL_UNIT;
+  viewer.setCreatures(currentCreatures.map((c) => ({
+    x: c.x * S * GAME_TO_RENDER, y: -c.y * S * GAME_TO_RENDER, z: -c.z * S * GAME_TO_RENDER,
+    yaw: toRadians(c.yaw), colour: creatureColour(c),
+  })));
 }
 
 /** Show every token, as if all five tasks were done. For the harness and for looking around. */

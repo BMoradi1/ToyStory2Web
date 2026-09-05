@@ -78,7 +78,7 @@ Do not use these comments to identify levels.
 | `.all` | TT data-group container (meshes OR collision) | **Solved & ported** |
 | `.anm` | Skeletal animation | **Solved & ported** |
 | `.dat` | PC world geometry: meshes + placements | **Solved & ported** |
-| `.raw` `.raws` | RNC PRO-PACK compressed, identical container | **Spec found** |
+| `.raw` `.raws` | RNC method-2 packet: typed records, creature list = 0x23 | **Solved & ported** (container); records partly mapped |
 | `.vis` `.kp2` | Same container as `.dat`, 12-byte records | Partly mapped |
 | `.kep` `.new` | **Older revisions of `level.dat` itself** | Identified |
 
@@ -414,14 +414,30 @@ triangles). The 300 that don't are `level07`-`level10` each holding a copy of on
 stale 1998 `TERR1.ALL` that uses the older 32-byte A Bug's Life poly — the twin
 of the stale `level1.dat` recorded above. One artefact, not 300 failures.
 
-### `.raw` / `.raws` — spec found
+### `.raw` / `.raws` — the level packet, container SOLVED
 
-Chunked **RNC PRO-PACK** with the `RNC\x01` magic stripped. Repeating header:
-`u32 BE` uncompressed size (`0xFFFFFFFF` marks EOF), `u32 BE` compressed size,
-6 further bytes (14 total), then payload. Toy Story 2's chunk size is a constant
-**33548** (`0x830C`). `.raws` uses an identical container to `.raw`.
+Chunked **RNC PRO-PACK method 2** with the `RNC\x01` magic stripped.
+Repeating 14-byte header: `u32 BE` unpacked size (`0xFFFFFFFF` marks EOF),
+`u32 BE` packed size, `u16` CRC of the unpacked data, `u16` CRC of the
+packed, `u8` leeway, `u8` chunks; then the stream. Most records unpack to a
+fixed **33548** bytes (`0x830C`), the packer's block size.
 
-Largely superseded for textures by `.ngn`, which already holds decoded BMPs.
+The unpacker is `src/formats/rnc.ts`, transcribed from the engine's own
+`FUN_0047b170` (method 2: MSB-first bits out of single bytes, literals,
+LZ matches with two-level length and offset codes, raw blocks). It decodes
+all 54 `.raw`/`.raws` in the install and every record matches its CRC
+(`tools/raw-validate.ts`).
+
+Each record's payload starts with a `u32` **record type**. This file is the
+PlayStation side of a level — `FUN_00452310` logs it as "Loading packet
+data" — and the PC loader keeps two records: **0x23 `CreatListRam`**, the
+64-slot creature placement list (docs/CREATURES.md, `src/formats/creatures.ts`),
+and **0x24**, a 25 KB paletted image it samples a few colours from. The
+`data/gfx/levelNx.raw` texture sets are the same container holding types
+0xd and 0x25; the scene packets also carry 0x0–0x13 (fixed-size blocks),
+0x101/0x102/0x103 (per-object arrays, sizes tracking the scene) and
+0x104 — none of which the PC build has been seen to read. `.raws` is the
+same packet from an earlier build (its creature list differs).
 
 ### PC `level.dat` — SOLVED
 

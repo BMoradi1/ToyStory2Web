@@ -94,6 +94,12 @@ level.
   touching something flatter than 60 degrees rather than finding a floor
   underfoot. Fall out of the level and you are put back where you last stood
   safely, as the original does.
+- **Creatures, placed.** Every scene's enemies and cast are read from the
+  level's packet file (an RNC-compressed container the game's own unpacker
+  was transcribed for) and drawn as markers where they start. Their
+  behaviour — a script interpreter with 44 scripts in the executable, one
+  shared mover, one damage routine — is decoded in docs/CREATURES.md and
+  waiting to be ported.
 - **Two oracles.** An offline rasteriser and a headless browser driver, so a
   change can be checked pixel against pixel rather than by eye. They are how
   most of the bugs above were found.

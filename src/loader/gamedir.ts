@@ -170,13 +170,15 @@ export interface LevelScene {
   dat: GameFile | null;
   /** `TERRAIN.ALL` for `level`, `TERR1.ALL` for `level1`: the scene's collision. */
   terrain: GameFile | null;
+  /** `level.raw` / `level1.raw`: the RNC packet with the creature list (src/formats/creatures.ts). */
+  raw: GameFile | null;
 }
 
 export function findLevels(dir: GameDir): LevelScene[] {
   const scenes = new Map<string, LevelScene>();
   const want = (id: string): LevelScene => {
     let scene = scenes.get(id);
-    if (!scene) { scene = { id, ngn: null, dat: null, terrain: null }; scenes.set(id, scene); }
+    if (!scene) { scene = { id, ngn: null, dat: null, terrain: null, raw: null }; scenes.set(id, scene); }
     return scene;
   };
 
@@ -196,6 +198,13 @@ export function findLevels(dir: GameDir): LevelScene[] {
     if (!m) continue;
     const scene = scenes.get(`${m[1]}/${m[2] === 'terrain' ? 'level' : 'level1'}`);
     if (scene) scene.terrain = file;
+  }
+  // The packet file beside each scene: creatures, and the PSX-side art.
+  for (const [path, file] of dir) {
+    const m = /^data\/(level\d+)\/(level1?)\.raw$/.exec(path);
+    if (!m) continue;
+    const scene = scenes.get(`${m[1]}/${m[2]}`);
+    if (scene) scene.raw = file;
   }
 
   // A scene needs geometry to be a scene. `level00` holds four .ngn texture

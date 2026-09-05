@@ -370,6 +370,8 @@
                 unlocks per-sound pitch, 3D falloff, and the animation
                 scripts' own sound opcodes.
                 Also absent: music (audio/*.wav, one 8 MB track per area)
+                - fully decoded 2026-09-05, see NEXT_SESSION.txt MUSIC:
+                table, per-level rule, overrides, volume curve. Opus job.
                 and any positional mixing.
 
  P2.8 [DONE]    Pickups, decoded from toy2.exe and ported (src/sim/pickups.ts,
@@ -406,11 +408,20 @@
 ================================================================================
  Done means: Andy's House start to finish, tokens collected, saved.
 
- P3.1 [READY]   creatures.cfg parser - id -> name -> model/anim directory.
- P3.2 [BLOCKED] Entity placement          <- P3.1. Pickups are placed (P2.8);
-                what is left is enemies and moving props, which the level
-                scripts drive by object id through the same id list.
-                Paths (30) are patrol/platform rails.
+ P3.1 [DONE]    creatures.cfg parser (src/formats/creatures.ts,
+                parseCreatureNames). 2026-09-05.
+ P3.2 [PART]    Entity placement. DONE: the creature list - record 0x23 of
+                levelNN/level.raw, RNC method 2 (src/formats/rnc.ts, from
+                the exe's own unpacker, CRC-checked on all 54 files), 64 x
+                32-byte placements parsed and drawn as markers in the
+                viewer (36 on level 1). LEFT: moving props, which the level
+                scripts drive by object id. Paths (30) are their rails.
+ P3.2b [READY]  Creature behaviour port <- docs/CREATURES.md is the spec:
+                entity fields, the tick, the update in 12 steps, all 34
+                script opcodes, damage table, death/respawn. Data is in
+                src/sim/creature-data.ts (44 scripts, 25 anim scripts,
+                tables). Port the interpreter + mover first (script 1 =
+                the Zurg toys is the test), then the level 1 handlers.
  P3.3 [READY]   Level 1 logic             <- P2. The x86 level scripts are
                 now defined and decompiled (docs/LEVELS.md): init
                 FUN_004171d0 and a 4 KB per-zone tick FUN_00417680, built

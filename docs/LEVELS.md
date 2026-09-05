@@ -134,12 +134,14 @@ the shared creature code, so the race is not portable until creatures are.
 
 ## Creatures
 
-`FUN_00406cd0` constructs an entity from its creature type (`piVar1[3]`, the
-`creatures.cfg` index) and installs per-type behaviour functions from a
-switch of 60-odd cases — types 4 and 5 get `FUN_00416a60`/`FUN_00416ab0`,
-which are level 1's tin robot: its death is where `FUN_004a0db0(4, 0)` comes
-from. The 25 addresses that switch stores are the creature behaviours the
-first Ghidra pass missed, listed in `tools/ghidra/README.md`.
+Decoded in full on 2026-09-05: see **docs/CREATURES.md** for the placement
+record (from the level's `.raw` packet), the entity, the shared update, the
+script interpreter, damage and respawn. The level scripts meet creatures in
+three places: the helpers above take a creature index into the entity array
+at `DAT_0052c840`; the token-task counters (sheep, laps, the tin robot's
+death) are written by the per-type C handlers listed in `CREATURE_TYPES`;
+and each level's init rebuilds a few entities with the constructor
+`FUN_00406cd0(entity, 0)` after setting their placement up by hand.
 
 ## Sound events, resolved
 

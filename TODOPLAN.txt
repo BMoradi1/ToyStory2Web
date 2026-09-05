@@ -345,8 +345,25 @@
                 spin, hard fall. The remaining 20 states belong to moves
                 that do not exist yet (poles, zip lines, grapple, cutscenes)
                 and are in the table but never selected.
-                Left to do: the laser and charged-spin states, and the
-                footfall/sound opcodes are counted but not yet played.
+                Left to do: the laser and charged-spin states. The
+                footfall/sound opcodes are counted but still not played -
+                they fire EVENT numbers, and the event table is the part
+                of the sound system that is not ported (see below).
+ P2.7 [PART DONE] Sound effects. src/audio/sfx.ts plays Buzz's effects from
+                the user's own data/sfx, keyed by the 61 effect names in
+                the exe's table at 0x4fcdc4, which match the filenames
+                exactly. Ten player effects preload; M mutes.
+                NOT ported: the 200-entry EVENT table at 0x502950 that maps
+                an event number to an effect plus pitch, volume and
+                falloff. Its effect field has an off-by-one and a sign
+                convention I could not settle - event 0x12 resolves to the
+                spin sound where the code fires it for a skid - so the sim
+                names effects directly instead. Settling that table is what
+                unlocks per-sound pitch, 3D falloff, and the animation
+                scripts' own sound opcodes.
+                Also absent: music (audio/*.wav, one 8 MB track per area)
+                and any positional mixing.
+
  P2.6 [READY]   Skeleton from gfx joints (0x011F) - parser done, unused.
 
 ================================================================================

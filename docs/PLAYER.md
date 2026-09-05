@@ -404,6 +404,27 @@ nothing and they drop for ever. The original never has to think about this
 because its mover keeps you inside the level; a reimplementation without a
 complete mover very much does.
 
+## Sound
+
+The controller and the animation scripts both fire sounds, and there are two
+layers between them and a file.
+
+**Effects** are 61 names in a table at `0x4fcdc4` — `BUZJMP1`, `BUZSKID`,
+`SPLAT` — and `LoadSoundEffect` turns each into `data/sfx/<name>.wav`, which
+is exactly what is on disc. That half is certain, and it is what
+`src/audio/sfx.ts` uses: the sim names an effect and the audio layer finds the
+file.
+
+**Events** are the layer above: 200 records at `0x502950`, sixteen bytes each,
+holding an effect plus a pitch, a volume and a falloff, and game code fires
+event numbers rather than effects. This is **not ported**. The effect field is
+stored with an off-by-one and a sign convention I have not pinned down —
+entries with the high bit set take a different call path that masks with
+`0x7fff` — and mapping event 0x12 through it lands on the spin sound where the
+code fires it for a skid. Rather than play a confidently wrong sound, the sim
+names effects directly and the event table waits for someone to settle it.
+What is lost meanwhile: per-sound pitch and volume, and 3D falloff.
+
 ## Ported
 
 The mover is in `src/formats/collision.ts` as `sweepSphere`, behind the
@@ -421,7 +442,8 @@ step, neither of which changes behaviour measurably at these speeds.
 angle system, `src/sim/input.ts` the keyboard and pad.
 `src/sim/player-animation.ts` is the state machine and script interpreter, and
 `src/sim/player-animation-data.ts` is the table above, generated from the
-executable rather than typed in. `tools/player-probe.ts`
+executable rather than typed in. `src/sim/camera.ts` is the follow camera and
+`src/audio/sfx.ts` plays the effects. `tools/player-probe.ts`
 runs the controller headlessly and checks the motion it produces against the
 closed-form values these constants predict; it is the regression test for any
 later change.

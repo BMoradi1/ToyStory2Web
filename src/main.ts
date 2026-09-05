@@ -21,6 +21,7 @@ import {
 } from './sim/player.ts';
 import { toRadians, yawOf } from './sim/trig.ts';
 import { createCamera, stepCamera, cameraTarget, type CameraState } from './sim/camera.ts';
+import { SoundBank, PLAYER_EFFECTS } from './audio/sfx.ts';
 import {
   createAnimation, stepAnimation, type AnimationPlayback,
 } from './sim/player-animation.ts';
@@ -263,6 +264,7 @@ async function open(dir: GameDir): Promise<void> {
 
   levels = findLevels(dir);
   models = findModels(dir);
+  sound = new SoundBank(dir);
   if (levels.length === 0) return setStatus('No levels found under data/.', true);
 
   setStatus(`${levels.length} scenes, ${models.length} models. Building UI\u2026`);
@@ -292,6 +294,7 @@ async function open(dir: GameDir): Promise<void> {
       get player() { return player; },
       get anim() { return playerAnim; },
       get hasAnm() { return playerModel?.anm ? playerModel.anm.animations.length : null; },
+      get sound() { return sound ? { enabled: sound.enabled, ready: sound.ready } : null; },
       get modelInfo() {
         const e = models[modelEl.selectedIndex];
         return { index: modelEl.selectedIndex, name: e?.name, hasAnmFile: !!e?.anm,
@@ -505,13 +508,23 @@ let playerRuntime: PlayerRuntime | null = null;
 let playerModel: { model: AllFile; anm: AnmFile | null } | null = null;
 let playerAnim: AnimationPlayback | null = null;
 let camera: CameraState | null = null;
+/** Effects, read from the install. Silent until play starts. */
+let sound: SoundBank | null = null;
 const input = new InputSource();
 
 /** `space` etc. must reach the game, not scroll the page, but only while playing. */
 function setPlaying(on: boolean): void {
   if (!viewer) return;
   viewer.playMode = on;
-  if (on) input.attach(); else input.detach();
+  if (on) {
+    input.attach();
+    // Entering play is a key press, which is the gesture browsers want before
+    // they will start an audio device.
+    void sound?.start().then(() => sound?.preload(PLAYER_EFFECTS));
+  } else {
+    input.detach();
+    sound?.stop();
+  }
 }
 
 function playTick(): void {
@@ -543,6 +556,7 @@ function playTick(): void {
       look.x * GAME_TO_RENDER, -look.y * GAME_TO_RENDER, -look.z * GAME_TO_RENDER,
     );
   }
+  for (const effect of player.sounds) sound?.play(effect);
   poseAnimation(Math.hypot(held.moveX, held.moveY) > 0);
 }
 
@@ -603,7 +617,8 @@ async function togglePlay(): Promise<void> {
     if (!player) return;
   }
   setPlaying(true);
-  infoEl.textContent = 'playing — WASD or stick to move, space to jump, J spin, K fire';
+  infoEl.textContent =
+    'playing — WASD or stick to move, space to jump, J spin, K fire, M mutes';
 }
 
 /** `k`: show or hide the collision hull, reading TERRAIN.ALL the first time. */
@@ -627,6 +642,11 @@ window.addEventListener('keydown', (ev) => {
   // Enter toggles play; while playing, the movement keys belong to the game
   // and the inspection shortcuts would collide with them.
   if (ev.key === 'Enter') { void togglePlay(); return; }
+  if (ev.key === 'm' && sound) {
+    sound.volume = sound.volume > 0 ? 0 : 0.6;
+    infoEl.textContent = sound.volume > 0 ? 'sound on' : 'sound muted';
+    return;
+  }
   if (viewer.playMode) return;
   if (ev.key === 'c') infoEl.textContent = `culling: ${viewer.cycleSide()}`;
   if (ev.key === 'g') infoEl.textContent = `draw groups: ${viewer.toggleSingleMaterial()}`;

@@ -48,9 +48,10 @@ onto the page instead. Nothing is uploaded either way.
 | `c` | cycle back-face culling, to check the winding by eye |
 | `g` | collapse the level to a single material |
 | `s` | report what is actually in the scene |
+| `m` | mute or unmute |
 
 While playing: **WASD** or a gamepad stick to move, **space** to jump (again at
-the top for a double jump), **J** to spin, **K** for the laser. Movement is
+the top for a double jump), **J** to spin, **K** for the laser, **M** to mute. Movement is
 camera-relative, as the original's is, and Buzz is animated from the game's own
 animation state machine. Walls do not stop you yet — collision response is the
 next piece of work — so it is possible to walk into scenery or out of the
@@ -66,6 +67,9 @@ level.
   in doorways. Both are decoded, so the viewer can draw one room and its
   neighbours instead of the whole house.
 - **Characters.** All 68 models load and texture, and all 170 animations play.
+- **Sound.** Buzz's effects play from your install's own `data/sfx`, found by
+  the names the engine itself uses — a table of 61 strings inside the
+  executable that match the files on disc exactly.
 - **Buzz moves.** Press enter and you can walk, run, turn, jump, double jump and
   spin around Andy's house, with the game's own follow camera behind you.
   Every constant — gravity, the jump impulse, friction,

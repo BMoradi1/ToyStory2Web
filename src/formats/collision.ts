@@ -30,10 +30,25 @@ const TRIANGLE_SENTINEL = 0x7fff;
 const NORMAL_SCALE = 16384;
 
 export interface CollisionPoly {
-  /** Three or four vertices in model space. PSX axes: +Y is down. */
+  /**
+   * Three or four vertices in model space, in PERIMETER order. PSX axes: +Y
+   * is down. The file stores a quad's four vertices in triangle-strip order,
+   * (a, b, c, d) meaning triangles (a, b, c) and (d, c, b); read as a
+   * perimeter that is a bow-tie, and a point-in-polygon test on a bow-tie
+   * calls the left and right lobes outside. 1,189 of level 1's 1,904 quads
+   * are laid out that way, and walking into one of those lobes was how Buzz
+   * fell through solid floor. Here they are reordered to (a, b, d, c).
+   */
   vertices: { x: number; y: number; z: number }[];
-  /** Unit face normal. Antiparallel to the winding's geometric normal. */
+  /** Unit normal of the first triangle (a, b, c). */
   normal: { x: number; y: number; z: number };
+  /**
+   * Unit normal of the second triangle (d, c, b), which the file stores
+   * separately because a quad need not be planar. Null on triangles. The
+   * original's sweep tests the two triangles independently, each against
+   * its own normal.
+   */
+  normal2: { x: number; y: number; z: number } | null;
   triangle: boolean;
 }
 
@@ -69,27 +84,27 @@ function readPoly(view: DataView, offset: number): CollisionPoly | null {
   // as there are triangles.
   const triangle = w(20) === TRIANGLE_SENTINEL;
 
-  const p1 = { x: w(4), y: w(5), z: w(6) };
-  const vertices = [
-    p1,
-    { x: p1.x + w(7), y: p1.y + w(8), z: p1.z + w(9) },
-    { x: p1.x + w(10), y: p1.y + w(11), z: p1.z + w(12) },
-  ];
+  const a = { x: w(4), y: w(5), z: w(6) };
+  const b = { x: a.x + w(7), y: a.y + w(8), z: a.z + w(9) };
+  const c = { x: a.x + w(10), y: a.y + w(11), z: a.z + w(12) };
+  // Strip order in the file; perimeter order here (see the interface).
   // On a triangle the fourth vertex is uninitialised — it sits well off the
   // plane, so reading it produces stray geometry.
-  if (!triangle) {
-    vertices.push({ x: p1.x + w(13), y: p1.y + w(14), z: p1.z + w(15) });
-  }
+  const vertices = triangle
+    ? [a, b, c]
+    : [a, b, { x: a.x + w(13), y: a.y + w(14), z: a.z + w(15) }, c];
 
-  const normal = {
-    x: w(16) / NORMAL_SCALE,
-    y: w(17) / NORMAL_SCALE,
-    z: w(18) / NORMAL_SCALE,
+  const unit = (k: number) => {
+    const n = { x: w(k) / NORMAL_SCALE, y: w(k + 1) / NORMAL_SCALE, z: w(k + 2) / NORMAL_SCALE };
+    return Math.abs(Math.hypot(n.x, n.y, n.z) - 1) > 0.05 ? null : n;
   };
-  const magnitude = Math.hypot(normal.x, normal.y, normal.z);
-  if (Math.abs(magnitude - 1) > 0.05) return null;
+  const normal = unit(16);
+  if (!normal) return null;
+  // Words 19-21 are the second triangle's normal on a quad (word 20 is the
+  // triangle sentinel, which is why it cannot be a normal there).
+  const normal2 = triangle ? null : unit(19);
 
-  return { vertices, normal, triangle };
+  return { vertices, normal, normal2, triangle };
 }
 
 /** Parse one collision group, or null if the payload isn't this format. */
@@ -196,19 +211,36 @@ export interface CollisionWorld {
   lowestY: number;
 }
 
-/** Flatten collision groups into a world-space hull with an X/Z lookup grid. */
+/**
+ * Flatten collision groups into a world-space hull with an X/Z lookup grid.
+ *
+ * Quads are split into their two triangles here, each with its own normal,
+ * because that is what the file describes and what the original tests: a
+ * quad need not be planar, and a height solved against the first triangle's
+ * plane is wrong over the second.
+ */
 export function buildCollisionWorld(groups: CollisionGroup[], cellSize = 1024): CollisionWorld {
   const world: CollisionWorld = { polys: [], cells: new Map(), cellSize, lowestY: -Infinity };
   for (const group of groups) {
     for (const mesh of group.meshes) {
       for (const poly of mesh.polys) {
-        const vertices = poly.vertices.map((v) => ({
+        const place = (v: { x: number; y: number; z: number }) => ({
           x: v.x + group.position.x,
           y: v.y + group.position.y,
           z: v.z + group.position.z,
-        }));
+        });
+        const [a, b, d, c] = poly.vertices.map(place);
+        const pieces: { vertices: { x: number; y: number; z: number }[]; normal: { x: number; y: number; z: number } }[] =
+          poly.triangle
+            ? [{ vertices: [a!, b!, d!], normal: poly.normal }]
+            : [
+              { vertices: [a!, b!, c!], normal: poly.normal },
+              { vertices: [d!, c!, b!], normal: poly.normal2 ?? poly.normal },
+            ];
+        for (const piece of pieces) {
+        const { vertices, normal } = piece;
         const index = world.polys.length;
-        world.polys.push({ vertices, normal: poly.normal, walkable: isWalkable(poly) });
+        world.polys.push({ vertices, normal, walkable: normal.y <= -Math.cos((60 * Math.PI) / 180) });
         for (const v of vertices) if (v.y > world.lowestY) world.lowestY = v.y;
         const xs = vertices.map((v) => v.x), zs = vertices.map((v) => v.z);
         const x0 = Math.floor(Math.min(...xs) / cellSize), x1 = Math.floor(Math.max(...xs) / cellSize);
@@ -219,6 +251,7 @@ export function buildCollisionWorld(groups: CollisionGroup[], cellSize = 1024): 
             const cell = world.cells.get(key);
             if (cell) cell.push(index); else world.cells.set(key, [index]);
           }
+        }
         }
       }
     }

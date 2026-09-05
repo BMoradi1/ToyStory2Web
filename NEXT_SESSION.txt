@@ -116,6 +116,18 @@
     query found something under me". Port that shape and the ledge and step
     behaviour fall out of it.
 
+    Read this before touching collision again. "Still falling through the
+    floor" after the mover was read turned out to be a PARSER bug, not a
+    physics one: quad vertices are stored in strip order and were being used
+    as a perimeter, making most of them bow-ties. Two lessons. First, the
+    thing that finally exposed it was one exact reproduction - spawn, hold
+    forward, dump every poly whose bounding box covers the loss point - and
+    noticing a floor whose box contained the point while the polygon test
+    said no. Second, a wrong census nearly sent this the wrong way: a quick
+    re-walk of the file used the wrong header size and "found" 782 dropped
+    polys; the real parser drops none. Replicate the real walk before
+    trusting a number about it.
+
     How it was read, for next time: the PC mover's one float call is sqrt of
     the step length, so the whole thing is integer apart from that and the
     decompile is complete. The PSX twin has no FPU so it confirms the same

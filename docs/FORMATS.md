@@ -364,12 +364,26 @@ Collision lives in `TERRAIN.ALL` (pairing with `level.dat`) and `TERR1.ALL`
     poly, 22 x i16:
       [0,1]   xMin, xExt
       [2,3]   partly understood extent encoding
-      [4..6]  first vertex, absolute
-      [7..9]  second vertex, as a delta
-      [10..12] third vertex, as a delta
-      [13..15] fourth vertex, as a delta (garbage on triangles)
-      [16..18] unit face normal, 2.14 fixed point
-      [19..21] word 20 == 0x7FFF marks a triangle
+      [4..6]  vertex a, absolute
+      [7..9]  vertex b, as a delta from a
+      [10..12] vertex c, as a delta from a
+      [13..15] vertex d, as a delta from a (garbage on triangles)
+      [16..18] unit normal of triangle (a, b, c), 2.14 fixed point
+      [19..21] unit normal of triangle (d, c, b) on a quad;
+               word 20 == 0x7FFF marks a triangle instead
+
+**The four vertices are in triangle-strip order, not perimeter order.** A quad
+is the two triangles `(a, b, c)` and `(d, c, b)`, which is how `toy2.exe`'s
+sweep reads it (`FUN_00481fb0` tests the first triangle against words 16-18
+and the second against words 19-21). Its perimeter is therefore `a, b, d, c`.
+Read as `a, b, c, d` it is a bow-tie for 1,189 of level 1's 1,904 quads, and a
+point-in-polygon test on a bow-tie calls its left and right lobes outside — so
+a third of every big floor was a hole. That was the bug behind Buzz falling
+through solid floor, and it survived every earlier check because the pickup
+markers used to place him happened to sit in the lobes that pass. The parser
+now reorders, and `buildCollisionWorld` splits each quad into its two
+triangles with their own normals; 170 of level 1's quads are not planar, so
+the second normal genuinely differs.
 
 The header is **12 bytes**, with the trailing `FFFFFFFF` belonging to the group
 rather than the last mesh. Measuring it as 16 makes single-mesh groups tile
@@ -377,14 +391,17 @@ while every multi-mesh group fails — which reads convincingly as "there are no
 multi-mesh groups." There are 418.
 
 **There is no `inclination` and no `bouncing`.** The published spec names those
-fields; words 16-18 are a unit face normal, and what it calls `bouncing1` is
-simply the normal's Y. Verified: all 23,394 normals are unit length to within
-0.0000, and each is antiparallel to its winding's geometric normal. There is no
-restitution or material term in the record at all.
+fields; words 16-18 and 19-21 are the two triangles' unit normals, and what it
+calls `bouncing1` is simply the second one's Y. Verified: all 23,394 first
+normals are unit length to within 0.0000, and every quad's second normal is
+too; each is antiparallel to the cross product of its own triangle's winding,
+`(a, b, c)` for the first and `(d, c, b)` for the second, without exception.
+There is no restitution or material term in the record at all.
 
 So **walkability is just the normal's Y component** (PSX +Y is down): a floor
-faces `-Y`. No material system to reverse-engineer. Roughly a third of faces are
-walkable at a 45-degree limit.
+faces `-Y`. No material system to reverse-engineer. The original's limit is 60
+degrees — a contact normal with `y < -0x2000` in 2.14 is ground — read from the
+mover; see docs/PLAYER.md, "Collision".
 
 Other confirmed properties: collision is **instanced** (261 groups reuse the
 previous payload at a new position); type `0x0008` is byte-identical to

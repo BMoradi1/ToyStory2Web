@@ -280,7 +280,19 @@
                 model all agree on one coordinate system.
                 Spawn point is a pickup marker for now - the real one is
                 presumably in the level's own code, which is not decoded.
- P2.3 [READY TO PORT] Collision response. The mover is READ (2026-09-04,
+ P2.3 [READY TO PORT] Collision response.
+                THE FLOOR BUG IS FIXED and it was never the mover: the
+                collision file stores a quad's four vertices in
+                triangle-strip order, and the parser read them as a
+                perimeter, so 1,189 of level 1's 1,904 quads were bow-ties
+                and a point-in-polygon test called their left and right
+                lobes "outside". A third of every large floor was a hole.
+                Quads are now split into their two triangles with their
+                own normals, as the original does. Floor coverage over
+                collision went 93.9% -> 100%; wander fall-outs 74 -> 3;
+                walking forward in the browser for eight seconds stays
+                grounded 100% with no vertical movement.
+                The mover is READ (2026-09-04,
                 Fable): docs/PLAYER.md "Collision: the mover" has the whole
                 algorithm and every constant, checked PC against PSX. The
                 player is a swept SPHERE of radius 4000 (125 level units),

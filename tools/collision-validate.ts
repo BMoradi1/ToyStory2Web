@@ -25,4 +25,4 @@ for (const dir of readdirSync(data).filter((d) => /^level\d+$/.test(d)).sort()) 
 console.log(`groups parsed ${groups}, skipped ${skipped} (expected 300: one stale 1998 file copied 4x)`);
 console.log(`  dynamic (movers): ${dynamic}, meshes: ${meshes}`);
 console.log(`polys ${polys} (${tris} triangles, ${polys - tris} quads)`);
-console.log(`walkable at 45deg: ${walkable} (${(100 * walkable / polys).toFixed(1)}%)`);
+console.log(`walkable at 60deg (the original's limit): ${walkable} (${(100 * walkable / polys).toFixed(1)}%)`);

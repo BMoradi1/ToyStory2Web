@@ -210,8 +210,14 @@
 
  The pattern matches the shell's own command line, so the shell kills itself
  and everything after it in the chain silently does not run. It swallowed a
- commit twice before I noticed. Use a pattern that cannot match, such as
- pkill -f "bin/vite".
+ commit twice before I noticed - and then a third time with "bin/vite", which
+ is no better: ANY literal pattern appears in the command line that runs it.
+ The only safe form is one the shell text cannot match, e.g.
+
+   kill $(pgrep -f "[b]in/vite")
+
+ where the bracket makes the regex match "bin/vite" but not the literal
+ characters "[b]in/vite" in its own invocation. Run it on its own line.
 
  ANOTHER TRAP.  .gitignore has a bare "game/" rule (it guards against a copy
  of the install landing in the tree). It also ignores src/game/, silently -

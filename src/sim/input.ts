@@ -12,7 +12,9 @@
 import type { PlayerInput } from './player.ts';
 
 /** What a binding can drive. */
-export type Action = 'up' | 'down' | 'left' | 'right' | 'jump' | 'spin' | 'fire';
+export type Action =
+  | 'up' | 'down' | 'left' | 'right' | 'jump' | 'spin' | 'fire'
+  | 'cameraLeft' | 'cameraRight';
 
 /** `KeyboardEvent.code` values per action. Codes, not keys, so layout does not matter. */
 export type KeyBindings = Record<Action, string[]>;
@@ -25,6 +27,8 @@ export const DEFAULT_KEYS: KeyBindings = {
   jump: ['Space'],
   spin: ['KeyJ', 'ShiftLeft'],
   fire: ['KeyK', 'ControlLeft'],
+  cameraLeft: ['KeyQ'],
+  cameraRight: ['KeyE'],
 };
 
 /**
@@ -34,9 +38,14 @@ export const DEFAULT_KEYS: KeyBindings = {
  * a PlayStation pad is cross and square. On the web's standard mapping those
  * are 0 and 2, with fire on circle.
  */
-export type PadBindings = { jump: number[]; spin: number[]; fire: number[] };
+export type PadBindings = {
+  jump: number[]; spin: number[]; fire: number[];
+  cameraLeft: number[]; cameraRight: number[];
+};
 
-export const DEFAULT_PAD: PadBindings = { jump: [0], spin: [2], fire: [1] };
+/** Shoulder buttons swing the camera, as the original's menu bindings do. */
+export const DEFAULT_PAD: PadBindings =
+  { jump: [0], spin: [2], fire: [1], cameraLeft: [4], cameraRight: [5] };
 
 /** Below this the stick is treated as centred, before the engine's own dead zone. */
 const PAD_NOISE = 0.06;
@@ -106,6 +115,8 @@ export class InputSource {
     let jump = this.keyDown('jump');
     let spin = this.keyDown('spin');
     let fire = this.keyDown('fire');
+    let cameraLeft = this.keyDown('cameraLeft');
+    let cameraRight = this.keyDown('cameraRight');
 
     const pad = this.gamepad();
     if (pad) {
@@ -122,6 +133,8 @@ export class InputSource {
       jump ||= anyOf(this.pad.jump);
       spin ||= anyOf(this.pad.spin);
       fire ||= anyOf(this.pad.fire);
+      cameraLeft ||= anyOf(this.pad.cameraLeft);
+      cameraRight ||= anyOf(this.pad.cameraRight);
     }
 
     // A diagonal on the keyboard would otherwise be 1.41 long and read as
@@ -129,6 +142,6 @@ export class InputSource {
     const size = Math.hypot(moveX, moveY);
     if (size > 1) { moveX /= size; moveY /= size; }
 
-    return { moveX, moveY, jump, spin, fire };
+    return { moveX, moveY, jump, spin, fire, cameraLeft, cameraRight };
   }
 }

@@ -51,7 +51,8 @@ onto the page instead. Nothing is uploaded either way.
 | `m` | mute or unmute |
 
 While playing: **WASD** or a gamepad stick to move, **space** to jump (again at
-the top for a double jump), **J** to spin, **K** for the laser, **M** to mute. Movement is
+the top for a double jump), **J** to spin, **K** for the laser, **Q**/**E** or
+the shoulder buttons to swing the camera, **M** to mute. Movement is
 camera-relative, as the original's is, and Buzz is animated from the game's own
 animation state machine. Walls do not stop you yet — collision response is the
 next piece of work — so it is possible to walk into scenery or out of the
@@ -89,10 +90,10 @@ level.
 
 ## What doesn't work yet
 
-**The camera** follows properly now — the original's distance, height and yaw
-lag, and it pulls in rather than clipping through scenery — but its four modes,
-auto-centring and look-ahead are not ported, so it will not always frame a
-jump the way the real game does.
+**The camera** has the original's distance, height, yaw lag, hand-turning and
+auto-centring, and pulls in rather than clipping through scenery. What is
+missing is its look-ahead and the pitch it leans into as Buzz climbs or drops,
+so it will not always frame a jump the way the real game does.
 
 **Everything around the moving.** No enemies, no pickups, no HUD, no save file,
 no audio, no cutscenes. The spawn point is a heuristic — the pickup marker

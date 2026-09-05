@@ -318,11 +318,18 @@
                 way round at triple rate past 0x600. Occlusion is a sphere
                 sweep from the player out to the wanted spot, so the camera
                 pulls in rather than clipping through scenery.
-                NOT ported, listed at the foot of the module: the four
-                camera modes and their menu bindings, auto-centring after
-                0xf0 still ticks, look-ahead and the height ramp, the pitch
-                field (+0x2e - a fixed height stands in), and the
-                level-specific cases.
+                Hand-turning is in: Q/E or the shoulder buttons swing the
+                camera by 16 a tick, as "camera left"/"camera right" do,
+                and reset the auto-centre timer to 0x42.
+                Auto-centring is in, and it is a behaviour not an effect:
+                while the player is stopped the camera HOLDS rather than
+                chasing his facing, and only after 100 ticks does it ease
+                back behind him, gathering pace over the next 8. Turning on
+                the spot therefore does not drag the view around.
+                NOT ported, listed at the foot of the module: look-ahead and
+                the height ramp, the pitch field (+0x2e, eased to 0x40 at 8
+                a tick) and the smoothed height, so the view does not tilt
+                as Buzz climbs or drops; and the level-specific cases.
 
  P2.5 [MOSTLY DONE] Animation state machine.
                 Found in toy2.exe: FUN_004011d0 runs a 28-state machine

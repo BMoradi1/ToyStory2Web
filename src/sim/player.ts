@@ -71,9 +71,15 @@ export interface PlayerInput {
   jump: boolean;
   spin: boolean;
   fire: boolean;
+  /** Swing the camera by hand. The original's "camera left"/"camera right". */
+  cameraLeft: boolean;
+  cameraRight: boolean;
 }
 
-export const NO_INPUT: PlayerInput = { moveX: 0, moveY: 0, jump: false, spin: false, fire: false };
+export const NO_INPUT: PlayerInput = {
+  moveX: 0, moveY: 0, jump: false, spin: false, fire: false,
+  cameraLeft: false, cameraRight: false,
+};
 
 /**
  * Mutable player state. Field comments give the original's byte offset in the

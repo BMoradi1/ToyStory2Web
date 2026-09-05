@@ -55,6 +55,27 @@ export const CAMERA = {
   yawHurryThreshold: 0x600,
   /** Radius of the sphere the camera is swept as, so it cannot enter scenery. */
   radius: 200 * S / 32,
+
+  /**
+   * Swinging the camera by hand: `(dt << 5) / 2` per tick, the original's
+   * "camera left" and "camera right".
+   */
+  manualTurn: 16,
+  /** A hand turn resets the auto-centre timer to this, so it waits again. */
+  centreAfterManual: 0x42,
+  /**
+   * Auto-centring. While the player is essentially stopped the camera does
+   * NOT chase his facing — it holds where it is and a timer runs. Past
+   * `centreDelay` it eases behind him, gathering pace over `centreRamp` ticks.
+   * At 0xf0 the timer stops climbing. This is why standing still and turning
+   * on the spot does not drag the view around with you.
+   */
+  centreDelay: 100,
+  centreRamp: 8,
+  centreDivisor: 0x180,
+  centreTimerMax: 0xf0,
+  /** Below this speed on both axes the player counts as stopped. */
+  stillSpeed: 4,
 } as const;
 
 export interface CameraState {
@@ -64,11 +85,16 @@ export interface CameraState {
   yaw: number;
   /** `+0x26`: current follow distance, eased toward `CAMERA.distance`. */
   distance: number;
+  /**
+   * `DAT_0050a534`: how long the player has been standing still. Drives
+   * auto-centring; reset by moving or by turning the camera by hand.
+   */
+  stillFor: number;
 }
 
 export function createCamera(p: PlayerState): CameraState {
   const camera: CameraState = {
-    x: p.x, y: p.y, z: p.z, yaw: p.yaw, distance: CAMERA.distance,
+    x: p.x, y: p.y, z: p.z, yaw: p.yaw, distance: CAMERA.distance, stillFor: 0,
   };
   place(camera, p);
   return camera;
@@ -89,15 +115,48 @@ function place(camera: CameraState, p: PlayerState): void {
  */
 export function stepCamera(
   camera: CameraState, p: PlayerState, world: CollisionWorld | null,
+  input: { cameraLeft: boolean; cameraRight: boolean } = { cameraLeft: false, cameraRight: false },
 ): void {
-  // --- yaw: lag toward the player's facing ---------------------------------
-  let diff = yawDelta(camera.yaw, p.yaw);
-  const lag = p.skid > 0 ? CAMERA.yawLagSkid : CAMERA.yawLag;
-  if (Math.abs(diff) > CAMERA.yawHurryThreshold) {
-    // Nearly behind us: swing round the short way and hurry.
-    diff = ((diff > 0 ? 0x800 : -0x800) - diff) * 3;
+  // --- yaw -----------------------------------------------------------------
+  // Turning it by hand wins, and puts the auto-centre back on its timer.
+  let manual = 0;
+  if (input.cameraRight) manual += CAMERA.manualTurn;
+  if (input.cameraLeft) manual -= CAMERA.manualTurn;
+  if (manual !== 0) {
+    camera.yaw = (camera.yaw + manual) & YAW_MASK;
+    camera.stillFor = CAMERA.centreAfterManual;
   }
-  camera.yaw = (camera.yaw - idiv(diff, lag)) & YAW_MASK;
+
+  const still = Math.abs(p.vx) < CAMERA.stillSpeed && Math.abs(p.vz) < CAMERA.stillSpeed
+    && p.onGround;
+
+  if (still) {
+    // Standing: hold the view where it is and start counting. Only once the
+    // timer is past the delay does the camera drift back behind the player,
+    // and it gathers pace as the timer climbs. Turning on the spot therefore
+    // does not drag the camera round with you, which is the whole point.
+    camera.stillFor = Math.min(CAMERA.centreTimerMax, camera.stillFor + 1);
+    if (camera.stillFor >= CAMERA.centreDelay && manual === 0) {
+      const stage = Math.min(camera.stillFor - CAMERA.centreDelay, CAMERA.centreRamp);
+      const offset = yawDelta(camera.yaw, p.yaw);
+      const step = idiv(Math.abs(offset) * stage, CAMERA.centreDivisor);
+      if (step > 0) {
+        camera.yaw = Math.abs(offset) <= step
+          ? p.yaw
+          : (camera.yaw - Math.sign(offset) * step) & YAW_MASK;
+      }
+    }
+  } else if (manual === 0) {
+    camera.stillFor = 0;
+    // Moving: lag toward the facing.
+    let diff = yawDelta(camera.yaw, p.yaw);
+    const lag = p.skid > 0 ? CAMERA.yawLagSkid : CAMERA.yawLag;
+    if (Math.abs(diff) > CAMERA.yawHurryThreshold) {
+      // Nearly behind us: swing round the short way and hurry.
+      diff = ((diff > 0 ? 0x800 : -0x800) - diff) * 3;
+    }
+    camera.yaw = (camera.yaw - idiv(diff, lag)) & YAW_MASK;
+  }
 
   // --- distance: ease back out after anything pulled it in -----------------
   const wanted = CAMERA.distance;
@@ -151,10 +210,10 @@ export function cameraTarget(p: PlayerState): { x: number; y: number; z: number 
  *
  * - the camera **modes** (`FUN_00405860` switches between four, and the menu
  *   strings "camera mode", "camera left" and "camera right" belong to them)
- * - **auto-centring**: standing still for 0xf0 ticks re-centres the view, with
- *   a first stage at 0x42
  * - **look-ahead** and the height ramp `DAT_0050a4e0`, which rises to 0xc0 at
  *   2 per tick while the player is grounded and moving
- * - the pitch field `+0x2e`, so this uses a fixed height instead
+ * - the pitch field `+0x2e`, eased toward 0x40 at 8 a tick, and the smoothed
+ *   height in `+0x18`/`+0x1c`; a fixed height stands in for both, which is
+ *   why the view does not tilt as Buzz climbs or drops
  * - every level-specific case, of which there are several in the original
  */

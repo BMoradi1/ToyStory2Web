@@ -305,7 +305,10 @@ async function open(dir: GameDir): Promise<void> {
       drive(held: Partial<import('./sim/player.ts').PlayerInput>, ticks = 1) {
         if (!player || !playerRuntime || !currentCollisionWorld || !viewer) return null;
         const ground = groundFromCollision(currentCollisionWorld);
-        const full = { moveX: 0, moveY: 0, jump: false, spin: false, fire: false, ...held };
+        const full = {
+          moveX: 0, moveY: 0, jump: false, spin: false, fire: false,
+          cameraLeft: false, cameraRight: false, ...held,
+        };
         for (let i = 0; i < ticks; i++) stepPlayer(player, full, playerRuntime, ground, 0);
         return { ...player };
       },
@@ -549,7 +552,7 @@ function playTick(): void {
     Math.PI - toRadians(player.yaw),
   );
   if (camera) {
-    stepCamera(camera, player, currentCollisionWorld);
+    stepCamera(camera, player, currentCollisionWorld, held);
     const look = cameraTarget(player);
     viewer.placeCamera(
       camera.x * GAME_TO_RENDER, -camera.y * GAME_TO_RENDER, -camera.z * GAME_TO_RENDER,

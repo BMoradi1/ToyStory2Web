@@ -478,9 +478,14 @@
                 Slot 2 WORKS on level 1: talk to the R.C. car and three
                 laps of its box award the token, with the engine's own
                 "the lap you are on does not count" rule.
-                LEFT: slot 4 (the boss), Mr Potato Head's power-up
-                hand-over, those nine counters, and the other levels'
-                race boxes.
+                Slot 4 WORKS on level 1: reach the tin robot's platform,
+                take its taunt, and spin it while it is open. It is
+                immune otherwise, jumps to its own hit and death script
+                entries, and awards the token partway through dying.
+                So all five of level 1's tokens can now be got: 3 is
+                revealed at init, 0/1/2/4 are earned.
+                LEFT: Mr Potato Head's power-up hand-over, those nine
+                counters, and the other levels' race boxes and bosses.
                 Older note: DECODED (docs/LEVELS.md - slot 0 Hamm's 50
                 coins, 1 find-five, 2 challenge, 3 puzzle token revealed at
                 init, 4 boss; per-level table with ids). Not implemented.

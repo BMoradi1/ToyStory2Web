@@ -52,6 +52,8 @@ export interface TaskState {
   hintChatter: number;
   /** The hint NPC's rotating hint, or -1 before Buzz first comes near. */
   hintIndex: number;
+  /** The boss: 0 not taunted, 1 taunt shown, 2 awake, 3 dead. */
+  boss: number;
   /** The race. */
   race: RaceState;
   laps: number;
@@ -69,7 +71,7 @@ export interface TaskState {
 export function createTasks(): TaskState {
   return {
     done: 0, hammChatter: 0, hintChatter: 0, hintIndex: -1,
-    race: RaceState.Idle, laps: 0, raceQuadrant: 0, raceBlocked: true,
+    boss: 0, race: RaceState.Idle, laps: 0, raceQuadrant: 0, raceBlocked: true,
   };
 }
 
@@ -111,11 +113,38 @@ export function stepTasks(
   creatureAt: (index: number) => Creature | undefined,
   world: {
     coins: number; found: number; rand: RandomStream; talking: boolean;
-    /** Where Buzz is, for the race's lap box. Game units. */
-    x: number; z: number;
+    /** Where Buzz is, for the race's lap box and the boss's height band. */
+    x: number; y: number; z: number;
   },
   dt = 1,
 ): DialogueRequest | null {
+  // --- the mini-boss: taunt, then wake it up.
+  const boss = level.boss;
+  if (boss && tasks.boss < 2) {
+    const c = creatureAt(boss.creature);
+    if (c) {
+      if (tasks.boss === 0) {
+        // Its own handler decides it is being looked at; the height band is
+        // what keeps it from taunting through the ceiling.
+        const inBand = world.y > boss.yMin && world.y < boss.yMax;
+        if (inBand && (c.flags & CREATURE_FLAGS.near) !== 0 && c.animState !== 7) {
+          tasks.boss = 1;
+          return {
+            creature: boss.creature, pathTag: boss.pathTag, text: boss.text,
+            playerYaw: boss.playerYaw, creatureYaw: boss.creatureYaw, slot: -1,
+          };
+        }
+      } else if (!world.talking) {
+        // The taunt is over: kick its script out of the idle loop it starts
+        // in and let it come after Buzz.
+        tasks.boss = 2;
+        c.pc = boss.wakeWord;
+        c.wait = 0;
+        c.flags |= CREATURE_FLAGS.chase;
+      }
+    }
+  }
+
   // --- the race: accept it, then count laps round the box.
   const race = level.race;
   if (race && !slotDone(tasks, race.slot)) {

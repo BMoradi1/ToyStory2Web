@@ -288,6 +288,19 @@ export interface LevelTasks {
     xMin: number; xMax: number; zMin: number; zMax: number;
     laps: number; slot: number;
   };
+  /**
+   * The mini-boss (`slot 4`). It idles in a closed loop until its taunt
+   * dialogue has been seen: the handler opens that when Buzz is in its box
+   * and within the height band of its platform, and the level's tick then
+   * kicks its script to `wakeWord` and gives it the chase flag.
+   */
+  boss?: {
+    creature: number; pathTag: number; text: number;
+    playerYaw: number; creatureYaw: number;
+    /** Buzz has to be between these heights, game units, +Y down. */
+    yMin: number; yMax: number;
+    wakeWord: number; slot: number;
+  };
   /** The find-five owner: their two lines and the slot the second one reveals. */
   findFive?: {
     creature: number; pathTag: number;
@@ -316,6 +329,12 @@ export interface LevelTasks {
 export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
   1: {
     hamm: { creature: 0x1e, pathTag: 0x1d, playerYaw: 0xe10, creatureYaw: 0x6e0, slot: 0 },
+    boss: {
+      creature: 8, pathTag: 0x1a, text: 0x4f0330,
+      playerYaw: 0xe23, creatureYaw: 0x700,
+      yMin: -205114, yMax: -179566,
+      wakeWord: 10, slot: 4,
+    },
     race: {
       creature: 0x1d, pathTag: 0x1b, text: 0x4f042c,
       xMin: 0x2900, xMax: 0x21000, zMin: -0x1e000, zMax: -0x1a000,

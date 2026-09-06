@@ -80,10 +80,11 @@ level.
   it decides what an object is by counting its polygons, and that rule is
   ported as found. The shapes standing in for them are placeholders: the real
   coin art is a sprite inside the executable that is not extracted yet.
-- **Two token tasks work.** Round up Bo Peep's five sheep and tell her, or
-  bring Hamm fifty coins, and the Pizza Planet token you earned appears
-  where the game puts it. Rex tells you what is still to do, rotating
-  through the level's hints and skipping the ones you have done.
+- **Level 1's five tokens can all be got.** Round up Bo Peep's sheep, bring
+  Hamm fifty coins, win the R.C. car's three-lap race, and beat the tin
+  robot in the attic, which is immune until it opens up and has to be spun
+  while it is. The fifth is the one behind the basement boxes. Rex tells you
+  what is still to do, skipping what you have done.
 - **Crates push.** Lean on one of the shove-able crates and it runs along
   the rail the level gives it, tips over a ledge, falls and lands, and can
   be pushed on from there. Its collision moves with it. The crate you see

@@ -207,6 +207,14 @@ export interface CreatureSim {
   lastKilled: number;
   /** Per-type model data, once supplied. */
   models: ReadonlyMap<number, CreatureModel> | null;
+  /**
+   * The mini-boss's state. The engine keeps this in its level script's own
+   * globals rather than on the entity, and so does the handler here: the
+   * health it last saw (`DAT_0052f5a8`), and whether its death has passed the
+   * frame that awards the token (`FUN_004a0db0(4, 0)`).
+   */
+  bossLastHealth: number;
+  bossSlotEarned: boolean;
   /** Indices of the creatures updated this tick, in near-list order. */
   near: number[];
 }
@@ -297,6 +305,7 @@ export function createCreatureSim(
     creatures, world, rand, level,
     sounds: [], sparks: [], shots: [], near: [],
     sheepFound: 0, lastKilled: -1, models: null,
+    bossLastHealth: -1, bossSlotEarned: false,
   };
 }
 
@@ -898,6 +907,46 @@ function hoverBot(sim: CreatureSim, c: Creature, args: HandlerArgs): void {
 }
 
 /**
+ * The tin robot, level 1's mini-boss (`FUN_00416ab0`).
+ *
+ * Three things matter and are ported. Its shell bounces attacks except in
+ * the two animation states where it is open, which is the placement's
+ * `vulnerable` byte being rewritten every tick. Losing health jumps its
+ * script to one of two entry points the script itself provides — word 90 for
+ * a hit, word 101 for dying. And once the death animation passes frame
+ * twelve, the boss token is earned.
+ *
+ * Not ported: the taunt dialogue it opens when Buzz reaches its platform,
+ * its hover wobble, and the sparks and explosion it throws off, which need
+ * the effect system (NEXT_SESSION.txt).
+ */
+function tinRobot(sim: CreatureSim, c: Creature): void {
+  const rec = c.record;
+  // Its top speed is tied to what is left of its health.
+  rec.speedMax = ((c.health + 14) * 12) & 0xff;
+
+  // Open to attack only in the states where it has committed to a move.
+  rec.vulnerable = c.animState === 3 || c.animState === 5 ? 7 : 4;
+
+  if (sim.bossLastHealth === -1) sim.bossLastHealth = c.health;
+  if (c.health !== sim.bossLastHealth) {
+    if (c.health < 10) {
+      // Dying: the script's own death entry, and the shell closes again.
+      c.pc = 101;
+      rec.vulnerable = 4;
+    } else {
+      c.pc = 90;
+    }
+    c.wait = 0;
+    sim.bossLastHealth = c.health;
+  }
+
+  // The token is awarded partway through the death animation, not at the
+  // moment the last hit lands.
+  if (c.animState === 7 && (c.frame >>> 16) > 12) sim.bossSlotEarned = true;
+}
+
+/**
  * The handlers that are ported, by the name `CREATURE_TYPES` gives them.
  * The rest are per-level work: the tin robot's (`FUN_00416ab0`) drives level
  * 1's boss state and its token reveal, and the R.C. car's is the level's own
@@ -906,6 +955,7 @@ function hoverBot(sim: CreatureSim, c: Creature, args: HandlerArgs): void {
 export const CREATURE_HANDLERS: Record<string, CreatureHandler> = {
   FUN_00416a60: sheep,
   LAB_00406220: hoverBot,
+  FUN_00416ab0: tinRobot,
 };
 
 /**

@@ -13,8 +13,13 @@ contact test. The hit geometry is read from each type's `.all`
 (`setCreatureModels`). `tools/creature-probe.ts` runs every creature in the
 install and checks it patrols inside its home box, runs its script, and
 hurts Buzz exactly when its flags say it should.
-Two of the per-type handlers are ported as well: the sheep, which counts
-level 1's find-five task, and the hover bot's firing cycle. The viewer
+Three of the per-type handlers are ported as well: the sheep, which counts
+level 1's find-five task, the hover bot's firing cycle, and the tin robot
+mini-boss — its shell bounces attacks except in the two animation states
+where it is open, losing health jumps its script to the hit or death entry
+the script itself carries, and its death animation awards the boss token.
+The tin robot idles in a closed three-word loop until its taunt dialogue has
+been seen; the level's tick is what kicks its script out of that. The viewer
 draws each creature as its own model, posed by its `animState` and frame,
 which works because `animState` is a slot in that creature's `.anm`.
 **Not ported**: the rest of the handlers, the laser and the dive (damage

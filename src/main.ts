@@ -548,6 +548,7 @@ async function open(dir: GameDir): Promise<void> {
       get tasks() {
         return tasks ? {
           done: tasks.done, hintIndex: tasks.hintIndex,
+          boss: tasks.boss,
           race: tasks.race, laps: tasks.laps, quadrant: tasks.raceQuadrant, blocked: tasks.raceBlocked,
         } : null;
       },
@@ -1022,6 +1023,11 @@ function startHintTalk(objectId: number): boolean {
   return true;
 }
 
+/** Is this slot already earned? */
+function slotDoneNow(slot: number): boolean {
+  return !!tasks && (tasks.done & (1 << slot)) !== 0;
+}
+
 /** Open a character's dialogue (`FUN_004027f0`). */
 function startDialogue(request: import('./sim/tasks.ts').DialogueRequest): void {
   if (!currentLevel || !exeBytes) return;
@@ -1326,10 +1332,13 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
           found: creatureSim.sheepFound,
           rand: creatureSim.rand,
           talking: false,
-          x: player.x, z: player.z,
+          x: player.x, y: player.y, z: player.z,
         },
       );
       if (request) startDialogue(request);
+      // The boss token is awarded by the creature handler partway through
+      // its death, so pick that up here too.
+      if (creatureSim.bossSlotEarned && !slotDoneNow(4)) markSlotDone(tasks, 4);
       // A slot the race awarded has no dialogue to close, so reveal here.
       for (let slot = 0; slot < 5; slot++) {
         if (pickups && (tasks.done & (1 << slot)) !== 0 && !revealedSlots.has(slot)) {

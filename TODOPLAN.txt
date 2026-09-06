@@ -400,13 +400,15 @@
                 bits) live in PickupState for now, not the player block.
                 Headless check on level 1: table spawn, 20 coins, 2 lives
                 and a token collected by walking onto them.
-                Still a stand-in visual (octahedra, coloured by kind); the
-                real coin art is one of the exe's own sprites (the table at
-                DAT_00557500: 50 global headers from PTR_DAT_004ec0a4 plus
-                the level's from PTR_PTR_004f7284[level]; a header is i16
-                texture, u8 w, u8 h, then (u8 u, u8 v) frames from +8,
-                drawn by FUN_00493f40) - not yet extracted; and a collected class
-                object should hide its level mesh, which the renderer
+                Still a stand-in visual (octahedra, coloured by kind). The
+                real coin is DECODED 2026-09-06 (docs/HUD.md): sprite 16 of
+                the exe's sprite table, parsed by src/formats/sprite-table.ts
+                from the user's toy2.exe and validated across every level
+                (tools/sprite-table.ts), drawn 100 x 100 level units
+                camera-facing with a ten-frame spin, per-coin phase,
+                distance fade and a flat shadow; the class objects are
+                their own meshes and tumble. READY for Opus. A collected
+                class object should hide its level mesh, which the renderer
                 cannot do per object yet.
 
  P2.6 [READY]   Skeleton from gfx joints (0x011F) - parser done, unused.
@@ -526,7 +528,11 @@
                 Older note: DECODED (docs/LEVELS.md - slot 0 Hamm's 50
                 coins, 1 find-five, 2 challenge, 3 puzzle token revealed at
                 init, 4 boss; per-level table with ids). Not implemented.
-                HUD for the P2.8 counters, pause and menus: not started.
+                HUD for the P2.8 counters: DECODED 2026-09-06, docs/HUD.md
+                has all ten elements with positions, sprites, colours,
+                slide-in and blink, and the sheets they draw from are in
+                every level's .ngn. READY for Opus. Pause and menus: laid
+                out in the same function, not written up.
  P3.5 [PART]    Mr. Potato Head. The hand-over WORKS 2026-09-05: he has
                 three lines chosen by whether his part is out there, in
                 Buzz's hands or already returned, picking up the level's

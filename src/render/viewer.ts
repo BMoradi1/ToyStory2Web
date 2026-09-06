@@ -524,12 +524,12 @@ export class Viewer {
   /**
    * Show collectibles at these renderer-space positions.
    *
-   * The shapes are a STAND-IN. The real coin is a 2D sprite out of the
-   * executable's own sprite table (`DAT_00557500`, filled by `FUN_00447d40`
-   * and drawn by `FUN_00493f40`), so drawing it needs a 2D path this viewer
-   * does not have yet — the same gap that leaves the talk box in a plain
-   * font. These are small spinning octahedra in its place, and are
-   * deliberately not trying to look like the original.
+   * The shapes are a STAND-IN. The real coin is sprite 16 of the
+   * executable's own sprite table (src/formats/sprite-table.ts), a
+   * camera-facing card with a ten-frame spin and a flat shadow, on texture
+   * slot 31 of the level's own .ngn; docs/HUD.md has the whole draw. These
+   * are small spinning octahedra in its place, and are deliberately not
+   * trying to look like the original.
    *
    * It is NOT the `level.dat` sprite records: those were decoded on
    * 2026-09-05 and turned out to be camera-facing cards for things like

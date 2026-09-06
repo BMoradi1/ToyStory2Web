@@ -217,6 +217,8 @@
         clock's floor of 100 and its 1-in-64 frame divider are all written
         up in docs/LEVELS.md.
 
+      - (the 2D layer is DECODED 2026-09-06: docs/HUD.md. The coin sprite,
+        the HUD and the text box are Opus work now.)
       - nothing else is left on this list. The rest is item 3.
         For the avoidance of doubt, the token tasks are FINISHED as far as
         decoding goes: all five slots on all ten non-boss levels are ported
@@ -246,6 +248,17 @@ mover, damage and contact are all ported (src/sim/creatures.ts), every
 creature in the install patrols correctly (tools/creature-probe.ts), and
 they are drawn as their own models posed by animState. The handlers that
 the token tasks needed are in.
+
+ THE 2D LAYER - DECODED 2026-09-06, an Opus job now. docs/HUD.md: the
+exe's sprite table (parsed and validated, src/formats/sprite-table.ts), the
+draw primitive and its two screen spaces, every HUD element with its
+sprite, position, colour, timer, slide and blink, the coin as a world
+sprite with its spin, phase, fade and shadow, the tumbling class objects,
+and the effects' draw side. Build order: coins as sprites, then the HUD as
+a quad layer over the canvas, then the talk box in the game's own font.
+The sheets are texture slots 31 and 32 of every levelNN/level.ngn, which
+the viewer already decodes. Open: what the second marker list's signposts
+mark (sprite 30), and the pause menu layout.
 
  THE TOKEN TASKS - DONE 2026-09-06. All five slots on all ten non-boss
 levels: Hamm's fifty coins, the find-five owners, the two shapes of race,

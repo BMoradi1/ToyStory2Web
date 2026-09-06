@@ -54,6 +54,8 @@ export interface TaskState {
   hintIndex: number;
   /** The boss: 0 not taunted, 1 taunt shown, 2 awake, 3 dead. */
   boss: number;
+  /** Counts up once the boss is gone, to the delay before its token. */
+  bossGone: number;
   /**
    * Mr Potato Head's missing part (`DAT_00830d48`): the level's part number
    * while it is still out there, its negative once Buzz is carrying it, and
@@ -91,7 +93,7 @@ export function startLevelTasks(tasks: TaskState, level: number): void {
 export function createTasks(): TaskState {
   return {
     done: 0, hammChatter: 0, hintChatter: 0, hintIndex: -1,
-    boss: 0, potatoPart: 0, powerUps: 0, potatoChatter: 0, challenge: 0, challengeFrom: 0,
+    boss: 0, bossGone: 0, potatoPart: 0, powerUps: 0, potatoChatter: 0, challenge: 0, challengeFrom: 0,
     race: RaceState.Idle, laps: 0, raceQuadrant: 0, checkpoint: 0, raceBlocked: true,
   };
 }
@@ -201,30 +203,38 @@ export function stepTasks(
     }
   }
 
-  // --- the mini-boss: taunt, then wake it up.
+  // --- the mini-boss.
   const boss = level.boss;
-  if (boss && tasks.boss < 2) {
+  if (boss && !slotDone(tasks, boss.slot)) {
     const c = creatureAt(boss.creature);
-    if (c) {
+    const taunt = boss.taunt;
+    if (c && taunt && tasks.boss < 2) {
       if (tasks.boss === 0) {
-        // Its own handler decides it is being looked at; the height band is
-        // what keeps it from taunting through the ceiling.
-        const inBand = world.y > boss.yMin && world.y < boss.yMax;
+        // The height band is what keeps it from taunting through the ceiling.
+        const inBand = world.y > taunt.yMin && world.y < taunt.yMax;
         if (inBand && (c.flags & CREATURE_FLAGS.near) !== 0 && c.animState !== 7) {
           tasks.boss = 1;
           return {
-            creature: boss.creature, pathTag: boss.pathTag, text: boss.text,
-            playerYaw: boss.playerYaw, creatureYaw: boss.creatureYaw, slot: -1,
+            creature: boss.creature, pathTag: taunt.pathTag, text: taunt.text,
+            playerYaw: taunt.playerYaw, creatureYaw: taunt.creatureYaw, slot: -1,
           };
         }
       } else if (!world.talking) {
         // The taunt is over: kick its script out of the idle loop it starts
         // in and let it come after Buzz.
         tasks.boss = 2;
-        c.pc = boss.wakeWord;
+        c.pc = taunt.wakeWord;
         c.wait = 0;
         c.flags |= CREATURE_FLAGS.chase;
       }
+    }
+    // Gone for good — its type is zeroed when it is removed and does not
+    // respawn — so run the level scripts' delay and hand the token over.
+    // A boss slot that is not in the level's list at all awards nothing:
+    // that would be a token for a fight that never happened.
+    if (c && c.type === 0) {
+      tasks.bossGone += dt;
+      if (tasks.bossGone >= boss.delay) markSlotDone(tasks, boss.slot);
     }
   }
 

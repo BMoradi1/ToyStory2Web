@@ -98,6 +98,18 @@ from the hint text):
 
 Levels 3, 6, 9, 12 and 15 are boss arenas with no tokens of their own.
 
+**The bosses** award slot 4 the same way on every level but the first: the
+level's tick watches for the boss creature to be gone — its type is zeroed
+when it is removed and does not respawn — then runs a counter from 3 to 0x78
+and hands the token over, latching at 200. That condition was read from level
+5, whose test is literally "entity 3's type field is zero", and matched on
+13. Level 1 is the exception: its tin robot's own handler awards the token
+partway through its death animation instead.
+
+Each level's boss is the creature its taunt line names, and all nine resolve
+to the creature the table above says: the kite, the jackhammer, the clown,
+the dinosaur, the gunslinger, the prospector and the blacksmith.
+
 ## Shared task helpers
 
 Ported 2026-09-05 in `src/sim/tasks.ts`, with the per-level table in

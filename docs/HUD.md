@@ -299,15 +299,23 @@ draw ranges, since it shares one material across every reflective group and
 cannot be hidden a group at a time. The stand-in octahedra are gone: there
 was never anything to stand in for.
 
+**They tumble too.** An uncollected class object turns on all three axes
+while it is near enough to draw, its angles advancing by 10,
+`((i >> 2 & 3) * 3 + 7) * 2` and `((i & 7) + 4) * 2` a tick with `i` the
+record's index, so no two turn together. The level is one shared vertex
+buffer with no per-object transform, so a turn rewrites the object's own
+vertices: the rotation already baked into them is undone and the new one put
+in its place, about the object's origin, which is why the group carries both
+its origin and the angles it was built at. `tools/object-turn.ts` measures
+that against the alternative — rebuilding the whole level with the object
+placed at the new angle — over every level and a spread of angles, and the
+two agree to within 7e-6 renderer units. Only the ranges that moved are
+uploaded, so a spinning token does not cost a hundred thousand vertices a
+frame.
+
 Left to build:
 
 1. **The pause menu and the token screen**, which the HUD function also
    draws and which are not written up here.
-2. **Tumbling.** An uncollected class object turns on all three axes, its
-   angles advancing by 10, `((i >> 2 & 3) * 3 + 7) * 2` and
-   `((i & 7) + 4) * 2` a tick with `i` the record's index, so each turns at
-   its own rate. The rule is decoded; what is missing is a way to move one
-   object of the level, which needs its local vertices kept rather than
-   baked into the shared buffer.
-3. The level's sprite records, if the PSX look is wanted.
-4. Letterboxing the view to 4:3, which is the aspect note above.
+2. The level's sprite records, if the PSX look is wanted.
+3. Letterboxing the view to 4:3, which is the aspect note above.

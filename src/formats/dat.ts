@@ -773,6 +773,15 @@ export interface GeometryGroup {
    * taken off the screen without rebuilding the level.
    */
   object: number | null;
+  /**
+   * Where that object stands, renderer units, and the rotation already baked
+   * into these vertices, in the engine's 4,096-per-turn angles. A pickup
+   * turns on the spot, and rebuilding its vertices needs both: the spin is
+   * applied about the origin, and composed with the rotation that is already
+   * there rather than replacing it. Null on a merged group.
+   */
+  origin: readonly [number, number, number] | null;
+  rotation: readonly [number, number, number] | null;
 }
 
 export interface LevelGeometry {
@@ -853,6 +862,18 @@ export function faceAlpha(mode: number): number {
  * Composition order is assumed Ry * Rx * Rz and is unverified — though the
  * large majority of objects rotate on a single axis, where order can't matter.
  */
+/** The 4,096 steps a full turn is divided into, for both angles and yaw. */
+export const OBJECT_ANGLE_UNITS = ANGLE_UNITS;
+
+/**
+ * The rotation an object's vertices were baked with, as a row-major 3x3.
+ * Exported so a caller that wants to turn one object can undo the baked
+ * rotation and apply another in its place.
+ */
+export function objectRotationMatrix(x: number, y: number, z: number): number[] {
+  return rotationMatrix({ x, y, z });
+}
+
 function rotationMatrix(rot: Vec3): number[] {
   const a = (u: number) => (u / ANGLE_UNITS) * Math.PI * 2;
   const [sx, cx] = [Math.sin(a(rot.x)), Math.cos(a(rot.x))];
@@ -950,6 +971,7 @@ export function buildLevelGeometry(level: DatLevel, options: GeometryOptions = {
       z: (object.scale.z / ANGLE_UNITS) * u,
     };
     const px = object.position.x * u, py = object.position.y * u, pz = object.position.z * u;
+    const separate = options.separate?.has(index) ?? false;
 
     for (const face of mesh.faces) {
       const bucket = bucketFor({
@@ -959,7 +981,13 @@ export function buildLevelGeometry(level: DatLevel, options: GeometryOptions = {
         alpha: faceAlpha(face.mode),
         reflect: (face.mode & 0x08) !== 0,
         zone,
-        object: options.separate?.has(index) ? index : null,
+        object: separate ? index : null,
+        origin: separate
+          ? [px / WORLD_SCALE, -py / WORLD_SCALE, -pz / WORLD_SCALE] as const
+          : null,
+        rotation: separate
+          ? [object.rotation.x, object.rotation.y, object.rotation.z] as const
+          : null,
       });
 
       // PSX colour scaling differs by primitive kind: textured polys modulate

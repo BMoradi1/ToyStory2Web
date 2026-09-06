@@ -114,6 +114,8 @@ const groups: GeometryGroup[] = geo.groups.map((g) => {
     zone: level.zone ?? null,
     reflect: level.reflect ?? false,
     object: level.object ?? null,
+    origin: level.origin ?? null,
+    rotation: level.rotation ?? null,
   };
 });
 

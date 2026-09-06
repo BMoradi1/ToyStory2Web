@@ -415,9 +415,13 @@
                 from level load. buildLevelGeometry now takes a set of
                 objects to keep in their own draw groups and the viewer
                 hides those, the reflection overlay included.
-                LEFT: the tumble each uncollected object does, decoded in
-                docs/HUD.md, which needs a way to move one object of the
-                level rather than baking it into the shared buffer.
+                They tumble as well: three angles per object, each at its
+                own rate off the record's index, applied by undoing the
+                rotation baked into that object's vertices and putting the
+                new one in its place about its origin. Checked against
+                rebuilding the level at the new angle over every level by
+                tools/object-turn.ts, agreeing to 7e-6 renderer units, and
+                only the moved vertices are uploaded.
 
  P2.6 [READY]   Skeleton from gfx joints (0x011F) - parser done, unused.
 

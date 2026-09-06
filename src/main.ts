@@ -4,7 +4,10 @@ import {
   type AnmFile, type Animation,
 } from './formats/anm.ts';
 import * as THREE from 'three';
-import { WORLD_SCALE, buildLevelGeometry, objectFaceCount, parseDat, reachableZones, type DatLevel } from './formats/dat.ts';
+import {
+  OBJECT_ANGLE_UNITS, WORLD_SCALE, buildLevelGeometry, objectFaceCount, parseDat,
+  reachableZones, type DatLevel,
+} from './formats/dat.ts';
 import { decodeBmp, parseNgn, type NgnTexture } from './formats/ngn.ts';
 import { assignZones, parseNgnScene } from './formats/ngnscene.ts';
 import {
@@ -979,6 +982,8 @@ async function spawnPlayer(): Promise<void> {
   for (const slot of tokenSlotsAtStart(level)) revealToken(pickups, slot);
   // Each coin's shadow lies on the floor under it, so the ground is measured
   // once here rather than every frame.
+  pickupAngles = pickups.items.map(() => [0, 0, 0]);
+  pickupAngleMap.clear();
   pickupFloor = pickups.items.map((item) => {
     const hit = currentCollisionWorld
       ? groundBelow(currentCollisionWorld, item.x, item.y, item.z)
@@ -1041,9 +1046,23 @@ function drawCoins(): void {
   const shadowUv = shadow ? uv(shadow, 0) : null;
 
   let phase = 0;
+  pickupAngleMap.clear();
   for (let i = 0; i < pickups.items.length; i++) {
     const item = pickups.items[i]!;
-    if (item.kind !== PickupKind.Coin) continue;
+    if (item.kind !== PickupKind.Coin) {
+      // Everything else is one of the level's objects, and it tumbles while
+      // it is near enough to draw: three angles, each advancing at its own
+      // rate off the record's index, so no two turn together.
+      if (!item.enabled || item.collected || item.objectIndex < 0) continue;
+      const dx = camX - item.x / 16, dz = camZ - item.z / 16;
+      if (dx * dx + dz * dz - COIN_DRAW.fadeBias >= radius2) continue;
+      const a = pickupAngles[i]!;
+      a[0] = (a[0] + 10) % OBJECT_ANGLE_UNITS;
+      a[1] = (a[1] + (((i >> 2) & 3) * 3 + 7) * 2) % OBJECT_ANGLE_UNITS;
+      a[2] = (a[2] + ((i & 7) + 4) * 2) % OBJECT_ANGLE_UNITS;
+      pickupAngleMap.set(item.objectIndex, a);
+      continue;
+    }
     // Every coin in the list advances the phase, taken or not, so collecting
     // one does not re-shuffle the rest.
     const frame = ((hud.coinSpin >> 1) + phase) % COIN_DRAW.phaseWrap;
@@ -1066,6 +1085,7 @@ function drawCoins(): void {
     }
   }
   viewer.setWorldCards(coinCards, coinShadows);
+  viewer.setObjectAngles(pickupAngleMap);
 }
 
 /** What the HUD needs to know this tick, gathered from the sim. */
@@ -1403,6 +1423,9 @@ let hud: HudState = createHud();
 let hudPainter: HudPainter | null = null;
 /** Each coin's floor height in level units, for its shadow. */
 let pickupFloor: number[] = [];
+/** How far each class object has turned, in the engine's 4,096-per-turn angles. */
+let pickupAngles: [number, number, number][] = [];
+const pickupAngleMap = new Map<number, readonly [number, number, number]>();
 /** Rebuilt every tick: the coins and the shadows under them. */
 const coinCards: WorldSprite[] = [];
 const coinShadows: WorldSprite[] = [];

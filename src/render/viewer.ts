@@ -15,7 +15,10 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { MeshData } from '../formats/all.ts';
-import { WORLD_SCALE, type GeometryGroup, type LevelGeometry } from '../formats/dat.ts';
+import {
+  OBJECT_ANGLE_UNITS, WORLD_SCALE, objectRotationMatrix,
+  type GeometryGroup, type LevelGeometry,
+} from '../formats/dat.ts';
 import { isWalkable, type CollisionGroup } from '../formats/collision.ts';
 import { SpriteBatch, type WorldSprite } from './world-sprites.ts';
 
@@ -95,6 +98,14 @@ export class Viewer {
   private hiddenObjects: ReadonlySet<number> = new Set();
   /** The groups the reflection overlay draws, so they can be filtered too. */
   private reflectGroups: readonly GeometryGroup[] = [];
+  /**
+   * The vertices of every object kept separate, as the level built them.
+   * Turning one rewrites its range of the shared buffer, so the untouched
+   * original has to be kept to turn it from.
+   */
+  private objectVertices = new Map<number, { start: number; count: number; base: Float32Array }[]>();
+  /** The angles each of those objects has been turned to. */
+  private objectAngles = new Map<number, readonly [number, number, number]>();
 
   constructor(canvas: HTMLCanvasElement) {
     this.view = canvas;
@@ -223,6 +234,20 @@ export class Viewer {
     this.current = new THREE.Mesh(buffer, materials);
     this.scene.add(this.current);
 
+    // Keep the untouched vertices of anything that can be turned.
+    this.objectVertices = new Map();
+    this.objectAngles = new Map();
+    for (const group of geometry.groups) {
+      if (group.object === null) continue;
+      let ranges = this.objectVertices.get(group.object);
+      if (!ranges) { ranges = []; this.objectVertices.set(group.object, ranges); }
+      ranges.push({
+        start: group.start,
+        count: group.count,
+        base: geometry.positions.slice(group.start * 3, (group.start + group.count) * 3),
+      });
+    }
+
     // The reflection pass: the same triangles again, sphere-mapped. A matcap
     // material is exactly the mapping the engine generates by hand — the
     // texture is indexed by the view-space normal — so the overlay is one
@@ -275,6 +300,72 @@ export class Viewer {
   setHiddenObjects(objects: ReadonlySet<number>): void {
     this.hiddenObjects = objects;
     this.applyVisibility();
+  }
+
+  /**
+   * Turn one of the level's objects on the spot, in the engine's 4,096-per-
+   * turn angles. Only an object the geometry kept separate can be turned.
+   *
+   * The vertices already carry the object's placed rotation, so the spin is
+   * not applied on top of them: the baked rotation is undone and the new one
+   * put in its place, about the object's own origin. That keeps a pickup
+   * turning exactly as the engine turns it, which is by setting the angles
+   * rather than adding to the mesh.
+   */
+  setObjectAngles(angles: ReadonlyMap<number, readonly [number, number, number]>): void {
+    const mesh = this.current;
+    const groups = this.lastLevel?.geometry.groups;
+    if (!mesh || !groups) return;
+    const position = mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const array = position.array as Float32Array;
+    let touched = false;
+
+    for (const [object, ranges] of this.objectVertices) {
+      const want = angles.get(object);
+      const have = this.objectAngles.get(object);
+      if (!want) continue;
+      if (have && have[0] === want[0] && have[1] === want[1] && have[2] === want[2]) continue;
+      const group = groups.find((g) => g.object === object);
+      if (!group || !group.origin || !group.rotation) continue;
+      this.objectAngles.set(object, want);
+      touched = true;
+
+      // `M = R(new) * R(baked)^T` in game space, wrapped by the axis flip the
+      // renderer uses, so it can be applied straight to the drawn vertices.
+      const base = objectRotationMatrix(group.rotation[0], group.rotation[1], group.rotation[2]);
+      const next = objectRotationMatrix(
+        want[0] % OBJECT_ANGLE_UNITS, want[1] % OBJECT_ANGLE_UNITS, want[2] % OBJECT_ANGLE_UNITS,
+      );
+      const m = new Array(9).fill(0) as number[];
+      for (let i = 0; i < 3; i++) {
+        for (let j = 0; j < 3; j++) {
+          let sum = 0;
+          for (let k = 0; k < 3; k++) sum += next[i * 3 + k]! * base[j * 3 + k]!;
+          // Y and Z are negated on the way to the renderer, so a term
+          // changes sign whenever exactly one of its ends is flipped.
+          m[i * 3 + j] = i === 0 === (j === 0) ? sum : -sum;
+        }
+      }
+
+      const [ox, oy, oz] = group.origin;
+      for (const range of ranges) {
+        // Upload only what moved. The level's buffer is a hundred thousand
+        // vertices and a pickup is a couple of hundred of them, so sending
+        // the whole thing every frame for a spinning token would cost more
+        // than everything else the renderer does.
+        position.addUpdateRange(range.start * 3, range.count * 3);
+        for (let v = 0; v < range.count; v++) {
+          const o = v * 3;
+          const x = range.base[o]! - ox, y = range.base[o + 1]! - oy, z = range.base[o + 2]! - oz;
+          const w = (range.start + v) * 3;
+          array[w] = m[0]! * x + m[1]! * y + m[2]! * z + ox;
+          array[w + 1] = m[3]! * x + m[4]! * y + m[5]! * z + oy;
+          array[w + 2] = m[6]! * x + m[7]! * y + m[8]! * z + oz;
+        }
+      }
+    }
+    if (touched) position.needsUpdate = true;
+    else position.clearUpdateRanges();
   }
 
   /** A group is drawn when its zone is showing and its object is not hidden. */

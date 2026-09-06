@@ -72,6 +72,8 @@ export interface TaskState {
   laps: number;
   /** The four side bits of the lap box, from last tick. */
   raceQuadrant: number;
+  /** How many of a checkpoint race's gates have been passed, in order. */
+  checkpoint: number;
   /**
    * Blocks the next outward crossing from counting. It starts set, so the
    * lap you are on when the flag drops does not count, and crossing the line
@@ -90,7 +92,7 @@ export function createTasks(): TaskState {
   return {
     done: 0, hammChatter: 0, hintChatter: 0, hintIndex: -1,
     boss: 0, potatoPart: 0, powerUps: 0, potatoChatter: 0, challenge: 0, challengeFrom: 0,
-    race: RaceState.Idle, laps: 0, raceQuadrant: 0, raceBlocked: true,
+    race: RaceState.Idle, laps: 0, raceQuadrant: 0, checkpoint: 0, raceBlocked: true,
   };
 }
 
@@ -235,6 +237,7 @@ export function stepTasks(
         tasks.race = RaceState.Accepted;
         tasks.laps = 0;
         tasks.raceQuadrant = 0;
+        tasks.checkpoint = 0;
         tasks.raceBlocked = true;
         return {
           creature: race.creature, pathTag: race.pathTag, text: race.text,
@@ -244,7 +247,7 @@ export function stepTasks(
     } else if (tasks.race === RaceState.Accepted) {
       // The engine waits for the talk box to shut before the flag drops.
       if (!world.talking) tasks.race = RaceState.Running;
-    } else if (tasks.race === RaceState.Running) {
+    } else if (tasks.race === RaceState.Running && race.style === 'lap') {
       // One bit per side of the box; 0xf is inside it.
       let bits = world.z < race.zMax ? 1 : 0;
       if (world.x > race.xMin) bits |= 2;
@@ -259,6 +262,24 @@ export function stepTasks(
         tasks.raceBlocked = true;
       }
       tasks.raceQuadrant = bits;
+      if (tasks.laps >= race.laps) {
+        tasks.race = RaceState.Done;
+        markSlotDone(tasks, race.slot);
+      }
+    } else if (tasks.race === RaceState.Running && race.style === 'checkpoints') {
+      // Each gate is a two-bit quadrant code, and they have to come in the
+      // table's order. The first half is measured against one pair of
+      // thresholds, the second half against another.
+      const half = tasks.checkpoint < race.codes.length / 2 ? race.first : race.second;
+      if (tasks.checkpoint < race.codes.length) {
+        let code = world.x > half.x ? 1 : 0;
+        if (world.z > half.z) code += 2;
+        if (code === race.codes[tasks.checkpoint]) tasks.checkpoint += 1;
+      }
+      if (tasks.checkpoint === race.codes.length && world.z > race.finishZ) {
+        tasks.checkpoint = 0;
+        tasks.laps += 1;
+      }
       if (tasks.laps >= race.laps) {
         tasks.race = RaceState.Done;
         markSlotDone(tasks, race.slot);

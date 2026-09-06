@@ -285,9 +285,27 @@ export interface LevelTasks {
    */
   race?: {
     creature: number; pathTag: number; text: number;
-    xMin: number; xMax: number; zMin: number; zMax: number;
     laps: number; slot: number;
-  };
+  } & ({
+    /**
+     * Level 1's shape: four bits, one per side of a box, and a lap each time
+     * Buzz leaves across the first bit's edge.
+     */
+    style: 'lap';
+    xMin: number; xMax: number; zMin: number; zMax: number;
+  } | {
+    /**
+     * Level 2's shape: eight checkpoints that have to be passed in order,
+     * each a two-bit quadrant code. The first four are measured against one
+     * pair of thresholds and the last four against another, and the lap
+     * lands when the eighth is passed and Buzz is beyond `finishZ`.
+     */
+    style: 'checkpoints';
+    codes: readonly number[];
+    first: { x: number; z: number };
+    second: { x: number; z: number };
+    finishZ: number;
+  });
   /**
    * The mini-boss (`slot 4`). It idles in a closed loop until its taunt
    * dialogue has been seen: the handler opens that when Buzz is in its box
@@ -373,6 +391,7 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
       wakeWord: 10, slot: 4,
     },
     race: {
+      style: 'lap',
       creature: 0x1d, pathTag: 0x1b, text: 0x4f042c,
       xMin: 0x2900, xMax: 0x21000, zMin: -0x1e000, zMax: -0x1a000,
       laps: 3, slot: 2,
@@ -387,6 +406,15 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
     },
   },
   2: {
+    race: {
+      style: 'checkpoints',
+      creature: 0x1d, pathTag: 5, text: 0x4f10f8,
+      codes: [0, 1, 3, 2, 3, 1, 0, 2],
+      first: { x: 0x25342, z: 0x3cc17 },
+      second: { x: 0xb9c2, z: -0x42069 },
+      finishZ: -0x24269,
+      laps: 3, slot: 2,
+    },
     hamm: { creature: 0xf, pathTag: 0x8, playerYaw: 0xc00, creatureYaw: 0x400, slot: 0 },
     hintNpc: {
       creature: 0x1b, pathTag: 0xb,

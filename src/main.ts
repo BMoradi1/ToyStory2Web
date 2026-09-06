@@ -559,7 +559,8 @@ async function open(dir: GameDir): Promise<void> {
         return tasks ? {
           done: tasks.done, hintIndex: tasks.hintIndex,
           boss: tasks.boss, potatoPart: tasks.potatoPart, powerUps: tasks.powerUps,
-          race: tasks.race, laps: tasks.laps, quadrant: tasks.raceQuadrant, blocked: tasks.raceBlocked,
+          race: tasks.race, laps: tasks.laps, quadrant: tasks.raceQuadrant,
+          checkpoint: tasks.checkpoint, challenge: tasks.challenge, blocked: tasks.raceBlocked,
         } : null;
       },
       get talk() {

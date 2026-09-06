@@ -149,6 +149,14 @@ token slot:
   points are within `r` in 256-game-unit steps. `0x280` (= 640 × 256) is the
   usual trigger reach.
 
+**Races come in two shapes**, and both are ported (2026-09-05,
+`src/sim/tasks.ts`). Level 1's is a lap box, below. Level 2's is eight
+checkpoints that have to be passed in order, each a two-bit quadrant code
+from a table in the executable, the first four measured against one pair of
+thresholds and the last four against another, with the lap landing when the
+eighth is passed beyond a finish line. Levels 4, 5, 11 and 13 have no race at
+all: their slot 2 is a collect-five-objects challenge instead.
+
 **The race is ported** (2026-09-05, `src/sim/tasks.ts`). The laps are
 counted on BUZZ's position, not the car's, so it works without the car
 driving its route: four bits, one per side of a box, and a lap each time he

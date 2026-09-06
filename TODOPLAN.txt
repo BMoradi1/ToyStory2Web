@@ -489,8 +489,13 @@
                 and 13 have instead. The find-five counting works on every
                 level (one shared creature handler), and Mr Potato Head
                 hands his power-up over.
-                LEFT: the other levels' race boxes and bosses, and levels
-                7 and 10's Mr Potato Head paths, which are variables.
+                Level 2's race is in too - a different shape, eight
+                ordered checkpoints rather than a lap box.
+                LEFT: a long tail of the same kind of work - each
+                remaining level's race and its boss handler, and levels 7
+                and 10's Mr Potato Head paths, which are variables. Each
+                is small, bespoke and reads the same way as the ones
+                already done.
                 Older note: DECODED (docs/LEVELS.md - slot 0 Hamm's 50
                 coins, 1 find-five, 2 challenge, 3 puzzle token revealed at
                 init, 4 boss; per-level table with ids). Not implemented.

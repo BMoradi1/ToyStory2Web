@@ -396,12 +396,35 @@ effect - 1, pitch, volume, pos, 0)`, which adds the one back before
     i16 effect     1..61: the global name table at 0x4fcdc4
                    87..:  this level's own table, PTR_PTR_004fd140[level * 2],
                           whose base index is DAT_004fd144[level * 2] = 87
-    i16 pitch      5120 on most records; scale unknown
+    i16 pitch      5120 on most records. UNUSED on PC: `FUN_004a3c80` never
+                   reads its pitch argument, and the buffer plays at the
+                   WAV's own rate (`DAT_00726234`, stored at load). A PSX
+                   SPU pitch, most likely, left behind by the port
     i16 volume     0..150 after clamping; distance-attenuated when the play
-                   call asks for it: (0xc0 - dist) * 16 / 24
+                   call asks for it (below)
     i16 volume2    a second channel level, usually 0
     i16 priority   2, 3, 4 or -1
     i16 x 3        falloff parameters, e.g. (10, 10, 120)
+
+**Attenuation, pan and the slider** (`FUN_004a3c80` → `FUN_0047de50`).
+A positional play computes two levels, one per ear, from the sound's
+offset to the render camera (`DAT_00555314/18/1c`) in 512-game-unit steps,
+turned into camera space by the camera's rotation rows (`DAT_00555334`,
+row 0, and `DAT_00555340`, row 2; 12-bit):
+
+    x = row0 . d >> 12            sideways
+    z = (row2 . d >> 12) / 2      depth, halved
+    L = (0xc0 - sqrt(z^2 + (x + 0x40)^2)) * 16 / 24
+    R = (0xc0 - sqrt(z^2 + (x - 0x40)^2)) * 16 / 24     each clamped 0..150
+
+so a sound fades out 192 steps (3072 level units) from the camera and the
+ears sit 64 steps apart. A non-positional play uses the record's volume
+for both. The DirectSound buffer then gets `SetPan((L - R) * 10000 / 128)`
+clamped to ±10000, and `SetVolume(curve[(slider * max(L, R)) >> 8])` where
+the slider `DAT_004fcdb0` is the options byte times two and `curve` is the
+151-entry 1/100 dB table at `0x4fd668` that the music volume uses too
+(NEXT_SESSION.txt, MUSIC). The call returns `(L + R) / 2`, which the
+creature code keeps as the event's loudness.
 
 Per-level names come from `data/sfx/<name>.wav` too, and `FUN_0047ec20`
 loads the global table then the level's at `level` start. Examples: event

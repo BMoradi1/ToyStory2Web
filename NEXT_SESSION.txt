@@ -137,10 +137,14 @@
         validated against every scene. Side find: a dynamic collision
         group's object number sits at +0x1a of its TERRAIN.ALL entry;
         reserved path tags 58 (sparkle points, decoded) and 59-63 (leads).)
-      - the sound event table's pitch scale, then Opus ports playEvent().
-      - the wall-line list DAT_007290f4: read in three places, never
-        written by name in the dump, so it is filled through a pointer -
-        find the writer.
+      - (the sound event pitch is SETTLED 2026-09-05: unused on PC, the
+        buffer plays at the WAV's own rate. The attenuation, pan and
+        slider maths are in docs/LEVELS.md "Attenuation, pan and the
+        slider"; Opus can port playEvent() now.)
+      - (the wall-line list DAT_007290f4 is CLOSED 2026-09-05: the machine
+        code never writes it - zeroed at level load, read three times -
+        so the line collision is dead on PC. docs/PLAYER.md.)
+      - nothing is left on this list. The next Fable work is item 3.
 
  3. THE REMAINING FORMAT UNKNOWNS.  None block anything, all are the same
     shape of puzzle, and the .ngn scene is an oracle for most of them:

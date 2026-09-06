@@ -540,7 +540,9 @@ later change.
 
 Projectile speeds and lifetimes; the exact ledge-grab probe geometry
 (`FUN_00435f30` probes 0x3600 below the origin and one third of a unit
-forward, low confidence); the "line"
-collision the mover also runs (`FUN_00480660`, a linked list at `0x7290f4` of
-up to 32 vertical segments, tested like walls) — level 1's terrain file has no
-infinite-wall groups, so where those lines come from is open.
+forward, low confidence). The "line" collision the mover also runs
+(`FUN_00480660`, walking a linked list at `0x7290f4` of up to 32 vertical
+segments, tested like walls) is dead on PC: the machine code reads that
+head in three places (`FUN_00484380`, `FUN_0048c860`, `FUN_0048d530`),
+zeroes it with the rest of its block at level load (`FUN_00489980`), and
+never writes it, so every walk is over an empty list. Nothing to port.

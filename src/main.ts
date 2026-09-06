@@ -4,7 +4,7 @@ import {
   type AnmFile, type Animation,
 } from './formats/anm.ts';
 import * as THREE from 'three';
-import { WORLD_SCALE, buildLevelGeometry, parseDat, reachableZones, type DatLevel } from './formats/dat.ts';
+import { WORLD_SCALE, buildLevelGeometry, objectFaceCount, parseDat, reachableZones, type DatLevel } from './formats/dat.ts';
 import { decodeBmp, parseNgn, type NgnTexture } from './formats/ngn.ts';
 import { assignZones, parseNgnScene } from './formats/ngnscene.ts';
 import { buildCollisionWorld, groundBelow, parseCollision, type CollisionGroup, type CollisionWorld } from './formats/collision.ts';
@@ -229,7 +229,7 @@ async function showLevel(index: number): Promise<void> {
       if (sceneBytes) {
         try {
           zones = assignZones(
-            parsed.objects.map((o) => ({ ...o, faceCount: parsed.meshes.get(o.meshOffset)?.faces.length ?? -1 })),
+            parsed.objects.map((o) => ({ ...o, faceCount: objectFaceCount(parsed, o) })),
             parseNgnScene(sceneBytes),
           );
         } catch { /* no zones: the level still draws, just all at once */ }

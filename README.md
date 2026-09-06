@@ -77,7 +77,7 @@ level.
   with the engine's own reach test. The game has no "type" field for these:
   it decides what an object is by counting its polygons, and that rule is
   ported as found. The shapes standing in for them are placeholders: the real
-  coin art lives in a sprite pool that is not decoded.
+  coin art is a sprite inside the executable that is not extracted yet.
 - **Sound.** Buzz's effects play from your install's own `data/sfx`, found by
   the names the engine itself uses — a table of 61 strings inside the
   executable that match the files on disc exactly.

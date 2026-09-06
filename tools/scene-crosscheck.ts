@@ -9,7 +9,7 @@
  *   npx tsx tools/scene-crosscheck.ts "Toy Story 2"
  */
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { parseDat } from '../src/formats/dat.ts';
+import { objectFaceCount, parseDat } from '../src/formats/dat.ts';
 import { assignZones, parseNgnScene } from '../src/formats/ngnscene.ts';
 
 const root = process.argv[2];
@@ -44,7 +44,7 @@ for (const dir of readdirSync(`${root}/data`).filter((d) => /^level\d\d$/.test(d
         if (datFaces.has(keyOf(prim.indices.slice(i, i + step).map((ix) => { const v = g.vertices[ix]!; return [v.x, v.y, v.z]; })))) hit++;
       }
     }
-    const zones = assignZones(level.objects.map((o) => ({ ...o, faceCount: level.meshes.get(o.meshOffset)?.faces.length ?? -1 })), scene);
+    const zones = assignZones(level.objects.map((o) => ({ ...o, faceCount: objectFaceCount(level, o) })), scene);
     const assigned = zones.filter((z) => z !== null).length;
     const ok = sect1 === list1 && hit / total > 0.97 && assigned === level.objects.length;
     if (!ok) bad++;

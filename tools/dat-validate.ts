@@ -23,14 +23,25 @@ let okCount = 0, failCount = 0, totalTris = 0;
 for (const path of files) {
   const label = path.split('/').slice(-2).join('/');
   try {
-    const level = parseDat(readFileSync(path));
+    const bytes = readFileSync(path);
+    const level = parseDat(bytes);
     const geo = buildLevelGeometry(level);
+    // The pool should now tile to the end of the file: meshes, sprite records
+    // and the odd lone terminator, nothing else.
+    let walk = level.sections.meshPool;
+    for (;;) {
+      const m = level.meshes.get(walk); const sp = level.sprites.get(walk);
+      if (m) walk = m.end; else if (sp) walk = sp.end;
+      else if (walk + 4 <= bytes.length && bytes.readUInt32LE(walk) === 0xffffffff) walk += 4;
+      else break;
+    }
+    const poolNote = walk === bytes.length ? 'pool tiled' : `pool walk stops at ${walk} of ${bytes.length}`;
     totalTris += geo.triangleCount;
     okCount++;
     console.log(
       `${label.padEnd(20)} markers=${String(level.markers.length).padStart(3)} ` +
       `paths=${String(level.paths.length).padStart(3)} zones=${String(level.zones.length).padStart(3)} ` +
-      `objects=${String(level.objects.length).padStart(4)} meshes=${String(level.meshes.size).padStart(4)} ` +
+      `objects=${String(level.objects.length).padStart(4)} meshes=${String(level.meshes.size).padStart(4)} sprites=${String(level.sprites.size).padStart(2)} ${poolNote} ` +
       `drawn=${String(geo.objectCount).padStart(4)} tris=${geo.triangleCount}`,
     );
   } catch (err) {

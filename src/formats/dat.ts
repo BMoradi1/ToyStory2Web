@@ -111,6 +111,53 @@ export interface DatFace {
 export interface DatMesh { offset: number; end: number; vertices: DatVertex[]; faces: DatFace[] }
 
 /**
+ * One quad of a sprite record: a camera-facing card hung on a node. The
+ * corners are 2D offsets from the node in the object's units; `mode` is the
+ * same texture page / flag word a face group carries.
+ */
+export interface DatSpriteFace {
+  corners: { x: number; y: number }[];
+  /** i16 at +16, added to the card's depth (times the draw scale, 1.0). 0 in every record but one. */
+  depthOffset: number;
+  /**
+   * u16 at +18: bits 0..4 the texture slot, the same per-slot table a face
+   * group's mode indexes; bits 5..6 the PSX blend: 0x60 opaque, anything else
+   * semi-transparent with mode `(mode >> 5) & 3`.
+   */
+  mode: number;
+  uvs: { u: number; v: number }[];
+  colours: { r: number; g: number; b: number; flag: number }[];
+}
+
+/**
+ * A sprite record — the other thing an object's "mesh" pointer can name.
+ * Which reader an object needs is decided by its placement's flags, not by
+ * the record (see `DatPlacement.kind`); the executable's own classifier
+ * (`FUN_0043e430`) walks this form as
+ *
+ *     i32 nodeCount; nodeCount x { i32 x, y, z }
+ *     nodeCount x { i32 faceCount; faceCount x face (44 bytes) }
+ *     face: 4 x { i16 x, i16 y }; i16 depthOffset; u16 mode; 4 x { u8 u, v }; 4 x { u8 r, g, b, flag }
+ *
+ * A chandelier is one of these: seven nodes, one flame card each. There are
+ * 57 in the install, and every one ends exactly where the next record starts
+ * (two are followed by a lone FFFFFFFF, the last sprite of the second
+ * section in level01/level and level01/level1). The PC executable never
+ * draws them — it renders the .ngn scene, where pconv has turned them into
+ * ordinary quads — but it does walk them to count an object's polygons.
+ *
+ * How the PlayStation build draws them (`FUN_80023730` in psx.exe, chosen by
+ * `FUN_8001fc2c`): each node goes through the object's rotation and
+ * translation into camera space; each card's corners are then added in a
+ * camera-aligned frame at the node's depth, so the cards are billboards.
+ * With placement flag bit 0 clear the frame is the screen itself, with the
+ * x offsets stretched by 0x1999/0x1000 = 1.6; with it set the frame is
+ * turned to the camera's yaw only, so the card stays upright. The corner z
+ * is ignored either way (the frame's third column is zero).
+ */
+export interface DatSprite { offset: number; end: number; nodes: Vec3[]; faces: DatSpriteFace[][] }
+
+/**
  * A placement: one of the 20-byte records the engine's level loader
  * (`FUN_0043e6e0` in toy2.exe) walks to put objects in the world. The object
  * table the renderer reads is what these point at; the engine's own logic —
@@ -136,10 +183,15 @@ export interface DatPlacement {
   /**
    * Byte at +14. Nonzero on every real record — a zero here ends the table.
    * Bit 0x08 selects the 32-byte object record with the mesh pointer at
-   * +0x1c (every placement seen has it); 0x20 marks an object with a second
-   * mesh pointer; 0x80 is rewritten to 0x40 at load.
+   * +0x1c; 0x20 marks an object with a second mesh pointer; 0x80 is rewritten
+   * to 0x40 at load. Masked with 0x6f, the loader's classifier
+   * (`FUN_0043e430`) reads 1, 4, 0x41, 0x44 (and 9, 0xc, 0x49, 0x4c with the
+   * 32-byte record) as a mesh and 2, 3, 0x42, 0x43 (0xa, 0xb, 0x4a, 0x4b) as
+   * a sprite record — that is `kind`.
    */
   flags: number;
+  /** What the placed object's pointer names, from `flags` (see there). */
+  kind: 'mesh' | 'sprite';
   /** Byte at +15. Small integers, purpose unknown. */
   aux: number;
   /** Byte offset of the object record this places, i.e. a `DatObject.offset`. */
@@ -173,12 +225,43 @@ export interface DatLevel {
   zones: Zone[];
   objects: DatObject[];
   meshes: Map<number, DatMesh>;
+  /** Sprite records by offset, the way `meshes` holds meshes. */
+  sprites: Map<number, DatSprite>;
 }
 
 const ZONE_SIZE = 64;
 const ZONE_MAGIC = 0x0005;
 const ZONE_TAG = 0x0041;
 const MESH_TERMINATOR = 0xffffffff;
+/** `flags & 0x6f` values the loader's classifier treats as a sprite record. */
+const SPRITE_FLAG_KINDS = new Set([0x02, 0x03, 0x42, 0x43, 0x0a, 0x0b, 0x4a, 0x4b]);
+
+/** Read one sprite record (see `DatSprite`); null if it cannot be one. */
+function readSprite(r: Reader, offset: number): DatSprite | null {
+  if (offset + 4 > r.length) return null;
+  const nodeCount = r.i32(offset);
+  if (nodeCount <= 0 || nodeCount > 256 || offset + 4 + nodeCount * 12 > r.length) return null;
+  let pos = offset + 4;
+  const nodes: Vec3[] = [];
+  for (let i = 0; i < nodeCount; i++) { nodes.push(r.vec3(pos)); pos += 12; }
+  const faces: DatSpriteFace[][] = [];
+  for (let i = 0; i < nodeCount; i++) {
+    if (pos + 4 > r.length) return null;
+    const faceCount = r.i32(pos);
+    pos += 4;
+    if (faceCount < 0 || faceCount > 4096 || pos + faceCount * 44 > r.length) return null;
+    const list: DatSpriteFace[] = [];
+    for (let k = 0; k < faceCount; k++) {
+      const corners = [0, 1, 2, 3].map((c) => ({ x: r.i16(pos + c * 4), y: r.i16(pos + c * 4 + 2) }));
+      const uvs = [0, 1, 2, 3].map((c) => ({ u: r.bytes[pos + 20 + c * 2]!, v: r.bytes[pos + 21 + c * 2]! }));
+      const colours = [0, 1, 2, 3].map((c) => ({ r: r.bytes[pos + 28 + c * 4]!, g: r.bytes[pos + 29 + c * 4]!, b: r.bytes[pos + 30 + c * 4]!, flag: r.bytes[pos + 31 + c * 4]! }));
+      list.push({ corners, depthOffset: r.i16(pos + 16), mode: r.u16(pos + 18), uvs, colours });
+      pos += 44;
+    }
+    faces.push(list);
+  }
+  return { offset, end: pos, nodes, faces };
+}
 
 class Reader {
   readonly view: DataView;
@@ -486,29 +569,42 @@ export function parseDat(buffer: ArrayBuffer | Uint8Array): DatLevel {
   for (; resolves(q); q += 20) firstSection++;
   if (firstSection > 0) for (let i = firstSection; i < objects.length; i++) objects[i]!.unitScale = 4;
 
-  // --- mesh pool: meshes are stored back to back, but resolve them from the
-  //     object pointers rather than only by walking forwards. The pool ends in
-  //     a 2D sprite pool we can't parse yet, so a contiguous walk stops early
-  //     and would silently drop every object pointing past that point.
-  const meshes = new Map<number, DatMesh>();
-  for (let o = meshStart; o < r.length - 8;) {
-    const mesh = readMesh(r, o);
-    if (!mesh) break;
-    meshes.set(o, mesh);
-    o = mesh.end;
-  }
-  for (const object of objects) {
-    if (object.meshOffset === 0 || meshes.has(object.meshOffset)) continue;
-    const mesh = readMesh(r, object.meshOffset);
-    if (mesh) meshes.set(object.meshOffset, mesh);
-  }
-
   // Placements point at object records by the offset of their position field,
   // which is exactly what `DatObject.offset` records.
   const objectAt = new Map(objects.map((o, i) => [o.offset, i]));
   for (const p of placements) p.objectIndex = objectAt.get(p.objectOffset) ?? -1;
 
-  return { sections, placements, objectIds, markers, paths, zones, objects, meshes };
+  // --- mesh pool: meshes and sprite records stored back to back. Which is
+  //     which is the placement's say (`kind`), never the record's: a sprite
+  //     record can pass the mesh reader by accident (16 do across the install),
+  //     so resolve every placed object by its own pointer with the right
+  //     reader first, and only then walk the pool for whatever is left, taking
+  //     each record with the reader its pointer chose.
+  const meshes = new Map<number, DatMesh>();
+  const sprites = new Map<number, DatSprite>();
+  const spriteOffsets = new Set<number>();
+  for (const p of placements) {
+    const object = objects[p.objectIndex];
+    if (object && object.meshOffset !== 0 && p.kind === 'sprite') spriteOffsets.add(object.meshOffset);
+  }
+  for (const object of objects) {
+    const o = object.meshOffset;
+    if (o === 0 || meshes.has(o) || sprites.has(o)) continue;
+    if (spriteOffsets.has(o)) { const sprite = readSprite(r, o); if (sprite) sprites.set(o, sprite); continue; }
+    const mesh = readMesh(r, o);
+    if (mesh) meshes.set(o, mesh);
+  }
+  for (let o = meshStart; o < r.length - 8;) {
+    if (meshes.has(o)) { o = meshes.get(o)!.end; continue; }
+    if (sprites.has(o)) { o = sprites.get(o)!.end; continue; }
+    if (r.u32(o) === MESH_TERMINATOR) { o += 4; continue; }  // the lone word after a section's last sprite
+    const mesh = readMesh(r, o);
+    if (!mesh) break;
+    meshes.set(o, mesh);
+    o = mesh.end;
+  }
+
+  return { sections, placements, objectIds, markers, paths, zones, objects, meshes, sprites };
 }
 
 /**
@@ -574,6 +670,7 @@ function readPlacements(r: Reader, pos: number): { placements: DatPlacement[]; o
       placements.push({
         offset: pos, table, position: r.vec3(pos),
         param: r.i16(pos + 12), flags, aux: r.bytes[pos + 15]!,
+        kind: SPRITE_FLAG_KINDS.has(flags & 0x6f) ? 'sprite' : 'mesh',
         objectOffset: r.u32(pos + 16), objectIndex: -1,
       });
       pos += 20;
@@ -612,6 +709,30 @@ export function meshPolyCount(mesh: DatMesh): number {
     n += kind >= 8 && kind <= 0xe && kind !== 0xd ? 2 : 1;
   }
   return n;
+}
+
+/**
+ * The polygon count the engine gives an object (`FUN_0043e430`): the mesh
+ * count above, or for a sprite record the number of cards over all its
+ * nodes. -1 when the pointer names nothing readable.
+ */
+export function objectPolyCount(level: DatLevel, object: DatObject | undefined): number {
+  if (!object) return -1;
+  const mesh = level.meshes.get(object.meshOffset);
+  if (mesh) return meshPolyCount(mesh);
+  const sprite = level.sprites.get(object.meshOffset);
+  if (sprite) return sprite.faces.reduce((n, list) => n + list.length, 0);
+  return -1;
+}
+
+/** Faces as the scene cross-check counts them: mesh faces, or a sprite's cards. -1 if unreadable. */
+export function objectFaceCount(level: DatLevel, object: DatObject | undefined): number {
+  if (!object) return -1;
+  const mesh = level.meshes.get(object.meshOffset);
+  if (mesh) return mesh.faces.length;
+  const sprite = level.sprites.get(object.meshOffset);
+  if (sprite) return sprite.faces.reduce((n, list) => n + list.length, 0);
+  return -1;
 }
 
 // --- Renderable output ------------------------------------------------------

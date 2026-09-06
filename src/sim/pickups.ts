@@ -36,7 +36,7 @@
  * Positions here are LEVEL units, as the engine stores them; the player is
  * in game units and is converted at the test.
  */
-import { meshPolyCount, type DatLevel } from '../formats/dat.ts';
+import { objectPolyCount, type DatLevel } from '../formats/dat.ts';
 import { firstPickupId, TOKEN_LISTS } from './level-data.ts';
 import { GAME_UNITS_PER_LEVEL_UNIT } from './player-constants.ts';
 import type { PlayerState } from './player.ts';
@@ -150,8 +150,8 @@ export function createPickups(dat: DatLevel, level: number): PickupState {
     const placement = dat.placements[dat.objectIds[id]!];
     if (!placement) continue;
     const object = dat.objects[placement.objectIndex];
-    const mesh = object ? dat.meshes.get(object.meshOffset) : undefined;
-    const kind = mesh ? kindOfPolyCount(meshPolyCount(mesh)) : PickupKind.None;
+    const polys = objectPolyCount(dat, object);
+    const kind = polys >= 0 ? kindOfPolyCount(polys) : PickupKind.None;
     const slot = tokens ? tokens.ids.indexOf(id) : -1;
     const spare = tokens !== undefined && id >= tokens.spare && id < tokens.spare + 5;
     items.push({

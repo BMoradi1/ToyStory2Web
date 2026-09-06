@@ -12,7 +12,7 @@
  */
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { meshPolyCount, parseDat } from '../src/formats/dat.ts';
+import { objectPolyCount, parseDat } from '../src/formats/dat.ts';
 import { GroupType, parseAll } from '../src/formats/all.ts';
 import { kindOfPolyCount, PickupKind } from '../src/sim/pickups.ts';
 import { firstPickupId, HINT_SIGNS, levelNumber, PUSH_BLOCKS, SPARKLE_PATH_TAG, TOKEN_LISTS } from '../src/sim/level-data.ts';
@@ -40,9 +40,8 @@ for (const dir of dirs) {
       const p = dat.placements[dat.objectIds[id]!];
       if (!p) continue;
       const object = dat.objects[p.objectIndex];
-      const mesh = object ? dat.meshes.get(object.meshOffset) : undefined;
-      const polys = mesh ? meshPolyCount(mesh) : -1;
-      const kind = kindOfPolyCount(polys);
+      const polys = objectPolyCount(dat, object);
+      const kind = polys >= 0 ? kindOfPolyCount(polys) : PickupKind.None;
       const name = kind === PickupKind.None ? `?${polys}` : PickupKind[kind]!;
       summary.set(name, (summary.get(name) ?? 0) + 1);
       rows.push(`  id ${id.toString(16).padStart(2, '0')}  ${name.padEnd(12)} table ${p.table} ` +
@@ -55,9 +54,8 @@ for (const dir of dirs) {
     if (tokens) {
       const kinds = tokens.ids.map((id) => {
         const p = dat.placements[dat.objectIds[id] ?? -1];
-        const object = p ? dat.objects[p.objectIndex] : undefined;
-        const mesh = object ? dat.meshes.get(object.meshOffset) : undefined;
-        return mesh ? kindOfPolyCount(meshPolyCount(mesh)) : PickupKind.None;
+        const polys = objectPolyCount(dat, p ? dat.objects[p.objectIndex] : undefined);
+        return polys >= 0 ? kindOfPolyCount(polys) : PickupKind.None;
       });
       const ok = kinds.every((k) => k === PickupKind.Token);
       if (!ok) failures++;
@@ -66,9 +64,8 @@ for (const dir of dirs) {
 
     const kindOf = (id: number): PickupKind => {
       const p = dat.placements[dat.objectIds[id] ?? -1];
-      const object = p ? dat.objects[p.objectIndex] : undefined;
-      const mesh = object ? dat.meshes.get(object.meshOffset) : undefined;
-      return mesh ? kindOfPolyCount(meshPolyCount(mesh)) : PickupKind.None;
+      const polys = objectPolyCount(dat, p ? dat.objects[p.objectIndex] : undefined);
+      return polys >= 0 ? kindOfPolyCount(polys) : PickupKind.None;
     };
     const notes: string[] = [];
     const signs = HINT_SIGNS[level];

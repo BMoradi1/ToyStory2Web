@@ -148,8 +148,10 @@
 
  3. THE REMAINING FORMAT UNKNOWNS.  None block anything, all are the same
     shape of puzzle, and the .ngn scene is an oracle for most of them:
-      - the 2D sprite pool at the tail of level.dat's mesh pool. 98 KB in
-        level 1, and the second object section points into it
+      - (the "sprite pool" is DECODED 2026-09-05: sprite records - nodes
+        carrying camera-facing cards - interleaved with the meshes, told
+        apart by the placement's flags; docs/FORMATS.md, DatSprite. The
+        PSX decompile, rebuilt this session, gave the draw semantics.)
       - (section 4 is SOLVED 2026-09-05: two placement tables and the
         object-id list, parsed and documented in docs/FORMATS.md)
       - what the extra-pass material (mode bit 0x08) actually draws

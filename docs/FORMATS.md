@@ -466,6 +466,8 @@ with no offset table:
     zone      u16 0x0005, u16 0x0041; 4 x { i32 x,y,z }; i32 a, b, c
     object    i32 x,y,z; [u16 rx,ry,rz]; [u16 sx,sy,sz]; u16 flags; u32 meshPtr
     mesh      i32 nverts; nverts x { i16 x,y,z; u16 colour }; face groups; FFFFFFFF
+    sprite    i32 nodes; nodes x { i32 x,y,z }; nodes x { i32 cards; cards x card }
+    card      4 x { i16 x, y }; i16 depthOffset; u16 mode; 4 x { u8 u, v }; 4 x { u8 r,g,b,flag }
 
 **The mesh pointer is the record's LAST field, not its first.** Both readings
 tile the table identically, because the u32 that ends one record sits at the
@@ -589,17 +591,42 @@ zone) each consuming one instance. Assigns every object in 13 of 16 scenes and
 all but one or two in the rest. `tools/scene-crosscheck.ts` reports all of
 this per scene.
 
-**Do not resolve meshes by walking the pool alone.** The pool ends in a 2D
-sprite section we can't parse yet, so a contiguous walk stops early; objects
-pointing past that point must be resolved from their own pointers. Doing only
-the walk silently drops ~27% of level 1's objects — it renders, so the loss is
-easy to miss.
+**The pool holds two kinds of record, and only the placement knows which.**
+Alongside meshes sit **sprite records** (the "2D sprite section" of earlier
+notes, which is not a section: 25 records in level 1, 57 across the install,
+interleaved with meshes from 0x52b44 on in level 1). A sprite record is a
+list of nodes, each carrying camera-facing cards — a chandelier is seven
+nodes with a flame card each; the largest has 18 nodes. Nothing in the
+record says which kind it is: the loader's classifier `FUN_0043e430` masks
+the **placement's** flags byte with `0x6f` and reads 1, 4, 0x41, 0x44 (9,
+0xc, 0x49, 0x4c with the 32-byte object) as a mesh and 2, 3, 0x42, 0x43
+(0xa, 0xb, 0x4a, 0x4b) as a sprite, and the PSX renderer dispatches on the
+same values (`FUN_8001fc2c`). That is `DatPlacement.kind`. Sixteen sprite
+records across the install happen to pass the mesh reader, so a reader
+that guesses from the bytes invents meshes; resolve every object by its
+placement's kind first and only then walk the pool for leftovers. Done that
+way the pool tiles to the last byte of every real scene file: meshes,
+sprites, and a lone `FFFFFFFF` after the second section's last sprite in
+two files.
 
-**Validated:** 16 of 16 real scene files parse, 320,257 triangles across the
-game (an earlier figure of 338,650 counted the phantom second halves of
-triangle-group faces). Level 1 yields 1,126 objects over 701 meshes drawing
-1,072 of them, plus 70 markers, 30 paths and 22 zones — matching an
-independent Python implementation exactly. Top-down renders show a room with floorboards, an
+The card's `mode` word is a face group's: bits 0..4 the texture slot, bits
+5..6 the PSX blend (0x60 opaque, else semi-transparent mode `(mode >> 5) &
+3`; the records seen use 0x21/0x25, additive, and 0x61..0x6b, opaque).
+`depthOffset` is added to the card's depth and is 0 in every record but
+one. The PSX build (`FUN_80023730`) transforms each node by the object's
+rotation and position, then adds the corners in a camera-aligned frame:
+placement flag bit 0 clear means screen-aligned with x stretched by 1.6
+(0x1999/0x1000, the 4:3 correction), set means turned to the camera's yaw
+only, an upright card. The PC never draws these records — pconv turned them
+into ordinary quads in the `.ngn` — but `FUN_0043e430` counts their cards as
+the object's polygons, which is what `objectPolyCount` does.
+
+**Validated:** 16 of 16 real scene files parse, 314,050 triangles across the
+game (an earlier 320,257 included sprite records misread as meshes; 338,650
+before that counted the phantom second halves of triangle-group faces).
+Level 1 yields 1,126 objects over 699 meshes and 25 sprite records, drawing
+1,069 of them, plus 70 markers, 30 paths and 22 zones — the mesh figures
+matching an independent Python implementation exactly. Top-down renders show a room with floorboards, an
 octagonal rug and a roof gable.
 
 The four files that fail (`level07`–`level10`'s `level1.dat`) are **one
@@ -834,7 +861,7 @@ screen unchanged.
 
 **Still unknown:** the 20-byte ref list (not positional under either record
 pairing — test membership, not distance); `Object.flags`; the `aux` block;
-zone `a`/`b` beyond "portal pair"; the sprite pool at the mesh-pool tail; what
+zone `a`/`b` beyond "portal pair"; what
 the extra-pass global material looks like; and chunks `0x102`/`0x103`/`0x105`
 of the `.ngn` scene, which look like paths, portals and a name table.
 

@@ -399,7 +399,11 @@
                 Headless check on level 1: table spawn, 20 coins, 2 lives
                 and a token collected by walking onto them.
                 Still a stand-in visual (octahedra, coloured by kind); the
-                real coin sprite pool is undecoded, and a collected class
+                real coin art is one of the exe's own sprites (the table at
+                DAT_00557500: 50 global headers from PTR_DAT_004ec0a4 plus
+                the level's from PTR_PTR_004f7284[level]; a header is i16
+                texture, u8 w, u8 h, then (u8 u, u8 v) frames from +8,
+                drawn by FUN_00493f40) - not yet extracted; and a collected class
                 object should hide its level mesh, which the renderer
                 cannot do per object yet.
 
@@ -496,7 +500,11 @@
  [DONE]   .kep / .new - older revisions of level.dat itself.
  [READY]  .raw / .raws - chunked RNC PRO-PACK, chunk size 0x830C. Superseded
           for textures by .ngn.
- [OPEN]   The 2D sprite pool at the mesh-pool tail; the aux block on
+ [DONE]   The "2D sprite pool" - 2026-09-05: not a pool but sprite RECORDS
+          (nodes with camera-facing cards) interleaved with the meshes, the
+          placement's flags saying which is which; parsed (DatSprite), the
+          pool now tiles every real scene to its last byte. FORMATS.md.
+ [OPEN]   The aux block on
           negative-count meshes; mode bits 13/14/15 and the low nibble
           (answered by P1.1); the 20-byte ref list's meaning.
 

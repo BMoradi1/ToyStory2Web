@@ -490,8 +490,17 @@
                 coins, 1 find-five, 2 challenge, 3 puzzle token revealed at
                 init, 4 boss; per-level table with ids). Not implemented.
                 HUD for the P2.8 counters, pause and menus: not started.
- P3.5 [BLOCKED] Mr. Potato Head parts -> Cosmic Shield, Disk Launcher,
-                Rocket Boots, Grappling Hook (+ a fifth).
+ P3.5 [PART]    Mr. Potato Head. The hand-over WORKS 2026-09-05: he has
+                three lines chosen by whether his part is out there, in
+                Buzz's hands or already returned, picking up the level's
+                uncategorised object is what puts it in Buzz's hands, and
+                handing it back grants the level's power-up bit. The five
+                are Cosmic Shield (1), Disk Launcher (4), Rocket Boots (7),
+                Grappling Hook (10) and Hover Boots (13), from the table at
+                0x503a22.
+                LEFT: the power-ups do nothing yet - none of the five moves
+                is implemented - and levels 7 and 10 pass his path in a
+                variable, so only 1, 4 and 13 are tabled.
  P3.6 [READY]   Save format: Toy200.sav / Toy299.sav are samples in the
                 install; decode, then write.
  P3.7 [BLOCKED] Level 3 boss              <- P3.3. Forces the scripting model

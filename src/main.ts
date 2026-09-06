@@ -36,7 +36,7 @@ import {
   type TalkState,
 } from './sim/talk.ts';
 import { LEVEL_TASKS } from './sim/level-data.ts';
-import { createTasks, markSlotDone, stepTasks, type TaskState } from './sim/tasks.ts';
+import { createTasks, markSlotDone, startLevelTasks, stepTasks, type TaskState } from './sim/tasks.ts';
 import { unpackRaw } from './formats/rnc.ts';
 import {
   CREATURE_LIST_TYPE, parseCreatureList, parseCreatureModels, parseCreatureNames,
@@ -527,6 +527,16 @@ async function open(dir: GameDir): Promise<void> {
           })),
         };
       },
+      /** Stand the player on the first pickup of a kind, by its name. */
+      goToPickupKind(kind: string) {
+        if (!player || !pickups) return null;
+        const item = pickups.items.find((i) => i.enabled && !i.collected && PickupKind[i.kind] === kind);
+        if (!item) return null;
+        const S = GAME_UNITS_PER_LEVEL_UNIT;
+        player.x = item.x * S; player.y = item.y * S; player.z = item.z * S;
+        player.vx = 0; player.vy = 0; player.vz = 0;
+        return { kind, id: item.id, x: player.x, y: player.y, z: player.z };
+      },
       /** Stand the player on a hint sign, so touching it opens the talk box. */
       goToHintSign(which = 0) {
         if (!player || !pickups) return null;
@@ -548,7 +558,7 @@ async function open(dir: GameDir): Promise<void> {
       get tasks() {
         return tasks ? {
           done: tasks.done, hintIndex: tasks.hintIndex,
-          boss: tasks.boss,
+          boss: tasks.boss, potatoPart: tasks.potatoPart, powerUps: tasks.powerUps,
           race: tasks.race, laps: tasks.laps, quadrant: tasks.raceQuadrant, blocked: tasks.raceBlocked,
         } : null;
       },
@@ -882,6 +892,7 @@ async function spawnPlayer(): Promise<void> {
   drawPushBlocks();
 
   tasks = createTasks();
+  startLevelTasks(tasks, level);
   revealedSlots = new Set();
   pickups = createPickups(currentLevel.level, level);
   for (const slot of tokenSlotsAtStart(level)) revealToken(pickups, slot);
@@ -1334,7 +1345,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
             : creatureSim.foundCount,
           rand: creatureSim.rand,
           talking: false,
-          x: player.x, y: player.y, z: player.z,
+          x: player.x, y: player.y, z: player.z, level,
         },
       );
       if (request) startDialogue(request);
@@ -1369,6 +1380,12 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     // PICKUP1 is the engine's own name for a collect; which of PICKUP1 and
     // PICKUP5 belongs to which collectible is in the sound EVENT table, which
     // is not ported (docs/PLAYER.md).
+    // The object with no category is Mr Potato Head's missing part: picking
+    // it up flips his part state negative, which is how he knows Buzz has it.
+    if (tasks && tasks.potatoPart > 0 && taken.some((t) => t.kind === PickupKind.None)) {
+      tasks.potatoPart = -tasks.potatoPart;
+      infoEl.textContent = "you picked up mr potato head's missing part";
+    }
     // A hint sign is reported but never consumed; touching one opens its box.
     const sign = taken.find((t) => t.kind === PickupKind.HintSign);
     if (sign && !talk) startHintTalk(pickups.items[sign.index]!.id);

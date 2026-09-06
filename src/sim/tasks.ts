@@ -14,7 +14,7 @@
  */
 
 import { CREATURE_FLAGS, type Creature } from './creatures.ts';
-import { HAMM_COINS, TASK_TEXT, type LevelTasks } from './level-data.ts';
+import { HAMM_COINS, POTATO_PARTS, TASK_TEXT, type LevelTasks } from './level-data.ts';
 import type { RandomStream } from './creatures.ts';
 
 /** A dialogue the level wants opened, as `FUN_004027f0` takes it. */
@@ -54,6 +54,15 @@ export interface TaskState {
   hintIndex: number;
   /** The boss: 0 not taunted, 1 taunt shown, 2 awake, 3 dead. */
   boss: number;
+  /**
+   * Mr Potato Head's missing part (`DAT_00830d48`): the level's part number
+   * while it is still out there, its negative once Buzz is carrying it, and
+   * zero when it has been handed back.
+   */
+  potatoPart: number;
+  /** Power-up bits earned (`DAT_0052f2d8`). */
+  powerUps: number;
+  potatoChatter: number;
   /** The race. */
   race: RaceState;
   laps: number;
@@ -68,10 +77,16 @@ export interface TaskState {
   raceBlocked: boolean;
 }
 
+/** Set the level's starting state: which part Mr Potato Head is missing. */
+export function startLevelTasks(tasks: TaskState, level: number): void {
+  tasks.potatoPart = POTATO_PARTS[level]?.part ?? 0;
+}
+
 export function createTasks(): TaskState {
   return {
     done: 0, hammChatter: 0, hintChatter: 0, hintIndex: -1,
-    boss: 0, race: RaceState.Idle, laps: 0, raceQuadrant: 0, raceBlocked: true,
+    boss: 0, potatoPart: 0, powerUps: 0, potatoChatter: 0,
+    race: RaceState.Idle, laps: 0, raceQuadrant: 0, raceBlocked: true,
   };
 }
 
@@ -115,9 +130,40 @@ export function stepTasks(
     coins: number; found: number; rand: RandomStream; talking: boolean;
     /** Where Buzz is, for the race's lap box and the boss's height band. */
     x: number; y: number; z: number;
+    /** The game's level number, for the per-level power-up. */
+    level: number;
   },
   dt = 1,
 ): DialogueRequest | null {
+  // --- Mr Potato Head: his part, and the power-up he gives back for it.
+  const potato = level.potato;
+  if (potato) {
+    const c = creatureAt(potato.creature);
+    if (c) {
+      if ((c.flags & CREATURE_FLAGS.near) !== 0 && !world.talking) {
+        tasks.potatoChatter -= dt;
+        if (tasks.potatoChatter < 0) tasks.potatoChatter = chatter(world.rand);
+      }
+      if (tookTalk(c)) {
+        // Carrying it: hand it over and take the power-up.
+        if (tasks.potatoPart < 0) {
+          tasks.powerUps |= POTATO_PARTS[world.level]?.power ?? 0;
+          tasks.potatoPart = 0;
+          return {
+            creature: potato.creature, pathTag: potato.pathTag, text: potato.thanksText,
+            playerYaw: potato.playerYaw, creatureYaw: potato.creatureYaw, slot: -1,
+          };
+        }
+        return {
+          creature: potato.creature, pathTag: potato.pathTag,
+          // Still out there, or already done and he explains what it does.
+          text: tasks.potatoPart > 0 ? potato.askText : potato.explainText,
+          playerYaw: potato.playerYaw, creatureYaw: potato.creatureYaw, slot: -1,
+        };
+      }
+    }
+  }
+
   // --- the mini-boss: taunt, then wake it up.
   const boss = level.boss;
   if (boss && tasks.boss < 2) {

@@ -30,8 +30,11 @@ Buzz Lightyear to the Rescue** (Traveller's Tales, 1999).
   twice over from the install: `gfx/level1a..level5c.cfg` texture sets, and
   boss cutscenes at exactly `l 03/06/09/12/15 bo`.
 - 5 Pizza Planet tokens per level, 50 total, gating level unlocks.
-- Power-ups unlock via Mr. Potato Head's parts: Cosmic Shield, Disk Launcher,
-  Rocket Boots, Grappling Hook (+ a fifth).
+- Power-ups unlock via Mr. Potato Head's parts, one on each of levels 1, 4,
+  7, 10 and 13: Cosmic Shield, Disk Launcher, Rocket Boots, Grappling Hook
+  and Hover Boots. The fifth was open until 2026-09-05; the table at 0x503a22
+  pairs each level with its part and its power-up bit, and the levels' own
+  dialogue names them.
 - Engine runs at ~59 FPS (16949 microsecond frame pacing) with a native 4:3
   projection. Source: RibShark's ToyStory2Fix, which patches this exe.
 

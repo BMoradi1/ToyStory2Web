@@ -301,6 +301,21 @@ export interface LevelTasks {
     yMin: number; yMax: number;
     wakeWord: number; slot: number;
   };
+  /**
+   * Mr Potato Head (`FUN_004a2480`). He has three lines, chosen by whether
+   * his missing part is still out there, in Buzz's hands, or already
+   * returned, and handing it back grants the level's power-up.
+   */
+  potato?: {
+    creature: number; pathTag: number;
+    /** Said while the part is still out there. */
+    askText: number;
+    /** Said when Buzz brings it. */
+    thanksText: number;
+    /** Said once it is done: what the power-up is for. */
+    explainText: number;
+    playerYaw: number; creatureYaw: number;
+  };
   /** The find-five owner: their two lines and the slot the second one reveals. */
   findFive?: {
     creature: number; pathTag: number;
@@ -338,6 +353,7 @@ export interface LevelTasks {
  */
 export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
   1: {
+    potato: { creature: 0x1f, pathTag: 0x19, askText: 0x4f0adc, thanksText: 0x4f0b60, explainText: 0x4f0c10, playerYaw: 0x200, creatureYaw: 0xa00 },
     hamm: { creature: 0x1e, pathTag: 0x1d, playerYaw: 0xe10, creatureYaw: 0x6e0, slot: 0 },
     boss: {
       creature: 8, pathTag: 0x1a, text: 0x4f0330,
@@ -371,6 +387,7 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
     },
   },
   4: {
+    potato: { creature: 0x15, pathTag: 0x1e, askText: 0x4f1818, thanksText: 0x4f18a0, explainText: 0x4f192c, playerYaw: 0x440, creatureYaw: 0xc40 },
     hamm: { creature: 0x14, pathTag: 0x1d, playerYaw: 0xe10, creatureYaw: 0x6e0, slot: 0 },
     hintNpc: {
       creature: 0x11, pathTag: 0x23,
@@ -437,6 +454,7 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
     },
   },
   13: {
+    potato: { creature: 8, pathTag: 0x1f, askText: 0x4f4268, thanksText: 0x4f42b8, explainText: 0x4f4384, playerYaw: -1, creatureYaw: 0xe00 },
     hamm: { creature: 0x6, pathTag: 0x1d, playerYaw: -1, creatureYaw: 0x0, slot: 0 },
     hintNpc: {
       creature: 0x21, pathTag: 0x22,
@@ -458,6 +476,31 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
       askText: 0x4f47cc, doneText: 0x4f4844, slot: 1, needed: 5, countedBy: 'creature',
     },
   },
+};
+
+/**
+ * Mr Potato Head's five power-ups, by the bit the hand-over ORs into the
+ * player's set (`DAT_00503a23[level * 2]`, granted in `FUN_004a2480`). The
+ * fifth was open in CLAUDE.md: it is the hover boots.
+ */
+export const POWER_UP = {
+  cosmicShield: 0x01,
+  rocketBoots: 0x02,
+  diskLauncher: 0x04,
+  hoverBoots: 0x08,
+  grapplingHook: 0x10,
+} as const;
+
+/**
+ * Which part he is missing on each level and which power-up he gives back,
+ * from the two-byte-per-level table at 0x503a22. Only five levels have one.
+ */
+export const POTATO_PARTS: Readonly<Record<number, { part: number; power: number }>> = {
+  1: { part: 8, power: POWER_UP.cosmicShield },
+  4: { part: 9, power: POWER_UP.diskLauncher },
+  7: { part: 1, power: POWER_UP.rocketBoots },
+  10: { part: 4, power: POWER_UP.grapplingHook },
+  13: { part: 5, power: POWER_UP.hoverBoots },
 };
 
 /** Coins Hamm wants before he hands over his token (`0x31 <` in the original). */

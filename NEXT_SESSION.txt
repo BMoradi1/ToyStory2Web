@@ -203,8 +203,16 @@ strings into the repo. Port order: the script tick and flight first (the
 camera cut helpers FUN_004020f0/FUN_00402290 fall out of it), the box
 second, push blocks when the controller exposes a per-group contact normal.
 
-MUSIC - decoded 2026-09-05, ready for Opus to wire up.  Nothing left to
- find; this is a wiring job against src/audio/sfx.ts's GameDir handle.
+MUSIC - DONE 2026-09-05 (src/audio/music.ts). The level's track starts
+ when play does, `n` mutes it, and the options volume curve is the
+ executable's own 151-entry table. Every one of the 15 levels resolves to
+ a track that exists in the install. What is left is the two overrides,
+ which need systems that do not exist yet: the mini-boss theme wants the
+ creature timer and the race theme wants the race. The decode notes are
+ kept below because they describe those.
+
+ MUSIC - decoded 2026-09-05.  Nothing left to
+ find; this was a wiring job against src/audio/sfx.ts's GameDir handle.
 
    Files: audio/<name>.wav in the install root (NOT data/), plain PCM WAV,
    about 8 MB each. Twenty-two names, in the order of the table at 0x4eccd8

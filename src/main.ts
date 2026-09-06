@@ -22,6 +22,7 @@ import {
 import { cos as cosOf, sin as sinOf, toRadians, yawOf } from './sim/trig.ts';
 import { createCamera, stepCamera, cameraTarget, type CameraState } from './sim/camera.ts';
 import { SoundBank, PLAYER_EFFECTS } from './audio/sfx.ts';
+import { MUSIC_TRACKS, MusicPlayer, trackForLevel } from './audio/music.ts';
 import { createPickups, PickupKind, revealToken, stepPickups, type PickupState } from './sim/pickups.ts';
 import { levelNumber, SPAWN_TABLE, tokenSlotsAtStart } from './sim/level-data.ts';
 import { unpackRaw } from './formats/rnc.ts';
@@ -203,6 +204,7 @@ async function showLevel(index: number): Promise<void> {
   currentCollision = null;
   currentCollisionWorld = null;
   creatureSim = null;
+  music?.stop();
   currentTerrainFile = level.terrain;
   viewer?.setCollision(null);
   viewer?.setPlayer(null);
@@ -314,6 +316,7 @@ async function open(dir: GameDir): Promise<void> {
   creatureModelPaths = cfg ? parseCreatureModels(new TextDecoder('latin1').decode(await cfg.read())) : new Map();
   creatureModels.clear();
   sound = new SoundBank(dir);
+  music = new MusicPlayer(dir);
   if (levels.length === 0) return setStatus('No levels found under data/.', true);
 
   setStatus(`${levels.length} scenes, ${models.length} models. Building UI\u2026`);
@@ -399,6 +402,22 @@ async function open(dir: GameDir): Promise<void> {
       },
       spawnPlayer,
       togglePlay,
+      get music() {
+        if (!music) return null;
+        const level = levelNumber(levels[levelEl.selectedIndex]?.id ?? '') ?? 0;
+        const want = trackForLevel(level);
+        return {
+          enabled: music.enabled, playing: music.current, name: music.currentName,
+          level, wantTrack: want, wantName: want === null ? null : MUSIC_TRACKS[want],
+          slider: music.volume,
+        };
+      },
+      playMusic(track: number, loop = true) {
+        if (!music) return null;
+        music.start();
+        music.play(track, loop);
+        return { track, name: MUSIC_TRACKS[track] ?? null };
+      },
       /**
        * Run the creature sim without the player controller, so a test can
        * watch the cast on its own. Returns how many the tick updated.
@@ -808,6 +827,7 @@ let playerAnim: AnimationPlayback | null = null;
 let camera: CameraState | null = null;
 /** Effects, read from the install. Silent until play starts. */
 let sound: SoundBank | null = null;
+let music: MusicPlayer | null = null;
 let pickups: PickupState | null = null;
 /** Drawn instance for each pickup, or -1 for one that is not drawn (hidden tokens, spares). */
 let pickupDrawIndex: number[] = [];
@@ -833,9 +853,14 @@ function setPlaying(on: boolean): void {
     // Entering play is a key press, which is the gesture browsers want before
     // they will start an audio device.
     void sound?.start().then(() => sound?.preload(PLAYER_EFFECTS));
+    // The engine picks the track from the level every tick; here the level
+    // only changes on a load, so asking once when play starts is the same.
+    music?.start();
+    music?.want(trackForLevel(levelNumber(levels[levelEl.selectedIndex]?.id ?? '') ?? 0));
   } else {
     input.detach();
     sound?.stop();
+    music?.disable();
   }
 }
 
@@ -986,6 +1011,14 @@ window.addEventListener('keydown', (ev) => {
   if (ev.key === 'm' && sound) {
     sound.volume = sound.volume > 0 ? 0 : 0.6;
     infoEl.textContent = sound.volume > 0 ? 'sound on' : 'sound muted';
+    return;
+  }
+  if (ev.key === 'n' && music) {
+    // The options slider is 0..64 and its curve is the engine's own.
+    music.volume = music.volume > 0 ? 0 : 40;
+    infoEl.textContent = music.volume > 0
+      ? `music on${music.currentName ? `: ${music.currentName}` : ''}`
+      : 'music muted';
     return;
   }
   if (viewer.playMode) return;

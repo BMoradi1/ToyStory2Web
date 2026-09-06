@@ -78,6 +78,9 @@ level.
   it decides what an object is by counting its polygons, and that rule is
   ported as found. The shapes standing in for them are placeholders: the real
   coin art is a sprite inside the executable that is not extracted yet.
+- **Music.** Each level's theme streams from your install's own `audio`
+  folder, chosen the way the game chooses it and mixed through the volume
+  curve out of the executable. Press `n` to mute it.
 - **Sound.** Buzz's effects play from your install's own `data/sfx`, found by
   the names the engine itself uses — a table of 61 strings inside the
   executable that match the files on disc exactly.

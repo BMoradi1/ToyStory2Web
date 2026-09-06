@@ -371,10 +371,12 @@
                 opcodes (2026-09-05: the effect field is 1-based, the pitch
                 is unused on PC, and the falloff/pan/slider formula is in
                 docs/LEVELS.md "Attenuation, pan and the slider").
-                Also absent: music (audio/*.wav, one 8 MB track per area)
-                - fully decoded 2026-09-05, see NEXT_SESSION.txt MUSIC:
-                table, per-level rule, overrides, volume curve. Opus job.
-                and any positional mixing.
+                Music is DONE 2026-09-05: src/audio/music.ts streams the
+                level's track from the user's audio/ directory through an
+                <audio> element (8 MB a track, so not decodeAudioData),
+                with the exe's own 151-entry volume curve and `n` to mute.
+                The mini-boss and race overrides wait on those systems.
+                Still absent: any positional mixing.
 
  P2.8 [DONE]    Pickups, decoded from toy2.exe and ported (src/sim/pickups.ts,
                 docs/PLAYER.md "Pickups and Pizza Planet tokens").

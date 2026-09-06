@@ -1329,7 +1329,9 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
         (index) => creatureSim!.creatures.find((c) => c.slot === index),
         {
           coins: pickups?.coins ?? 0,
-          found: creatureSim.sheepFound,
+          found: LEVEL_TASKS[level]?.findFive?.countedBy === 'pickup'
+            ? (pickups?.itemsFound ?? 0)
+            : creatureSim.foundCount,
           rand: creatureSim.rand,
           talking: false,
           x: player.x, y: player.y, z: player.z,

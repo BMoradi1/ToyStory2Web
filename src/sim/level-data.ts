@@ -307,6 +307,16 @@ export interface LevelTasks {
     askText: number; doneText: number; slot: number;
     /** How many of the thing there are. */
     needed: number;
+    /**
+     * Where the count comes from. On all ten levels the five lost things are
+     * creatures, counted into one global (`DAT_0052b7d8`) by whichever type
+     * carries the collectable handler there.
+     *
+     * The other counter, `DAT_00830d4c` over category-9 objects, looked like
+     * this task at first and is not: on levels 4, 5, 11 and 13 it gates the
+     * SLOT 2 challenge, a collect-five-objects task with its own three lines.
+     */
+    countedBy: 'creature' | 'pickup';
   };
 }
 
@@ -346,7 +356,7 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
     },
     findFive: {
       creature: 0x1, pathTag: 0x1c,
-      askText: 0x4f036c, doneText: 0x4f03e0, slot: 1, needed: 5,
+      askText: 0x4f036c, doneText: 0x4f03e0, slot: 1, needed: 5, countedBy: 'creature',
     },
   },
   2: {
@@ -357,7 +367,7 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
     },
     findFive: {
       creature: 0x6, pathTag: 0x7,
-      askText: 0x4f0fc0, doneText: 0x4f1078, slot: 1, needed: 5,
+      askText: 0x4f0fc0, doneText: 0x4f1078, slot: 1, needed: 5, countedBy: 'creature',
     },
   },
   4: {
@@ -368,7 +378,7 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
     },
     findFive: {
       creature: 0x12, pathTag: 0x20,
-      askText: 0x4f15d4, doneText: 0x4f1650, slot: 1, needed: 5,
+      askText: 0x4f15d4, doneText: 0x4f1650, slot: 1, needed: 5, countedBy: 'creature',
     },
   },
   5: {
@@ -379,7 +389,7 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
     },
     findFive: {
       creature: 0x13, pathTag: 0x10,
-      askText: 0x4f1d5c, doneText: 0x4f1dec, slot: 1, needed: 5,
+      askText: 0x4f1d5c, doneText: 0x4f1dec, slot: 1, needed: 5, countedBy: 'creature',
     },
   },
   7: {
@@ -390,7 +400,7 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
     },
     findFive: {
       creature: 0xc, pathTag: 0x4,
-      askText: 0x4f23a4, doneText: 0x4f2418, slot: 1, needed: 5,
+      askText: 0x4f23a4, doneText: 0x4f2418, slot: 1, needed: 5, countedBy: 'creature',
     },
   },
   8: {
@@ -401,7 +411,7 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
     },
     findFive: {
       creature: 0x2, pathTag: 0xb,
-      askText: 0x4f2ae4, doneText: 0x4f2b58, slot: 1, needed: 5,
+      askText: 0x4f2ae4, doneText: 0x4f2b58, slot: 1, needed: 5, countedBy: 'creature',
     },
   },
   10: {
@@ -412,7 +422,7 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
     },
     findFive: {
       creature: 0x0, pathTag: 0x1e,
-      askText: 0x4f2fe0, doneText: 0x4f3058, slot: 1, needed: 5,
+      askText: 0x4f2fe0, doneText: 0x4f3058, slot: 1, needed: 5, countedBy: 'creature',
     },
   },
   11: {
@@ -423,7 +433,7 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
     },
     findFive: {
       creature: 0x1, pathTag: 0x11,
-      askText: 0x4f3874, doneText: 0x4f3900, slot: 1, needed: 5,
+      askText: 0x4f3874, doneText: 0x4f3900, slot: 1, needed: 5, countedBy: 'creature',
     },
   },
   13: {
@@ -434,7 +444,7 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
     },
     findFive: {
       creature: 0x7, pathTag: 0x21,
-      askText: 0x4f419c, doneText: 0x4f4210, slot: 1, needed: 5,
+      askText: 0x4f419c, doneText: 0x4f4210, slot: 1, needed: 5, countedBy: 'creature',
     },
   },
   14: {
@@ -445,7 +455,7 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
     },
     findFive: {
       creature: 0x28, pathTag: 0x3,
-      askText: 0x4f47cc, doneText: 0x4f4844, slot: 1, needed: 5,
+      askText: 0x4f47cc, doneText: 0x4f4844, slot: 1, needed: 5, countedBy: 'creature',
     },
   },
 };

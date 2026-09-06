@@ -199,10 +199,11 @@ export interface CreatureSim {
   /** Bolts a handler fired this tick. The projectile itself is not ported. */
   shots: { x: number; y: number; z: number; heading: number }[];
   /**
-   * `DAT_0052b7d8`: how many sheep have been sent home. Level 1's find-five
-   * task reads it (docs/LEVELS.md), and the sheep handler counts it up.
+   * `DAT_0052b7d8`: how many of the level's five lost things have been
+   * brought home. One global for every level, counted by whichever creature
+   * type is the collectable one there (docs/LEVELS.md).
    */
-  sheepFound: number;
+  foundCount: number;
   /** The slot killed this tick, whose respawn timer does not start yet. */
   lastKilled: number;
   /** Per-type model data, once supplied. */
@@ -304,7 +305,7 @@ export function createCreatureSim(
   return {
     creatures, world, rand, level,
     sounds: [], sparks: [], shots: [], near: [],
-    sheepFound: 0, lastKilled: -1, models: null,
+    foundCount: 0, lastKilled: -1, models: null,
     bossLastHealth: -1, bossSlotEarned: false,
   };
 }
@@ -850,14 +851,28 @@ export interface HandlerArgs {
 type CreatureHandler = (sim: CreatureSim, c: Creature, args: HandlerArgs) => void;
 
 /**
- * The sheep (`FUN_00416a60`). Touching one sends it home: it counts toward
- * level 1's find-five task and is removed. The puff of smoke it leaves
- * (`FUN_00410410`) is not ported.
+ * The find-five collectable: the sheep, the troops, the ducklings and the
+ * rest. Ten types have this handler, one per level, and they are the same
+ * function with different sound events (`FUN_00416a60`, `FUN_00418610`,
+ * `FUN_0041bb80` and so on).
+ *
+ * It chirps on a timer while it is alive, and touching it counts it toward
+ * the level's find-five task and takes it away. The puff of smoke it leaves
+ * (`FUN_00410410`) needs the effect system and is not ported.
+ *
+ * The harmless health, 102, is what marks one as still to be collected: the
+ * handlers all check it before counting.
  */
-function sheep(sim: CreatureSim, c: Creature): void {
+function collectable(sim: CreatureSim, c: Creature, args: HandlerArgs): void {
+  c.timer -= args.dt;
+  if (c.timer < 1 && c.health === CREATURE_HEALTH.harmless) {
+    c.timer = (sim.rand.byte() & 0xff7f) + 0x5a;
+    sim.sounds.push({ event: 0x6b, x: c.x, y: c.y, z: c.z });
+  }
   if ((c.flags & CREATURE_FLAGS.touched) === 0) return;
-  sim.sheepFound++;
-  sim.sounds.push({ event: 0x20, x: c.x, y: c.y, z: c.z });
+  if (c.health !== CREATURE_HEALTH.harmless) return;
+  sim.foundCount++;
+  sim.sounds.push({ event: 0x6c, x: c.x, y: c.y, z: c.z });
   killCreature(c, 2);
 }
 
@@ -953,7 +968,17 @@ function tinRobot(sim: CreatureSim, c: Creature): void {
  * race, so both belong with the level script port rather than here.
  */
 export const CREATURE_HANDLERS: Record<string, CreatureHandler> = {
-  FUN_00416a60: sheep,
+  // The ten find-five collectables, one per level.
+  FUN_00416a60: collectable,
+  FUN_00418610: collectable,
+  FUN_0041bb80: collectable,
+  FUN_0041dec0: collectable,
+  FUN_00420ed0: collectable,
+  FUN_00422c70: collectable,
+  FUN_004259b0: collectable,
+  FUN_00428650: collectable,
+  FUN_0042c150: collectable,
+  FUN_0042d620: collectable,
   LAB_00406220: hoverBot,
   FUN_00416ab0: tinRobot,
 };

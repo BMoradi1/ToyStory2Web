@@ -524,11 +524,17 @@ export class Viewer {
   /**
    * Show collectibles at these renderer-space positions.
    *
-   * The shapes are a STAND-IN. The real coins are drawn from the 2D sprite
-   * pool at the tail of `level.dat`'s mesh pool, which is 98 KB in level 1 and
-   * is not decoded (docs/FORMATS.md), so there is no way yet to draw the thing
-   * the game draws. These are small spinning octahedra in its place, and are
+   * The shapes are a STAND-IN. The real coin is a 2D sprite out of the
+   * executable's own sprite table (`DAT_00557500`, filled by `FUN_00447d40`
+   * and drawn by `FUN_00493f40`), so drawing it needs a 2D path this viewer
+   * does not have yet — the same gap that leaves the talk box in a plain
+   * font. These are small spinning octahedra in its place, and are
    * deliberately not trying to look like the original.
+   *
+   * It is NOT the `level.dat` sprite records: those were decoded on
+   * 2026-09-05 and turned out to be camera-facing cards for things like
+   * chandeliers, which pconv already converted to quads in the `.ngn`. An
+   * earlier version of this comment sent the reader to the wrong file.
    */
   setPickups(positions: { x: number; y: number; z: number; colour?: number }[]): void {
     if (this.pickups) {

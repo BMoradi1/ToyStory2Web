@@ -58,6 +58,8 @@ export const PICKUP = {
   healthGain: 4, healthMax: 14,
   livesMax: 9,
   coinsMax: 99,
+  /** How many of the level's lost things there are. */
+  findFive: 5,
   /** Coins that earn the coin token — the original fires event 0x4f here. */
   coinsForToken: 50,
 } as const;
@@ -116,6 +118,8 @@ export interface Pickup {
 }
 
 export interface PickupState {
+  /** Category-9 objects collected: the find-five counter on some levels. */
+  itemsFound: number;
   items: Pickup[];
   /** Counters the original keeps in the player block (+0x9e, +0x96, +0x9a). */
   coins: number;
@@ -162,7 +166,7 @@ export function createPickups(dat: DatLevel, level: number): PickupState {
     });
   }
 
-  return { items, coins: 0, health: PICKUP.healthMax, lives: 0, tokens: 0, taken: 0 };
+  return { items, coins: 0, health: PICKUP.healthMax, lives: 0, tokens: 0, taken: 0, itemsFound: 0 };
 }
 
 /** Make a token slot collectable, as its task would. */
@@ -200,6 +204,11 @@ export function stepPickups(state: PickupState, p: PlayerState): PickupEvent[] {
         break;
       case PickupKind.Token:
         if (item.tokenSlot >= 0) state.tokens |= 1 << item.tokenSlot;
+        break;
+      case PickupKind.Kind9:
+        // `DAT_00830d4c`: on the levels whose five lost things are objects
+        // rather than creatures, this is the find-five counter.
+        state.itemsFound++;
         break;
       case PickupKind.HintSign:
         // A trigger, not a collectable: the original opens the hint's talk

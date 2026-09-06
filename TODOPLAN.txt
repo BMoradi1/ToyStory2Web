@@ -538,8 +538,15 @@
                 working in the browser: lives, health, coins, spin charge
                 and laser. The ammo pair needs pickup categories 6 and 7,
                 which level 1 has none of. Pause and menus: laid out in
-                the same function, not written up. The talk box still uses
-                a plain HTML panel rather than the game's font.
+                the same function, not written up.
+                THE TALK BOX IS THE GAME'S OWN 2026-09-06: the red panel
+                scaling open from its centre and the game's font, with the
+                ^word^ highlight coming out green because the modulate
+                kills the red channel, and "press jump to continue"
+                blinking below. It replaces the HTML panel. One deviation,
+                written up in docs/HUD.md: the layer stretches to the
+                window as the 3D view does, so on a window that is not 4:3
+                the glyphs are wider than the original's.
  P3.5 [PART]    Mr. Potato Head. The hand-over WORKS 2026-09-05: he has
                 three lines chosen by whether his part is out there, in
                 Buzz's hands or already returned, picking up the level's

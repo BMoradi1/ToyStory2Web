@@ -29,6 +29,68 @@
 import { HUD, HudElement, blinkOn, offsetOf, pulse, stackShift, type HudState } from '../sim/hud.ts';
 import { FONT_DIGIT_BASE, LEVEL_SPRITE_BASE, SPRITE, type SpriteHeader } from '../formats/sprite-table.ts';
 
+/**
+ * The talk box, from `FUN_00401c30` and `FUN_00401b60`. The box is five
+ * quads of sprite 6 in the 512 space — four black edges and a
+ * half-transparent fill — scaling open about its centre at (257, 44) to a
+ * full 474 x 32. The text is the small font at half scale in the 320 space,
+ * thirty-six columns eight apart from x = 16, two rows at y = 32 and 40,
+ * with the continue prompt centred below at y = 48.
+ */
+export const TALK_DRAW = {
+  centreX: 0x101, centreY: 0x2c,
+  /** Full size, as a 12-bit scale of one texel. */
+  width: 0x1da, height: 0x20,
+  /** The box never shrinks below this, so it opens from a slot not a point. */
+  minWidth: 4, minHeight: 2,
+  /** Fill colour, and the inset of the fill inside the black edge. */
+  fill: { r: 0x80, g: 0, b: 0 }, insetX: 2, insetY: 1,
+  /** The solid texel sprite 6 draws bars and boxes from, and its frame here. */
+  frame: 1,
+  textX: 0x10, textStep: 8, textRow: [0x20, 0x28], textEnd: 0x12f,
+  promptY: 0x30, columns: 36,
+  /** The scale at which the box is fully open and the text runs. */
+  full: 0x1000,
+} as const;
+
+/**
+ * The glyph a character draws, from `FUN_0049b630`. Lower case runs a..z
+ * over frames 0..25 and the digits follow; the rest is this table. A space
+ * draws nothing, and `~` and `@` are the two frames of icon sprite 38
+ * rather than a letter.
+ */
+export function glyphOf(ch: string): { frame: number; icon?: number } | null {
+  const c = ch.charCodeAt(0);
+  if (c === 0x20) return null;
+  if (c === 0x7e) return { frame: 0, icon: 38 };
+  if (c === 0x40) return { frame: 1, icon: 38 };
+  switch (c) {
+    case 0x21: return { frame: 0x29 };
+    case 0x27: return { frame: 0x30 };
+    case 0x2a: return { frame: 0x32 };
+    case 0x2c: return { frame: 0x25 };
+    case 0x2d: return { frame: 0x31 };
+    case 0x2e: return { frame: 0x24 };
+    case 0x3e: return { frame: 0x2d };
+    case 0x3f: return { frame: 0x28 };
+    default:
+      // Digits sit just past the letters; lower case wraps to 0..25.
+      return { frame: c < 0x3a ? c - 0x16 : (c + 0x9f) & 0xff };
+  }
+}
+
+/** What the painter needs to draw a talk box. */
+export interface TalkDraw {
+  /** 0 to 0x1000 as it opens and shuts. */
+  scale: number;
+  /** The two visible rows, with the highlight flag per character. */
+  rows: readonly { text: string; marks: readonly boolean[] }[];
+  /** Whether a page is waiting, which is when the prompt blinks. */
+  waiting: boolean;
+  /** "press jump to continue", read from the user's own executable. */
+  prompt: string;
+}
+
 /** One decoded texture sheet, ready to blit from. */
 export type Sheet = CanvasImageSource & { width: number; height: number };
 
@@ -63,16 +125,63 @@ export interface HudReadout {
 const SOLID_TEXEL = 190;
 const NEUTRAL = 0x80;
 
+/** A colour for the modulate: one grey, or a red/green/blue triple. */
+export type Modulate = number | readonly [number, number, number];
+
+function rgbOf(c: Modulate): readonly [number, number, number] {
+  return typeof c === 'number' ? [c, c, c] : c;
+}
+
 /** `texel * colour / 0x80`, the engine's modulate, for the bars' solid texel. */
 function barColour(r: number, g: number, b: number): string {
   const c = (v: number) => Math.min(255, Math.round((SOLID_TEXEL * v) / NEUTRAL));
   return `rgb(${c(r)},${c(g)},${c(b)})`;
 }
 
+/**
+ * The engine multiplies every texel by the draw's colour and halves it,
+ * `texel * colour / 0x80`, so 0x80 leaves a sprite alone, 0xff nearly
+ * doubles it and 0 kills a channel outright — which is how one yellow font
+ * draws green highlights. A canvas cannot do that per channel while
+ * blitting, so each sheet is multiplied once per colour it is asked for and
+ * the result kept; there are only a handful of colours in a frame.
+ */
+function tintSheet(sheet: Sheet, r: number, g: number, b: number): Sheet {
+  const out = document.createElement('canvas');
+  out.width = sheet.width;
+  out.height = sheet.height;
+  const ctx = out.getContext('2d');
+  if (!ctx) return sheet;
+  ctx.drawImage(sheet, 0, 0);
+  const image = ctx.getImageData(0, 0, out.width, out.height);
+  const px = image.data;
+  const mul = [r, g, b];
+  for (let i = 0; i < px.length; i += 4) {
+    if (px[i + 3] === 0) continue;
+    for (let k = 0; k < 3; k++) px[i + k] = Math.min(255, (px[i + k]! * mul[k]!) / NEUTRAL);
+  }
+  ctx.putImageData(image, 0, 0);
+  return out;
+}
+
 export class HudPainter {
   private readonly ctx: CanvasRenderingContext2D;
   /** This frame's draw calls, flushed in reverse. See the note above. */
   private readonly queue: (() => void)[] = [];
+  /** Modulated copies of each sheet, made once and kept. */
+  private readonly tints = new Map<Sheet, Map<number, Sheet>>();
+
+  /** A sheet multiplied by a colour, from the cache. */
+  private tinted(sheet: Sheet, colour: Modulate): Sheet {
+    const [r, g, b] = rgbOf(colour);
+    if (r === NEUTRAL && g === NEUTRAL && b === NEUTRAL) return sheet;
+    let bySheet = this.tints.get(sheet);
+    if (!bySheet) { bySheet = new Map(); this.tints.set(sheet, bySheet); }
+    const key = (r << 16) | (g << 8) | b;
+    let out = bySheet.get(key);
+    if (!out) { out = tintSheet(sheet, r, g, b); bySheet.set(key, out); }
+    return out;
+  }
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d');
@@ -101,6 +210,7 @@ export class HudPainter {
     table: readonly (SpriteHeader | null)[],
     sheets: ReadonlyMap<number, Sheet>,
     r: HudReadout,
+    talk?: TalkDraw | null,
   ): void {
     this.clear();
     const ctx = this.ctx;
@@ -115,30 +225,46 @@ export class HudPainter {
     /** Blit a frame of a sprite. `sx` is the space's pixels per virtual unit. */
     const blit = (
       index: number, frame: number, x: number, y: number,
-      grey: number, sx: number, scaleX = 0x1000, scaleY = 0x1000,
+      colour: Modulate, sx: number, scaleX = 0x1000, scaleY = 0x1000,
     ) => {
       const h = table[index];
       if (!h) return;
-      const sheet = sheets.get(h.texture);
-      if (!sheet) return;
+      const raw = sheets.get(h.texture);
+      if (!raw) return;
       const f = h.frames[frame] ?? h.frames[0];
       if (!f) return;
       const w = (h.width * scaleX) >> 12;
       const ht = (h.height * scaleY) >> 12;
       if (w <= 0 || ht <= 0) return;
+      const sheet = this.tinted(raw, colour);
       this.queue.push(() => {
-        ctx.filter = grey === NEUTRAL ? 'none' : `brightness(${grey / NEUTRAL})`;
         ctx.drawImage(sheet, f.u, f.v, h.width, h.height, x * sx, y * py, w * sx, ht * py);
-        ctx.filter = 'none';
       });
     };
     /** A bar: sprite 6's solid texel stretched to `w` x `ht` virtual pixels. */
-    const bar = (x: number, y: number, w: number, ht: number, cr: number, cg: number, cb: number, sx: number) => {
+    const bar = (
+      x: number, y: number, w: number, ht: number,
+      cr: number, cg: number, cb: number, sx: number, alpha = 1,
+    ) => {
       if (w <= 0 || ht <= 0) return;
       this.queue.push(() => {
+        ctx.globalAlpha = alpha;
         ctx.fillStyle = barColour(cr, cg, cb);
         ctx.fillRect(x * sx, y * py, w * sx, ht * py);
+        ctx.globalAlpha = 1;
       });
+    };
+    /**
+     * One character of the small font, in the 320 space at half scale. The
+     * colour is a modulate, and only the red channel ever varies, so a grey
+     * of 0 turns the yellow font green — that is the highlight.
+     */
+    const glyph = (ch: string, x: number, y: number, colour: Modulate) => {
+      const g = glyphOf(ch);
+      if (!g) return;
+      // `~` and `@` are an icon rather than a letter, and sit two pixels up.
+      if (g.icon !== undefined) { blit(g.icon, g.frame, x, y - 2, NEUTRAL, px320); return; }
+      blit(SPRITE.font, g.frame, x, y, colour, px320, 0x800, 0x800);
     };
     /** A digit of the small font. */
     const digit = (value: number, x: number, y: number, sx: number, scale = 0x1000) => {
@@ -279,6 +405,52 @@ export class HudPainter {
         bar(0xe4, boss + 0x14, value, 4, NEUTRAL, value * 2, 0, px512);
       }
       blit(SPRITE.barFrame, 0, 0xe0, boss + 0x10, NEUTRAL, px512, 0x2000, 0x2000);
+    }
+
+    // --- the talk box, submitted after the HUD so it lands behind it ------
+    if (talk && talk.scale !== 0) {
+      const t = Math.abs(talk.scale);
+      const w = Math.max(TALK_DRAW.minWidth << 12, t * TALK_DRAW.width);
+      const h = Math.max(TALK_DRAW.minHeight << 12, t * TALK_DRAW.height);
+      const bx = TALK_DRAW.centreX - (w >> 13);
+      const by = TALK_DRAW.centreY - (h >> 13);
+      const solid = (x: number, y: number, sx: number, sy: number, cr: number, cg: number, cb: number, alpha: number) => {
+        const header = table[SPRITE.pixel];
+        if (!header) return;
+        bar(x, y, (header.width * sx) >> 12, (header.height * sy) >> 12, cr, cg, cb, px512, alpha);
+      };
+      // Four black edges and the fill inside them, exactly as the box helper
+      // lays them out.
+      solid(bx, by, 0x2000, h, 0, 0, 0, 1);
+      solid((w >> 12) - 2 + bx, by, 0x2000, h, 0, 0, 0, 1);
+      solid(bx, by, w, 0x1000, 0, 0, 0, 1);
+      solid(bx, (h >> 12) - 1 + by, w, 0x1000, 0, 0, 0, 1);
+      solid(
+        bx + TALK_DRAW.insetX, by + TALK_DRAW.insetY, w - 0x4000, h - 0x2000,
+        TALK_DRAW.fill.r, TALK_DRAW.fill.g, TALK_DRAW.fill.b, 0x80 / 0xff,
+      );
+
+      if (talk.scale === TALK_DRAW.full) {
+        // Only once it is fully open does the text run.
+        if (talk.waiting && hud.div32 < 0x10) {
+          let x = (0x28 - talk.prompt.length) * 4;
+          for (const ch of talk.prompt) {
+            glyph(ch, x, TALK_DRAW.promptY, 0xff);
+            x += TALK_DRAW.textStep;
+          }
+        }
+        for (let row = 0; row < TALK_DRAW.textRow.length; row++) {
+          const line = talk.rows[row];
+          if (!line) continue;
+          const y = TALK_DRAW.textRow[row]!;
+          for (let i = 0; i < line.text.length && i < TALK_DRAW.columns; i++) {
+            // Highlighted words drop the red channel, which turns the
+            // yellow font green.
+            glyph(line.text[i]!, TALK_DRAW.textX + i * TALK_DRAW.textStep, y,
+              [line.marks[i] ? 0 : NEUTRAL, NEUTRAL, 0]);
+          }
+        }
+      }
     }
 
     // The buffer fills backward, so the frame lands in the reverse of the

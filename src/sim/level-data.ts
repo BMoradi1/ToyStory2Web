@@ -269,6 +269,8 @@ export const TASK_TEXT = {
   hammGive: 0x502834,
   /** The hint NPC once every slot is done (`FUN_004a1e60`). */
   allTokens: 0x502868,
+  /** What the talk box shows while a page waits (`FUN_00401c30`). */
+  pressJump: 0x4df684,
 } as const;
 
 /** Who runs which task on a level, from its tick's calls to the helpers. */

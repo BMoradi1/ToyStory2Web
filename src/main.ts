@@ -30,7 +30,7 @@ import { createPickups, PickupKind, revealToken, stepPickups, type PickupState }
 import {
   COIN_DRAW, SPRITE, SPRITE_SHEET, readSpriteTable, type SpriteHeader,
 } from './formats/sprite-table.ts';
-import { HudPainter, type HudReadout, type Sheet } from './render/hud-draw.ts';
+import { HudPainter, type HudReadout, type Sheet, type TalkDraw } from './render/hud-draw.ts';
 import {
   HUD, HudElement, createHud, offsetOf, showHud, startHud, stepCoinSpin, stepHud,
   type HudState,
@@ -44,7 +44,7 @@ import {
   BoxPhase, TALK_SCRIPT, buildDialogueScript, startTalk, stepTalk, talkVisibleRows,
   type TalkState,
 } from './sim/talk.ts';
-import { LEVEL_TASKS } from './sim/level-data.ts';
+import { LEVEL_TASKS, TASK_TEXT } from './sim/level-data.ts';
 import {
   RaceState, createTasks, markSlotDone, startLevelTasks, stepTasks, type TaskState,
 } from './sim/tasks.ts';
@@ -72,9 +72,6 @@ const levelEl = $<HTMLSelectElement>('level');
 const modelEl = $<HTMLSelectElement>('model');
 const animEl = $<HTMLSelectElement>('anim');
 const infoEl = $<HTMLSpanElement>('info');
-const talkEl = $<HTMLDivElement>('talk');
-const talkTextEl = $<HTMLParagraphElement>('talktext');
-const talkHintEl = $<HTMLSpanElement>('talkhint');
 const texturesEl = $<HTMLDivElement>('textures');
 const hudEl = $<HTMLCanvasElement>('hud');
 
@@ -253,7 +250,6 @@ async function showLevel(index: number): Promise<void> {
   pushBlocks = null;
   tasks = null;
   talk = null;
-  talkEl.hidden = true;
   creatureArt.clear();
   viewer?.clearCreatureMeshes();
   music?.stop();
@@ -631,6 +627,7 @@ async function open(dir: GameDir): Promise<void> {
           timer: [...hud.timer], phase: [...hud.phase],
           offsets: hud.timer.map((_, n) => offsetOf(hud, n)),
           coinSpin: hud.coinSpin,
+          div8: hud.div8, div16: hud.div16, div32: hud.div32, div64: hud.div64,
           sprites: spriteTable.filter(Boolean).length,
           sheets: [...sceneSheets.keys()],
           coins: coinCards.length, shadows: coinShadows.length,
@@ -1150,7 +1147,7 @@ function drawHud(level: number): void {
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   if (!hudPainter) hudPainter = new HudPainter(hudEl);
   hudPainter.resize(Math.round(view.width * dpr), Math.round(view.height * dpr));
-  hudPainter.draw(hud, spriteTable, sceneSheets, r);
+  hudPainter.draw(hud, spriteTable, sceneSheets, r, talkDraw());
 }
 
 /**
@@ -1298,36 +1295,20 @@ function startDialogue(request: import('./sim/tasks.ts').DialogueRequest): void 
 }
 
 /** Show whatever the talk box has revealed so far. */
-function drawTalk(): void {
-  if (!talk) { talkEl.hidden = true; return; }
-  talkEl.hidden = false;
-  talkEl.style.setProperty('--talk-scale', String(Math.max(0.04, talk.scale / 0x1000)));
-  talkTextEl.replaceChildren();
-  for (const row of talkVisibleRows(talk)) {
-    const line = document.createElement('span');
-    // A `^...^` pair in the string is the game's own highlight.
-    let run = '';
-    let marked = row.marks[0] ?? false;
-    const flush = () => {
-      if (!run) return;
-      const part = document.createElement('span');
-      if (marked) part.className = 'mark';
-      part.textContent = run;
-      line.append(part);
-      run = '';
-    };
-    for (let i = 0; i < row.text.length; i++) {
-      const m = row.marks[i] ?? false;
-      if (m !== marked) { flush(); marked = m; }
-      run += row.text[i];
-    }
-    flush();
-    line.append('\n');
-    talkTextEl.append(line);
-  }
-  talkHintEl.textContent = talk.phase === BoxPhase.Waiting || talk.phase === BoxPhase.Done
-    ? 'press jump to continue'
-    : '';
+/**
+ * The talk box, handed to the sprite layer. The panel and its font are the
+ * game's own now (docs/HUD.md), so all this does is gather what the painter
+ * needs; the prompt is read from the user's executable like every other
+ * line of text.
+ */
+function talkDraw(): TalkDraw | null {
+  if (!talk) return null;
+  return {
+    scale: talk.scale,
+    rows: talkVisibleRows(talk),
+    waiting: talk.phase === BoxPhase.Waiting || talk.phase === BoxPhase.Done,
+    prompt: exeBytes ? exeString(exeBytes, TASK_TEXT.pressJump) : '',
+  };
 }
 
 /**
@@ -1525,7 +1506,6 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       talk.eye.x * GAME_TO_RENDER, -talk.eye.y * GAME_TO_RENDER, -talk.eye.z * GAME_TO_RENDER,
       talk.look.x * GAME_TO_RENDER, -talk.look.y * GAME_TO_RENDER, -talk.look.z * GAME_TO_RENDER,
     );
-    drawTalk();
     if (talk.finished) {
       // A dialogue's last argument is the slot it earns: mark it done and
       // put its token in the world (`FUN_004a0db0`).
@@ -1538,7 +1518,6 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       }
       talkSlot = -1;
       talk = null;
-      drawTalk();
       // Hand the camera back where it is, so it eases rather than snapping.
       if (camera && player) camera = createCamera(player);
     }

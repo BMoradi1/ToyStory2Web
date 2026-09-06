@@ -61,6 +61,15 @@ Both spaces stretch to the whole screen, so a 512-space x of 0x1dc and a
 texels times a 12-bit scale (0x1000 = one texel per virtual pixel) over the
 same divisor.
 
+**The stretch assumes a 4:3 screen.** A unit of the 320 space is 6.7% wider
+than a unit of the vertical one there, which is the shape the font was drawn
+for. The viewer widens its camera to the window instead of pillarboxing, so
+the 2D layer stretches with it and the glyphs come out wider than the
+original's on a wide window — about 30% on a 16:10 one. Fixing that means
+letterboxing the whole view to 4:3, three-dimensional part included; do that
+and this layer comes right on its own, because it is defined in the same
+spaces the engine uses.
+
     FUN_00493f40  x/512  colour and scale given          the box, font, bars
     FUN_004942d0  x/320  colour and scale given          HUD icons
     FUN_00494820  x/512  1:1, screen-fade colour         big digits
@@ -177,6 +186,29 @@ timer. The same function draws the pause menu (`DAT_0052adb0` pages,
 box `FUN_00401b60`) and the "you have collected a token" screen; they are
 not laid out here.
 
+## The talk box (`FUN_00401c30`)
+
+The box is `FUN_00401b60(0x101 - (w >> 13), 0x2c - (h >> 13), w, h, 0x80, 0, 0)`
+where `w = scale * 0x1da` floored at 0x4000 and `h = scale << 5` floored at
+0x2000, so it scales open about (257, 44) to a full 474 x 32 in the 512
+space. That helper is five quads of sprite 6, frame 1: a two-pixel black
+left and right edge, a one-pixel black top and bottom, and the fill inset by
+(2, 1) at mode 0, which is half alpha — a dark red panel with a black frame.
+
+The text runs only while the box is fully open. It is the small font at half
+scale in the 320 space: thirty-six columns eight apart from x = 16, two rows
+at y = 32 and y = 40, colour (0x80, 0x80, 0), which is the sheet's own
+yellow. A highlighted word (the `^...^` pairs in the strings) drops the red
+channel to 0 and comes out green. "press jump to continue" (0x4df684) is
+centred at `x = (0x28 - len) * 4`, y = 48, in white, and blinks on the
+32-tick divider's first half while a page is waiting.
+
+`FUN_0049b630` maps a character to a glyph: lower case a..z are frames
+0..25 and the digits follow at `c - 0x16`, with `!`, `'`, `*`, `,`, `-`,
+`.`, `>` and `?` by table, a space drawing nothing, and `~` and `@` drawing
+the two frames of icon sprite 38 two pixels higher. Upper case has no
+glyphs, which is why every string in the executable is lower case.
+
 ## Coins and pickups in the world (`FUN_00440f70`)
 
 The pickup list (`DAT_00559d6c`, src/sim/pickups.ts) is walked each frame
@@ -250,12 +282,17 @@ tail, so the bar's recovery sliver only appears over the last 120 ticks.
 And the ammo counters are wired to pickup categories 6, 7 and 10, which no
 level 1 object uses, so those two elements have not been seen on screen.
 
+**The talk box is in too**, panel and font, replacing the HTML overlay it
+used to be. The colour modulate is exact: each sheet is multiplied by a
+draw's colour once and the result kept, because a canvas cannot multiply per
+channel while blitting and the highlight is exactly a channel being killed.
+
 Left to build:
 
-1. **The talk box and its font** from the same layer (docs/LEVELS.md has
-   the layout in the same 512 x 256 space). It is a plain HTML panel today.
-2. **The pause menu and the token screen**, which the same function draws.
-3. A collected class object should hide its own level mesh, and the ones
+1. **The pause menu and the token screen**, which the HUD function also
+   draws and which are not written up here.
+2. A collected class object should hide its own level mesh, and the ones
    still out there should tumble; the renderer cannot yet move a single
    object of the level.
-4. The level's sprite records, if the PSX look is wanted.
+3. The level's sprite records, if the PSX look is wanted.
+4. Letterboxing the view to 4:3, which is the aspect note above.

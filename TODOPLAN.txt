@@ -428,6 +428,9 @@
                 src/sim/creature-data.ts (44 scripts, 25 anim scripts,
                 tables). Port the interpreter + mover first (script 1 =
                 the Zurg toys is the test), then the level 1 handlers.
+                Drawing and hit-testing them is unblocked (2026-09-05):
+                animState is the .anm slot, the hit ellipsoids are the
+                model's type-9 group (readHitShapes in src/formats/all.ts).
  P3.3 [READY]   Level 1 logic             <- P2. The x86 level scripts are
                 now defined and decompiled (docs/LEVELS.md): init
                 FUN_004171d0 and a 4 KB per-zone tick FUN_00417680, built

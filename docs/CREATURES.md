@@ -105,7 +105,9 @@ constructor. Fields the code uses, by offset:
     +0x7c i16 stun        hit cooldown
     +0x7e i16 health
     +0x80 ptr pc          script position
-    +0x84 ptr hitShapes   16 bytes per animState: offset x3, pad, scale x3, radius
+    +0x84 ptr hitShapes   the model's type-9 group (see below): 16 bytes per
+                          animState — i16 offset x3, i16 count (record 0
+                          only), i16 scale x3 (256 = 1.0), i16 radius
     +0x8a i16 timer       free for the C handler (the hover-bot's firing cycle)
     +0x90 i32 lastFloor   y to fall back to when the ground ray finds nothing
     +0x94 ptr handler     per-type C function, or null
@@ -128,8 +130,20 @@ Flags at +0x40, as far as they are used:
            comes back turned half round
     0x2000 its model is not loaded (`FUN_00447bd0` sets it): never in the near list
 
-Where the +0x84 hit-shape table is filled from was not found; the laser and
-contact tests read it, indexed by `animState`.
+**Where the model-derived fields come from** (found 2026-09-05). Each
+creature type's `.all` ends with a group of type 9 (`GroupType.HitShapes`,
+53 of the 68 character models; Buzz and Woody have none). Its payload is the
+`+0x84` table, one 16-byte ellipsoid per `animState`, and its group entry
+carries the coarse-sphere numbers: `+0x38/+0x3a/+0x3c` are the entry's
+u16s at +0x2c/+0x2e/+0x30 and `+0x3e`, the hit radius, is +0x32. The type
+loader `FUN_0043b0c0` (a switch from type number to `chars<n>/<name>`)
+loads each model through `FUN_0043aca0`, which reads the `.all` with
+`FUN_0043d820` into one 0x6c-byte part record per group, keeps the last
+record's payload pointer when that group is type 9 (`DAT_0053e6c8[type]`)
+and the entry words (`DAT_0053eac8[type]`), and then, once every type is
+in, copies them into every entity of that type. `readHitShapes` in
+src/formats/all.ts reads the table; the laser and contact tests index it by
+`animState`.
 
 ## Construction (`FUN_00406cd0(entity, fromList)`)
 
@@ -335,9 +349,14 @@ one entry: if the next byte is 0xff, the byte after is a marker — 1 holds
 the current frame (the cursor's low word is filled so it never advances),
 otherwise the script rewinds that many bytes. A script whose third byte is
 0xff and fourth is 0 is a single held frame. The frame goes into the top
-half of `+0x18`. How that frame number selects a pose in the creature's
-`.anm` is not yet pinned down; the constructor's animation slot per type
-was not found either.
+half of `+0x18`. The type's `.anm` is loaded whole by the same loader and
+kept per type (`DAT_00547cd4[type]`, the file image with its first word set
+to 1 and the part-record range written over the header's +4/+6), and
+**`animState` is the `.anm` slot index**: the animation player
+`FUN_0043ba80` is handed `anm + 8 + animState * 4`, the slot's offset entry
+(`FUN_004019d0`, `FUN_0043c070`), and the frame number picks the frame
+inside that animation. So there is no per-type slot table; the state
+numbers in the scripts are slots in that creature's own `.anm`.
 
 ## Health, damage and contact
 
@@ -410,10 +429,14 @@ private timer, and end a creature by calling `FUN_00405d20` themselves.
 
 ## Not yet decoded
 
-- where `+0x84` (the per-state hit ellipsoids) and the animation slot per
-  type come from — most likely the creature model loader
 - record type 0x24 (a 25 KB paletted image the loader samples colours
   from) and the other `.raw` record types
-- `FUN_00447bd0`, run over the near list before the update, which calls
-  into the renderer (`FUN_004bc160`) and is probably draw registration
 - what the flying creatures' shadow list is drawn as
+
+`FUN_00447bd0` (settled 2026-09-05) is the visibility pass over the near
+list: it clears flags 0x1 and 0x2000, then for a creature whose type has
+its `.anm` loaded and whose draw slot's model is in (`FUN_004bc160(+0x6c)`)
+sets flag 0x1 when the player is within `bodyRadius^2 * 16` (plus 250000
+while the flag is already set, a hysteresis; distances in 32-unit steps)
+and the sphere of `hitRadius` at the creature passes the frustum test
+(`FUN_004ba1f0`); a creature with no model gets 0x2000 instead.

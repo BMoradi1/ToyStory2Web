@@ -125,10 +125,12 @@
         an RNC method-2 packet, unpacker ported and CRC-validated - and
         behaviour is a word-code interpreter over 44 scripts in the exe,
         extracted to src/sim/creature-data.ts. The eight handlers the
-        first pass missed are defined now. What Fable could still do
-        here: find where entity +0x84 (per-state hit ellipsoids) and the
-        per-type animation slot are set - probably the creature model
-        loader - and what record 0x24 is.)
+        first pass missed are defined now. 2026-09-05 later: the hit
+        ellipsoids are the model's trailing type-9 .all group
+        (readHitShapes), the entity's centre offset and hit radius are
+        that group's entry words, and animState indexes the .anm slot
+        table directly - so creatures can be drawn and hit-tested from
+        the files. Only record 0x24 is left.)
       - (the two per-level tables are DECODED 2026-09-05: FUN_004025c0
         loads the HINT SIGNS and FUN_00402610 opens their talk box - the
         "camera trigger" was a tutorial signpost; FUN_004335d0 loads the

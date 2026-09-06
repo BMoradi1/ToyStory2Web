@@ -30,7 +30,14 @@ export enum GroupType {
   GfxMesh = 0x0001,
   Collision = 0x0006,
   DynamicCollision = 0x0008,
-  TargetPosition = 0x0009,
+  /**
+   * A creature's hit shapes, the last group of 53 of the 68 character models
+   * (every creature; not Buzz or Woody): 16-byte records, one per animation
+   * state, that the creature code indexes by `animState` (docs/CREATURES.md).
+   * Its entry also carries the entity's centre offset and hit radius at
+   * +0x2c..+0x33. Called "target position" in an earlier pass.
+   */
+  HitShapes = 0x0009,
   InfiniteWall = 0x0101,
   CollisionFooter = 0x0104,
   GfxJoint = 0x011f,
@@ -54,6 +61,35 @@ export interface AllGroup {
 
 export interface AllFile {
   groups: AllGroup[];
+}
+
+/** One record of a `HitShapes` group: an ellipsoid around a creature, per animation state. */
+export interface HitShape {
+  /** Centre offset from the entity, game units (+Y down). */
+  offset: { x: number; y: number; z: number };
+  /** Per-axis scale, 256 = 1.0. */
+  scale: { x: number; y: number; z: number };
+  radius: number;
+}
+
+/**
+ * Read a `HitShapes` group's payload: `i16 ox, oy, oz; i16 n; i16 sx, sy, sz;
+ * i16 radius` per record, where `n` is the record count on the first record
+ * and 0 after. Checked on all 53 creature models: the count matches the
+ * payload length. Returns null for any other group.
+ */
+export function readHitShapes(group: AllGroup): HitShape[] | null {
+  if (group.type !== GroupType.HitShapes || group.payload.length < 16) return null;
+  const v = new DataView(group.payload.buffer, group.payload.byteOffset, group.payload.byteLength);
+  const out: HitShape[] = [];
+  for (let p = 0; p + 16 <= group.payload.length; p += 16) {
+    out.push({
+      offset: { x: v.getInt16(p, true), y: v.getInt16(p + 2, true), z: v.getInt16(p + 4, true) },
+      scale: { x: v.getInt16(p + 8, true), y: v.getInt16(p + 10, true), z: v.getInt16(p + 12, true) },
+      radius: v.getInt16(p + 14, true),
+    });
+  }
+  return out;
 }
 
 export function parseAll(buffer: ArrayBuffer | Uint8Array): AllFile {

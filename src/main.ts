@@ -402,6 +402,10 @@ async function open(dir: GameDir): Promise<void> {
             pc: c.pc, wait: c.wait, animState: c.animState, frame: c.frame >>> 16,
             homeX: c.homeX, homeZ: c.homeZ,
             targetX: c.targetX, targetZ: c.targetZ,
+            bodyRadius: c.bodyRadius, hitRadius: c.hitRadius,
+            offsetX: c.offsetX, offsetY: c.offsetY, offsetZ: c.offsetZ,
+            stun: c.stun, respawn: c.respawn, deathTimer: c.deathTimer,
+            rangeX: c.record.rangeX, rangeZ: c.record.rangeZ, rangeYaw: c.record.rangeYaw,
             live: true,
           }));
         }
@@ -1192,6 +1196,10 @@ let pickupDrawIndex: number[] = [];
 let pickupSpin = 0;
 /** Last frame's jump and fire, so the box sees presses rather than holds. */
 let talkHeld = { jump: false, fire: false };
+/** Enter pressed while a box is open: it pages the box instead of leaving play. */
+let talkEnter = false;
+/** What the status line last showed of the counters, so hits refresh it. */
+let lastShown = { health: -1, lives: -1 };
 /** Stand-in colours: coins gold, tokens red, health green, lives blue, the rest grey. */
 const PICKUP_COLOURS: Partial<Record<PickupKind, number>> = {
   [PickupKind.Coin]: 0xffd24a,
@@ -1242,8 +1250,9 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   // control" bit and drives the camera from the talk script rather than the
   // follow camera (docs/LEVELS.md). Everything else still ticks.
   if (talk) {
-    const pressed = { jump: held.jump && !talkHeld.jump, fire: held.fire && !talkHeld.fire };
+    const pressed = { jump: (held.jump && !talkHeld.jump) || talkEnter, fire: held.fire && !talkHeld.fire };
     talkHeld = { jump: held.jump, fire: held.fire };
+    talkEnter = false;
     const request = stepTalk(talk, pressed);
     if (request.moveTo) {
       // The script teleports him to a path node; the engine then drops a
@@ -1417,7 +1426,11 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       if (pickups.items[i]!.collected && pickupDrawIndex[i]! >= 0) gone.add(pickupDrawIndex[i]!);
     }
     viewer.updatePickups(gone, pickupSpin);
-    if (taken.length > 0) {
+    // Refresh the counters on a pickup, and on a hit: there is no HUD yet,
+    // so this line is the only place a creature's damage shows.
+    const hurt = pickups.health !== lastShown.health || pickups.lives !== lastShown.lives;
+    if (taken.length > 0 || hurt) {
+      lastShown = { health: pickups.health, lives: pickups.lives };
       const slots = [0, 1, 2, 3, 4].filter((s) => pickups!.tokens & (1 << s)).length;
       infoEl.textContent = `coins ${pickups.coins}  health ${pickups.health}/14  lives ${pickups.lives}  tokens ${slots}/5`;
     }
@@ -1506,7 +1519,13 @@ window.addEventListener('keydown', (ev) => {
   if (!viewer) return;
   // Enter toggles play; while playing, the movement keys belong to the game
   // and the inspection shortcuts would collide with them.
-  if (ev.key === 'Enter') { void togglePlay(); return; }
+  if (ev.key === 'Enter') {
+    // While a box is open Enter pages it, as jump does; leaving play
+    // mid-dialogue left the box up with nothing driving it.
+    if (talk && viewer.playMode) { talkEnter = true; return; }
+    void togglePlay();
+    return;
+  }
   if (ev.key === 'm' && sound) {
     sound.volume = sound.volume > 0 ? 0 : 0.6;
     infoEl.textContent = sound.volume > 0 ? 'sound on' : 'sound muted';

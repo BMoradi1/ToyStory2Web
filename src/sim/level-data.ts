@@ -316,6 +316,17 @@ export interface LevelTasks {
     explainText: number;
     playerYaw: number; creatureYaw: number;
   };
+  /**
+   * The collect-five-objects challenge that earns slot 2 on the levels that
+   * have no race. Talking accepts it and zeroes the counter; talking again
+   * hurries Buzz along or hands the token over. The count is category-9
+   * objects (`DAT_00830d4c`).
+   */
+  challenge?: {
+    creature: number; pathTag: number;
+    askText: number; hurryText: number; doneText: number;
+    needed: number; slot: number;
+  };
   /** The find-five owner: their two lines and the slot the second one reveals. */
   findFive?: {
     creature: number; pathTag: number;
@@ -387,6 +398,7 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
     },
   },
   4: {
+    challenge: { creature: 0x1a, pathTag: 0x1f, askText: 0x4f1710, hurryText: 0x4f178c, doneText: 0x4f17c0, needed: 5, slot: 2 },
     potato: { creature: 0x15, pathTag: 0x1e, askText: 0x4f1818, thanksText: 0x4f18a0, explainText: 0x4f192c, playerYaw: 0x440, creatureYaw: 0xc40 },
     hamm: { creature: 0x14, pathTag: 0x1d, playerYaw: 0xe10, creatureYaw: 0x6e0, slot: 0 },
     hintNpc: {
@@ -399,6 +411,7 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
     },
   },
   5: {
+    challenge: { creature: 0x12, pathTag: 0x0e, askText: 0x4f1e3c, hurryText: 0x4f1eb0, doneText: 0x4f1ed4, needed: 5, slot: 2 },
     hamm: { creature: 0x14, pathTag: 0xf, playerYaw: -1, creatureYaw: 0x0, slot: 0 },
     hintNpc: {
       creature: 0x22, pathTag: 0x14,
@@ -443,6 +456,7 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
     },
   },
   11: {
+    challenge: { creature: 2, pathTag: 0x12, askText: 0x4f3948, hurryText: 0x4f39c0, doneText: 0x4f39ec, needed: 5, slot: 2 },
     hamm: { creature: 0x0, pathTag: 0xf, playerYaw: -1, creatureYaw: 0x0, slot: 0 },
     hintNpc: {
       creature: 0xc, pathTag: 0x14,
@@ -454,6 +468,7 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
     },
   },
   13: {
+    challenge: { creature: 5, pathTag: 0x1e, askText: 0x4f40b4, hurryText: 0x4f4124, doneText: 0x4f414c, needed: 5, slot: 2 },
     potato: { creature: 8, pathTag: 0x1f, askText: 0x4f4268, thanksText: 0x4f42b8, explainText: 0x4f4384, playerYaw: -1, creatureYaw: 0xe00 },
     hamm: { creature: 0x6, pathTag: 0x1d, playerYaw: -1, creatureYaw: 0x0, slot: 0 },
     hintNpc: {

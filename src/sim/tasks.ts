@@ -63,6 +63,10 @@ export interface TaskState {
   /** Power-up bits earned (`DAT_0052f2d8`). */
   powerUps: number;
   potatoChatter: number;
+  /** The collect-five challenge: 0 not offered, 1 running, 3 done. */
+  challenge: number;
+  /** What the item counter read when the challenge was accepted. */
+  challengeFrom: number;
   /** The race. */
   race: RaceState;
   laps: number;
@@ -85,7 +89,7 @@ export function startLevelTasks(tasks: TaskState, level: number): void {
 export function createTasks(): TaskState {
   return {
     done: 0, hammChatter: 0, hintChatter: 0, hintIndex: -1,
-    boss: 0, potatoPart: 0, powerUps: 0, potatoChatter: 0,
+    boss: 0, potatoPart: 0, powerUps: 0, potatoChatter: 0, challenge: 0, challengeFrom: 0,
     race: RaceState.Idle, laps: 0, raceQuadrant: 0, raceBlocked: true,
   };
 }
@@ -132,9 +136,40 @@ export function stepTasks(
     x: number; y: number; z: number;
     /** The game's level number, for the per-level power-up. */
     level: number;
+    /** Category-9 objects collected, for the challenge. */
+    items: number;
   },
   dt = 1,
 ): DialogueRequest | null {
+  // --- the collect-five challenge, where a level has one instead of a race.
+  const challenge = level.challenge;
+  if (challenge && !slotDone(tasks, challenge.slot)) {
+    const c = creatureAt(challenge.creature);
+    if (c && tookTalk(c)) {
+      if (tasks.challenge === 0) {
+        // Accepting it starts the count from wherever it stands.
+        tasks.challenge = 1;
+        tasks.challengeFrom = world.items;
+        return {
+          creature: challenge.creature, pathTag: challenge.pathTag, text: challenge.askText,
+          playerYaw: -1, creatureYaw: 0, slot: -1,
+        };
+      }
+      const got = world.items - tasks.challengeFrom;
+      if (got < challenge.needed) {
+        return {
+          creature: challenge.creature, pathTag: challenge.pathTag, text: challenge.hurryText,
+          playerYaw: -1, creatureYaw: 0, slot: -1,
+        };
+      }
+      tasks.challenge = 3;
+      return {
+        creature: challenge.creature, pathTag: challenge.pathTag, text: challenge.doneText,
+        playerYaw: -1, creatureYaw: 0, slot: challenge.slot,
+      };
+    }
+  }
+
   // --- Mr Potato Head: his part, and the power-up he gives back for it.
   const potato = level.potato;
   if (potato) {

@@ -1346,6 +1346,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
           rand: creatureSim.rand,
           talking: false,
           x: player.x, y: player.y, z: player.z, level,
+          items: pickups?.itemsFound ?? 0,
         },
       );
       if (request) startDialogue(request);

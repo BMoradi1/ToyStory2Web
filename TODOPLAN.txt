@@ -493,7 +493,19 @@
                 every table id is a sign on all seven levels. Port: the
                 script tick and camera flight, then the box (word wrap,
                 reveal, paging, two coordinate spaces).
- P3.9 [READY]   Push blocks: DECODED 2026-09-05 (docs/LEVELS.md "Push
+ P3.9 [PART]    Push blocks: PORTED 2026-09-05 (src/sim/push-blocks.ts).
+                Buzz shoves a crate along its rail, it tips over a ledge,
+                falls and lands on the segment below, and can be pushed on
+                from there. The collision moves with it: the sphere sweep
+                now reports which collision GROUP it touched and with what
+                normal (needed for the "am I leaning on this" test), and
+                moveCollisionGroup shifts a group's polygons and re-files
+                them in the lookup grid.
+                LEFT: the crate the game DRAWS is part of the baked level
+                geometry and does not move, so a translucent stand-in box
+                is drawn at the block's position instead. Moving the real
+                object needs the .ngn instance to be drawable on its own.
+                Original note: DECODED 2026-09-05 (docs/LEVELS.md "Push
                 blocks"). Crates shoved along level.dat paths with edge
                 drops; the collision group is named by a number in the
                 TERRAIN.ALL group entry (+0x1a), new in the .all parser.

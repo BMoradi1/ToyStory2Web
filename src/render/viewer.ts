@@ -348,6 +348,42 @@ export class Viewer {
    * nothing poses or moves them yet, so a marker is more honest than a frozen
    * model.
    */
+  private pushBlocks: THREE.InstancedMesh | null = null;
+
+  /**
+   * Show the push blocks where the sim has them.
+   *
+   * A STAND-IN. The crate the game draws is part of the baked level geometry
+   * and cannot be moved yet, so this is a translucent box at the block's
+   * position: enough to see it slide along its rail and drop off the ledge.
+   * Its size is the block's own collision extent, so it is at least the right
+   * shape.
+   */
+  setPushBlocks(boxes: { x: number; y: number; z: number; sx: number; sy: number; sz: number }[]): void {
+    if (this.pushBlocks) {
+      this.scene.remove(this.pushBlocks);
+      this.pushBlocks.geometry.dispose();
+      (this.pushBlocks.material as THREE.Material).dispose();
+      this.pushBlocks = null;
+    }
+    if (boxes.length === 0) return;
+    const mesh = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshBasicMaterial({ color: 0xffc46b, transparent: true, opacity: 0.45, depthWrite: false }),
+      boxes.length,
+    );
+    mesh.frustumCulled = false;
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    boxes.forEach((b, i) => {
+      m.compose(new THREE.Vector3(b.x, b.y, b.z), q, new THREE.Vector3(b.sx, b.sy, b.sz));
+      mesh.setMatrixAt(i, m);
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+    this.pushBlocks = mesh;
+    this.scene.add(mesh);
+  }
+
   /**
    * One drawn creature per id, each with its own geometry because each is
    * posed differently. Buzz gets a single mesh swapped in place for the same

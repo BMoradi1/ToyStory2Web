@@ -57,6 +57,8 @@ export interface Ground {
     vx: number; vy: number; vz: number;
     onGround: boolean;
     groundNormal: { x: number; y: number; z: number } | null;
+    /** Collision groups touched, with the face normal. Absent on the stubs. */
+    contacts?: { group: number; normal: { x: number; y: number; z: number } }[];
   };
   /** Y past which the player counts as having fallen out of the level. */
   deathY?: number;
@@ -105,6 +107,13 @@ export interface PlayerState {
   groundNormal: { x: number; y: number; z: number } | null;
   /** +0x9c: reloads to 6 on the ground, counts down in the air. */
   coyote: number;
+  /**
+   * The collision groups this tick's move touched, with the normal of the
+   * face that stopped him. The push-block code reads it to work out which
+   * block he is leaning on, which is what the engine's per-object contact
+   * records are for (docs/LEVELS.md).
+   */
+  contacts: { group: number; normal: { x: number; y: number; z: number } }[];
   /** +0x98: reduces jump and acceleration while nonzero. */
   hitStun: number;
   /** +0x90: animation phase the controller asks for. */
@@ -155,6 +164,7 @@ export function createPlayer(x = 0, y = 0, z = 0, yaw = 0): PlayerState {
     onGround: false,
     groundNormal: null,
     coyote: 0,
+    contacts: [],
     hitStun: 0,
     animPhase: 0,
     fallTimer: 0,
@@ -446,6 +456,7 @@ export function stepPlayer(
   p.vx = Math.round(swept.vx);
   p.vz = Math.round(swept.vz);
   p.groundNormal = swept.groundNormal;
+  p.contacts = swept.contacts ?? [];
 
   if (swept.onGround) {
     // Landing. A flagged hard fall costs velocity and control on the way down.

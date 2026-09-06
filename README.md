@@ -80,6 +80,11 @@ level.
   it decides what an object is by counting its polygons, and that rule is
   ported as found. The shapes standing in for them are placeholders: the real
   coin art is a sprite inside the executable that is not extracted yet.
+- **Crates push.** Lean on one of the shove-able crates and it runs along
+  the rail the level gives it, tips over a ledge, falls and lands, and can
+  be pushed on from there. Its collision moves with it. The crate you see
+  is a stand-in box: the real one is baked into the level geometry and
+  cannot be moved yet.
 - **Hint signs talk.** Touch one of the tutorial signposts and the game
   does what it always did: freezes Buzz, flies the camera along the sign's
   own path, and types the hint out a character at a time. The words come

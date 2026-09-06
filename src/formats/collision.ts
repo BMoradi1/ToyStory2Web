@@ -198,7 +198,19 @@ export function isWalkable(poly: CollisionPoly, maxSlopeDegrees = 60): boolean {
  * conventions in one module.
  */
 export interface CollisionWorld {
-  polys: { vertices: { x: number; y: number; z: number }[]; normal: { x: number; y: number; z: number }; walkable: boolean }[];
+  polys: {
+    vertices: { x: number; y: number; z: number }[];
+    normal: { x: number; y: number; z: number };
+    walkable: boolean;
+    /** Index into `groups` of the group this came from. */
+    group: number;
+  }[];
+  /**
+   * One entry per source group, in file order. `objectNumber` is the id the
+   * level code moves a dynamic group by (docs/FORMATS.md); `polys` lets a
+   * whole group be moved, which is what a pushed block does.
+   */
+  groups: { objectNumber: number; dynamic: boolean; polys: number[] }[];
   /** Poly indices by grid cell, keyed `gx,gz`. */
   cells: Map<string, number[]>;
   cellSize: number;
@@ -222,8 +234,10 @@ export interface CollisionWorld {
  * plane is wrong over the second.
  */
 export function buildCollisionWorld(groups: CollisionGroup[], cellSize = 1024): CollisionWorld {
-  const world: CollisionWorld = { polys: [], cells: new Map(), cellSize, lowestY: -Infinity };
+  const world: CollisionWorld = { polys: [], groups: [], cells: new Map(), cellSize, lowestY: -Infinity };
   for (const group of groups) {
+    const groupIndex = world.groups.length;
+    world.groups.push({ objectNumber: group.objectNumber, dynamic: group.dynamic, polys: [] });
     for (const mesh of group.meshes) {
       for (const poly of mesh.polys) {
         const place = (v: { x: number; y: number; z: number }) => ({
@@ -242,7 +256,8 @@ export function buildCollisionWorld(groups: CollisionGroup[], cellSize = 1024): 
         for (const piece of pieces) {
         const { vertices, normal } = piece;
         const index = world.polys.length;
-        world.polys.push({ vertices, normal, walkable: normal.y <= -Math.cos((60 * Math.PI) / 180) });
+        world.polys.push({ vertices, normal, walkable: normal.y <= -Math.cos((60 * Math.PI) / 180), group: groupIndex });
+        world.groups[groupIndex]!.polys.push(index);
         for (const v of vertices) if (v.y > world.lowestY) world.lowestY = v.y;
         const xs = vertices.map((v) => v.x), zs = vertices.map((v) => v.z);
         const x0 = Math.floor(Math.min(...xs) / cellSize), x1 = Math.floor(Math.max(...xs) / cellSize);
@@ -259,6 +274,57 @@ export function buildCollisionWorld(groups: CollisionGroup[], cellSize = 1024): 
     }
   }
   return world;
+}
+
+/** The group with this object number, or -1. Dynamic groups only carry one. */
+export function collisionGroupByObject(world: CollisionWorld, objectNumber: number): number {
+  return world.groups.findIndex((g) => g.dynamic && g.objectNumber === objectNumber);
+}
+
+/**
+ * Move one group's collision, the way the engine moves a pushed block's
+ * (`FUN_00488510`). Shifts every vertex and re-files the polygons in the
+ * lookup grid, since a moved block belongs in different cells.
+ */
+export function moveCollisionGroup(
+  world: CollisionWorld,
+  groupIndex: number,
+  dx: number, dy: number, dz: number,
+): void {
+  const group = world.groups[groupIndex];
+  if (!group || (dx === 0 && dy === 0 && dz === 0)) return;
+  for (const index of group.polys) {
+    const poly = world.polys[index]!;
+    // Out of its old cells first, because the extent changes with the move.
+    const oldX = poly.vertices.map((v) => v.x), oldZ = poly.vertices.map((v) => v.z);
+    forEachCell(world, oldX, oldZ, (cell) => {
+      const at = cell.indexOf(index);
+      if (at >= 0) cell.splice(at, 1);
+    });
+    for (const v of poly.vertices) { v.x += dx; v.y += dy; v.z += dz; }
+    const xs = poly.vertices.map((v) => v.x), zs = poly.vertices.map((v) => v.z);
+    forEachCell(world, xs, zs, (cell) => cell.push(index), true);
+    for (const v of poly.vertices) if (v.y > world.lowestY) world.lowestY = v.y;
+  }
+}
+
+/** Visit every grid cell a polygon's extent covers. */
+function forEachCell(
+  world: CollisionWorld,
+  xs: number[], zs: number[],
+  visit: (cell: number[]) => void,
+  create = false,
+): void {
+  const x0 = Math.floor(Math.min(...xs) / world.cellSize), x1 = Math.floor(Math.max(...xs) / world.cellSize);
+  const z0 = Math.floor(Math.min(...zs) / world.cellSize), z1 = Math.floor(Math.max(...zs) / world.cellSize);
+  for (let gx = x0; gx <= x1; gx++) {
+    for (let gz = z0; gz <= z1; gz++) {
+      const key = `${gx},${gz}`;
+      let cell = world.cells.get(key);
+      if (!cell && create) { cell = []; world.cells.set(key, cell); }
+      if (cell) visit(cell);
+    }
+  }
 }
 
 /** Does the X/Z point fall inside the polygon, projected onto the X/Z plane? */
@@ -376,6 +442,13 @@ export interface SphereSweep {
   touched: boolean;
   /** Normal of the flattest ground contact, or null. */
   groundNormal: { x: number; y: number; z: number } | null;
+  /**
+   * Every collision group touched on the way, with the normal of the face
+   * that stopped the sphere. The engine keeps the same thing per collision
+   * object and the push-block code reads it to decide what Buzz is leaning
+   * on (`FUN_00488580` / `FUN_004885a0`, docs/LEVELS.md).
+   */
+  contacts: { group: number; normal: { x: number; y: number; z: number } }[];
 }
 
 /** Smallest root of `a t^2 + b t + c` in `(0, maxT]`, or null. */
@@ -518,6 +591,7 @@ export function sweepSphere(
   let remaining: Vec3 = { x: velocity.x, y: velocity.y, z: velocity.z };
   let onGround = false, touched = false;
   let groundNormal: Vec3 | null = null;
+  const contacts: { group: number; normal: Vec3 }[] = [];
 
   // Broadphase once, over the whole step plus the sphere, in hull units.
   const reach = (radius + Math.sqrt(lengthSq(remaining))) / scale + 2;
@@ -543,17 +617,20 @@ export function sweepSphere(
   for (let pass = 0; pass < passes; pass++) {
     if (lengthSq(remaining) < 1e-9) break;
 
-    let hit: { t: number; normal: Vec3 } | null = null;
+    let hit: { t: number; normal: Vec3; group: number } | null = null;
     for (const index of candidates) {
       const poly = world.polys[index]!;
       const v = poly.vertices;
       const a = scaled(v[0]!, scale), b = scaled(v[1]!, scale), c = scaled(v[2]!, scale);
       const found = sweepTriangle(position, remaining, radius, a, b, c, poly.normal);
-      if (found && (!hit || found.t < hit.t)) hit = found;
+      if (found && (!hit || found.t < hit.t)) hit = { ...found, group: poly.group };
     }
     if (!hit) break;
 
     touched = true;
+    if (!contacts.some((c) => c.group === hit!.group)) {
+      contacts.push({ group: hit.group, normal: hit.normal });
+    }
     // Advance to just short of the contact, so the next pass starts outside.
     const travel = Math.max(0, hit.t - skin / (Math.sqrt(lengthSq(remaining)) || 1));
     position = {
@@ -622,7 +699,7 @@ export function sweepSphere(
   return {
     x: position.x, y: position.y, z: position.z,
     vx: moved.x, vy: moved.y, vz: moved.z,
-    onGround, touched, groundNormal,
+    onGround, touched, groundNormal, contacts,
   };
 }
 

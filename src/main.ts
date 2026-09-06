@@ -7,7 +7,10 @@ import * as THREE from 'three';
 import { WORLD_SCALE, buildLevelGeometry, objectFaceCount, parseDat, reachableZones, type DatLevel } from './formats/dat.ts';
 import { decodeBmp, parseNgn, type NgnTexture } from './formats/ngn.ts';
 import { assignZones, parseNgnScene } from './formats/ngnscene.ts';
-import { buildCollisionWorld, groundBelow, parseCollision, type CollisionGroup, type CollisionWorld } from './formats/collision.ts';
+import {
+  buildCollisionWorld, collisionGroupByObject, groundBelow, moveCollisionGroup, parseCollision,
+  type CollisionGroup, type CollisionWorld,
+} from './formats/collision.ts';
 import {
   findLevels, findModels, gameDirFromDrop, gameDirFromFileList, pickGameDir,
   supportsDirectoryPicker, validateGameDir, type GameDir,
@@ -17,7 +20,7 @@ import { InputSource } from './sim/input.ts';
 import { GAME_UNITS_PER_LEVEL_UNIT } from './sim/player-constants.ts';
 import {
   createPlayer, createRuntime, groundFromCollision, stepPlayer,
-  type PlayerRuntime, type PlayerState,
+  type PlayerInput, type PlayerRuntime, type PlayerState,
 } from './sim/player.ts';
 import { cos as cosOf, sin as sinOf, toRadians, yawOf } from './sim/trig.ts';
 import { createCamera, stepCamera, cameraTarget, type CameraState } from './sim/camera.ts';
@@ -25,8 +28,9 @@ import { SoundBank, PLAYER_EFFECTS } from './audio/sfx.ts';
 import { MUSIC_TRACKS, MusicPlayer, trackForLevel } from './audio/music.ts';
 import { createPickups, PickupKind, revealToken, stepPickups, type PickupState } from './sim/pickups.ts';
 import {
-  exeString, HINT_SIGNS, levelNumber, SPAWN_TABLE, TALK_SCRIPTS, tokenSlotsAtStart,
+  exeString, HINT_SIGNS, levelNumber, PUSH_BLOCKS, SPAWN_TABLE, TALK_SCRIPTS, tokenSlotsAtStart,
 } from './sim/level-data.ts';
+import { createPushBlocks, stepPushBlocks, type PushState } from './sim/push-blocks.ts';
 import {
   BoxPhase, TALK_SCRIPT, startTalk, stepTalk, talkVisibleRows, type TalkState,
 } from './sim/talk.ts';
@@ -216,6 +220,7 @@ async function showLevel(index: number): Promise<void> {
   currentCollision = null;
   currentCollisionWorld = null;
   creatureSim = null;
+  pushBlocks = null;
   talk = null;
   talkEl.hidden = true;
   creatureArt.clear();
@@ -456,6 +461,62 @@ async function open(dir: GameDir): Promise<void> {
         }
         drawCreatures();
         return { ticks, touches, updated: creatureSim.near.length, total: creatureSim.creatures.length };
+      },
+      /**
+       * Run whole frames of play, pad and all, which `drive` does not: it
+       * steps only the controller. Anything that lives in the tick — pushing,
+       * creatures, pickups, the talk box — needs this one.
+       */
+      tickGame(held: Partial<PlayerInput> = {}, ticks = 1, bearing?: number) {
+        if (!player) return null;
+        for (let i = 0; i < ticks; i++) playTick(held, bearing);
+        return { x: player.x, y: player.y, z: player.z, yaw: player.yaw, onGround: player.onGround };
+      },
+      /** Put the player against a push block's face, ready to shove it. */
+      goToPushBlock(which = 0) {
+        if (!player || !pushBlocks) return null;
+        const b = pushBlocks.blocks[which];
+        if (!b) return null;
+        // Stand him one step back along the segment, facing down it.
+        // Clear of the crate: it is as wide as Buzz is tall, so a small step
+        // back puts him inside it and the sweep shoves him straight through.
+        const S3 = GAME_UNITS_PER_LEVEL_UNIT;
+        let reach = 900;
+        const grp = currentCollisionWorld?.groups[b.group];
+        if (grp) {
+          let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+          for (const i of grp.polys) {
+            for (const v of currentCollisionWorld!.polys[i]!.vertices) {
+              minX = Math.min(minX, v.x); maxX = Math.max(maxX, v.x);
+              minZ = Math.min(minZ, v.z); maxZ = Math.max(maxZ, v.z);
+            }
+          }
+          if (Number.isFinite(minX)) reach = (Math.max(maxX - minX, maxZ - minZ) / 2 + 40) * S3;
+        }
+        const back = reach;
+        player.x = b.x - Math.round((sinOf(b.segYaw) / 0x4000) * back);
+        player.z = b.z - Math.round((cosOf(b.segYaw) / 0x4000) * back);
+        // Stand him on whatever is under that point: a block can sit high up
+        // on a shelf, and dropping him in at its own height makes him fall
+        // past it before he ever touches it.
+        const S2 = GAME_UNITS_PER_LEVEL_UNIT;
+        const floor = currentCollisionWorld
+          ? groundBelow(currentCollisionWorld, player.x / S2, (b.y - 4000) / S2, player.z / S2)
+          : null;
+        player.y = floor ? floor.y * S2 : b.y;
+        player.vx = 0; player.vy = 0; player.vz = 0;
+        player.yaw = b.segYaw;
+        return { index: which, yaw: b.segYaw, block: { x: b.x, y: b.y, z: b.z }, player: { x: player.x, y: player.y, z: player.z } };
+      },
+      get pushBlocks() {
+        if (!pushBlocks) return null;
+        return {
+          held: pushBlocks.held,
+          blocks: pushBlocks.blocks.map((b) => ({
+            index: b.index, seg: b.seg, run: b.run, segLen: b.segLen, tipPoint: b.tipPoint,
+            fall: b.fallSpeed, x: b.x, y: b.y, z: b.z, group: b.group,
+          })),
+        };
       },
       /** Stand the player on a hint sign, so touching it opens the talk box. */
       goToHintSign(which = 0) {
@@ -779,6 +840,23 @@ async function spawnPlayer(): Promise<void> {
       }
     }
   }
+  // The crates Buzz shoves. Their rails are paths in the scene and their
+  // collision is a numbered dynamic group in the terrain file.
+  const S = GAME_UNITS_PER_LEVEL_UNIT;
+  const table = PUSH_BLOCKS[level];
+  pushBlocks = table
+    ? createPushBlocks(
+      table,
+      (tag) => {
+        const path = currentLevel!.level.paths.find((p) => p.id === tag);
+        return path ? path.points.map((p) => ({ x: p.x * S, y: p.y * S, z: p.z * S })) : null;
+      },
+      (object) => collisionGroupByObject(currentCollisionWorld!, object),
+      level,
+    )
+    : null;
+  drawPushBlocks();
+
   pickups = createPickups(currentLevel.level, level);
   for (const slot of tokenSlotsAtStart(level)) revealToken(pickups, slot);
   drawPickups();
@@ -952,6 +1030,40 @@ function drawTalk(): void {
     : '';
 }
 
+/**
+ * Show the push blocks. The size comes from the block's own collision group,
+ * so the stand-in box is at least the shape of the crate it replaces.
+ */
+function drawPushBlocks(): void {
+  if (!viewer) return;
+  if (!pushBlocks || !currentCollisionWorld) { viewer.setPushBlocks([]); return; }
+  const world = currentCollisionWorld;
+  const S = GAME_UNITS_PER_LEVEL_UNIT;
+  viewer.setPushBlocks(pushBlocks.blocks.map((b) => {
+    let sx = 1, sy = 1, sz = 1;
+    const group = world.groups[b.group];
+    if (group) {
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
+      for (const index of group.polys) {
+        for (const v of world.polys[index]!.vertices) {
+          minX = Math.min(minX, v.x); maxX = Math.max(maxX, v.x);
+          minY = Math.min(minY, v.y); maxY = Math.max(maxY, v.y);
+          minZ = Math.min(minZ, v.z); maxZ = Math.max(maxZ, v.z);
+        }
+      }
+      if (Number.isFinite(minX)) {
+        sx = Math.max(0.05, (maxX - minX) / WORLD_SCALE);
+        sy = Math.max(0.05, (maxY - minY) / WORLD_SCALE);
+        sz = Math.max(0.05, (maxZ - minZ) / WORLD_SCALE);
+      }
+    }
+    return {
+      x: b.x * GAME_TO_RENDER, y: -b.y * GAME_TO_RENDER - sy / 2, z: -b.z * GAME_TO_RENDER,
+      sx, sy, sz,
+    };
+  }));
+}
+
 /** As `creatureColour`, but a creature the sim is actually updating shows brighter. */
 function liveCreatureColour(c: Creature): number {
   const base = c.health >= 100 ? 0x60d060 : c.record.respawn > 0 ? 0xe04040 : 0xa0a0a0;
@@ -986,6 +1098,8 @@ let sound: SoundBank | null = null;
 let music: MusicPlayer | null = null;
 /** The talk box in progress, if any. Buzz is frozen while it is up. */
 let talk: TalkState | null = null;
+/** The level's push blocks, once the player has spawned. */
+let pushBlocks: PushState | null = null;
 /** toy2.exe, kept because the hint text lives inside it. */
 let exeBytes: Uint8Array | null = null;
 let pickups: PickupState | null = null;
@@ -1026,14 +1140,19 @@ function setPlaying(on: boolean): void {
   }
 }
 
-function playTick(): void {
+/**
+ * One frame of play. `override` and `bearing` exist for the headless harness,
+ * which cannot press keys: they stand in for the pad and for the camera's
+ * bearing that the stick is measured against.
+ */
+function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   if (!viewer || !player || !playerRuntime || !currentCollisionWorld) return;
 
   if (player.fellOut) { void respawn(); return; }
   // The camera's bearing to the player, taken from the sim camera rather than
   // the rendered one, so the controls do not depend on how the view is drawn.
-  const cameraYaw = camera ? yawOf(player.x - camera.x, player.z - camera.z) : 0;
-  const held = input.read();
+  const cameraYaw = bearing ?? (camera ? yawOf(player.x - camera.x, player.z - camera.z) : 0);
+  const held = override ? { ...input.read(), ...override } : input.read();
 
   // A talk freezes Buzz and takes the camera: the engine sets its "no player
   // control" bit and drives the camera from the talk script rather than the
@@ -1095,6 +1214,27 @@ function playTick(): void {
     );
   }
   for (const effect of player.sounds) sound?.play(effect);
+
+  if (pushBlocks && currentCollisionWorld) {
+    const busy = player.spin !== 0 || player.laser !== 0 || player.hitStun > 0
+      || player.jumpState !== 0 || !!talk;
+    const push = stepPushBlocks(pushBlocks, {
+      x: player.x, y: player.y, z: player.z, yaw: player.yaw,
+      onGround: player.onGround, busy, contacts: player.contacts,
+    }, Math.hypot(held.moveX, held.moveY) > 0);
+    for (const move of push.moved) {
+      const block = pushBlocks.blocks[move.index];
+      if (block && block.group >= 0) {
+        moveCollisionGroup(currentCollisionWorld, block.group, move.dx, move.dy, move.dz);
+      }
+    }
+    if (push.playerVelocity) {
+      player.vx = push.playerVelocity.x;
+      player.vz = push.playerVelocity.z;
+    }
+    for (const effect of pushBlocks.sounds) sound?.play(effect);
+    if (push.moved.length > 0) drawPushBlocks();
+  }
 
   if (creatureSim) {
     stepCreatures(creatureSim, player);

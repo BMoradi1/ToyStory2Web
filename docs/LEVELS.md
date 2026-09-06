@@ -100,6 +100,12 @@ Levels 3, 6, 9, 12 and 15 are boss arenas with no tokens of their own.
 
 ## Shared task helpers
 
+Ported 2026-09-05 in `src/sim/tasks.ts`, with the per-level table in
+`src/sim/level-data.ts` (`LEVEL_TASKS`, level 1 read out of its tick) and the
+dialogue itself in `src/sim/talk.ts`. Hamm's coin gate, the find-five owner
+and the hint NPC all work: touching one of them opens the right line, and a
+line with a slot marks it earned and puts its token in the world.
+
 The tasks are built from a handful of engine routines the level ticks call
 with a creature index (`DAT_0052c840 + i * 0x9c`, the entity array) and a
 token slot:

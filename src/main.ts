@@ -32,8 +32,11 @@ import {
 } from './sim/level-data.ts';
 import { createPushBlocks, stepPushBlocks, type PushState } from './sim/push-blocks.ts';
 import {
-  BoxPhase, TALK_SCRIPT, startTalk, stepTalk, talkVisibleRows, type TalkState,
+  BoxPhase, TALK_SCRIPT, buildDialogueScript, startTalk, stepTalk, talkVisibleRows,
+  type TalkState,
 } from './sim/talk.ts';
+import { LEVEL_TASKS } from './sim/level-data.ts';
+import { createTasks, markSlotDone, stepTasks, type TaskState } from './sim/tasks.ts';
 import { unpackRaw } from './formats/rnc.ts';
 import {
   CREATURE_LIST_TYPE, parseCreatureList, parseCreatureModels, parseCreatureNames,
@@ -221,6 +224,7 @@ async function showLevel(index: number): Promise<void> {
   currentCollisionWorld = null;
   creatureSim = null;
   pushBlocks = null;
+  tasks = null;
   talk = null;
   talkEl.hidden = true;
   creatureArt.clear();
@@ -527,6 +531,9 @@ async function open(dir: GameDir): Promise<void> {
         const S = GAME_UNITS_PER_LEVEL_UNIT;
         player.x = item.x * S; player.y = item.y * S; player.z = item.z * S;
         return { id: item.id, of: signs.length, x: player.x, y: player.y, z: player.z };
+      },
+      get tasks() {
+        return tasks ? { done: tasks.done, hintIndex: tasks.hintIndex } : null;
       },
       get talk() {
         if (!talk) return null;
@@ -857,6 +864,7 @@ async function spawnPlayer(): Promise<void> {
     : null;
   drawPushBlocks();
 
+  tasks = createTasks();
   pickups = createPickups(currentLevel.level, level);
   for (const slot of tokenSlotsAtStart(level)) revealToken(pickups, slot);
   drawPickups();
@@ -997,6 +1005,27 @@ function startHintTalk(objectId: number): boolean {
   return true;
 }
 
+/** Open a character's dialogue (`FUN_004027f0`). */
+function startDialogue(request: import('./sim/tasks.ts').DialogueRequest): void {
+  if (!currentLevel || !exeBytes) return;
+  const path = currentLevel.level.paths.find((p) => p.id === request.pathTag);
+  if (!path || path.points.length < 3) return;
+  let text: string;
+  try {
+    text = exeString(exeBytes, request.text);
+  } catch {
+    return;
+  }
+  const S = GAME_UNITS_PER_LEVEL_UNIT;
+  talk = startTalk(
+    buildDialogueScript(request.pathTag, request.creature, request.playerYaw, request.creatureYaw),
+    { points: path.points.map((p) => ({ x: p.x * S, y: p.y * S, z: p.z * S })) },
+    text,
+    request.slot,
+  );
+  talkSlot = request.slot;
+}
+
 /** Show whatever the talk box has revealed so far. */
 function drawTalk(): void {
   if (!talk) { talkEl.hidden = true; return; }
@@ -1100,6 +1129,10 @@ let music: MusicPlayer | null = null;
 let talk: TalkState | null = null;
 /** The level's push blocks, once the player has spawned. */
 let pushBlocks: PushState | null = null;
+/** Which token tasks are done, and the talkers' timers. */
+let tasks: TaskState | null = null;
+/** The slot the talk box will reveal when it closes, or -1. */
+let talkSlot = -1;
 /** toy2.exe, kept because the hint text lives inside it. */
 let exeBytes: Uint8Array | null = null;
 let pickups: PickupState | null = null;
@@ -1172,6 +1205,21 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       player.vx = 0; player.vy = 0; player.vz = 0;
     }
     if (request.faceYaw !== null) player.yaw = request.faceYaw;
+    if (request.creature && creatureSim) {
+      const c = creatureSim.creatures.find((q) => q.slot === request.creature!.index);
+      if (c) {
+        if (request.creature.moveTo) {
+          c.x = request.creature.moveTo.x;
+          c.y = request.creature.moveTo.y;
+          c.z = request.creature.moveTo.z;
+          c.vx = 0; c.vy = 0; c.vz = 0;
+        }
+        if (request.creature.faceYaw !== null) {
+          c.heading = request.creature.faceYaw;
+          c.wantYaw = request.creature.faceYaw;
+        }
+      }
+    }
     for (const effect of talk.sounds) sound?.play(effect);
     talk.sounds.length = 0;
     viewer.setPlayerTransform(
@@ -1184,6 +1232,15 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     );
     drawTalk();
     if (talk.finished) {
+      // A dialogue's last argument is the slot it earns: mark it done and
+      // put its token in the world (`FUN_004a0db0`).
+      if (talkSlot >= 0 && tasks && pickups) {
+        markSlotDone(tasks, talkSlot);
+        revealToken(pickups, talkSlot);
+        drawPickups();
+        infoEl.textContent = `pizza planet token ${talkSlot + 1} of 5`;
+      }
+      talkSlot = -1;
       talk = null;
       drawTalk();
       // Hand the camera back where it is, so it eases rather than snapping.
@@ -1234,6 +1291,25 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     }
     for (const effect of pushBlocks.sounds) sound?.play(effect);
     if (push.moved.length > 0) drawPushBlocks();
+  }
+
+  // The level's talkers. Only while nothing else is being said.
+  if (creatureSim && tasks && !talk && exeBytes) {
+    const level = levelNumber(levels[levelEl.selectedIndex]?.id ?? '') ?? 0;
+    const table = LEVEL_TASKS[level];
+    if (table) {
+      const request = stepTasks(
+        tasks, table,
+        (index) => creatureSim!.creatures.find((c) => c.slot === index),
+        {
+          coins: pickups?.coins ?? 0,
+          found: creatureSim.sheepFound,
+          rand: creatureSim.rand,
+          talking: false,
+        },
+      );
+      if (request) startDialogue(request);
+    }
   }
 
   if (creatureSim) {

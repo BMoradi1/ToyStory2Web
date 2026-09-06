@@ -257,3 +257,55 @@ export function exeString(exe: Uint8Array, address: number): string {
   for (let i = start; i < end; i++) out += String.fromCharCode(exe[i]!);
   return out;
 }
+
+/**
+ * The strings the shared task helpers use on every level, by address in
+ * toy2.exe. Read them with `exeString`; they are never stored here.
+ */
+export const TASK_TEXT = {
+  /** Hamm, before you have the coins (`FUN_004a1ce0`). */
+  hammAsk: 0x5027e0,
+  /** Hamm, handing the token over. */
+  hammGive: 0x502834,
+  /** The hint NPC once every slot is done (`FUN_004a1e60`). */
+  allTokens: 0x502868,
+} as const;
+
+/** Who runs which task on a level, from its tick's calls to the helpers. */
+export interface LevelTasks {
+  /** `FUN_004a1ce0(creature, pathTag, x, y, slot)`: talk to him holding fifty coins. */
+  hamm?: { creature: number; pathTag: number; playerYaw: number; creatureYaw: number; slot: number };
+  /** `FUN_004a1e60(creature, pathTag, hints)`: says what is still to do. */
+  hintNpc?: { creature: number; pathTag: number; hints: readonly number[] };
+  /** The find-five owner: their two lines and the slot the second one reveals. */
+  findFive?: {
+    creature: number; pathTag: number;
+    askText: number; doneText: number; slot: number;
+    /** How many of the thing there are. */
+    needed: number;
+  };
+}
+
+/**
+ * Level 1's, read from `FUN_00417680`: Hamm on the sofa is creature 0x1e,
+ * Rex is the hint NPC at 0x23 with the five-string table at 0x4f0f7c, and Bo
+ * Peep at creature 1 wants her five sheep back.
+ *
+ * The other levels' tables are the same shape and are not read out yet.
+ */
+export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
+  1: {
+    hamm: { creature: 0x1e, pathTag: 0x1d, playerYaw: 0xe10, creatureYaw: 0x6e0, slot: 0 },
+    hintNpc: {
+      creature: 0x23, pathTag: 0x27,
+      hints: [0x4f0c78, 0x4f0cac, 0x4f0cf0, 0x4f0d54, 0x4f0e18],
+    },
+    findFive: {
+      creature: 1, pathTag: 0x1c,
+      askText: 0x4f036c, doneText: 0x4f03e0, slot: 1, needed: 5,
+    },
+  },
+};
+
+/** Coins Hamm wants before he hands over his token (`0x31 <` in the original). */
+export const HAMM_COINS = 50;

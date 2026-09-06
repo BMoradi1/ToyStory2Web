@@ -33,11 +33,30 @@ export const TALK_SCRIPT = {
   /** 0x4df69c: stand Buzz on node 0, fly from node 2, hold. */
   hint: [1, -1, 0, 4, 2, 3, -1, 10, 7, -1, 8, -1] as const,
   /**
-   * 0x4df6cc, with its four patch slots at words 1, 5, 9 and 12: the path
-   * tag, the creature, Buzz's yaw and the creature's yaw.
+   * 0x4df6cc. `FUN_004027f0` patches four words in place before running it:
+   * the path tag at 1, the creature at 6 and 12, Buzz's yaw at 10 and the
+   * creature's at 13. `buildDialogueScript` does the same.
    */
   dialogue: [0, 0, 1, -1, 0, 1, 0, 1, 2, -1, 0, 2, 0, 0, 4, 2, 3, -1, 10, 7, -1, 8, -1] as const,
 } as const;
+
+/**
+ * The dialogue script with its arguments filled in: the path they stand on,
+ * which creature is speaking, and the two yaws. A `playerYaw` of -1 means
+ * "face each other", which the face opcode works out from the path's first
+ * two nodes.
+ */
+export function buildDialogueScript(
+  pathTag: number, creature: number, playerYaw: number, creatureYaw: number,
+): number[] {
+  const words: number[] = [...TALK_SCRIPT.dialogue];
+  words[1] = pathTag;
+  words[6] = creature;
+  words[10] = playerYaw;
+  words[12] = creature;
+  words[13] = creatureYaw;
+  return words;
+}
 
 /** How the box is doing, for the caller to draw. */
 export enum BoxPhase {
@@ -53,12 +72,21 @@ export enum BoxPhase {
   Closing,
 }
 
-/** What the caller has to do to Buzz while a talk runs. */
+/** What the caller has to do to Buzz, and to the creature, while a talk runs. */
 export interface TalkPlayerRequest {
   /** Put him here, in game units. Null means leave him alone. */
   moveTo: { x: number; y: number; z: number } | null;
   /** Turn him to this 12-bit yaw. Null means leave it. */
   faceYaw: number | null;
+  /**
+   * The same for the creature the script names, when it names one: a
+   * dialogue stands its speaker on node 1 and turns it to face Buzz.
+   */
+  creature: {
+    index: number;
+    moveTo: { x: number; y: number; z: number } | null;
+    faceYaw: number | null;
+  } | null;
 }
 
 export interface TalkState {
@@ -216,7 +244,7 @@ function aimCamera(t: TalkState): void {
  * Returns what to do with Buzz this tick.
  */
 export function stepTalk(t: TalkState, input: TalkInput, dt = 1): TalkPlayerRequest {
-  const request: TalkPlayerRequest = { moveTo: null, faceYaw: null };
+  const request: TalkPlayerRequest = { moveTo: null, faceYaw: null, creature: null };
   if (t.finished) return request;
 
   // --- the script. Opcodes run back to back until one waits.
@@ -238,6 +266,9 @@ export function stepTalk(t: TalkState, input: TalkInput, dt = 1): TalkPlayerRequ
         const who = t.script[t.pc + 1]!;
         const n = t.script[t.pc + 2]!;
         if (who === -1) request.moveTo = node(t, n);
+        else {
+          request.creature = { index: who, moveTo: node(t, n), faceYaw: request.creature?.faceYaw ?? null };
+        }
         t.pc += 3;
         continue;
       }
@@ -249,6 +280,16 @@ export function stepTalk(t: TalkState, input: TalkInput, dt = 1): TalkPlayerRequ
           // a half turn, which is the engine's own convention.
           request.faceYaw = yaw >= 0 ? yaw & YAW_MASK
             : (yawOf(node(t, 0).x - node(t, 1).x, node(t, 0).z - node(t, 1).z) + 0x800) & YAW_MASK;
+        } else {
+          // The creature faces the other way down the same pair of nodes.
+          const facing = yaw >= 0 && t.script[t.pc + 2] !== 0
+            ? yaw & YAW_MASK
+            : yawOf(node(t, 0).x - node(t, 1).x, node(t, 0).z - node(t, 1).z) & YAW_MASK;
+          request.creature = {
+            index: who,
+            moveTo: request.creature?.moveTo ?? null,
+            faceYaw: facing,
+          };
         }
         t.pc += 3;
         continue;

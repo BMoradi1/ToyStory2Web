@@ -309,3 +309,12 @@ MUSIC - decoded 2026-09-05, ready for Opus to wire up.  Nothing left to
  branch main was renamed and relicensed mid-session, and three README commits
  appeared from elsewhere. Fetch before assuming your view of origin/main is
  current, and never force-push.
+
+ The one exception, 2026-09-05: every commit message carried a
+ "Claude-Session: https://claude.ai/code/session_..." trailer, and the user
+ asked for those links to be removed from the repo. The 44 affected messages
+ were rewritten with git filter-branch and force-pushed, which changed the
+ hash of all 57 commits from 092e90c onward - the tree at the tip was checked
+ identical before and after. Any clone made before that needs
+ "git reset --hard origin/main". DO NOT ADD THAT TRAILER AGAIN: commits end
+ with the Co-Authored-By line and nothing else.

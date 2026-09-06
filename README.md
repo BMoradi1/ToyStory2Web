@@ -100,6 +100,10 @@ level.
   behaviour — a script interpreter with 44 scripts in the executable, one
   shared mover, one damage routine — is decoded in docs/CREATURES.md and
   waiting to be ported.
+- **Hint signs and push blocks, decoded.** The tutorial signposts (a talk
+  box with a scripted camera flight, also how every character speaks) and
+  the crates Buzz shoves along rails are read out of the executable and
+  checked against every level's scene; see docs/LEVELS.md. Not yet ported.
 - **Two oracles.** An offline rasteriser and a headless browser driver, so a
   change can be checked pixel against pixel rather than by eye. They are how
   most of the bugs above were found.

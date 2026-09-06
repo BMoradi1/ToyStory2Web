@@ -163,6 +163,10 @@ The consequence matters: **level visual geometry is not in `.ALL` at all.**
       +0x08  i32  y
       +0x0C  i32  z
       +0x10  u32  type
+      +0x1A  u16  object number + 1 on dynamic collision groups (0x0008), 0
+                  otherwise: the id the executable's tables and the level
+                  scripts move the group by (`FUN_00488510(id, x, y, z)`).
+                  Checked against all 24 push blocks (docs/LEVELS.md).
       +0x28  u8   collision category
       +0x29  bit 0x04 = LOD
 

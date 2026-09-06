@@ -44,13 +44,16 @@ Level 1's, `FUN_004171d0`, in order:
 
 1. `FUN_004a0c80(tokenList, 0x48)` — hide the five tokens and their spares
    (docs/PLAYER.md, "Tokens start hidden").
-2. `FUN_004025c0(table)` — load a table of up to ten 4-int records into
-   `DAT_0050a150`. Purpose not decoded; every level has one.
+2. `FUN_004025c0(table)` — load the level's **hint signs**: up to ten
+   records of `{objectId, pathTag, textPtr, playerYaw}` ending at a
+   negative id (see "Hint signs and the talk box" below). Seven levels have
+   one; level 2's is missing its terminator.
 3. `FUN_004a0db0(3, 1)` — **reveal slot 3 quietly**. The puzzle token is
    collectable from the start; the puzzle is getting to it.
-4. `FUN_004335d0(table)` — load a table of `(a, b, pathTag)` triples: the
-   moving objects that ride the paths in `level.dat`, resolved through the
-   loader's path table `DAT_00559c70[tag]`.
+4. `FUN_004335d0(table)` — load the level's **push blocks**: triples of
+   `(sceneObject, collisionObject, pathTag)`, the crates Buzz shoves along a
+   path in `level.dat` (see "Push blocks" below). Eight levels have a table;
+   the rest pass 0.
 5. Zero the level's own state variables (`DAT_0052f4f4..0052f5d0`), then read
    the start positions of objects 6, 9, 0x11, 0x12, 0xa and 0x10 through
    `FUN_004ccef0(id, &out)` — the same id space as the tokens.
@@ -114,11 +117,26 @@ token slot:
   carried): on talk with it he hands over the power-up for this level
   (`(&DAT_00503a23)[level * 2]`, ORed into `DAT_0052f2d8`) and re-shows the
   category-9 objects with `FUN_0044f840(9, …)`.
-- `FUN_004027f0(creature, anim, text, x, y, slot)` — **dialogue**. Opens the
-  text box; the last argument is the slot to reveal when it closes
-  (`FUN_00402a10` calls `FUN_004a0db0(slot, 0)`), or -1. This is how the
-  find-five owners award slot 1: level 1's Bo Peep line runs with slot 1
-  once `DAT_0052b7d8`, the sheep count, reaches five.
+- `FUN_004027f0(creature, pathTag, text, playerYaw, creatureYaw, slot)` —
+  **dialogue**. Puts Buzz on node 0 of the path and the creature on node 1,
+  faces them (yaw -1 means "at each other", computed from the two nodes),
+  flies the camera along the rest of the path and opens the text box — the
+  whole mechanism is "Hint signs and the talk box" below. The last argument
+  is the slot to reveal when the box closes (`FUN_00402a10` calls
+  `FUN_004a0db0(slot, 0)`), or -1. This is how the find-five owners award
+  slot 1: level 1's Bo Peep line runs with slot 1 once `DAT_0052b7d8`, the
+  sheep count, reaches five.
+- `FUN_004020f0(pos, ticks, distance)` and `FUN_00402290(ticks)` — **camera
+  cut**. Freeze Buzz (`DAT_0052b816 |= 1`, pad masked to `0x309`), hand the
+  camera to the cutscene system (`DAT_0052f340 |= 4`) and hold it for
+  `ticks` looking at `pos` (an entity, usually) from `distance` back along
+  the line to Buzz, or at Buzz from where the camera already is. Eighteen
+  calls, all from level ticks: doors opening, a boss appearing.
+- `FUN_0049fab0(n, scripted)` — put out a **sparkle**. The reserved path
+  tag 58 lists points that glitter until something happens there (see
+  "Reserved path tags"); this consumes point `n` — counted after the push
+  block points when `scripted` is 1 — by ending its live effect and marking
+  the point spent.
 - `FUN_004a26f0(creature, event)` — idle chatter through the sound event
   table.
 - `FUN_0049f400(p, q, r)` — the level code's proximity test: true when the
@@ -131,6 +149,230 @@ four-quadrant lap counter (`DAT_0052f584`, bits for the garage's x/z
 halves), `DAT_0052ad64` counts laps, and at three `FUN_004a0db0(2, 0)`
 reveals slot 2 with the camera cut. The car itself is a creature driven by
 the shared creature code, so the race is not portable until creatures are.
+
+## Hint signs and the talk box
+
+The six-polygon pickup category (4, "camera trigger" in an earlier pass) is
+the **hint sign**: a signpost prop that, when touched, freezes Buzz, flies
+the camera along a path and shows a tutorial line in a text box. Level 1 has
+nine of them and its table (loaded by init step 2, at `0x4f0ee8`) has nine
+records; `tools/level-objects.ts` checks that every level's table ids are
+signs.
+
+    record   i32 objectId      the sign's object id (`DatLevel.objectIds`)
+             i32 pathTag       path in level.dat: node 0 is where Buzz is
+                               stood, nodes 2.. are the camera's flight
+             char *text        the hint, a C string in the executable
+             i32 playerYaw     Buzz faces this while the box is up
+
+Touching the sign (`FUN_004a0f80` case 4, the record stays live so it can be
+read again) calls `FUN_00402610(id)`, which finds the record, then starts a
+**talk** with the hint script. The same talk machinery serves the
+characters' dialogue (`FUN_004027f0`, the helper above), so both are here.
+
+**The talk state.** `DAT_0050a1f8` is the talk in progress: 1, or `slot + 10`
+when a token slot is to be revealed at the end. Starting one sets
+`DAT_0052b816 |= 1` (Buzz frozen; `FUN_004011d0` forces his animation to 1,
+the controller `FUN_00405860` and the hit reaction skip him), `DAT_0052f340
+|= 4` (the camera is driven from here, not the follow camera), masks the
+pad to `0x309`, and sets `DAT_0050a140 = 0x40`. It also resets the pushing /
+climbing state (`FUN_00433ed0`) when the player is teleported. Then, every
+tick before the player update, `FUN_00402a10` runs the script.
+
+**The script.** A list of `i32` words at `DAT_0050a294`; each opcode reads
+its operands and continues in the same tick until a wait. Paths are the
+level's `DAT_00559c70[tag]` (`u16 count, u16 id, count x {i32 x, y, z}` in
+level units; multiplied by 32 here). "Node n" below is `points[n]`.
+
+| word | operands | does |
+|---|---|---|
+| 0 | tag | select path `tag` (`DAT_0050a0c8`) |
+| 1 | who, n | teleport: `who` -1 is Buzz (position = node n, ground ray, velocity and jump state cleared, `FUN_00433ed0`), else creature `who` (entity `DAT_0052c840 + who * 0x9c`, its velocity cleared) |
+| 2 | who, yaw | face: Buzz's heading and the follow camera's yaw (`DAT_0052f30e`, `DAT_0052f348`, `DAT_0052f3c8`), or creature `who`'s heading, wanted yaw and placement facing (`yaw >> 4`) |
+| 3 | n | the camera's **target node** (`DAT_0050a514`); n < 0 means half way between the eye node and the last node |
+| 4 | n | the camera's **eye node** (`DAT_0050a4bc`) |
+| 7 | ticks | wait; -1 waits for the flight. When the wait ends the pc skips one extra word, so every 7 in the data is followed by a spare word (8) that is never executed |
+| 10 | — | cut the camera to the eye node looking at the target node and start the flight |
+| -1 | — | hold: re-executed every tick until the text box closes |
+
+Any other word (5, 6, 8, 9) is not in the jump table and would loop
+forever; none occurs. The two scripts in the executable:
+
+    hint (0x4df69c):      1 -1 0   4 2   3 -1   10   7 -1   8 -1
+    dialogue (0x4df6cc):  0 tag   1 -1 0   1 who 1   2 -1 yaw   2 who yaw2
+                          4 2   3 -1   10   7 -1   8 -1
+
+`FUN_004027f0` writes its arguments into the dialogue script in place
+(`tag`, `who`, `yaw`, `yaw2` at `0x4df6d0/e4/f4/700`); `FUN_00402610` uses
+the hint script and sets Buzz's yaw itself from the record. So a hint
+stands Buzz on node 0 and flies from node 2; a dialogue also stands the
+creature on node 1, and with `playerYaw` -1 both yaws come from the nodes:
+the creature faces `atan2(node0 - node1)`, Buzz that plus a half turn.
+
+**The flight** (word 10 and the wait). The camera has two cursors on the
+same path, the eye on segment `e` and the target on segment `t`, both at
+the same fraction of their segments; `DAT_0050a53c` is the distance run
+along the target segment in level units and `DAT_0050a1f0` that segment's
+length. Speed `DAT_0050a144` starts at 0 and eases toward the length of the
+*next* target segment (`DAT_0050a0cc`, 0 on the last), so a segment takes
+about 32 ticks whatever its length and the camera slows to a crawl at the
+end:
+
+    speed  -= (speed - nextLen) * dt / 16;   speed = max(speed, 0x80)
+    run    += speed * dt / 32
+    eye    = lerp(node[e], node[e+1], run / len) * 32   (target likewise)
+
+When `run` passes the length: if `t` is the last segment the flight ends
+(`DAT_0050a134 = 0`, script continues), else both cursors advance one
+segment and the remainder carries over. The camera's own yaw is
+`atan2(target - eye)` and its pitch is `-atan2(±dy^2, dx^2 + dz^2)` with
+the sign of `dy` — the squares are what the code does (`FUN_00402030`
+computes the same pair for the camera cut), so the pitch is flatter than
+the true angle. The camera globals it writes are `DAT_0052b7f4/f8/fc` (the
+point looked at) and `DAT_0052b800/04/08` (the eye), yaw `DAT_0052b80e`,
+pitch `DAT_0052b80c`; the follow camera reads those back when `DAT_0052f340
+& 4` clears.
+
+**The text box** (`FUN_00401c30`, ticked from the script tick while
+`DAT_0050a518` is set). Opening: `FUN_00401a00` word-wraps the string into
+a 15 x 36 buffer at `DAT_0050a298`, breaking at spaces and not counting the
+`^` characters, which toggle the highlight — `^stomp^` in a line draws that
+word in the second colour. Plays event 0x1d (`TEXTBOX1`). The box scales
+open from its centre over 16 ticks (`DAT_0050a4ec` 0 → 0x1000 by `0x100 *
+dt`), then reveals one character every two ticks into a two-row, 36-column
+window (`DAT_0050a1fc`, 72 x u16: the glyph plus 0x100 while highlighted).
+When a row fills, the window scrolls; when both rows have been used the
+page is full (`DAT_0050a4c0 = 1`) and waits. Keys, on the pad's
+new-press word `DAT_0088279c` against the held word `DAT_00882794`:
+
+    jump  (0x4000)  while revealing: reveal the rest of the page at once
+                    page full: clear and continue, event 0x3d (PICKUP1)
+                    text done (DAT_0050a4c0 = 2): close, event 0x3e (PICKUP5)
+    fire  (0x8000)  close at any time, event 0x3e
+
+Closing scales the box shut the same way (`DAT_0050a4ec = -0x1000`, up to
+0), then `DAT_0050a518 = 0` and the next script tick ends the talk: clears
+`DAT_0052b816 & 1` and `DAT_0052f340 & 4`, `DAT_0050a140 = 0x40`, event
+0x1e (`TEXTBOX2`), sets the jump state to 5 if it was 0 and clears
+on-ground (so the jump press that dismissed the box does not launch a
+jump), and reveals the token slot if one was given.
+
+Drawing, as the code lays it out and not checked against the real game:
+the box `FUN_00401b60(x, y, w, h, 0x80, 0, 0)` is a 2-pixel black frame
+around a half-transparent red fill, in the sprite layer's 512 x 256 space,
+centred on (257, 44): full size is 474 x 32 at (20, 28), and while opening
+`w = 0x1da * t >> 12`, `h = 32 * t >> 12`, min 4 x 2. Text glyphs
+(`FUN_0049b630`, font sprite 0x14 at half scale) are in a 320 x 240 space:
+36 columns 8 apart from x = 16, rows at y = 32 and 40, colour (0x80, 0x80,
+0) or (0, 0x80, 0) for highlighted words with 0x80 the neutral modulate;
+"press jump to continue" is centred at y = 48 in white while a page waits.
+The lower-case font maps `a..z` to frames 0..25, digits to `c - 0x16`, and
+a few punctuation marks by table; `~` and `@` draw icon sprite 0x26.
+
+## Push blocks
+
+`FUN_004335d0(table)` (init step 4) loads up to ten push blocks; each is a
+prop Buzz can shove along a path, with a drop at the end of the path in
+most of them. Levels 1 (seven blocks), 2, 4, 5, 7, 8, 11 and 13 have
+tables, in `src/sim/level-data.ts` as `PUSH_BLOCKS`. Level 1's paths are
+straight two-node pushes, an L (tag 0) and two edge drops (tags 3, 4).
+
+    table entry   i16 sceneObject      .ngn scene object moved with the block
+                                       (`FUN_004cce30`), -2 for none
+                  i16 collisionObject  the dynamic collision group in
+                                       TERRAIN.ALL whose entry carries this
+                                       number + 1 at +0x1a (docs/FORMATS.md);
+                                       moved with the block (`FUN_00488510`)
+                  i16 pathTag          the rail; segment 0 runs node 0 -> 1
+                  ended by -1
+
+`tools/level-objects.ts` checks every table entry against its scene: the
+path exists and the numbered group exists, on all eight levels.
+
+    block state   (40 bytes each at DAT_0053c680, count DAT_0053c65c)
+      +0x00 i32 x, y, z     game units
+      +0x0c i32 dirX, dirZ  unit vector of the segment, 0x1000 = 1
+      +0x14 i16 fallSpeed   nonzero while dropping
+      +0x16 i16 tipPoint    distance along the segment at which the block
+                            tips over an edge: half the segment length when
+                            the segment after next is vertical, else 0;
+                            -1 while tipping
+      +0x18 i16 run         distance pushed along the segment, level units
+      +0x1a i16 segLen      the segment's length, level units
+      +0x1c i16 segYaw      atan2 of the segment
+      +0x1e i16 seg         current segment
+      +0x20 i16 floorSeg    lowest segment it can be pulled back to
+      +0x22 i16 pathTag, +0x24 collisionObject, +0x26 sceneObject
+
+`FUN_004334d0(tag, block)` fills the segment fields from `seg`. Init places
+each block at node 0 of segment 0 — except that on level 12 (index 0xb) a
+block on tag 0x1d starts on segment 2.
+
+**Pushing** (`FUN_00433700(player)`, ticked from the controller). While
+Buzz holds a direction (`DAT_0052ad88 & 0xf0`) with no other move active
+(`DAT_0053c828 & 0xffdfe == 0`), is on the ground, and no block is held,
+every resting block is tested: its collision object's contact flags
+(`FUN_00488580(id) & 3 == 1`, Buzz touching its side) give a contact
+normal (`FUN_004885a0`), and if Buzz faces within ±0x180 of straight into
+it the push starts: `DAT_0053c648 = index + 1`, the push direction
+`DAT_0053c624` = normal + half turn, the offset from block to Buzz is
+remembered (`DAT_0053c81c/20`, level units), event 0x2d (`BUZPUSH1`) with a
+0x28-tick cooldown, and the first forward push spends the block's sparkle
+(`FUN_0049fab0(index, 0)`). The push ends when the direction is released
+or any other state bit appears (the test at the top clears `DAT_0053c648`).
+
+Each tick while held, if the push direction is within ±8 of `segYaw` the
+block runs forward 12 level units per tick, if within ±8 of the reverse it
+runs back 12; anything else holds it still. Forward past `segLen` steps to
+the next segment (not past the last); back past 0 steps to the previous,
+never below `floorSeg`. Level 12's block 0 cannot go forward while its
+script variable `DAT_0052fd24` is positive. Buzz is dragged along: his
+velocity is set so he keeps the remembered offset, and event 0x2e (a
+looping level effect) plays with a puff of dust (`FUN_0040fdf0`, kind 2)
+whenever the block moves.
+
+**Tipping.** When `run` passes `tipPoint`, the push ends (`DAT_0053c648 =
+0`, Buzz's velocity zeroed and held at zero for 10 ticks by
+`DAT_0053c5dc`), event 0x31 (`BUZCLIMB`, reused) plays, and the block
+slides the rest of its segment on its own at 24 units per tick. At the end
+it skips the vertical segment (`seg += 2`), starts falling (`fallSpeed =
+2`), and falls at 64 game units per tick squared, capped at 0x800 per tick,
+until `y` reaches the new segment's start node; then it lands there, event
+0x2f (`BOXFALL`), `floorSeg = seg`, and can be pushed on. A path that ends
+with its drop (tag 4 on level 1: edge, then the floor below) leaves the
+block at rest on its last node.
+
+Positions: `x = node[seg].x * 32 + (dirX * run >> 7) & ~0x1f` and z
+likewise, so the block moves in 32-unit steps; y is the segment's start
+node while pushing. Both the scene object and the collision object are
+moved every tick the block moves.
+
+## Reserved path tags
+
+Paths in `level.dat` with tags 58..63 are lists, not rails; the loader
+stores their pointers at `DAT_00559c70[tag]` like any other path and
+`FUN_00414550` scales them by 32 at level start.
+
+- **58 — sparkle points**, decoded. `[push points ...] (0,0,0) [scripted
+  points ...]`: a point above the start of push block `i` at index `i`, a
+  zero separator, then the points the level script consumes with
+  `FUN_0049fab0(n, 1)`. The zero is compacted out and its index kept as the
+  split (`DAT_00830e28`). Every tick `FUN_0049fb40` spawns effect kind 0x71
+  (before the split) or 0x73 (after) with emitter template 2 at every
+  unspent point within 600 x 256 game units of the camera, staggered four
+  points per tick — the glitter that marks a secret. The push code indexes
+  the list by block number without checking the split: levels 1, 2, 4, 5,
+  7, 11 and 13 have exactly one point per block, but level 8 has two for
+  three blocks, so its third block's first push spends scripted point 0
+  (the kind test fails to find a live effect, and the point is marked spent
+  regardless).
+- **59** is read by `FUN_004038e0`, the laser-targeting view (`DAT_0050a13c`
+  states 3..5, `GENBEEP2` on entry) — not decoded.
+- **60** is triples of points; **61** pairs of vertically aligned points
+  with sentinel nodes like `(50, -50, -50)` that set a group value
+  (`|x| == |y| == |z|`, value `|x| / 50`); level scripts move nodes of 61
+  (level 1 init reads and writes one). Poles and zip lines are the obvious
+  candidates, by shape only. **62** and **63** are read by level inits.
 
 ## Creatures
 

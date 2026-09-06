@@ -63,6 +63,8 @@ export interface CollisionGroup {
   position: { x: number; y: number; z: number };
   /** Type 0x0008 marks movers — crane arms, platform decks, vehicles. */
   dynamic: boolean;
+  /** The number the level code moves a dynamic group by (`AllGroup.objectNumber`), -1 if none. */
+  objectNumber: number;
 }
 
 /**
@@ -122,7 +124,7 @@ export function parseCollisionGroup(group: AllGroup): CollisionGroup | null {
     if (view.getUint32(pos, true) === GROUP_TERMINATOR) {
       // The terminator must close the payload exactly.
       return pos + 4 === p.length
-        ? { meshes, position: group.position, dynamic: group.type === GroupType.DynamicCollision }
+        ? { meshes, position: group.position, dynamic: group.type === GroupType.DynamicCollision, objectNumber: group.objectNumber }
         : null;
     }
     if (pos + MESH_HEADER > p.length) return null;

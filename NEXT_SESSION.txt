@@ -129,9 +129,14 @@
         here: find where entity +0x84 (per-state hit ellipsoids) and the
         per-type animation slot are set - probably the creature model
         loader - and what record 0x24 is.)
-      - the two per-level tables every init loads (FUN_004025c0 - ten
-        4-int records; FUN_004335d0 - path-riding objects) and the camera
-        trigger modes (FUN_00402610).
+      - (the two per-level tables are DECODED 2026-09-05: FUN_004025c0
+        loads the HINT SIGNS and FUN_00402610 opens their talk box - the
+        "camera trigger" was a tutorial signpost; FUN_004335d0 loads the
+        PUSH BLOCKS. Both in docs/LEVELS.md with the talk script, the
+        camera flight and the text box; tables in src/sim/level-data.ts,
+        validated against every scene. Side find: a dynamic collision
+        group's object number sits at +0x1a of its TERRAIN.ALL entry;
+        reserved path tags 58 (sparkle points, decoded) and 59-63 (leads).)
       - the sound event table's pitch scale, then Opus ports playEvent().
       - the wall-line list DAT_007290f4: read in three places, never
         written by name in the dump, so it is filled through a pointer -
@@ -170,7 +175,18 @@
  Phase 7. All of these are specified; the difficulty is in getting them right,
  not in working out what they are.
 
- MUSIC - decoded 2026-09-05, ready for Opus to wire up.  Nothing left to
+ THE TALK BOX AND THE PUSH BLOCKS (P3.8, P3.9) - decoded 2026-09-05, Opus
+jobs. docs/LEVELS.md has the talk script's opcodes with their exact
+arithmetic, the camera flight, the text box's timing and layout (note the
+two coordinate spaces: sprites in 512 x 256, glyphs in 320 x 240), and
+the push block's state machine; src/sim/level-data.ts has HINT_SIGNS,
+TALK_SCRIPTS and PUSH_BLOCKS, checked by tools/level-objects.ts. Hint text
+is read from the user's toy2.exe at run time (exeString) - do not copy the
+strings into the repo. Port order: the script tick and flight first (the
+camera cut helpers FUN_004020f0/FUN_00402290 fall out of it), the box
+second, push blocks when the controller exposes a per-group contact normal.
+
+MUSIC - decoded 2026-09-05, ready for Opus to wire up.  Nothing left to
  find; this is a wiring job against src/audio/sfx.ts's GameDir handle.
 
    Files: audio/<name>.wav in the install root (NOT data/), plain PCM WAV,

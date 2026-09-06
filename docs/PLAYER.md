@@ -467,7 +467,7 @@ count double). There is no type field anywhere; the count is the type:
 | 0x24, 0x48 | 2 token | sets bit `slot` of `(&DAT_0052f0d7)[level]`, plays the reveal |
 | 0x20 | 0 health | +4, capped at 14, 0xb4-tick flash |
 | 0x12 | 3 extra life | +1, capped at 9 |
-| 6 | 4 camera trigger | `FUN_00402610(id)` switches camera mode; record stays live |
+| 6 | 4 hint sign | `FUN_00402610(id)` opens the tutorial talk box (docs/LEVELS.md, "Hint signs and the talk box"); record stays live |
 | 0x27 | 5 rocket boots | `FUN_004a4d60` |
 | 0x14 | 8 hover boots | `FUN_004a4b70`; the object comes back after 400 ticks |
 | 100 | 6 | `DAT_00882938 += 5`, capped 10 — ammunition of some kind, regenerating |

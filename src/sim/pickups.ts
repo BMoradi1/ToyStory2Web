@@ -69,7 +69,8 @@ export enum PickupKind {
   Kind1 = 1,
   Token = 2,
   Life = 3,
-  Camera = 4,
+  /** A tutorial signpost: touching it opens the talk box (docs/LEVELS.md). */
+  HintSign = 4,
   RocketBoots = 5,
   Kind6 = 6,
   Kind7 = 7,
@@ -82,7 +83,7 @@ export enum PickupKind {
 /** The polygon-count switch in `FUN_0044e520`, verbatim. */
 export function kindOfPolyCount(count: number): PickupKind {
   switch (count) {
-    case 6: return PickupKind.Camera;
+    case 6: return PickupKind.HintSign;
     case 0x12: return PickupKind.Life;
     case 0x13: return PickupKind.Kind10;
     case 0x14: return PickupKind.HoverBoots;
@@ -200,10 +201,10 @@ export function stepPickups(state: PickupState, p: PlayerState): PickupEvent[] {
       case PickupKind.Token:
         if (item.tokenSlot >= 0) state.tokens |= 1 << item.tokenSlot;
         break;
-      case PickupKind.Camera:
-        // A trigger, not a collectable: the original switches camera mode
-        // (`FUN_00402610`) and leaves the record live. Camera modes are not
-        // ported, so it is skipped rather than consumed.
+      case PickupKind.HintSign:
+        // A trigger, not a collectable: the original opens the hint's talk
+        // box (`FUN_00402610`, docs/LEVELS.md) and leaves the record live.
+        // The talk box is not ported, so it is skipped rather than consumed.
         continue;
       default:
         // Power-ups and the unknown kinds: consumed, effect not ported.

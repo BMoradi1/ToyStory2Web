@@ -41,6 +41,14 @@ export interface AllGroup {
   type: GroupType;
   /** Model-space offset applied to every vertex in this group. */
   position: { x: number; y: number; z: number };
+  /**
+   * The object number a dynamic collision group answers to, or -1. The entry
+   * stores it plus one at +0x1a (0 on every static group), and it is the id
+   * the executable's tables and level scripts move the group by — the push
+   * blocks' `collisionObject` in src/sim/level-data.ts, `FUN_00488510(id, ...)`.
+   * Checked on all 24 push blocks across eight levels.
+   */
+  objectNumber: number;
   payload: Uint8Array;
 }
 
@@ -129,6 +137,7 @@ export function parseAll(buffer: ArrayBuffer | Uint8Array): AllFile {
         y: view.getInt32(entry + 0x08, true),
         z: view.getInt32(entry + 0x0c, true),
       },
+      objectNumber: view.getUint16(entry + 0x1a, true) - 1,
       payload,
     });
   }

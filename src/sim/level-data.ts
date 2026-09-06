@@ -128,3 +128,132 @@ export function levelNumber(sceneId: string): number | null {
   if (m[2] === '') return dir >= 1 && dir <= 10 ? dir : null;
   return dir >= 1 && dir <= 5 ? dir + 10 : null;
 }
+
+/**
+ * A hint sign (docs/LEVELS.md, "Hint signs and the talk box"): the
+ * six-polygon signpost `objectId`, the path whose node 0 is where Buzz is
+ * stood and whose nodes 2.. the camera flies along, the address of the hint
+ * text in toy2.exe (a C string; read it with `exeString`), and the heading
+ * Buzz is turned to while the box is up.
+ */
+export interface HintSign { objectId: number; pathTag: number; text: number; playerYaw: number }
+
+/**
+ * Each level's hint-sign table, from the `FUN_004025c0(table)` call in its
+ * init: ten 16-byte records at most, ended by a negative id. Level 1's is at
+ * 0x4f0ee8. Level 2's table (0x4f153c) has no terminator, so the game reads
+ * garbage after its one record; only the record is kept here. Levels not
+ * listed have no signs.
+ */
+export const HINT_SIGNS: Readonly<Record<number, readonly HintSign[]>> = {
+  1: [
+    { objectId: 67, pathTag: 31, text: 0x4f0638, playerYaw: 2048 },
+    { objectId: 62, pathTag: 32, text: 0x4f05bc, playerYaw: 2048 },
+    { objectId: 63, pathTag: 33, text: 0x4f0a18, playerYaw: 2435 },
+    { objectId: 64, pathTag: 34, text: 0x4f0730, playerYaw: 2048 },
+    { objectId: 68, pathTag: 35, text: 0x4f0784, playerYaw: 727 },
+    { objectId: 65, pathTag: 36, text: 0x4f07fc, playerYaw: 226 },
+    { objectId: 69, pathTag: 37, text: 0x4f08b8, playerYaw: 48 },
+    { objectId: 66, pathTag: 38, text: 0x4f090c, playerYaw: 3072 },
+    { objectId: 71, pathTag: 40, text: 0x4f04d0, playerYaw: 0 },
+  ],
+  2: [{ objectId: 70, pathTag: 12, text: 0x4f1460, playerYaw: 2048 }],
+  4: [{ objectId: 116, pathTag: 33, text: 0x4f1570, playerYaw: 0 }],
+  7: [{ objectId: 70, pathTag: 20, text: 0x4f2844, playerYaw: 1024 }],
+  10: [
+    { objectId: 112, pathTag: 34, text: 0x4f3314, playerYaw: 0 },
+    { objectId: 113, pathTag: 35, text: 0x4f3368, playerYaw: 0 },
+    { objectId: 114, pathTag: 36, text: 0x4f33ac, playerYaw: 0 },
+  ],
+  11: [
+    { objectId: 120, pathTag: 22, text: 0x4f3c54, playerYaw: 3072 },
+    { objectId: 119, pathTag: 21, text: 0x4f3d04, playerYaw: 3072 },
+  ],
+  14: [{ objectId: 150, pathTag: 30, text: 0x4f4b08, playerYaw: 2048 }],
+};
+
+/**
+ * The two talk scripts (docs/LEVELS.md, "The script"), as the words sit in
+ * the executable. The dialogue script has four slots `FUN_004027f0` writes
+ * before running it: the path tag (word 1), the creature (words 6 and 12),
+ * Buzz's yaw (word 10) and the creature's yaw (word 13).
+ */
+export const TALK_SCRIPTS = {
+  /** 0x4df69c: stand Buzz on node 0, fly from node 2, hold. */
+  hint: [1, -1, 0, 4, 2, 3, -1, 10, 7, -1, 8, -1],
+  /** 0x4df6cc: select the path, place and face both, fly from node 2, hold. */
+  dialogue: [0, 0, 1, -1, 0, 1, 0, 1, 2, -1, 0, 2, 0, 0, 4, 2, 3, -1, 10, 7, -1, 8, -1],
+} as const;
+
+/**
+ * A push block (docs/LEVELS.md, "Push blocks"): the crate Buzz shoves along
+ * `pathTag`. `sceneObject` is the .ngn scene object that moves with it (-2
+ * for none) and `collisionObject` the number of the dynamic collision group
+ * in TERRAIN.ALL that moves with it (`AllGroup.objectNumber`).
+ */
+export interface PushBlock { sceneObject: number; collisionObject: number; pathTag: number }
+
+/**
+ * Each level's push-block table, from the `FUN_004335d0(table)` call in its
+ * init (level 1's is at 0x4f0f90); levels not listed pass 0. Entry order is
+ * the order of the sparkle points in path tag 58.
+ */
+export const PUSH_BLOCKS: Readonly<Record<number, readonly PushBlock[]>> = {
+  1: [
+    { sceneObject: 1, collisionObject: 5, pathTag: 1 },
+    { sceneObject: 2, collisionObject: 6, pathTag: 2 },
+    { sceneObject: 3, collisionObject: 7, pathTag: 3 },
+    { sceneObject: 4, collisionObject: 1, pathTag: 4 },
+    { sceneObject: 7, collisionObject: 3, pathTag: 7 },
+    { sceneObject: 8, collisionObject: 4, pathTag: 8 },
+    { sceneObject: 0, collisionObject: 0, pathTag: 0 },
+  ],
+  2: [
+    { sceneObject: -2, collisionObject: 2, pathTag: 4 },
+    { sceneObject: -2, collisionObject: 11, pathTag: 20 },
+  ],
+  4: [
+    { sceneObject: 32, collisionObject: 0, pathTag: 3 },
+    { sceneObject: 12, collisionObject: 18, pathTag: 5 },
+  ],
+  5: [
+    { sceneObject: 14, collisionObject: 0, pathTag: 12 },
+    { sceneObject: 0, collisionObject: 17, pathTag: 6 },
+    { sceneObject: -2, collisionObject: 18, pathTag: 7 },
+    { sceneObject: 51, collisionObject: 26, pathTag: 21 },
+  ],
+  7: [
+    { sceneObject: 8, collisionObject: 5, pathTag: 0 },
+    { sceneObject: 9, collisionObject: 6, pathTag: 1 },
+  ],
+  8: [
+    { sceneObject: 0, collisionObject: 0, pathTag: 1 },
+    { sceneObject: 15, collisionObject: 3, pathTag: 2 },
+    { sceneObject: 19, collisionObject: 4, pathTag: 3 },
+  ],
+  11: [
+    { sceneObject: 30, collisionObject: 19, pathTag: 13 },
+    { sceneObject: 29, collisionObject: 20, pathTag: 0 },
+    { sceneObject: 81, collisionObject: 21, pathTag: 14 },
+  ],
+  13: [{ sceneObject: 8, collisionObject: 11, pathTag: 0 }],
+};
+
+/** The path tag whose nodes are the sparkle points (docs/LEVELS.md, "Reserved path tags"). */
+export const SPARKLE_PATH_TAG = 58;
+
+/**
+ * Read a C string out of toy2.exe by its address. Every section of the
+ * executable is mapped at its file offset plus 0x400000, so no header
+ * parsing is needed. The game's text lives in the user's own copy and is
+ * read from there at run time; it is never stored in this repository.
+ */
+export function exeString(exe: Uint8Array, address: number): string {
+  const start = address - 0x400000;
+  if (start < 0 || start >= exe.length) throw new RangeError(`address 0x${address.toString(16)} is outside toy2.exe`);
+  let end = start;
+  while (end < exe.length && exe[end] !== 0) end++;
+  let out = '';
+  for (let i = start; i < end; i++) out += String.fromCharCode(exe[i]!);
+  return out;
+}

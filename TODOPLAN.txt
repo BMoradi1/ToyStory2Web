@@ -380,7 +380,7 @@
                 code 0x11 = 248 level units) plus every used OBJECT ID from
                 the level's starting id up (0x30, or 0x50/0x60 on some
                 levels), each typed by the POLYGON COUNT of its mesh - 36
-                is a token, 32 health, 18 a life, 6 a camera trigger, 39
+                is a token, 32 health, 18 a life, 6 a hint sign (P3.8), 39
                 rocket boots, 20 hover boots. There is no type field; the
                 count is the type. The touch test is a plain sphere from
                 230 level units above the origin, ((code & 0x7f) + 14) << 3
@@ -439,6 +439,25 @@
                 install; decode, then write.
  P3.7 [BLOCKED] Level 3 boss              <- P3.3. Forces the scripting model
                 before it is generalised.
+ P3.8 [READY]   The talk box: DECODED 2026-09-05 (docs/LEVELS.md "Hint signs
+                and the talk box"). Hint signs are the six-polygon pickup
+                category (was "camera trigger"); touching one freezes Buzz,
+                flies the camera along a path and shows a tutorial line. The
+                same machinery is every character's dialogue
+                (FUN_004027f0). Tables in src/sim/level-data.ts
+                (HINT_SIGNS, TALK_SCRIPTS; the text is read out of the
+                user's toy2.exe with exeString, never stored). Validated:
+                every table id is a sign on all seven levels. Port: the
+                script tick and camera flight, then the box (word wrap,
+                reveal, paging, two coordinate spaces).
+ P3.9 [READY]   Push blocks: DECODED 2026-09-05 (docs/LEVELS.md "Push
+                blocks"). Crates shoved along level.dat paths with edge
+                drops; the collision group is named by a number in the
+                TERRAIN.ALL group entry (+0x1a), new in the .all parser.
+                PUSH_BLOCKS in src/sim/level-data.ts, validated on all 24
+                blocks. Needs the controller's contact normal per collision
+                group (FUN_00488580/FUN_004885a0) which the port does not
+                keep yet.
 
 ================================================================================
  PHASE 4 - SCALE TO 15 LEVELS

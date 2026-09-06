@@ -1,6 +1,9 @@
 /**
  * List a scene's placements by object id with the category the engine would
- * give each as a pickup, and check the level's token list resolves to tokens.
+ * give each as a pickup, and check the level's tables from the executable
+ * against the scene: the token list resolves to tokens, every hint sign is
+ * a sign, every push block's path and object exist, and the sparkle path's
+ * push points count the push blocks.
  *
  *     npx tsx tools/level-objects.ts "Toy Story 2" [level] [scene]
  *
@@ -10,8 +13,9 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { meshPolyCount, parseDat } from '../src/formats/dat.ts';
+import { GroupType, parseAll } from '../src/formats/all.ts';
 import { kindOfPolyCount, PickupKind } from '../src/sim/pickups.ts';
-import { firstPickupId, levelNumber, TOKEN_LISTS } from '../src/sim/level-data.ts';
+import { firstPickupId, HINT_SIGNS, levelNumber, PUSH_BLOCKS, SPARKLE_PATH_TAG, TOKEN_LISTS } from '../src/sim/level-data.ts';
 
 const [root, levelArg, sceneArg] = process.argv.slice(2);
 if (!root) { console.error('usage: npx tsx tools/level-objects.ts <game dir> [dir number] [scene]'); process.exit(1); }
@@ -60,10 +64,43 @@ for (const dir of dirs) {
       tokenNote = ` token list ${ok ? 'OK' : 'MISMATCH: ' + kinds.join(',')}`;
     }
 
+    const kindOf = (id: number): PickupKind => {
+      const p = dat.placements[dat.objectIds[id] ?? -1];
+      const object = p ? dat.objects[p.objectIndex] : undefined;
+      const mesh = object ? dat.meshes.get(object.meshOffset) : undefined;
+      return mesh ? kindOfPolyCount(meshPolyCount(mesh)) : PickupKind.None;
+    };
+    const notes: string[] = [];
+    const signs = HINT_SIGNS[level];
+    if (signs) {
+      const bad = signs.filter((h) => kindOf(h.objectId) !== PickupKind.HintSign || !dat.paths.some((p) => p.id === h.pathTag && p.points.length >= 3));
+      const signIds = new Set(signs.map((h) => h.objectId));
+      let unlisted = 0;
+      for (let id = first; id < dat.objectIds.length; id++) if (kindOf(id) === PickupKind.HintSign && !signIds.has(id)) unlisted++;
+      if (bad.length) failures++;
+      notes.push(`hint signs ${bad.length ? 'MISMATCH: ' + bad.map((h) => h.objectId).join(',') : `${signs.length} OK`}${unlisted ? `, ${unlisted} sign(s) not in the table` : ''}`);
+    }
+    const blocks = PUSH_BLOCKS[level];
+    if (blocks) {
+      // The collision object is a numbered dynamic group in the scene's terrain file.
+      const terrainPath = join(root, 'data', `level${String(dir).padStart(2, '0')}`, scene === 'level1' ? 'TERR1.ALL' : 'TERRAIN.ALL');
+      const numbers = new Set(existsSync(terrainPath)
+        ? parseAll(readFileSync(terrainPath)).groups.filter((g) => g.type === GroupType.DynamicCollision).map((g) => g.objectNumber)
+        : []);
+      const bad = blocks.filter((b) => !dat.paths.some((p) => p.id === b.pathTag && p.points.length >= 2) || !numbers.has(b.collisionObject));
+      const sparkle = dat.paths.find((p) => p.id === SPARKLE_PATH_TAG);
+      const split = sparkle ? sparkle.points.findIndex((v) => v.x === 0 && v.y === 0 && v.z === 0) : -1;
+      // One sparkle point per block, except that level 8 has two for three (docs/LEVELS.md).
+      const splitOk = split >= 0 && split <= blocks.length;
+      if (bad.length || !splitOk) failures++;
+      notes.push(`push blocks ${bad.length ? 'MISMATCH: ' + bad.map((b) => `${b.collisionObject}/${b.pathTag}`).join(',') : `${blocks.length} OK`}, ` +
+        `sparkle points ${split}${splitOk ? (split < blocks.length ? ' (fewer than blocks)' : ' OK') : ' MISMATCH'}`);
+    }
+
     const parts = [...summary].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${n}`).join(', ');
     console.log(`${dir}/${scene}${level ? ` (level ${level})` : ''}: ${dat.placements.length} placements, ids 0..${dat.objectIds.length - 1}, ` +
-      `pickups from 0x${first.toString(16)}: ${parts || 'none'}${tokenNote}`);
+      `pickups from 0x${first.toString(16)}: ${parts || 'none'}${tokenNote}${notes.map((n) => '; ' + n).join('')}`);
     if (levelArg) for (const row of rows) console.log(row);
   }
 }
-if (failures) { console.log(`${failures} token list(s) did not resolve to tokens`); process.exit(1); }
+if (failures) { console.log(`${failures} table(s) did not match the scene`); process.exit(1); }

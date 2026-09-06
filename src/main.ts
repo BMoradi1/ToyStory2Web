@@ -342,8 +342,8 @@ async function open(dir: GameDir): Promise<void> {
         let best = -1, bestD = Infinity;
         for (let i = 0; i < pickups.items.length; i++) {
           const it = pickups.items[i]!;
-          // A camera trigger is never consumed, so it would be "nearest" for ever.
-          if (it.collected || !it.enabled || it.kind === PickupKind.Camera) continue;
+          // A hint sign is never consumed, so it would be "nearest" for ever.
+          if (it.collected || !it.enabled || it.kind === PickupKind.HintSign) continue;
           // Pickups are stored in level units; the player is in game units.
           const d = Math.hypot(it.x * GAME_UNITS_PER_LEVEL_UNIT - player.x, it.z * GAME_UNITS_PER_LEVEL_UNIT - player.z);
           if (d < bestD) { bestD = d; best = i; }
@@ -660,7 +660,7 @@ const PICKUP_COLOURS: Partial<Record<PickupKind, number>> = {
   [PickupKind.Token]: 0xe0312d,
   [PickupKind.Health]: 0x4fd65a,
   [PickupKind.Life]: 0x4a8cff,
-  [PickupKind.Camera]: 0x303030,
+  [PickupKind.HintSign]: 0x303030,
   [PickupKind.RocketBoots]: 0xff8c1a,
   [PickupKind.HoverBoots]: 0xc86bff,
 };

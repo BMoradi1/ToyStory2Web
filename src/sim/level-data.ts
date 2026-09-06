@@ -342,6 +342,12 @@ export interface LevelTasks {
    */
   potato?: {
     creature: number; pathTag: number;
+    /**
+     * Where he stands once he has his part back. Levels 7 and 10 pass his
+     * path in a variable, and that variable is only ever this two-way
+     * choice on whether the part is still wanted.
+     */
+    pathTagDone?: number;
     /** Said while the part is still out there. */
     askText: number;
     /** Said when Buzz brings it. */
@@ -356,6 +362,34 @@ export interface LevelTasks {
    * "if you can reach the end" is one of these.
    */
   offer?: { creature: number; pathTag: number; text: number; slot: number };
+  /**
+   * Level 7's egg, a timed run offered twice.
+   *
+   * Talking to the rooster starts a run against a clock. The FIRST run ends
+   * when the chick is gone (the tick reads entity 6's type field), and its
+   * reward is not handed over then: it arrives the next time Buzz speaks to
+   * him, on the line that offers the SECOND, quicker run. That line is the
+   * one carrying the token, so the token appears and the shorter clock is
+   * what has to beat it. Talking while a run is going gets the hurry line
+   * and nothing else.
+   *
+   * The clock is the shared counter at `DAT_0052ad64`, which counts down to
+   * a floor of 100 and is stepped by the engine's 1-in-64 frame divider
+   * (`DAT_0052f1cb`), so a start value of 0x96 is 50 seconds and 0x7e is 26.
+   * Standing in `failZone` slams it to 99, which fails the run on the spot.
+   */
+  fetch?: {
+    creature: number; pathTag: number;
+    /** First offer, the line while a run is going, and the second offer. */
+    askText: number; hurryText: number; againText: number;
+    /** The creature whose disappearance ends the first run. */
+    watch: number;
+    /** Clock start values for the two runs, before the floor of 100. */
+    firstClock: number; secondClock: number;
+    /** Being in this zone fails a run at once, or -1 for no such zone. */
+    failZone: number;
+    slot: number;
+  };
   /**
    * "Beat me to the top": accept the challenge, then get inside a box. The
    * engine's own test is an axis-aligned box in x and z with a height to be
@@ -491,6 +525,12 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
     },
   },
   7: {
+    potato: { creature: 0x0e, pathTag: 2, pathTagDone: 10, askText: 0x4f21b8, thanksText: 0x4f223c, explainText: 0x4f22ec, playerYaw: 0x600, creatureYaw: 0xe00 },
+    fetch: {
+      creature: 0x0d, pathTag: 8, watch: 6, slot: 2,
+      askText: 0x4f2460, hurryText: 0x4f24f0, againText: 0x4f2520,
+      firstClock: 0x96, secondClock: 0x7e, failZone: 4,
+    },
     boss: { creature: 0x0, slot: 4, delay: 0x78 },
     hamm: { creature: 0x1, pathTag: 0x3, playerYaw: 0xe10, creatureYaw: 0x6e0, slot: 0 },
     hintNpc: {
@@ -515,6 +555,7 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
     },
   },
   10: {
+    potato: { creature: 7, pathTag: 0x25, pathTagDone: 0x20, askText: 0x4f30a0, thanksText: 0x4f3120, explainText: 0x4f31ec, playerYaw: -1, creatureYaw: 0xe00 },
     offer: { creature: 0x16, pathTag: 0x21, text: 0x4f3284, slot: 2 },
     boss: { creature: 0x8, slot: 4, delay: 0x78 },
     hamm: { creature: 0x6, pathTag: 0x1d, playerYaw: -1, creatureYaw: 0x0, slot: 0 },

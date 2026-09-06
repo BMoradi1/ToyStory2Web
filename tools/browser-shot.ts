@@ -125,10 +125,17 @@ async function main() {
   }
   console.log(`status: ${status}`);
   if (levelIndex > 0) {
+    // Wait for THIS level to say ready, not whatever was ready before: the
+    // status line still carries the previous level for a beat after the
+    // change event, and matching /ready$/ alone lets the eval run against
+    // the old scene.
+    const wanted: string = await evaluate(
+      `document.getElementById('level').options[${levelIndex}].textContent`);
     await evaluate(`(() => { const s = document.getElementById('level'); s.selectedIndex = ${levelIndex}; s.dispatchEvent(new Event('change')); })()`);
     for (;;) {
       status = await evaluate(`document.getElementById('status').textContent`);
-      if (/ready$/.test(status) || /failed|Error/.test(status)) break;
+      if (status.startsWith(wanted) && /ready$/.test(status)) break;
+      if (/failed|Error/.test(status)) break;
       await sleep(500);
     }
     console.log(`status: ${status}`);

@@ -184,6 +184,31 @@ halves), `DAT_0052ad64` counts laps, and at three `FUN_004a0db0(2, 0)`
 reveals slot 2 with the camera cut. The car itself is a creature driven by
 the shared creature code, so the race is not portable until creatures are.
 
+**Timed runs, and the clock they share** (2026-09-05, `src/sim/tasks.ts`).
+Several levels' slot 2 is a run against a clock, and they all use the same
+three globals. `DAT_0052f2f8` is the run: 0 idle, 1 offered, 2 going, with
+the step from 1 to 2 waiting on the talk box to close (`DAT_0050a1f8`).
+`DAT_0052ad64` is the clock, and it counts DOWN TO A FLOOR OF 100, which is
+what failure is — so a start value of 0x96 leaves 50 to spend, not 150. It
+is stepped by `DAT_0052f1cb`, and that is the engine's 1-in-64 frame
+divider: `DAT_0052ad63` accumulates the frame step and sets the flag every
+time it passes 0x40. At 59 FPS a clock unit is therefore about a second.
+`DAT_00830cf0 == 2` is how a run ends in success on most levels; it is a
+field of the progress block reached through the pointer at 0x830cf4, it is
+never written directly in the listing, and every level that tests it is
+asking the same question — has the challenge's token been taken.
+
+**Level 7's egg is the one offered twice.** Talking to the rooster (entity
+0x0d, path 8) starts a 0x96 run; talking again while it runs gets the hurry
+line and nothing else. The first run ends when the chick (entity 6) is gone,
+which the tick reads straight off that entity's type field, and NO reward is
+handed over at that moment. It arrives the next time Buzz speaks to him, on
+the line that offers a second, quicker 0x7e run — and that line is the one
+carrying slot 2. Standing in zone 4 slams the clock to 99, failing the run
+on the spot; that rule waits on the player-zone byte and is stubbed out.
+While a run is going the chick's flag word gets bits 0x81 (awake and drawn)
+forced on, and they are cleared the moment it is not.
+
 ## Hint signs and the talk box
 
 The six-polygon pickup category (4, "camera trigger" in an earlier pass) is

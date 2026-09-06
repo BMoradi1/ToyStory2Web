@@ -58,6 +58,17 @@ export interface TaskState {
   bossGone: number;
   /** The reach-a-box challenge: 0 not offered, 1 accepted, 2 running. */
   reach: number;
+  /** The timed fetch run: 0 idle, 1 offered, 2 running. */
+  fetch: number;
+  /** How many of its two runs have been finished. */
+  fetchDone: number;
+  /** Its clock, counting down to the floor of 100 that means failure. */
+  fetchClock: number;
+  /**
+   * The engine's 1-in-64 frame divider (`DAT_0052ad63` / `DAT_0052f1cb`).
+   * Timed tasks step their clocks on it, so a "second" is 64 ticks.
+   */
+  slowTick: number;
   /**
    * Mr Potato Head's missing part (`DAT_00830d48`): the level's part number
    * while it is still out there, its negative once Buzz is carrying it, and
@@ -95,7 +106,7 @@ export function startLevelTasks(tasks: TaskState, level: number): void {
 export function createTasks(): TaskState {
   return {
     done: 0, hammChatter: 0, hintChatter: 0, hintIndex: -1,
-    boss: 0, bossGone: 0, reach: 0, potatoPart: 0, powerUps: 0, potatoChatter: 0, challenge: 0, challengeFrom: 0,
+    boss: 0, bossGone: 0, reach: 0, fetch: 0, fetchDone: 0, fetchClock: 100, slowTick: 0, potatoPart: 0, powerUps: 0, potatoChatter: 0, challenge: 0, challengeFrom: 0,
     race: RaceState.Idle, laps: 0, raceQuadrant: 0, checkpoint: 0, raceBlocked: true,
   };
 }
@@ -144,9 +155,77 @@ export function stepTasks(
     level: number;
     /** Category-9 objects collected, for the challenge. */
     items: number;
+    /** Bit per token slot already taken, for the timed runs. */
+    tokens: number;
+    /**
+     * The zone Buzz is standing in. The engine reads it from the surface
+     * under him (`DAT_0054dea0`); until that byte is decoded this is -1,
+     * which only costs the "leave the area and fail" rule.
+     */
+    zone: number;
   },
   dt = 1,
 ): DialogueRequest | null {
+  // The engine's 1-in-64 divider, which is what timed tasks count on.
+  tasks.slowTick += dt;
+  const slow = tasks.slowTick >= 64;
+  if (slow) tasks.slowTick -= 64;
+
+  // --- the timed fetch, offered twice: the token rides the SECOND offer.
+  const fetch = level.fetch;
+  if (fetch) {
+    const giver = creatureAt(fetch.creature);
+    let request: DialogueRequest | null = null;
+    if (giver && tookTalk(giver)) {
+      if (tasks.fetch !== 0) {
+        // A run is already going: he only tells Buzz to get on with it.
+        request = {
+          creature: fetch.creature, pathTag: fetch.pathTag, text: fetch.hurryText,
+          playerYaw: -1, creatureYaw: 0, slot: -1,
+        };
+      } else if (tasks.fetchDone !== 2) {
+        const second = tasks.fetchDone !== 0;
+        tasks.fetch = 1;
+        tasks.fetchClock = second ? fetch.secondClock : fetch.firstClock;
+        request = {
+          creature: fetch.creature, pathTag: fetch.pathTag,
+          text: second ? fetch.againText : fetch.askText,
+          playerYaw: -1, creatureYaw: 0,
+          // Only the second offer names the token.
+          slot: second ? fetch.slot : -1,
+        };
+      }
+    }
+    // The clock does not start until the box is out of the way.
+    if (tasks.fetch === 1 && !world.talking) tasks.fetch = 2;
+    if (tasks.fetch === 2) {
+      if (tasks.fetchDone === 0) {
+        // First run: done when the chick is gone.
+        const watched = creatureAt(fetch.watch);
+        if (!watched || watched.type === 0) { tasks.fetchDone = 1; tasks.fetch = 0; }
+      } else if ((world.tokens & (1 << fetch.slot)) !== 0) {
+        // Second run: done when its token has been taken. The tick reads
+        // that from the shared "challenge finished" word at 0x830cf0, which
+        // every level's timed task tests the same way.
+        tasks.fetchDone = 2;
+        tasks.fetch = 0;
+      }
+      if (tasks.fetch === 2) {
+        if (fetch.failZone >= 0 && world.zone === fetch.failZone) tasks.fetchClock = 99;
+        else if (slow) tasks.fetchClock -= 1;
+        if (tasks.fetchClock < 100) { tasks.fetchClock = 100; tasks.fetch = 0; }
+      }
+    }
+    // The egg is kept awake and drawn for as long as a run is going, and
+    // put back to sleep the moment one is not.
+    const egg = creatureAt(fetch.watch);
+    if (egg) {
+      if (tasks.fetch !== 0) egg.flags |= 0x81;
+      else egg.flags &= ~0x81;
+    }
+    if (request) return request;
+  }
+
   // --- beat me to the top: accept, then get into the box.
   const reach = level.reachBox;
   if (reach && !slotDone(tasks, reach.slot)) {
@@ -225,16 +304,19 @@ export function stepTasks(
       }
       if (tookTalk(c)) {
         // Carrying it: hand it over and take the power-up.
+        // He moves once he has it back, on the levels that give him a
+        // second spot.
+        const path = tasks.potatoPart > 0 ? potato.pathTag : (potato.pathTagDone ?? potato.pathTag);
         if (tasks.potatoPart < 0) {
           tasks.powerUps |= POTATO_PARTS[world.level]?.power ?? 0;
           tasks.potatoPart = 0;
           return {
-            creature: potato.creature, pathTag: potato.pathTag, text: potato.thanksText,
+            creature: potato.creature, pathTag: path, text: potato.thanksText,
             playerYaw: potato.playerYaw, creatureYaw: potato.creatureYaw, slot: -1,
           };
         }
         return {
-          creature: potato.creature, pathTag: potato.pathTag,
+          creature: potato.creature, pathTag: path,
           // Still out there, or already done and he explains what it does.
           text: tasks.potatoPart > 0 ? potato.askText : potato.explainText,
           playerYaw: potato.playerYaw, creatureYaw: potato.creatureYaw, slot: -1,

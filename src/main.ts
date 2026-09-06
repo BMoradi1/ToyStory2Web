@@ -45,7 +45,7 @@ import {
 import { AI_SCRIPTS } from './sim/creature-data.ts';
 import {
   RandomStream, attackFromPlayer, contactCreatures, createCreatureSim,
-  creatureWorldFromCollision, setCreatureModels, stepCreatures,
+  creatureWorldFromCollision, killCreature, setCreatureModels, stepCreatures,
   CREATURE_FLAGS, type Creature, type CreatureModel, type CreatureSim,
 } from './sim/creatures.ts';
 import {
@@ -559,6 +559,8 @@ async function open(dir: GameDir): Promise<void> {
         return tasks ? {
           done: tasks.done, hintIndex: tasks.hintIndex,
           boss: tasks.boss, potatoPart: tasks.potatoPart, powerUps: tasks.powerUps,
+          fetch: tasks.fetch, fetchDone: tasks.fetchDone, fetchClock: tasks.fetchClock,
+          slowTick: tasks.slowTick,
           race: tasks.race, laps: tasks.laps, quadrant: tasks.raceQuadrant,
           checkpoint: tasks.checkpoint, challenge: tasks.challenge, blocked: tasks.raceBlocked,
         } : null;
@@ -579,6 +581,18 @@ async function open(dir: GameDir): Promise<void> {
         if (!c) return null;
         player.x = c.x + 400; player.y = c.y; player.z = c.z + 400;
         return { slot, x: player.x, y: player.y, z: player.z };
+      },
+      /**
+       * Take a creature out of the world the way its own death does, so a
+       * test can reach the state a task waits on without playing the fight.
+       */
+      killCreature(slot: number) {
+        if (!creatureSim) return null;
+        const c = creatureSim.creatures.find((q) => q.slot === slot);
+        if (!c) return null;
+        killCreature(c, 3);
+        drawCreatures();
+        return { slot, type: c.type };
       },
       revealTokens: revealAllTokens,
       drive(held: Partial<import('./sim/player.ts').PlayerInput>, ticks = 1) {
@@ -1345,9 +1359,14 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
             ? (pickups?.itemsFound ?? 0)
             : creatureSim.foundCount,
           rand: creatureSim.rand,
-          talking: false,
+          // `DAT_0050a1f8`: a task that has just been accepted waits for the
+          // box to close before its clock starts.
+          talking: talk !== null,
           x: player.x, y: player.y, z: player.z, level,
           items: pickups?.itemsFound ?? 0,
+          tokens: pickups?.tokens ?? 0,
+          // Buzz's own zone is not decoded yet (NEXT_SESSION.txt).
+          zone: -1,
         },
       );
       if (request) startDialogue(request);

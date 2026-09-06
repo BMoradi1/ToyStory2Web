@@ -147,7 +147,39 @@
       - (the wall-line list DAT_007290f4 is CLOSED 2026-09-05: the machine
         code never writes it - zeroed at level load, read three times -
         so the line collision is dead on PC. docs/PLAYER.md.)
-      - nothing is left on this list. The next Fable work is item 3.
+      - THE EFFECT SYSTEM. This is the one thing on the whole list that
+        an Opus pass should not attempt, and the reason is measured
+        rather than felt. What is settled, from a read on 2026-09-05:
+
+          * the records are 0x3c bytes at DAT_00529e58, spawned by
+            FUN_0040fae0(x, y, z, vx, vy, vz, a, b, c, kind) and updated
+            by FUN_00410f40
+          * the spawner writes position at +0, velocity halved at +0xc,
+            and then COPIES thirteen bytes out of a 16-byte per-kind
+            template at 0x4ec160 into +0x24..+0x3a, doing no arithmetic
+            on them. A second table at 0x4ec948 (0x18 bytes) supplies
+            randomisation modes 1..6 for the velocity
+          * 127 of the template rows are non-empty, so there are 127
+            effect kinds
+          * kinds seen at call sites: 0x3d the creature death burst,
+            0x26 the hover bot's shot, 0x23/0x11/99 death sparks,
+            0x71/0x73 the sparkle points on path tag 58, 2 the push
+            block's dust, 0x7e/0x7f a pair spawned together
+
+        What is NOT settled is what any of those thirteen template bytes
+        MEAN. Their only definition is FUN_00410f40 itself: 912 lines of
+        decompiled C with 60 case labels. Working them out is forming a
+        hypothesis about unlabelled data, and the oracle is weak -
+        particles are visual, there is no .ngn copy to join against, and
+        a wrong reading yields something that looks plausible and is
+        wrong. That is exactly the failure this split exists to catch.
+
+        Porting it unlocks a lot at once: the laser bolt (damage kind 4,
+        which the creature code already handles), the hit sparks and
+        death bursts the creature port raises but cannot draw, the hover
+        bot's shots, and the sparkles over unspent secrets.
+
+      - nothing else is left on this list. The rest is item 3.
 
  3. THE REMAINING FORMAT UNKNOWNS.  None block anything, all are the same
     shape of puzzle, and the .ngn scene is an oracle for most of them:

@@ -1,8 +1,11 @@
 ================================================================================
  NEXT SESSION - what to hand to which model, and how to pick the work back up
  Written 2026-09-03 at the end of Phase 1; updated 2026-09-04, after the
- session that made Buzz playable, and 2026-09-05 after the pickups/tokens
- decode.
+ session that made Buzz playable, 2026-09-05 after the pickups/tokens
+ decode, and 2026-09-06 when the creature port and the token tasks were
+ finished. TWO THINGS ARE WAITING ON FABLE and nothing else is: the effect
+ system, and which zone the player is in. Both are written up under "WHAT
+ TO GIVE FABLE, IN ORDER".
 ================================================================================
 
  Read TODOPLAN.txt for WHAT to do. This file is about WHO should do it and what
@@ -205,7 +208,20 @@
         each level's boss creature, its script's wake word (14 everywhere
         but level 4, which is 12), and the token award.
 
+        One more thing waits on the same byte, found 2026-09-05: level 7's
+        timed egg run is supposed to fail the moment Buzz leaves the area,
+        which its tick writes as "zone 4 slams the clock to 99". The run
+        itself is ported and works; that one rule is stubbed out behind a
+        `failZone` field, so the byte switches it on with no other change.
+        Nothing else about the timed tasks is open - the run state, the
+        clock's floor of 100 and its 1-in-64 frame divider are all written
+        up in docs/LEVELS.md.
+
       - nothing else is left on this list. The rest is item 3.
+        For the avoidance of doubt, the token tasks are FINISHED as far as
+        decoding goes: all five slots on all ten non-boss levels are ported
+        and tested in the browser, and the only gap in them is the zone
+        byte above.
 
  3. THE REMAINING FORMAT UNKNOWNS.  None block anything, all are the same
     shape of puzzle, and the .ngn scene is an oracle for most of them:
@@ -225,21 +241,20 @@
 ================================================================================
  WHAT DOES NOT NEED FABLE
 ================================================================================
- THE CREATURE PORT (P3.2b) - PART DONE 2026-09-05. The interpreter and
-mover are ported (src/sim/creatures.ts) and every creature in the install
-patrols correctly (tools/creature-probe.ts). What is left is damage and
-contact, then the four level 1 handlers, then posed models. The paragraph
-below is the original brief and still describes the remaining work.
+ THE CREATURE PORT (P3.2b) - DONE 2026-09-05/06. The interpreter, the
+mover, damage and contact are all ported (src/sim/creatures.ts), every
+creature in the install patrols correctly (tools/creature-probe.ts), and
+they are drawn as their own models posed by animState. The handlers that
+the token tasks needed are in.
 
-THE CREATURE PORT (P3.2b) - an Opus job now. docs/CREATURES.md gives the
- entity, the tick, the 12-step update and every opcode with its exact
- arithmetic; src/sim/creature-data.ts has the scripts and tables. Port order:
- the interpreter and mover (no C handlers) and run level 1's Zurg toys
- (script 1) against the collision world; then damage/contact so the laser
- and spin kill them; then the four level 1 handlers (sheep, tin robot,
- hover bot, RC) which close the token tasks. Draw them with their .all
- models posed by the anim script frame once the slot mapping is known;
- until then the markers stand in.
+ THE TOKEN TASKS - DONE 2026-09-06. All five slots on all ten non-boss
+levels: Hamm's fifty coins, the find-five owners, the two shapes of race,
+the collect-five challenge, the reach-a-box and offered slots, level 7's
+twice-offered timed egg, the bosses, Mr Potato Head's five power-ups, the
+hint NPCs and the hint signs. src/sim/tasks.ts and src/sim/level-data.ts;
+the decode is docs/LEVELS.md. Every one was walked through in the browser
+with tools/browser-shot.ts. What is NOT in: the "leave the area and fail"
+rule on timed runs, which is the zone byte above.
 
  P2.2 character controller and P2.5 animation - both DONE 2026-09-04 by Opus.
  P2.2 was the pattern working as intended: the decoding was the hard part and

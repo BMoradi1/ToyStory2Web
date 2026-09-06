@@ -407,10 +407,17 @@
                 card 100 x 100 level units with the ten-frame spin, the
                 per-coin phase offset, the distance fade and the flat
                 subtractive shadow on the floor beneath
-                (src/render/world-sprites.ts). Everything else still uses a
-                stand-in octahedron. LEFT: a collected class object should
-                hide its level mesh and the rest should tumble, which the
-                renderer cannot do per object yet.
+                (src/render/world-sprites.ts).
+                Every OTHER pickup is one of the level's own objects and the
+                level mesh already draws it, so the stand-in octahedra are
+                gone. What was missing is hiding: a collected battery stayed
+                on its shelf and all ten token objects stood in the open
+                from level load. buildLevelGeometry now takes a set of
+                objects to keep in their own draw groups and the viewer
+                hides those, the reflection overlay included.
+                LEFT: the tumble each uncollected object does, decoded in
+                docs/HUD.md, which needs a way to move one object of the
+                level rather than baking it into the shared buffer.
 
  P2.6 [READY]   Skeleton from gfx joints (0x011F) - parser done, unused.
 

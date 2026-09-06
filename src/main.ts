@@ -1163,16 +1163,19 @@ function drawHud(level: number): void {
   stepHud(hud, talk !== null);
   if (offsetOf(hud, HudElement.Coins) < 1) stepCoinSpin(hud);
 
-  // The overlay covers the canvas exactly, at its device resolution.
+  // The overlay covers the game's own rectangle inside the canvas, not the
+  // whole canvas: the picture is fitted to the engine's 4:3 screen and the
+  // HUD is laid out for that screen.
   const view = viewer.view.getBoundingClientRect();
   const host = appEl.getBoundingClientRect();
-  hudEl.style.left = `${view.left - host.left}px`;
-  hudEl.style.top = `${view.top - host.top}px`;
-  hudEl.style.width = `${view.width}px`;
-  hudEl.style.height = `${view.height}px`;
+  const rect = viewer.pictureRect;
+  hudEl.style.left = `${view.left - host.left + rect.x}px`;
+  hudEl.style.top = `${view.top - host.top + rect.y}px`;
+  hudEl.style.width = `${rect.width}px`;
+  hudEl.style.height = `${rect.height}px`;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   if (!hudPainter) hudPainter = new HudPainter(hudEl);
-  hudPainter.resize(Math.round(view.width * dpr), Math.round(view.height * dpr));
+  hudPainter.resize(Math.round(rect.width * dpr), Math.round(rect.height * dpr));
   hudPainter.draw(hud, spriteTable, sceneSheets, r, talkDraw());
 }
 

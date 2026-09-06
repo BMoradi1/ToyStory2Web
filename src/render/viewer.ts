@@ -106,10 +106,28 @@ export class Viewer {
   private objectVertices = new Map<number, { start: number; count: number; base: Float32Array }[]>();
   /** The angles each of those objects has been turned to. */
   private objectAngles = new Map<number, readonly [number, number, number]>();
+  /**
+   * The 4:3 rectangle inside the canvas that the game is drawn into, in CSS
+   * pixels from the canvas's top left. The engine has one screen shape and
+   * everything is laid out for it — the camera's field of view, the sprite
+   * layer's two coordinate spaces, the font's proportions — so stretching
+   * that to whatever shape the window happens to be does not show more of
+   * the world, it shows the same world distorted. The picture is fitted and
+   * the rest left black, which is what the game looked like.
+   */
+  private frameRect = { x: 0, y: 0, width: 1, height: 1 };
+
+  /** Where the game's picture sits inside the canvas, in CSS pixels. */
+  get pictureRect(): { x: number; y: number; width: number; height: number } {
+    return { ...this.frameRect };
+  }
 
   constructor(canvas: HTMLCanvasElement) {
     this.view = canvas;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    // The frame is cleared by hand: the whole canvas black, then the game's
+    // own rectangle inside it.
+    this.renderer.autoClear = false;
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     // No output transform either: see the ColorManagement note above.
     this.renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
@@ -851,9 +869,23 @@ export class Viewer {
     const w = canvas.clientWidth || 1;
     const h = canvas.clientHeight || 1;
     this.renderer.setSize(w, h, false);
-    this.camera.aspect = w / h;
+    // Fit the engine's screen shape inside the canvas rather than stretching
+    // to it, and keep the camera at that shape.
+    const width = Math.min(w, h * NATIVE_ASPECT);
+    const height = width / NATIVE_ASPECT;
+    this.frameRect = {
+      x: Math.round((w - width) / 2),
+      y: Math.round((h - height) / 2),
+      width: Math.round(width),
+      height: Math.round(height),
+    };
+    this.camera.aspect = NATIVE_ASPECT;
     this.camera.updateProjectionMatrix();
+    this.onResize?.(this.pictureRect);
   }
+
+  /** Told whenever the picture's rectangle changes, so an overlay can follow. */
+  onResize: ((rect: { x: number; y: number; width: number; height: number }) => void) | null = null;
 
   start(): void {
     if (this.running) return;
@@ -884,6 +916,22 @@ export class Viewer {
     this.camera.updateMatrixWorld();
     this.coinCards.update(this.cards, this.camera);
     this.coinShadows.update(this.shadows, this.camera);
+
+    // Black the whole canvas, then draw the game into its own rectangle.
+    const canvas = this.renderer.domElement;
+    const pixels = this.renderer.getPixelRatio();
+    this.renderer.setScissorTest(false);
+    this.renderer.setViewport(0, 0, canvas.clientWidth, canvas.clientHeight);
+    this.renderer.setScissor(0, 0, canvas.clientWidth, canvas.clientHeight);
+    this.renderer.setClearColor(0x000000, 1);
+    this.renderer.clear();
+    const r = this.frameRect;
+    // WebGL counts y from the bottom; the rectangle is measured from the top.
+    const bottom = canvas.clientHeight - r.y - r.height;
+    this.renderer.setViewport(r.x, bottom, r.width, r.height);
+    this.renderer.setScissor(r.x, bottom, r.width, r.height);
+    this.renderer.setScissorTest(true);
+    void pixels;
     this.renderer.render(this.scene, this.camera);
   }
 }

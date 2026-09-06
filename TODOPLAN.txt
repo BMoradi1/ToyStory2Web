@@ -550,6 +550,12 @@
                 and laser. The ammo pair needs pickup categories 6 and 7,
                 which level 1 has none of. Pause and menus: laid out in
                 the same function, not written up.
+                THE PICTURE IS 4:3 AGAIN 2026-09-06. The renderer stretched
+                its camera to the window, which showed the same world
+                distorted rather than more of it, and dragged the sprite
+                layer with it - the font came out about 30% too wide. The
+                engine's screen is fitted inside the canvas now and the rest
+                is black, with the HUD over the same rectangle.
                 THE TALK BOX IS THE GAME'S OWN 2026-09-06: the red panel
                 scaling open from its centre and the game's font, with the
                 ^word^ highlight coming out green because the modulate

@@ -63,12 +63,12 @@ same divisor.
 
 **The stretch assumes a 4:3 screen.** A unit of the 320 space is 6.7% wider
 than a unit of the vertical one there, which is the shape the font was drawn
-for. The viewer widens its camera to the window instead of pillarboxing, so
-the 2D layer stretches with it and the glyphs come out wider than the
-original's on a wide window — about 30% on a 16:10 one. Fixing that means
-letterboxing the whole view to 4:3, three-dimensional part included; do that
-and this layer comes right on its own, because it is defined in the same
-spaces the engine uses.
+for, and the camera's field of view assumes the same shape. So the viewer
+fits that screen inside the canvas and leaves the rest black rather than
+stretching to the window (`Viewer.pictureRect`); the 2D layer is laid over
+the same rectangle. Stretching to a wide window would not show more of the
+world, it would show the same world distorted, and it made the font about
+30% too wide.
 
     FUN_00493f40  x/512  colour and scale given          the box, font, bars
     FUN_004942d0  x/320  colour and scale given          HUD icons
@@ -318,4 +318,5 @@ Left to build:
 1. **The pause menu and the token screen**, which the HUD function also
    draws and which are not written up here.
 2. The level's sprite records, if the PSX look is wanted.
-3. Letterboxing the view to 4:3, which is the aspect note above.
+3. Nothing else, unless the front end and its menus are wanted, which are
+   a different set of sprites on `level00`'s own texture slots.

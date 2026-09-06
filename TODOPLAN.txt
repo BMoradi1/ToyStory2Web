@@ -367,8 +367,10 @@
                 convention I could not settle - event 0x12 resolves to the
                 spin sound where the code fires it for a skid - so the sim
                 names effects directly instead. Settling that table is what
-                unlocks per-sound pitch, 3D falloff, and the animation
-                scripts' own sound opcodes.
+                unlocks 3D falloff and the animation scripts' own sound
+                opcodes (2026-09-05: the effect field is 1-based, the pitch
+                is unused on PC, and the falloff/pan/slider formula is in
+                docs/LEVELS.md "Attenuation, pan and the slider").
                 Also absent: music (audio/*.wav, one 8 MB track per area)
                 - fully decoded 2026-09-05, see NEXT_SESSION.txt MUSIC:
                 table, per-level rule, overrides, volume curve. Opus job.

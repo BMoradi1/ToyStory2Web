@@ -440,10 +440,13 @@
                 The sheep and hover-bot handlers are ported too (the sheep
                 counts level 1's find-five task; the bot opens, fires twice
                 and closes on a 360-tick cycle while Buzz is in its box).
+                Creatures are DRAWN as their own models now, posed by
+                animState (a slot in the type's .anm) and the frame the
+                anim script holds; a type with no model keeps a marker.
                 LEFT: the remaining per-type handlers - the tin robot's and
                 the R.C. car's are level-script work, so they belong with
-                P3.3 - the laser and dive damage kinds, the player's full
-                knock-down reaction, and posed models instead of markers.
+                P3.3 - the laser and dive damage kinds, and the player's
+                full knock-down reaction.
                 Original spec <- docs/CREATURES.md:
                 entity fields, the tick, the update in 12 steps, all 34
                 script opcodes, damage table, death/respawn. Data is in

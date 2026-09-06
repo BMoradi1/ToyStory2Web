@@ -348,6 +348,77 @@ export class Viewer {
    * nothing poses or moves them yet, so a marker is more honest than a frozen
    * model.
    */
+  /**
+   * One drawn creature per id, each with its own geometry because each is
+   * posed differently. Buzz gets a single mesh swapped in place for the same
+   * reason; there are simply more of these.
+   */
+  private creatureMeshes = new Map<number, THREE.Mesh>();
+
+  /**
+   * Install, replace or remove the model for one creature. Passing null drops
+   * it, which is what a creature dying or leaving the level does.
+   *
+   * Replacing keeps the object's transform, so a pose swap does not make it
+   * jump back to the origin for a frame.
+   */
+  setCreatureMesh(id: number, mesh: MeshData | null, textures?: Map<number, THREE.Texture>): void {
+    const existing = this.creatureMeshes.get(id);
+    if (!mesh || mesh.triangleCount === 0) {
+      if (existing) {
+        this.scene.remove(existing);
+        existing.geometry.dispose();
+        for (const m of existing.material as THREE.Material[]) m.dispose();
+        this.creatureMeshes.delete(id);
+      }
+      return;
+    }
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(mesh.positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(mesh.colors, 3));
+    geometry.setAttribute('uv', new THREE.BufferAttribute(mesh.uvs, 2));
+    const materials: THREE.Material[] = [];
+    for (const group of mesh.groups) {
+      geometry.addGroup(group.start, group.count, materials.length);
+      materials.push(new THREE.MeshBasicMaterial({
+        map: (group.page === null ? undefined : textures?.get(group.page)) ?? null,
+        vertexColors: true,
+        side: THREE.DoubleSide,
+        alphaTest: 0.5,
+      }));
+    }
+
+    if (existing) {
+      existing.geometry.dispose();
+      for (const m of existing.material as THREE.Material[]) m.dispose();
+      existing.geometry = geometry;
+      existing.material = materials;
+      return;
+    }
+    const object = new THREE.Mesh(geometry, materials);
+    this.creatureMeshes.set(id, object);
+    this.scene.add(object);
+  }
+
+  /** Where a drawn creature stands and which way it faces. Renderer units. */
+  placeCreatureMesh(id: number, x: number, y: number, z: number, facing: number): void {
+    const object = this.creatureMeshes.get(id);
+    if (!object) return;
+    object.position.set(x, y, z);
+    // Characters are authored facing +Z and Z is negated on the way in, the
+    // same correction the player gets.
+    object.rotation.set(0, Math.PI - facing, 0);
+  }
+
+  /** Which creatures currently have a model. */
+  get drawnCreatures(): number { return this.creatureMeshes.size; }
+
+  /** Drop every creature model, for a level change. */
+  clearCreatureMeshes(): void {
+    for (const id of [...this.creatureMeshes.keys()]) this.setCreatureMesh(id, null);
+  }
+
   setCreatures(placements: { x: number; y: number; z: number; yaw: number; colour: number }[]): void {
     if (this.creatures) {
       this.scene.remove(this.creatures);

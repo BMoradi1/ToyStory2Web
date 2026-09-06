@@ -106,7 +106,8 @@ level.
   above Buzz. All 373 creatures in the game are exercised by a probe tool.
   Buzz's spin kills what the data says it can kill, and the ones marked
   dangerous hurt him back, using each creature's own hit ellipsoid read out
-  of its model. They are still drawn as markers rather than posed models.
+  of its model. Each one is drawn as the model the game draws, posed by the
+  animation its script selected.
 - **Hint signs and push blocks, decoded.** The tutorial signposts (a talk
   box with a scripted camera flight, also how every character speaks) and
   the crates Buzz shoves along rails are read out of the executable and

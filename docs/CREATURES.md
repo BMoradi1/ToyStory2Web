@@ -14,10 +14,11 @@ contact test. The hit geometry is read from each type's `.all`
 install and checks it patrols inside its home box, runs its script, and
 hurts Buzz exactly when its flags say it should.
 Two of the per-type handlers are ported as well: the sheep, which counts
-level 1's find-five task, and the hover bot's firing cycle.
+level 1's find-five task, and the hover bot's firing cycle. The viewer
+draws each creature as its own model, posed by its `animState` and frame,
+which works because `animState` is a slot in that creature's `.anm`.
 **Not ported**: the rest of the handlers, the laser and the dive (damage
-kinds 4 and 5), the player's full knock-down reaction, and the drawing —
-the viewer still shows markers rather than posed models.
+kinds 4 and 5), and the player's full knock-down reaction.
 
 Two things in this document were wrong until the port was written against
 the decompile, and are corrected below: the placement's `+0x12` is the
@@ -382,7 +383,9 @@ otherwise the script rewinds that many bytes. A script whose third byte is
 half of `+0x18`. The type's `.anm` is loaded whole by the same loader and
 kept per type (`DAT_00547cd4[type]`, the file image with its first word set
 to 1 and the part-record range written over the header's +4/+6), and
-**`animState` is the `.anm` slot index**: the animation player
+**`animState` is the `.anm` slot index** — which is what lets the viewer
+pose them straight out of `AnmFile.animations[animState]` — and the
+animation player
 `FUN_0043ba80` is handed `anm + 8 + animState * 4`, the slot's offset entry
 (`FUN_004019d0`, `FUN_0043c070`), and the frame number picks the frame
 inside that animation. So there is no per-type slot table; the state

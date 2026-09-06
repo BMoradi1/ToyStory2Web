@@ -72,6 +72,10 @@ let currentDir: GameDir | null = null;
 let creatureModelPaths = new Map<number, { name: string; path: string }>();
 /** The hit geometry per type, read from those models on demand. */
 const creatureModels = new Map<number, CreatureModel>();
+/** The art beside it: the model to draw and the animations to pose it with. */
+const creatureArt = new Map<number, { model: AllFile; anm: AnmFile | null }>();
+/** What each drawn creature was last posed as, so a pose is rebuilt only on a change. */
+let creaturePosed = new Map<number, string>();
 /** The scene's collision hull, loaded lazily the first time it is shown. */
 let currentCollision: CollisionGroup[] | null = null;
 let currentCollisionWorld: CollisionWorld | null = null;
@@ -204,6 +208,8 @@ async function showLevel(index: number): Promise<void> {
   currentCollision = null;
   currentCollisionWorld = null;
   creatureSim = null;
+  creatureArt.clear();
+  viewer?.clearCreatureMeshes();
   music?.stop();
   currentTerrainFile = level.terrain;
   viewer?.setCollision(null);
@@ -550,7 +556,16 @@ async function loadCreatureModels(types: ReadonlySet<number>): Promise<void> {
     const file = currentDir.get(entry.path);
     if (!file) continue;
     try {
-      const groups = parseAll(await file.read()).groups;
+      const model = parseAll(await file.read());
+      // The animations sit beside the model, and a creature's animState is a
+      // slot in this file (docs/CREATURES.md) — no per-type table needed.
+      const anmFile = currentDir.get(entry.path.replace(/\.all$/, '.anm'));
+      let anm: AnmFile | null = null;
+      if (anmFile) {
+        try { anm = parseAnm(await anmFile.read()); } catch { anm = null; }
+      }
+      creatureArt.set(type, { model, anm });
+      const groups = model.groups;
       const last = groups[groups.length - 1];
       if (!last || last.type !== GroupType.HitShapes || !last.hitSphere) continue;
       const shapes = readHitShapes(last);
@@ -721,6 +736,14 @@ async function spawnPlayer(): Promise<void> {
       // marked "no model" and drops out of the near list, as in the original.
       await loadCreatureModels(new Set(currentCreatures.map((c) => c.type)));
       setCreatureModels(creatureSim, creatureModels);
+      // Draw them as themselves rather than as cones, where the install has
+      // the model. Anything without one keeps a marker.
+      viewer.clearCreatureMeshes();
+      creaturePosed = new Map();
+      for (const c of creatureSim.creatures) {
+        const art = creatureArt.get(c.type);
+        if (art) viewer.setCreatureMesh(c.slot, buildMeshData(art.model), sceneTextures);
+      }
     }
   }
   pickups = createPickups(currentLevel.level, level);
@@ -765,10 +788,47 @@ function drawCreatures(): void {
   if (!viewer) return;
   const S = GAME_UNITS_PER_LEVEL_UNIT;
   if (creatureSim) {
-    viewer.setCreatures(creatureSim.creatures.filter((c) => c.type > 0 && c.health > 0).map((c) => ({
-      x: c.x * GAME_TO_RENDER, y: -c.y * GAME_TO_RENDER, z: -c.z * GAME_TO_RENDER,
-      yaw: toRadians(c.heading), colour: liveCreatureColour(c),
-    })));
+    const markers: { x: number; y: number; z: number; yaw: number; colour: number }[] = [];
+    for (const c of creatureSim.creatures) {
+      const alive = c.type > 0 && c.health > 0;
+      const art = creatureArt.get(c.type);
+      if (!art) {
+        if (alive) {
+          markers.push({
+            x: c.x * GAME_TO_RENDER, y: -c.y * GAME_TO_RENDER, z: -c.z * GAME_TO_RENDER,
+            yaw: toRadians(c.heading), colour: liveCreatureColour(c),
+          });
+        }
+        continue;
+      }
+      if (!alive) {
+        // Dead or removed: take its model away and stop tracking its pose.
+        viewer.setCreatureMesh(c.slot, null);
+        creaturePosed.delete(c.slot);
+        continue;
+      }
+      viewer.placeCreatureMesh(
+        c.slot,
+        c.x * GAME_TO_RENDER, -c.y * GAME_TO_RENDER, -c.z * GAME_TO_RENDER,
+        toRadians(c.heading),
+      );
+      // Pose it only when something changed, and only while the sim is
+      // actually updating it — a creature outside the update radius is frozen
+      // anyway, so re-posing it would be work for nothing.
+      if (!art.anm || (c.flags & CREATURE_FLAGS.near) === 0) continue;
+      const animation = art.anm.animations[c.animState];
+      if (!animation) continue;
+      const frame = (c.frame >>> 16) % Math.max(1, animation.frameCount);
+      const key = `${c.animState}:${frame}`;
+      if (creaturePosed.get(c.slot) === key) continue;
+      creaturePosed.set(c.slot, key);
+      viewer.setCreatureMesh(
+        c.slot,
+        buildPosedMeshData(art.model, art.anm, animation, frame),
+        sceneTextures,
+      );
+    }
+    viewer.setCreatures(markers);
     return;
   }
   viewer.setCreatures(currentCreatures.map((c) => ({

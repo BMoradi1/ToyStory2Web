@@ -3,10 +3,20 @@
 How toy2.exe places, runs, hurts and respawns everything that is not Buzz:
 the enemies, the cast he talks to, the sheep, the race car. Read out of the
 executable on 2026-09-05; every function is named so it can be checked
-against the decompile (`tools/ghidra/README.md`). Nothing here is ported yet.
-What is: the placement file (`src/formats/rnc.ts`, `src/formats/creatures.ts`),
-the behaviour data (`src/sim/creature-data.ts`, generated), a disassembler
-(`tools/creature-scripts.ts`) and markers in the viewer.
+against the decompile (`tools/ghidra/README.md`).
+
+**Ported** (2026-09-05): the placement file (`src/formats/rnc.ts`,
+`src/formats/creatures.ts`), the behaviour data (`src/sim/creature-data.ts`,
+generated), and the entity, the tick, the twelve-step update and all 34
+script opcodes in `src/sim/creatures.ts`. `tools/creature-probe.ts` runs
+every creature in the install and checks it patrols inside its home box.
+**Not ported**: the per-type C handlers, damage and contact, and the drawing
+— the viewer still shows markers rather than posed models.
+
+Two things in this document were wrong until the port was written against
+the decompile, and are corrected below: the placement's `+0x12` is the
+entity's initial **flags** word, not a yaw, and the per-type table passed to
+the ground ray is a **shadow radius**, not a probe reach.
 
 The short version: a creature is a **32-byte placement** from the level's
 `.raw` packet, expanded by a constructor into a **156-byte entity**, and run
@@ -40,7 +50,12 @@ bytes**. A slot with type byte 0 is empty. `src/formats/creatures.ts`:
     +0x0f u8  facing      << 4 gives a fixed 12-bit heading; 0 = free
     +0x10 u8  health      see "Health" below; 102 marks the harmless
     +0x11 u8  respawn     0 = gone for good when killed; 100 = 1800 ticks
-    +0x12 i16 yaw         initial heading
+    +0x12 i16 flags       the entity's initial flags word, copied straight
+                          into +0x40. NOT a yaw: only 31 distinct values
+                          occur across the install's 373 creatures and each
+                          is a combination of the bits below — every enemy
+                          carries 0x100 "hurts on touch", the harmless sheep
+                          does not, and the hovering bots carry 0x010
     +0x14 i16 rangeX      half-extents of the HOME BOX, in 256-unit steps
     +0x16 i16 rangeZ
     +0x18 i16 rangeYaw    the box's rotation, in 1/512 turn (x 8 = 12-bit)
@@ -126,8 +141,8 @@ Flags at +0x40, as far as they are used:
     0x100  hurts the player on touch
     0x200  talked to / touched (the dialogue and the sheep use it)
     0x400  keep momentum: no deceleration; cleared on landing or when shoved
-    0x800  has died once: set by the death effect, and a respawn then
-           comes back turned half round
+    0x800  has died once: set by the death effect. A respawn rebuilds the
+           flags from the placement and adds this bit back if it was set
     0x2000 its model is not loaded (`FUN_00447bd0` sets it): never in the near list
 
 **Where the model-derived fields come from** (found 2026-09-05). Each
@@ -149,9 +164,9 @@ src/formats/all.ts reads the table; the laser and contact tests index it by
 
 Position = placement << 5. `type` from +0x0c, script pointer from the
 44-entry table `PTR_DAT_004e02c4[+0x0d]`, `health` from +0x10, `respawn`
-from +0x11 (100 becomes 0x708 = 1800 ticks), yaw from +0x12 (a respawn
-passes `fromList = 0`, and if the creature has died before — flag 0x800 —
-it comes back facing the other way), heading = facing << 4, home and target = position,
+from +0x11 (100 becomes 0x708 = 1800 ticks), flags from +0x12 (a respawn
+passes `fromList = 0`, and if the creature has died before it keeps flag
+0x800), heading and `wantYaw` = facing << 4, home and target = position,
 velocity 0, frame 0, floorY unknown, wait 0, animScript = the default
 (`ANIM_SCRIPTS[1]`, a 24-frame loop), bodyRadius 0x500 and no handler. The
 switch on type then overrides the radius and installs the handler for the
@@ -235,8 +250,11 @@ placement.
    its patch by walking, ever.
 10. **Vertical.** Without flag 0x010: `vy += dt * 0x100 / 4`, capped at
     0x800; `y += vy * dt`. Then, unless flag 0x020 (flying), a ground ray
-    from `y - 0x1900` with reach `GROUND_PROBE[type]` (`FUN_00486280`)
-    gives the floor; if none, `y` reverts to `lastFloor`. If the fallen
+    from `y - 0x1900` (`FUN_00486280`) gives the floor; if none, `y`
+    reverts to `lastFloor`. The ray always drops a fixed 0x10000: the
+    per-type value the call also takes (`SHADOW_RADIUS`, the table at
+    0x4e05ee) is handed to the shadow-drawing call and skipped when it is 0,
+    so a 0 there means "casts no shadow", not "no ground check". If the fallen
     `y` is within 0x200 above the floor the creature is **grounded**: with
     no jump pending `y` eases to the floor at up to 0x400 a tick, `vy = 0`;
     with a jump pending (step 3) the jump is over — `wait = 0`, `pc`

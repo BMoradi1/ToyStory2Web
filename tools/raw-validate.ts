@@ -55,7 +55,7 @@ for (const file of walk(join(root, 'data'))) {
       const name = names.get(c.type);
       if (showCreatures) {
         console.log(`  ${String(c.slot).padStart(2)} ${(name ?? '?').padEnd(9)} t${c.type} s${c.script}`
-          + ` at ${c.x},${c.y},${c.z} yaw ${c.yaw} hp ${c.health} rs ${c.respawn}`
+          + ` at ${c.x},${c.y},${c.z} flags 0x${(c.flags & 0xffff).toString(16)} hp ${c.health} rs ${c.respawn}`
           + ` box ${c.rangeX}x${c.rangeZ}@${c.rangeYaw} spd ${c.speed}/${c.speedMax} acc ${c.accel},${c.accelSide}`
           + ` turn ${c.turnRate} face ${c.facing} raw ${Buffer.from(c.raw).toString('hex')}`);
       }

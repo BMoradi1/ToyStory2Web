@@ -55,7 +55,7 @@ if (a === undefined) {
     used.add(c.script);
     const t = CREATURE_TYPES[c.type];
     console.log(`${String(c.slot).padStart(2)} ${(names.get(c.type) ?? '?').padEnd(9)} type ${String(c.type).padStart(2)}`
-      + ` script ${String(c.script).padStart(2)} at ${c.x},${c.y},${c.z} yaw ${c.yaw}`
+      + ` script ${String(c.script).padStart(2)} at ${c.x},${c.y},${c.z} flags 0x${(c.flags & 0xffff).toString(16)}`
       + ` hp ${c.health} respawn ${c.respawn} box ${c.rangeX}x${c.rangeZ}`
       + ` speed ${c.speed}/${c.speedMax}${t?.handler ? ` + ${t.handler}` : ''}`);
   }

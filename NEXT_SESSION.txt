@@ -167,7 +167,13 @@
 ================================================================================
  WHAT DOES NOT NEED FABLE
 ================================================================================
- THE CREATURE PORT (P3.2b) - an Opus job now. docs/CREATURES.md gives the
+ THE CREATURE PORT (P3.2b) - PART DONE 2026-09-05. The interpreter and
+mover are ported (src/sim/creatures.ts) and every creature in the install
+patrols correctly (tools/creature-probe.ts). What is left is damage and
+contact, then the four level 1 handlers, then posed models. The paragraph
+below is the original brief and still describes the remaining work.
+
+THE CREATURE PORT (P3.2b) - an Opus job now. docs/CREATURES.md gives the
  entity, the tick, the 12-step update and every opcode with its exact
  arithmetic; src/sim/creature-data.ts has the scripts and tables. Port order:
  the interpreter and mover (no C handlers) and run level 1's Zurg toys

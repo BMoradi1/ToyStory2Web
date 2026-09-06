@@ -28,6 +28,10 @@ import { unpackRaw } from './formats/rnc.ts';
 import { CREATURE_LIST_TYPE, parseCreatureList, parseCreatureNames, type CreaturePlacement } from './formats/creatures.ts';
 import { AI_SCRIPTS } from './sim/creature-data.ts';
 import {
+  RandomStream, createCreatureSim, creatureWorldFromCollision, stepCreatures,
+  CREATURE_FLAGS, type Creature, type CreatureSim,
+} from './sim/creatures.ts';
+import {
   createAnimation, stepAnimation, type AnimationPlayback,
 } from './sim/player-animation.ts';
 
@@ -53,6 +57,10 @@ let currentLevel: { level: DatLevel; zones: (number | null)[] } | null = null;
 /** The scene's creature placements from its `.raw` packet, and the names from creatures.cfg. */
 let currentCreatures: CreaturePlacement[] = [];
 let creatureNames = new Map<number, string>();
+/** The running cast, once the player has spawned. Null before that. */
+let creatureSim: CreatureSim | null = null;
+/** `data/rand.dat`: every random choice a creature makes comes out of it. */
+let randomBytes: Uint8Array | null = null;
 /** The scene's collision hull, loaded lazily the first time it is shown. */
 let currentCollision: CollisionGroup[] | null = null;
 let currentCollisionWorld: CollisionWorld | null = null;
@@ -184,6 +192,7 @@ async function showLevel(index: number): Promise<void> {
   // and drop whatever the previous scene had.
   currentCollision = null;
   currentCollisionWorld = null;
+  creatureSim = null;
   currentTerrainFile = level.terrain;
   viewer?.setCollision(null);
   viewer?.setPlayer(null);
@@ -245,8 +254,8 @@ async function showLevel(index: number): Promise<void> {
       await yieldToBrowser();
 
       // Creatures come from the RNC packet beside the scene, record type
-      // 0x23. Drawn as markers: the behaviour system is decoded
-      // (docs/CREATURES.md) but not yet ported.
+      // 0x23. Until the player spawns these are just start positions; from
+      // then on `creatureSim` runs them (src/sim/creatures.ts).
       currentCreatures = [];
       if (level.raw) {
         try {
@@ -289,6 +298,8 @@ async function open(dir: GameDir): Promise<void> {
   models = findModels(dir);
   const cfg = dir.get('data/creatures.cfg');
   creatureNames = cfg ? parseCreatureNames(new TextDecoder('latin1').decode(await cfg.read())) : new Map();
+  const rand = dir.get('data/rand.dat');
+  randomBytes = rand ? await rand.read() : null;
   sound = new SoundBank(dir);
   if (levels.length === 0) return setStatus('No levels found under data/.', true);
 
@@ -330,10 +341,24 @@ async function open(dir: GameDir): Promise<void> {
         } : null;
       },
       get creatures() {
+        // Live once the sim is up, in game units; the placements, in level
+        // units, before that. `near` is what the tick is actually updating.
+        if (creatureSim) {
+          return creatureSim.creatures.map((c) => ({
+            slot: c.slot, type: c.type, name: creatureNames.get(c.type) ?? null,
+            script: c.record.script, scriptWords: c.script.length,
+            x: c.x, y: c.y, z: c.z, heading: c.heading, health: c.health,
+            flags: c.flags, near: (c.flags & CREATURE_FLAGS.near) !== 0,
+            pc: c.pc, wait: c.wait, animState: c.animState, frame: c.frame >>> 16,
+            homeX: c.homeX, homeZ: c.homeZ,
+            targetX: c.targetX, targetZ: c.targetZ,
+            live: true,
+          }));
+        }
         return currentCreatures.map((c) => ({
           slot: c.slot, type: c.type, name: creatureNames.get(c.type) ?? null, script: c.script,
           scriptWords: AI_SCRIPTS[c.script]?.length ?? null,
-          x: c.x, y: c.y, z: c.z, yaw: c.yaw, health: c.health,
+          x: c.x, y: c.y, z: c.z, flags: c.flags, health: c.health, live: false,
         }));
       },
       /** Put the player on the nearest uncollected pickup. For the harness. */
@@ -361,6 +386,24 @@ async function open(dir: GameDir): Promise<void> {
       },
       spawnPlayer,
       togglePlay,
+      /**
+       * Run the creature sim without the player controller, so a test can
+       * watch the cast on its own. Returns how many the tick updated.
+       */
+      tickCreatures(ticks = 1) {
+        if (!creatureSim || !player) return null;
+        for (let i = 0; i < ticks; i++) stepCreatures(creatureSim, player);
+        drawCreatures();
+        return { ticks, updated: creatureSim.near.length, total: creatureSim.creatures.length };
+      },
+      /** Put the player beside a creature, so it comes into the update radius. */
+      goToCreature(slot: number) {
+        if (!creatureSim || !player) return null;
+        const c = creatureSim.creatures.find((q) => q.slot === slot);
+        if (!c) return null;
+        player.x = c.x + 400; player.y = c.y; player.z = c.z + 400;
+        return { slot, x: player.x, y: player.y, z: player.z };
+      },
       revealTokens: revealAllTokens,
       drive(held: Partial<import('./sim/player.ts').PlayerInput>, ticks = 1) {
         if (!player || !playerRuntime || !currentCollisionWorld || !viewer) return null;
@@ -582,6 +625,27 @@ async function spawnPlayer(): Promise<void> {
   // the one the level's own init reveals is shown; the tasks are not
   // implemented, so the rest stay hidden until `ts2.revealTokens()`.
   const level = levelNumber(sceneId) ?? 0;
+  // The cast starts running now. The engine builds its entities at level load
+  // and ticks them beside the player, so the random stream is rewound here to
+  // match: a level replays the same way every time.
+  creatureSim = null;
+  if (currentCreatures.length > 0) {
+    if (!randomBytes) {
+      console.warn('data/rand.dat is missing: creatures need its byte stream, so they stay still');
+    } else {
+      const world = currentCollisionWorld;
+      creatureSim = createCreatureSim(
+        currentCreatures,
+        creatureWorldFromCollision((x, y, z) => {
+          const S = GAME_UNITS_PER_LEVEL_UNIT;
+          const hit = groundBelow(world, x / S, y / S, z / S);
+          return hit ? hit.y * S : null;
+        }),
+        new RandomStream(randomBytes),
+        level,
+      );
+    }
+  }
   pickups = createPickups(currentLevel.level, level);
   for (const slot of tokenSlotsAtStart(level)) revealToken(pickups, slot);
   drawPickups();
@@ -615,14 +679,31 @@ function creatureColour(c: CreaturePlacement): number {
   return 0xa0a0a0;
 }
 
-/** Hand the viewer the creature start positions. */
+/**
+ * Hand the viewer the creatures: where they are now once the sim is running,
+ * else where the level puts them. The dead are dropped rather than left lying
+ * at the origin.
+ */
 function drawCreatures(): void {
   if (!viewer) return;
   const S = GAME_UNITS_PER_LEVEL_UNIT;
+  if (creatureSim) {
+    viewer.setCreatures(creatureSim.creatures.filter((c) => c.type > 0 && c.health > 0).map((c) => ({
+      x: c.x * GAME_TO_RENDER, y: -c.y * GAME_TO_RENDER, z: -c.z * GAME_TO_RENDER,
+      yaw: toRadians(c.heading), colour: liveCreatureColour(c),
+    })));
+    return;
+  }
   viewer.setCreatures(currentCreatures.map((c) => ({
     x: c.x * S * GAME_TO_RENDER, y: -c.y * S * GAME_TO_RENDER, z: -c.z * S * GAME_TO_RENDER,
-    yaw: toRadians(c.yaw), colour: creatureColour(c),
+    yaw: toRadians((c.facing << 4) & 0xfff), colour: creatureColour(c),
   })));
+}
+
+/** As `creatureColour`, but a creature the sim is actually updating shows brighter. */
+function liveCreatureColour(c: Creature): number {
+  const base = c.health >= 100 ? 0x60d060 : c.record.respawn > 0 ? 0xe04040 : 0xa0a0a0;
+  return (c.flags & CREATURE_FLAGS.near) !== 0 ? base : ((base >> 1) & 0x7f7f7f);
 }
 
 /** Show every token, as if all five tasks were done. For the harness and for looking around. */
@@ -711,6 +792,11 @@ function playTick(): void {
     );
   }
   for (const effect of player.sounds) sound?.play(effect);
+
+  if (creatureSim) {
+    stepCreatures(creatureSim, player);
+    drawCreatures();
+  }
 
   if (pickups) {
     const taken = stepPickups(pickups, player);

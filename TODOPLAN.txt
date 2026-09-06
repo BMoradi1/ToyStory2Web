@@ -422,7 +422,19 @@
                 32-byte placements parsed and drawn as markers in the
                 viewer (36 on level 1). LEFT: moving props, which the level
                 scripts drive by object id. Paths (30) are their rails.
- P3.2b [READY]  Creature behaviour port <- docs/CREATURES.md is the spec:
+ P3.2b [PART]   Creature behaviour port. DONE 2026-09-05: the entity, the
+                tick, the 12-step update and all 34 script opcodes are in
+                src/sim/creatures.ts, running in the viewer from the moment
+                the player spawns and drawn as markers at their live
+                positions. tools/creature-probe.ts exercises all 373
+                creatures in the install: every one patrols inside its home
+                box and runs its script. Two spec errors were caught against
+                the decompile while porting - placement +0x12 is the initial
+                FLAGS word, not a yaw, and the per-type ground-ray argument
+                is a shadow radius, not a probe reach.
+                LEFT: the per-type C handlers, damage/contact, and posed
+                models instead of markers.
+                Original spec <- docs/CREATURES.md:
                 entity fields, the tick, the update in 12 steps, all 34
                 script opcodes, damage table, death/respawn. Data is in
                 src/sim/creature-data.ts (44 scripts, 25 anim scripts,

@@ -440,8 +440,15 @@ export const DAMAGE_KINDS: readonly { mode: number; stun: number; damage: number
   { mode: 1, stun: 0, damage: 128 }, // 6
 ];
 
-/** Ground-probe reach per creature type (0x4e05ee), passed to the floor ray. */
-export const GROUND_PROBE: readonly number[] = [
+/**
+ * Drop-shadow radius per creature type (the table at 0x4e05ee).
+ *
+ * Named GROUND_PROBE until 2026-09-05, when reading `FUN_00486280` settled
+ * what its second argument is: the ray itself always drops a fixed 0x10000
+ * and this value is handed to the shadow-drawing call, which is skipped
+ * when it is 0. So a 0 here means "casts no shadow", not "no ground check".
+ */
+export const SHADOW_RADIUS: readonly number[] = [
     78, 150, 150, 150, 150, 150, 150, 150, 150, 150, 150, 0, 0, 70, 150, 150,
     150, 0, 150, 150, 150, 150, 150, 0, 150, 150, 150, 150, 50, 0, 0, 150,
     150, 150, 150, 150, 150, 150, 100, 150, 150, 150, 150, 150, 150, 150, 150, 150,

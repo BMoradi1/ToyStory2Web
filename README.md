@@ -94,12 +94,14 @@ level.
   touching something flatter than 60 degrees rather than finding a floor
   underfoot. Fall out of the level and you are put back where you last stood
   safely, as the original does.
-- **Creatures, placed.** Every scene's enemies and cast are read from the
+- **Creatures move.** Every scene's enemies and cast are read from the
   level's packet file (an RNC-compressed container the game's own unpacker
-  was transcribed for) and drawn as markers where they start. Their
-  behaviour — a script interpreter with 44 scripts in the executable, one
-  shared mover, one damage routine — is decoded in docs/CREATURES.md and
-  waiting to be ported.
+  was transcribed for) and then *run*: the game's own script interpreter,
+  44 scripts out of the executable, and the shared mover that walks them,
+  leaps them, turns them and pens each one inside its patrol box. The Zurg
+  toys of level 1 patrol and lunge; the hover bots drift and keep station
+  above Buzz. All 373 creatures in the game are exercised by a probe tool.
+  They are still drawn as markers, and nothing can hurt them yet.
 - **Hint signs and push blocks, decoded.** The tutorial signposts (a talk
   box with a scripted camera flight, also how every character speaks) and
   the crates Buzz shoves along rails are read out of the executable and

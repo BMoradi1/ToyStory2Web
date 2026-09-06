@@ -11,14 +11,23 @@
  *     +0x0c u8  type        creatures.cfg index (5 TINMAN, 6 SHEEP, ...)
  *     +0x0d u8  script      index into the 44 behaviour scripts in the exe
  *     +0x0e u8  turnRate    yaw easing per tick; 0 = never turn
- *     +0x0f u8  facing      fixed heading in 1/256 turn (<< 4 -> 12-bit), 0 = free
+ *     +0x0f u8  facing      the heading, in 1/256 turn (<< 4 -> 12-bit). The
+ *                           constructor starts the creature at it, and a
+ *                           non-zero value re-asserts it every tick
  *     +0x10 u8  health      copied to the entity; anything > 0 is alive
  *     +0x11 u8  respawn     seconds-ish before it comes back; 100 means 0x708
- *     +0x12 i16 yaw         12-bit; the level's own init may add 0x800
+ *     +0x12 i16 flags       the entity's initial flags word (NOT a yaw: the
+ *                           constructor writes it straight into entity +0x40,
+ *                           and only 31 distinct values occur across the
+ *                           install's 373 creatures, every one a combination
+ *                           of the documented bits — enemies carry 0x100
+ *                           "hurts on touch", the harmless sheep does not,
+ *                           the hovering bots carry 0x010 "no gravity")
  *     +0x14 i16 rangeX      half-extent of the home box, in 256-unit steps
  *     +0x16 i16 rangeZ
  *     +0x18 i16 rangeYaw    the box's rotation, in 1/512 turn
- *     +0x1a u8  ?           set by script opcode 0x1e
+ *     +0x1a u8  vulnerable  bit 0 spin, bit 1 body; exactly 4 bounces the
+ *                           laser. Script opcode 0x1e writes it
  *     +0x1c u8  accel       walk acceleration (x 2 in the mover)
  *     +0x1d u8  accelSide   and sideways
  *     +0x1e u8  speedMax    top speed / 16; 0xff = reverse
@@ -39,10 +48,12 @@ export interface CreaturePlacement {
   facing: number;
   health: number;
   respawn: number;
-  yaw: number;
+  /** The entity's initial flags word — see the note above; this is not a yaw. */
+  flags: number;
   rangeX: number;
   rangeZ: number;
   rangeYaw: number;
+  vulnerable: number;
   accel: number;
   accelSide: number;
   speedMax: number;
@@ -76,10 +87,11 @@ export function parseCreatureList(data: Uint8Array): CreaturePlacement[] {
       facing: data[p + 0xf]!,
       health: data[p + 0x10]!,
       respawn: data[p + 0x11]!,
-      yaw: view.getInt16(p + 0x12, true),
+      flags: view.getInt16(p + 0x12, true),
       rangeX: view.getInt16(p + 0x14, true),
       rangeZ: view.getInt16(p + 0x16, true),
       rangeYaw: view.getInt16(p + 0x18, true),
+      vulnerable: data[p + 0x1a]!,
       accel: data[p + 0x1c]!,
       accelSide: data[p + 0x1d]!,
       speedMax: data[p + 0x1e]!,

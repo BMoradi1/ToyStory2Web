@@ -655,6 +655,10 @@ async function open(dir: GameDir): Promise<void> {
         const hit = groundBelow(currentCollisionWorld, x, y, z);
         return hit ? { y: hit.y, normal: hit.normal } : null;
       },
+      /** The follow camera's own state, in game units. */
+      get camera() {
+        return camera ? { ...camera } : null;
+      },
       revealTokens: revealAllTokens,
       drive(held: Partial<import('./sim/player.ts').PlayerInput>, ticks = 1) {
         if (!player || !playerRuntime || !currentCollisionWorld || !viewer) return null;

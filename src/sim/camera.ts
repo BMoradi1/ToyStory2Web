@@ -53,8 +53,27 @@ export const CAMERA = {
    * the rate — the original's `if (|diff| > 0x600) diff = (±0x800 - diff) * 3`.
    */
   yawHurryThreshold: 0x600,
-  /** Radius of the sphere the camera is swept as, so it cannot enter scenery. */
-  radius: 200 * S / 32,
+  /**
+   * Radius of the sphere the camera is swept as. Not the engine's: it casts
+   * a bare ray, which lets a wall come closer than the near plane and be
+   * seen through. The renderer's near plane is 0.1 renderer units, which is
+   * 819 game units, so the sphere is a little wider than that and the wall
+   * is stopped before it can cross the plane.
+   */
+  radius: 1000,
+  /**
+   * How close a blocked line may pull the camera in.
+   *
+   * The original floors its distance field at TEN level units, which puts
+   * the camera inside Buzz. It gets away with that because it has four
+   * camera modes and three more ray casts that push the view sideways out of
+   * a corner instead of straight in; none of that is ported (see the list at
+   * the bottom of this module). Until it is, the floor here is Buzz's own
+   * collision radius plus the renderer's near plane, so a corner leaves the
+   * camera looking at his back rather than through his head. Geometry may
+   * clip instead, which is the lesser of the two.
+   */
+  minDistance: 4000 + 1000,
 
   /**
    * Swinging the camera by hand: `(dt << 5) / 2` per tick, the original's
@@ -158,36 +177,47 @@ export function stepCamera(
     camera.yaw = (camera.yaw - idiv(diff, lag)) & YAW_MASK;
   }
 
-  // --- distance: ease back out after anything pulled it in -----------------
+  // --- distance: a wall sets it, and it eases back out ---------------------
+  // The camera never dodges scenery by moving itself. What changes is HOW FAR
+  // BACK it sits, and that number is rate limited: a blocked line sets it
+  // outright, and every tick it walks back out toward the resting distance at
+  // `distanceRate`. Moving the camera instead — sweeping its position and
+  // using wherever the sweep ended — teleports it a whole follow distance the
+  // moment the line clears, which is what walking along a wall does over and
+  // over. The original keeps the distance in one field (`+0x26`), eases it at
+  // `dt << 5` at the top of its tick and lets the wall test overwrite it
+  // later, floored at ten.
   const wanted = CAMERA.distance;
   if (camera.distance > wanted) camera.distance = Math.max(wanted, camera.distance - CAMERA.distanceRate);
   else if (camera.distance < wanted) camera.distance = Math.min(wanted, camera.distance + CAMERA.distanceRate);
 
-  // --- position ------------------------------------------------------------
-  const wantX = p.x - idiv(sin(camera.yaw) * camera.distance, 0x4000);
-  const wantZ = p.z - idiv(cos(camera.yaw) * camera.distance, 0x4000);
-  const wantY = p.y - CAMERA.height;
+  /** Where the camera sits relative to the player, at a given distance. */
+  const offsetOf = (distance: number) => ({
+    x: -idiv(sin(camera.yaw) * distance, 0x4000),
+    y: CAMERA.lookAbove - CAMERA.height,
+    z: -idiv(cos(camera.yaw) * distance, 0x4000),
+  });
 
-  if (!world) {
-    camera.x = wantX; camera.y = wantY; camera.z = wantZ;
-    return;
+  if (world) {
+    // How much of the line from Buzz out to the resting position is clear.
+    // The sweep is the camera's own sphere rather than a bare ray, so it also
+    // keeps the view off a wall it is sliding past.
+    const from = { x: p.x, y: p.y - CAMERA.lookAbove, z: p.z };
+    const full = offsetOf(camera.distance);
+    const swept = sweepSphere(world, from, full, CAMERA.radius, { scale: S, passes: 1 });
+    const travelled = Math.hypot(swept.x - from.x, swept.y - from.y, swept.z - from.z);
+    const whole = Math.hypot(full.x, full.y, full.z);
+    if (whole > 0 && travelled < whole) {
+      camera.distance = Math.max(CAMERA.minDistance, (camera.distance * travelled) / whole);
+    }
   }
 
-  // Do not sit inside the scenery. The original ray-casts from the player out
-  // to the camera and pulls it in when the line is blocked; this sweeps the
-  // camera's own sphere along the same line, which also stops it grazing a
-  // wall it is sliding past.
-  const from = { x: p.x, y: p.y - CAMERA.lookAbove, z: p.z };
-  const swept = sweepSphere(
-    world,
-    from,
-    { x: wantX - from.x, y: wantY - from.y, z: wantZ - from.z },
-    CAMERA.radius,
-    { scale: S, passes: 1 },
-  );
-  camera.x = swept.x;
-  camera.y = swept.y;
-  camera.z = swept.z;
+  // --- position ------------------------------------------------------------
+  const offset = offsetOf(camera.distance);
+  camera.x = p.x + offset.x;
+  camera.y = p.y - CAMERA.height;
+  camera.z = p.z + offset.z;
+  if (!world) return;
 
   // Keep it out of the floor it ended over, so it does not end up under a
   // step. The tolerance has to be small: `groundBelow` will happily return a
@@ -206,10 +236,18 @@ export function cameraTarget(p: PlayerState): { x: number; y: number; z: number 
 }
 
 /**
- * Not ported, and worth knowing before trusting this:
+ * Not ported, and worth knowing before trusting this. `FUN_004045e0` is 600
+ * lines of unlabelled globals and the rest of it is a decoding job, not a
+ * transcription one — NEXT_SESSION.txt carries it as such.
  *
  * - the camera **modes** (`FUN_00405860` switches between four, and the menu
- *   strings "camera mode", "camera left" and "camera right" belong to them)
+ *   strings "camera mode", "camera left" and "camera right" belong to them).
+ *   The wall handling lives with them: the original casts its long ray with a
+ *   length that depends on how long the player has been still
+ *   (`(stillFor / 2) * 0x50 + 200`, or 0xb18 once settled) and then three
+ *   short ones of 200, which is how it slides the view out of a corner
+ *   sideways rather than pulling it into the player. That is why its distance
+ *   floor of ten works and ours cannot be that small
  * - **look-ahead** and the height ramp `DAT_0050a4e0`, which rises to 0xc0 at
  *   2 per tick while the player is grounded and moving
  * - the pitch field `+0x2e`, eased toward 0x40 at 8 a tick, and the smoothed

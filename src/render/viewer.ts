@@ -91,6 +91,10 @@ export class Viewer {
    * had no zone are always drawn, since hiding them would be a guess.
    */
   private zoneFilter: Set<number> | null = null;
+  /** Objects taken off the screen: collected pickups and unearned tokens. */
+  private hiddenObjects: ReadonlySet<number> = new Set();
+  /** The groups the reflection overlay draws, so they can be filtered too. */
+  private reflectGroups: readonly GeometryGroup[] = [];
 
   constructor(canvas: HTMLCanvasElement) {
     this.view = canvas;
@@ -224,6 +228,7 @@ export class Viewer {
     // texture is indexed by the view-space normal — so the overlay is one
     // extra mesh sharing this geometry's attributes rather than a shader.
     const reflectGroups = geometry.groups.filter((g) => g.reflect);
+    this.reflectGroups = reflectGroups;
     if (reflection && reflectGroups.length > 0) {
       const overlay = new THREE.BufferGeometry();
       overlay.setAttribute('position', buffer.getAttribute('position'));
@@ -242,8 +247,8 @@ export class Viewer {
     }
 
     this.frameObject(buffer);
-    // A rebuild makes fresh materials, so reapply whatever filter was set.
-    if (this.zoneFilter) this.setVisibleZones(this.zoneFilter);
+    // A rebuild makes fresh materials, so reapply whatever was filtered.
+    this.applyVisibility();
   }
 
   /**
@@ -255,19 +260,51 @@ export class Viewer {
    */
   setVisibleZones(zones: Set<number> | null): string {
     this.zoneFilter = zones;
-    const mesh = this.current;
-    const geometry = this.lastLevel?.geometry;
-    if (!mesh || !geometry || !Array.isArray(mesh.material)) return 'no level loaded';
-    let shown = 0, hidden = 0;
-    geometry.groups.forEach((group, i) => {
-      const material = mesh.material as THREE.Material[];
-      const visible = zones === null || group.zone === null || zones.has(group.zone);
-      if (material[i]) material[i]!.visible = visible;
-      if (visible) shown += group.count / 3; else hidden += group.count / 3;
-    });
+    const { shown, hidden } = this.applyVisibility();
     return zones === null
       ? `all zones, ${shown} triangles`
       : `zones ${[...zones].sort((a, b) => a - b).join(',')}: ${shown} triangles drawn, ${hidden} hidden`;
+  }
+
+  /**
+   * Take these objects off the screen: a pickup that has been collected, or
+   * a token whose task has not been done. Only objects the geometry was
+   * asked to keep separate can be hidden; the rest are merged into their
+   * material's draw group and have no identity left to hide.
+   */
+  setHiddenObjects(objects: ReadonlySet<number>): void {
+    this.hiddenObjects = objects;
+    this.applyVisibility();
+  }
+
+  /** A group is drawn when its zone is showing and its object is not hidden. */
+  private applyVisibility(): { shown: number; hidden: number } {
+    const mesh = this.current;
+    const geometry = this.lastLevel?.geometry;
+    if (!mesh || !geometry || !Array.isArray(mesh.material)) return { shown: 0, hidden: 0 };
+    const zones = this.zoneFilter;
+    let shown = 0, hidden = 0;
+    geometry.groups.forEach((group, i) => {
+      const material = mesh.material as THREE.Material[];
+      const visible = (zones === null || group.zone === null || zones.has(group.zone))
+        && (group.object === null || !this.hiddenObjects.has(group.object));
+      if (material[i]) material[i]!.visible = visible;
+      if (visible) shown += group.count / 3; else hidden += group.count / 3;
+    });
+    // The reflection overlay shares one material across every reflective
+    // group, so it cannot be hidden a group at a time the way the level can.
+    // Its draw ranges are rebuilt instead, which is why a collected pickup
+    // does not leave its shine behind.
+    const overlay = this.reflections?.geometry;
+    if (overlay) {
+      overlay.clearGroups();
+      for (const group of this.reflectGroups) {
+        const visible = (zones === null || group.zone === null || zones.has(group.zone))
+          && (group.object === null || !this.hiddenObjects.has(group.object));
+        if (visible) overlay.addGroup(group.start, group.count, 0);
+      }
+    }
+    return { shown, hidden };
   }
 
   /**
@@ -377,7 +414,6 @@ export class Viewer {
   get playMode(): boolean { return this.play; }
   private play = false;
 
-  private pickups: THREE.InstancedMesh | null = null;
 
   /**
    * The engine's own 2D cards in the world: coins facing the camera and their
@@ -389,7 +425,6 @@ export class Viewer {
   private readonly coinShadows = new SpriteBatch(true, 'subtract');
   private cards: readonly WorldSprite[] = [];
   private shadows: readonly WorldSprite[] = [];
-  private pickupAt: THREE.Vector3[] = [];
   private creatures: THREE.InstancedMesh | null = null;
 
   /**
@@ -537,21 +572,6 @@ export class Viewer {
   }
 
   /**
-   * Show collectibles at these renderer-space positions.
-   *
-   * The shapes are a STAND-IN. The real coin is sprite 16 of the
-   * executable's own sprite table (src/formats/sprite-table.ts), a
-   * camera-facing card with a ten-frame spin and a flat shadow, on texture
-   * slot 31 of the level's own .ngn; docs/HUD.md has the whole draw. These
-   * are small spinning octahedra in its place, and are deliberately not
-   * trying to look like the original.
-   *
-   * It is NOT the `level.dat` sprite records: those were decoded on
-   * 2026-09-05 and turned out to be camera-facing cards for things like
-   * chandeliers, which pconv already converted to quads in the `.ngn`. An
-   * earlier version of this comment sent the reader to the wrong file.
-   */
-  /**
    * The sheet the world cards come from: texture slot 31 of the level's own
    * `.ngn`, which is where the coin and its shadow live. Null takes them
    * away, which is what a scene without that slot gets.
@@ -569,49 +589,6 @@ export class Viewer {
   setWorldCards(cards: readonly WorldSprite[], shadows: readonly WorldSprite[]): void {
     this.cards = cards;
     this.shadows = shadows;
-  }
-
-  setPickups(positions: { x: number; y: number; z: number; colour?: number }[]): void {
-    if (this.pickups) {
-      this.scene.remove(this.pickups);
-      this.pickups.geometry.dispose();
-      (this.pickups.material as THREE.Material).dispose();
-      this.pickups = null;
-    }
-    this.pickupAt = positions.map((p) => new THREE.Vector3(p.x, p.y, p.z));
-    if (positions.length === 0) return;
-
-    const mesh = new THREE.InstancedMesh(
-      new THREE.OctahedronGeometry(0.09),
-      new THREE.MeshBasicMaterial({ color: 0xffd24a }),
-      positions.length,
-    );
-    mesh.frustumCulled = false;
-    // One colour per kind of pickup, so a token reads differently from a coin
-    // even though both are the same stand-in shape.
-    const colour = new THREE.Color();
-    positions.forEach((p, i) => mesh.setColorAt(i, colour.set(p.colour ?? 0xffd24a)));
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    this.pickups = mesh;
-    this.scene.add(mesh);
-    this.updatePickups(new Set());
-  }
-
-  /** Redraw the collectibles, hiding the ones already taken. */
-  updatePickups(taken: ReadonlySet<number>, spin = 0): void {
-    const mesh = this.pickups;
-    if (!mesh) return;
-    const m = new THREE.Matrix4();
-    const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), spin);
-    const one = new THREE.Vector3(1, 1, 1);
-    const gone = new THREE.Vector3(0, 0, 0);
-    for (let i = 0; i < this.pickupAt.length; i++) {
-      // Scaling a taken one to nothing keeps the instance count fixed, which
-      // is cheaper than rebuilding the buffer every time one is collected.
-      m.compose(this.pickupAt[i]!, q, taken.has(i) ? gone : one);
-      mesh.setMatrixAt(i, m);
-    }
-    mesh.instanceMatrix.needsUpdate = true;
   }
 
   /**

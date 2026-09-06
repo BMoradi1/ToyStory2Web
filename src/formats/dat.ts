@@ -766,6 +766,13 @@ export interface GeometryGroup {
    * one the camera is in plus whatever it can see through portals.
    */
   zone: number | null;
+  /**
+   * The single object these faces belong to, when the caller asked for it to
+   * be kept separate (`GeometryOptions.separate`), else null. It is what
+   * lets a collected pickup or a token that has not been earned yet be
+   * taken off the screen without rebuilding the level.
+   */
+  object: number | null;
 }
 
 export interface LevelGeometry {
@@ -900,6 +907,15 @@ export function reachableZones(portals: Zone[], from: number, depth = 1): Set<nu
 export interface GeometryOptions {
   /** Zone per object, parallel to `level.objects`. See `assignZones`. */
   zones?: (number | null)[];
+  /**
+   * Object indices to keep in draw groups of their own instead of merging
+   * them with everything that shares their material. Merging is what makes
+   * the level one handful of draw calls, but a pickup has to be taken away
+   * when it is collected and a hidden token must not be drawn at all, and
+   * an object cannot be hidden while its triangles are mixed in with a
+   * wall's. Only the objects that need it should be listed.
+   */
+  separate?: ReadonlySet<number>;
 }
 
 export function buildLevelGeometry(level: DatLevel, options: GeometryOptions = {}): LevelGeometry {
@@ -910,7 +926,7 @@ export function buildLevelGeometry(level: DatLevel, options: GeometryOptions = {
   interface Bucket { pos: number[]; col: number[]; uv: number[]; group: Omit<GeometryGroup, 'start' | 'count'> }
   const buckets = new Map<string, Bucket>();
   const bucketFor = (group: Omit<GeometryGroup, 'start' | 'count'>) => {
-    const key = `${group.page}|${group.blend}|${group.doubleSided}|${group.zone}`;
+    const key = `${group.page}|${group.blend}|${group.doubleSided}|${group.zone}|${group.object}`;
     let bucket = buckets.get(key);
     if (!bucket) { bucket = { pos: [], col: [], uv: [], group }; buckets.set(key, bucket); }
     return bucket;
@@ -943,6 +959,7 @@ export function buildLevelGeometry(level: DatLevel, options: GeometryOptions = {
         alpha: faceAlpha(face.mode),
         reflect: (face.mode & 0x08) !== 0,
         zone,
+        object: options.separate?.has(index) ? index : null,
       });
 
       // PSX colour scaling differs by primitive kind: textured polys modulate

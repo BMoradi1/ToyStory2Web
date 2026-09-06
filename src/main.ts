@@ -26,7 +26,9 @@ import { cos as cosOf, sin as sinOf, toRadians, yawOf } from './sim/trig.ts';
 import { createCamera, stepCamera, cameraTarget, type CameraState } from './sim/camera.ts';
 import { SoundBank, PLAYER_EFFECTS } from './audio/sfx.ts';
 import { MUSIC_TRACKS, MusicPlayer, trackForLevel } from './audio/music.ts';
-import { createPickups, PickupKind, revealToken, stepPickups, type PickupState } from './sim/pickups.ts';
+import {
+  createPickups, pickupObjects, PickupKind, revealToken, stepPickups, type PickupState,
+} from './sim/pickups.ts';
 import {
   COIN_DRAW, SPRITE, SPRITE_SHEET, readSpriteTable, type SpriteHeader,
 } from './formats/sprite-table.ts';
@@ -306,7 +308,13 @@ async function showLevel(index: number): Promise<void> {
         } catch { /* no zones: the level still draws, just all at once */ }
       }
       currentLevel = { level: parsed, zones };
-      const geometry = buildLevelGeometry(parsed, { zones });
+      // A pickup is one of the level's own objects, so it is drawn by the
+      // level mesh. Keeping each in a draw group of its own is what lets a
+      // collected one, or a token whose task is not done, be taken away.
+      const geometry = buildLevelGeometry(parsed, {
+        zones,
+        separate: pickupObjects(parsed, levelNumber(level.id) ?? 0),
+      });
 
       setStatus(`${level.id}: uploading ${geometry.triangleCount} triangles\u2026`);
       await yieldToBrowser();
@@ -988,18 +996,16 @@ async function spawnPlayer(): Promise<void> {
 /** Hand the viewer the pickups that are currently visible. */
 function drawPickups(): void {
   if (!viewer || !pickups) return;
-  const S = GAME_UNITS_PER_LEVEL_UNIT;
-  // Coins are drawn as the engine's own sprite (`drawCoins`); everything
-  // else still gets a stand-in marker, because the renderer cannot yet draw
-  // one of the level's objects on its own.
-  viewer.setPickups(pickups.items.filter((i) => i.enabled && i.kind !== PickupKind.Coin).map((i) => ({
-    x: i.x * S * GAME_TO_RENDER, y: -i.y * S * GAME_TO_RENDER, z: -i.z * S * GAME_TO_RENDER,
-    colour: PICKUP_COLOURS[i.kind] ?? 0x9a9a9a,
-  })));
-  pickupDrawIndex = pickups.items.map(
-    (i) => (i.enabled && i.kind !== PickupKind.Coin ? 0 : -1),
-  );
-  for (let i = 0, n = 0; i < pickupDrawIndex.length; i++) if (pickupDrawIndex[i] === 0) pickupDrawIndex[i] = n++;
+  // Coins are the engine's own sprite (`drawCoins`); every other pickup IS
+  // one of the level's objects and the level mesh already draws it, so all
+  // there is to do is take away the ones that should not be seen: collected
+  // ones, hidden tokens, and the five spare token objects.
+  const hidden = new Set<number>();
+  for (const item of pickups.items) {
+    if (item.objectIndex < 0) continue;
+    if (!item.enabled || item.collected) hidden.add(item.objectIndex);
+  }
+  viewer.setHiddenObjects(hidden);
 }
 
 /**
@@ -1403,25 +1409,12 @@ const coinShadows: WorldSprite[] = [];
 /** What the counters were when the status line last showed them. */
 let hudWas = { lives: -1, health: -1, coins: -1, found: -1 };
 let pickups: PickupState | null = null;
-/** Drawn instance for each pickup, or -1 for one that is not drawn (hidden tokens, spares). */
-let pickupDrawIndex: number[] = [];
-let pickupSpin = 0;
 /** Last frame's jump and fire, so the box sees presses rather than holds. */
 let talkHeld = { jump: false, fire: false };
 /** Enter pressed while a box is open: it pages the box instead of leaving play. */
 let talkEnter = false;
 /** What the status line last showed of the counters, so hits refresh it. */
 let lastShown = { health: -1, lives: -1 };
-/** Stand-in colours: coins gold, tokens red, health green, lives blue, the rest grey. */
-const PICKUP_COLOURS: Partial<Record<PickupKind, number>> = {
-  [PickupKind.Coin]: 0xffd24a,
-  [PickupKind.Token]: 0xe0312d,
-  [PickupKind.Health]: 0x4fd65a,
-  [PickupKind.Life]: 0x4a8cff,
-  [PickupKind.HintSign]: 0x303030,
-  [PickupKind.RocketBoots]: 0xff8c1a,
-  [PickupKind.HoverBoots]: 0xc86bff,
-};
 const input = new InputSource();
 
 /** `space` etc. must reach the game, not scroll the page, but only while playing. */
@@ -1638,14 +1631,10 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     const sign = taken.find((t) => t.kind === PickupKind.HintSign);
     if (sign && !talk) startHintTalk(pickups.items[sign.index]!.id);
     if (taken.some((t) => t.kind !== PickupKind.HintSign)) sound?.play('PICKUP1');
-    pickupSpin = (pickupSpin + 0.06) % (Math.PI * 2);
-    const gone = new Set<number>();
-    for (let i = 0; i < pickups.items.length; i++) {
-      if (pickups.items[i]!.collected && pickupDrawIndex[i]! >= 0) gone.add(pickupDrawIndex[i]!);
-    }
-    viewer.updatePickups(gone, pickupSpin);
-    // Refresh the counters on a pickup, and on a hit: there is no HUD yet,
-    // so this line is the only place a creature's damage shows.
+    // Anything consumed stops being drawn by the level mesh.
+    if (taken.some((t) => t.kind !== PickupKind.HintSign)) drawPickups();
+    // The status line still carries the counters until there is a real
+    // pause screen; the HUD shows them too, but only for a few seconds.
     const hurt = pickups.health !== lastShown.health || pickups.lives !== lastShown.lives;
     if (taken.length > 0 || hurt) {
       lastShown = { health: pickups.health, lives: pickups.lives };

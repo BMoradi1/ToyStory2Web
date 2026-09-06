@@ -287,12 +287,27 @@ used to be. The colour modulate is exact: each sheet is multiplied by a
 draw's colour once and the result kept, because a canvas cannot multiply per
 channel while blitting and the highlight is exactly a channel being killed.
 
+**Pickups other than coins are the level's own objects**, and the level
+mesh always drew them — including the ones that should not be there. A
+collected battery stayed on its shelf and all ten token objects, the five
+real ones and the five spares, were visible from the moment a level loaded.
+The geometry builder now takes a set of object indices to keep in draw
+groups of their own instead of merging them into their material's bucket
+(`GeometryOptions.separate`), and the viewer hides a group whose object is
+hidden. The reflection overlay is filtered the same way, by rebuilding its
+draw ranges, since it shares one material across every reflective group and
+cannot be hidden a group at a time. The stand-in octahedra are gone: there
+was never anything to stand in for.
+
 Left to build:
 
 1. **The pause menu and the token screen**, which the HUD function also
    draws and which are not written up here.
-2. A collected class object should hide its own level mesh, and the ones
-   still out there should tumble; the renderer cannot yet move a single
-   object of the level.
+2. **Tumbling.** An uncollected class object turns on all three axes, its
+   angles advancing by 10, `((i >> 2 & 3) * 3 + 7) * 2` and
+   `((i & 7) + 4) * 2` a tick with `i` the record's index, so each turns at
+   its own rate. The rule is decoded; what is missing is a way to move one
+   object of the level, which needs its local vertices kept rather than
+   baked into the shared buffer.
 3. The level's sprite records, if the PSX look is wanted.
 4. Letterboxing the view to 4:3, which is the aspect note above.

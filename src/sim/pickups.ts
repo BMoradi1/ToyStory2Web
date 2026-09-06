@@ -188,6 +188,20 @@ export function createPickups(dat: DatLevel, level: number): PickupState {
   };
 }
 
+/**
+ * Which of the level's objects are pickups, so the renderer can keep them
+ * in draw groups of their own and take one away when it is collected. Same
+ * walk as `createPickups`, without building the records.
+ */
+export function pickupObjects(dat: DatLevel, level: number): Set<number> {
+  const out = new Set<number>();
+  for (let id = firstPickupId(level); id < dat.objectIds.length; id++) {
+    const placement = dat.placements[dat.objectIds[id]!];
+    if (placement) out.add(placement.objectIndex);
+  }
+  return out;
+}
+
 /** Make a token slot collectable, as its task would. */
 export function revealToken(state: PickupState, slot: number): void {
   for (const item of state.items) if (item.tokenSlot === slot) item.enabled = true;

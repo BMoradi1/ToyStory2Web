@@ -60,6 +60,12 @@ export const PICKUP = {
   coinsMax: 99,
   /** How many of the level's lost things there are. */
   findFive: 5,
+  /** Category 6 gives this many pieces, up to `piecesMax`. */
+  piecesGain: 5, piecesMax: 10,
+  /** Category 7 gives this many discs, up to `discsMax`. */
+  discsGain: 10, discsMax: 30,
+  /** Category 10's power-up runs this long, counting down 10 a tick. */
+  powerTicks: 0x4b0, powerRate: 10,
   /** Coins that earn the coin token — the original fires event 0x4f here. */
   coinsForToken: 50,
 } as const;
@@ -129,6 +135,16 @@ export interface PickupState {
   tokens: number;
   /** How many have been taken, for the counter. */
   taken: number;
+  /**
+   * The two ammo counters the HUD shows beside the laser arm
+   * (`DAT_00882938` and `DAT_00882964`). Category 6 adds five pieces up to
+   * ten and clears the discs; category 7 adds ten discs up to thirty and
+   * clears the pieces, so only one of them is ever nonzero.
+   */
+  pieces: number;
+  discs: number;
+  /** `DAT_0053c824`: ticks left on the power-up category 10 starts. */
+  powerTimer: number;
 }
 
 export interface PickupEvent { index: number; kind: PickupKind }
@@ -166,7 +182,10 @@ export function createPickups(dat: DatLevel, level: number): PickupState {
     });
   }
 
-  return { items, coins: 0, health: PICKUP.healthMax, lives: 0, tokens: 0, taken: 0, itemsFound: 0 };
+  return {
+    items, coins: 0, health: PICKUP.healthMax, lives: 0, tokens: 0, taken: 0,
+    itemsFound: 0, pieces: 0, discs: 0, powerTimer: 0,
+  };
 }
 
 /** Make a token slot collectable, as its task would. */
@@ -178,7 +197,11 @@ export function revealToken(state: PickupState, slot: number): void {
  * Collect anything within reach. Returns what was taken this tick, so the
  * caller can play a sound and stop drawing it.
  */
-export function stepPickups(state: PickupState, p: PlayerState): PickupEvent[] {
+export function stepPickups(state: PickupState, p: PlayerState, dt = 1): PickupEvent[] {
+  // The power-up runs down whether or not anything is collected.
+  if (state.powerTimer > 0) {
+    state.powerTimer = Math.max(0, state.powerTimer - PICKUP.powerRate * dt);
+  }
   // The original shifts the player into level units first, then subtracts.
   const px = p.x >> 5, py = (p.y >> 5) - PICKUP.centreAbove, pz = p.z >> 5;
   const taken: PickupEvent[] = [];
@@ -204,6 +227,17 @@ export function stepPickups(state: PickupState, p: PlayerState): PickupEvent[] {
         break;
       case PickupKind.Token:
         if (item.tokenSlot >= 0) state.tokens |= 1 << item.tokenSlot;
+        break;
+      case PickupKind.Kind6:
+        state.pieces = Math.min(PICKUP.piecesMax, state.pieces + PICKUP.piecesGain);
+        state.discs = 0;
+        break;
+      case PickupKind.Kind7:
+        state.discs = Math.min(PICKUP.discsMax, state.discs + PICKUP.discsGain);
+        state.pieces = 0;
+        break;
+      case PickupKind.Kind10:
+        state.powerTimer = PICKUP.powerTicks;
         break;
       case PickupKind.Kind9:
         // `DAT_00830d4c`: on the levels whose five lost things are objects

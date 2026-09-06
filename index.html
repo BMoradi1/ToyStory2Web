@@ -32,6 +32,12 @@
         game's font (docs/LEVELS.md); this is a plain overlay in its place,
         laid out where the original puts it but not pretending to be it.
       -->
+      <!--
+        The HUD. The original draws it as textured quads in its sprite layer;
+        this is the same sprites and the same layout in a 2D context over the
+        canvas (docs/HUD.md). It never takes a click.
+      -->
+      <canvas id="hud"></canvas>
       <div id="talk" hidden><p id="talktext"></p><span id="talkhint"></span></div>
     </div>
     <script type="module" src="/src/main.ts"></script>

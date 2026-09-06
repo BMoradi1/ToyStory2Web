@@ -400,16 +400,17 @@
                 bits) live in PickupState for now, not the player block.
                 Headless check on level 1: table spawn, 20 coins, 2 lives
                 and a token collected by walking onto them.
-                Still a stand-in visual (octahedra, coloured by kind). The
-                real coin is DECODED 2026-09-06 (docs/HUD.md): sprite 16 of
-                the exe's sprite table, parsed by src/formats/sprite-table.ts
-                from the user's toy2.exe and validated across every level
-                (tools/sprite-table.ts), drawn 100 x 100 level units
-                camera-facing with a ten-frame spin, per-coin phase,
-                distance fade and a flat shadow; the class objects are
-                their own meshes and tumble. READY for Opus. A collected
-                class object should hide its level mesh, which the renderer
-                cannot do per object yet.
+                COINS ARE THE REAL SPRITE 2026-09-06 (docs/HUD.md): sprite
+                16 of the exe's own table, read at runtime from the user's
+                toy2.exe (src/formats/sprite-table.ts, validated on every
+                level by tools/sprite-table.ts), drawn as a camera-facing
+                card 100 x 100 level units with the ten-frame spin, the
+                per-coin phase offset, the distance fade and the flat
+                subtractive shadow on the floor beneath
+                (src/render/world-sprites.ts). Everything else still uses a
+                stand-in octahedron. LEFT: a collected class object should
+                hide its level mesh and the rest should tumble, which the
+                renderer cannot do per object yet.
 
  P2.6 [READY]   Skeleton from gfx joints (0x011F) - parser done, unused.
 
@@ -528,11 +529,17 @@
                 Older note: DECODED (docs/LEVELS.md - slot 0 Hamm's 50
                 coins, 1 find-five, 2 challenge, 3 puzzle token revealed at
                 init, 4 boss; per-level table with ids). Not implemented.
-                HUD for the P2.8 counters: DECODED 2026-09-06, docs/HUD.md
-                has all ten elements with positions, sprites, colours,
-                slide-in and blink, and the sheets they draw from are in
-                every level's .ngn. READY for Opus. Pause and menus: laid
-                out in the same function, not written up.
+                HUD WORKS 2026-09-06 (docs/HUD.md, src/sim/hud.ts and
+                src/render/hud-draw.ts): all ten elements, drawn as the
+                game's own sprites over the canvas in the two virtual
+                screen spaces, with the show timers, the sine slide-in,
+                the stacking that closes up around a hidden neighbour,
+                and the blink and pulse off the frame dividers. Seen
+                working in the browser: lives, health, coins, spin charge
+                and laser. The ammo pair needs pickup categories 6 and 7,
+                which level 1 has none of. Pause and menus: laid out in
+                the same function, not written up. The talk box still uses
+                a plain HTML panel rather than the game's font.
  P3.5 [PART]    Mr. Potato Head. The hand-over WORKS 2026-09-05: he has
                 three lines chosen by whether his part is out there, in
                 Buzz's hands or already returned, picking up the level's

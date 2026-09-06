@@ -28,6 +28,15 @@ import { SoundBank, PLAYER_EFFECTS } from './audio/sfx.ts';
 import { MUSIC_TRACKS, MusicPlayer, trackForLevel } from './audio/music.ts';
 import { createPickups, PickupKind, revealToken, stepPickups, type PickupState } from './sim/pickups.ts';
 import {
+  COIN_DRAW, SPRITE, SPRITE_SHEET, readSpriteTable, type SpriteHeader,
+} from './formats/sprite-table.ts';
+import { HudPainter, type HudReadout, type Sheet } from './render/hud-draw.ts';
+import {
+  HUD, HudElement, createHud, offsetOf, showHud, startHud, stepCoinSpin, stepHud,
+  type HudState,
+} from './sim/hud.ts';
+import type { WorldSprite } from './render/world-sprites.ts';
+import {
   exeString, HINT_SIGNS, levelNumber, PUSH_BLOCKS, SPAWN_TABLE, TALK_SCRIPTS, tokenSlotsAtStart,
 } from './sim/level-data.ts';
 import { createPushBlocks, stepPushBlocks, type PushState } from './sim/push-blocks.ts';
@@ -36,7 +45,9 @@ import {
   type TalkState,
 } from './sim/talk.ts';
 import { LEVEL_TASKS } from './sim/level-data.ts';
-import { createTasks, markSlotDone, startLevelTasks, stepTasks, type TaskState } from './sim/tasks.ts';
+import {
+  RaceState, createTasks, markSlotDone, startLevelTasks, stepTasks, type TaskState,
+} from './sim/tasks.ts';
 import { unpackRaw } from './formats/rnc.ts';
 import {
   CREATURE_LIST_TYPE, parseCreatureList, parseCreatureModels, parseCreatureNames,
@@ -65,6 +76,7 @@ const talkEl = $<HTMLDivElement>('talk');
 const talkTextEl = $<HTMLParagraphElement>('talktext');
 const talkHintEl = $<HTMLSpanElement>('talkhint');
 const texturesEl = $<HTMLDivElement>('textures');
+const hudEl = $<HTMLCanvasElement>('hud');
 
 let viewer: Viewer | null = null;
 let levels: ReturnType<typeof findLevels> = [];
@@ -152,10 +164,25 @@ async function drawTexture(tex: NgnTexture): Promise<HTMLElement> {
  */
 async function loadTextures(textures: NgnTexture[]): Promise<Map<number, THREE.Texture>> {
   const out = new Map<number, THREE.Texture>();
+  sceneSheets = new Map<number, Sheet>();
   for (const t of textures) {
     if (t.slot === null) continue;
     const image = decodeBmp(t.bmp);
     if (!image) continue;
+
+    // The same pixels again as a canvas, which is what the HUD's 2D context
+    // can blit from. Decoding once and keeping both is cheaper than asking
+    // the GPU for them back.
+    const sheet = document.createElement('canvas');
+    sheet.width = image.width;
+    sheet.height = image.height;
+    const sheetCtx = sheet.getContext('2d');
+    if (sheetCtx) {
+      sheetCtx.putImageData(
+        new ImageData(new Uint8ClampedArray(image.rgba), image.width, image.height), 0, 0,
+      );
+      sceneSheets.set(t.slot, sheet);
+    }
 
     const texture = new THREE.DataTexture(image.rgba, image.width, image.height, THREE.RGBAFormat);
     // Point sampling both ways, and no mip chain. These are 256x256 images
@@ -598,6 +625,28 @@ async function open(dir: GameDir): Promise<void> {
         drawCreatures();
         return { slot, type: c.type };
       },
+      /** The HUD's own state, so a test can see what is showing and where. */
+      get hud() {
+        return {
+          timer: [...hud.timer], phase: [...hud.phase],
+          offsets: hud.timer.map((_, n) => offsetOf(hud, n)),
+          coinSpin: hud.coinSpin,
+          sprites: spriteTable.filter(Boolean).length,
+          sheets: [...sceneSheets.keys()],
+          coins: coinCards.length, shadows: coinShadows.length,
+        };
+      },
+      /** Put a HUD element on screen, as the thing that owns it would. */
+      showHud(element: number, ticks = 0xb4) {
+        showHud(hud, element, ticks);
+        return { element, ticks };
+      },
+      /** The floor under a point, level units, as the shadows are placed. */
+      floorAt(x: number, y: number, z: number) {
+        if (!currentCollisionWorld) return null;
+        const hit = groundBelow(currentCollisionWorld, x, y, z);
+        return hit ? { y: hit.y, normal: hit.normal } : null;
+      },
       revealTokens: revealAllTokens,
       drive(held: Partial<import('./sim/player.ts').PlayerInput>, ticks = 1) {
         if (!player || !playerRuntime || !currentCollisionWorld || !viewer) return null;
@@ -910,11 +959,27 @@ async function spawnPlayer(): Promise<void> {
     : null;
   drawPushBlocks();
 
+  // The sprite table the HUD and the coins draw from lives in the user's own
+  // executable, and its second half is per level (docs/HUD.md).
+  spriteTable = exeBytes ? readSpriteTable(exeBytes, level) : [];
+  viewer.setCardSheet(sceneTextures.get(SPRITE_SHEET) ?? null);
+  hud = createHud();
+  startHud(hud);
+  hudWas = { lives: -1, health: -1, coins: -1, found: -1 };
+
   tasks = createTasks();
   startLevelTasks(tasks, level);
   revealedSlots = new Set();
   pickups = createPickups(currentLevel.level, level);
   for (const slot of tokenSlotsAtStart(level)) revealToken(pickups, slot);
+  // Each coin's shadow lies on the floor under it, so the ground is measured
+  // once here rather than every frame.
+  pickupFloor = pickups.items.map((item) => {
+    const hit = currentCollisionWorld
+      ? groundBelow(currentCollisionWorld, item.x, item.y, item.z)
+      : null;
+    return hit ? hit.y : item.y;
+  });
   drawPickups();
   spawnPoint = { x: player.x, y: player.y, z: player.z };
   const slope = (Math.acos(Math.min(1, -ground.normal.y)) * 180) / Math.PI;
@@ -927,12 +992,165 @@ async function spawnPlayer(): Promise<void> {
 function drawPickups(): void {
   if (!viewer || !pickups) return;
   const S = GAME_UNITS_PER_LEVEL_UNIT;
-  viewer.setPickups(pickups.items.filter((i) => i.enabled).map((i) => ({
+  // Coins are drawn as the engine's own sprite (`drawCoins`); everything
+  // else still gets a stand-in marker, because the renderer cannot yet draw
+  // one of the level's objects on its own.
+  viewer.setPickups(pickups.items.filter((i) => i.enabled && i.kind !== PickupKind.Coin).map((i) => ({
     x: i.x * S * GAME_TO_RENDER, y: -i.y * S * GAME_TO_RENDER, z: -i.z * S * GAME_TO_RENDER,
     colour: PICKUP_COLOURS[i.kind] ?? 0x9a9a9a,
   })));
-  pickupDrawIndex = pickups.items.map((i) => (i.enabled ? 0 : -1));
+  pickupDrawIndex = pickups.items.map(
+    (i) => (i.enabled && i.kind !== PickupKind.Coin ? 0 : -1),
+  );
   for (let i = 0, n = 0; i < pickupDrawIndex.length; i++) if (pickupDrawIndex[i] === 0) pickupDrawIndex[i] = n++;
+}
+
+/**
+ * The coins, as the engine draws them: sprite 16 facing the camera with a
+ * ten-frame spin, each one two frames further round than the last so a row
+ * of them does not flash in step, and a shadow lying on the floor under it.
+ * Anything past the draw distance is left out, and the last few steps of it
+ * are a fade rather than a pop. docs/HUD.md.
+ */
+function drawCoins(): void {
+  coinCards.length = 0;
+  coinShadows.length = 0;
+  if (!viewer || !pickups) return;
+  const header = spriteTable[SPRITE.coin];
+  const shadow = spriteTable[SPRITE.shadow];
+  const sheet = sceneSheets.get(SPRITE_SHEET);
+  if (!header || !sheet) return;
+
+  // The engine measures from the camera, in 16-level-unit steps.
+  const eye = viewer.camera.position;
+  const camX = (eye.x * WORLD_SCALE) / 16;
+  const camZ = (-eye.z * WORLD_SCALE) / 16;
+  const radius2 = COIN_DRAW.radius * COIN_DRAW.radius;
+  const size = COIN_DRAW.size / WORLD_SCALE;
+  const shadowSize = COIN_DRAW.shadowSize / WORLD_SCALE;
+  const uv = (h: typeof header, frame: number) => {
+    const f = h.frames[frame] ?? h.frames[0]!;
+    return {
+      u0: f.u / sheet.width, v0: f.v / sheet.height,
+      u1: (f.u + h.width) / sheet.width, v1: (f.v + h.height) / sheet.height,
+    };
+  };
+  const shadowUv = shadow ? uv(shadow, 0) : null;
+
+  let phase = 0;
+  for (let i = 0; i < pickups.items.length; i++) {
+    const item = pickups.items[i]!;
+    if (item.kind !== PickupKind.Coin) continue;
+    // Every coin in the list advances the phase, taken or not, so collecting
+    // one does not re-shuffle the rest.
+    const frame = ((hud.coinSpin >> 1) + phase) % COIN_DRAW.phaseWrap;
+    phase = (phase + COIN_DRAW.phaseStep) % COIN_DRAW.phaseWrap;
+    if (!item.enabled || item.collected) continue;
+
+    const dx = camX - item.x / 16;
+    const dz = camZ - item.z / 16;
+    const d2 = dx * dx + dz * dz - COIN_DRAW.fadeBias;
+    if (d2 >= radius2) continue;
+    const alpha = Math.min(255, (radius2 - d2) / (1 << COIN_DRAW.fadeShift)) / 255;
+
+    const x = item.x / WORLD_SCALE, y = -item.y / WORLD_SCALE, z = -item.z / WORLD_SCALE;
+    coinCards.push({ x, y, z, ...uv(header, frame), width: size, height: size, alpha });
+    if (shadowUv) {
+      coinShadows.push({
+        x, y: -(pickupFloor[i]! - COIN_DRAW.shadowDrop) / WORLD_SCALE, z,
+        ...shadowUv, width: shadowSize, height: shadowSize, alpha,
+      });
+    }
+  }
+  viewer.setWorldCards(coinCards, coinShadows);
+}
+
+/** What the HUD needs to know this tick, gathered from the sim. */
+function hudReadout(level: number): HudReadout {
+  const boss = LEVEL_TASKS[level]?.boss;
+  let bossBar = -1;
+  if (boss && creatureSim) {
+    const c = creatureSim.creatures.find((q) => q.slot === boss.creature);
+    // Only once the fight is actually on: the boss sets this every tick it
+    // is awake, so a boss standing in its idle loop across the level shows
+    // nothing. Being hurt counts too, for the bosses with no taunt.
+    const fighting = c && c.type !== 0 && c.health > 0
+      && (tasks !== null && tasks.boss >= 2 || c.health < c.record.health);
+    if (c && fighting) {
+      bossBar = Math.max(0, Math.min(0x36, Math.round(((c.health - 9) * 0x36) / 11)));
+    }
+  }
+  // The shared task counter: under 100 the flag counts laps down, at 100 or
+  // more it is a countdown in tenths of a minute.
+  let clock: number | null = null;
+  if (tasks) {
+    if (tasks.race === RaceState.Running) clock = tasks.laps;
+    else if (tasks.fetch === 2) clock = tasks.fetchClock;
+  }
+  const challenge = LEVEL_TASKS[level]?.challenge;
+  const collected = tasks && challenge && tasks.challenge === 1
+    ? Math.min(5, (pickups?.itemsFound ?? 0) - tasks.challengeFrom)
+    : -1;
+  return {
+    lives: pickups?.lives ?? 0,
+    health: pickups?.health ?? 0,
+    coins: pickups?.coins ?? 0,
+    found: LEVEL_TASKS[level]?.findFive?.countedBy === 'pickup'
+      ? (pickups?.itemsFound ?? 0)
+      : (creatureSim?.foundCount ?? 0),
+    collected,
+    clock,
+    // The controller keeps the same signed counter the HUD wants: positive
+    // while the spin charges, negative through the charged spin. Ours runs
+    // -240..0 over the whole 300-tick move where the engine's runs -120..0
+    // over the dizzy tail, so the bar's recovery sliver only appears over
+    // the last 120 ticks of it.
+    spinCharge: player?.spinCharge ?? 0,
+    laserCharge: player?.laserCharge ?? 0,
+    powerTimer: pickups?.powerTimer ?? 0,
+    discs: pickups?.discs ?? 0,
+    pieces: pickups?.pieces ?? 0,
+    boss: bossBar,
+  };
+}
+
+/**
+ * Show the elements whose condition holds this tick, the way the top of
+ * `FUN_0049fd40` does, then advance the timers and paint.
+ */
+function drawHud(level: number): void {
+  if (!viewer) return;
+  const r = hudReadout(level);
+  // A counter that changed puts itself back on screen.
+  if (r.lives !== hudWas.lives) showHud(hud, HudElement.Lives, HUD.counterTicks);
+  if (r.health !== hudWas.health) showHud(hud, HudElement.Health, HUD.counterTicks);
+  if (r.coins !== hudWas.coins) showHud(hud, HudElement.Coins, HUD.counterTicks);
+  hudWas = { lives: r.lives, health: r.health, coins: r.coins, found: r.found };
+
+  if (r.spinCharge !== 0) showHud(hud, HudElement.Spin, HUD.spinTicks);
+  if (r.laserCharge !== 0 || r.powerTimer !== 0 || r.discs !== 0 || r.pieces !== 0) {
+    showHud(hud, HudElement.Laser, HUD.laserTicks);
+  }
+  if (r.found > 0) showHud(hud, HudElement.FindFive, HUD.liveTicks);
+  if (r.clock !== null) showHud(hud, HudElement.TimedRun, HUD.liveTicks);
+  if (r.boss >= 0) showHud(hud, HudElement.Boss, HUD.bossTicks);
+  if (tasks && tasks.potatoPart < 0) showHud(hud, HudElement.PotatoHead, HUD.liveTicks);
+  if (tasks && r.coins >= 50 && (tasks.done & 1) === 0) showHud(hud, HudElement.Hamm, HUD.liveTicks);
+
+  stepHud(hud, talk !== null);
+  if (offsetOf(hud, HudElement.Coins) < 1) stepCoinSpin(hud);
+
+  // The overlay covers the canvas exactly, at its device resolution.
+  const view = viewer.view.getBoundingClientRect();
+  const host = appEl.getBoundingClientRect();
+  hudEl.style.left = `${view.left - host.left}px`;
+  hudEl.style.top = `${view.top - host.top}px`;
+  hudEl.style.width = `${view.width}px`;
+  hudEl.style.height = `${view.height}px`;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  if (!hudPainter) hudPainter = new HudPainter(hudEl);
+  hudPainter.resize(Math.round(view.width * dpr), Math.round(view.height * dpr));
+  hudPainter.draw(hud, spriteTable, sceneSheets, r);
 }
 
 /**
@@ -1190,6 +1408,19 @@ let talkSlot = -1;
 let revealedSlots = new Set<number>();
 /** toy2.exe, kept because the hint text lives inside it. */
 let exeBytes: Uint8Array | null = null;
+/** The level's sprite table, read from the user's own toy2.exe. */
+let spriteTable: readonly (SpriteHeader | null)[] = [];
+/** The decoded texture sheets, as canvases the HUD's 2D context can blit. */
+let sceneSheets = new Map<number, Sheet>();
+let hud: HudState = createHud();
+let hudPainter: HudPainter | null = null;
+/** Each coin's floor height in level units, for its shadow. */
+let pickupFloor: number[] = [];
+/** Rebuilt every tick: the coins and the shadows under them. */
+const coinCards: WorldSprite[] = [];
+const coinShadows: WorldSprite[] = [];
+/** What the counters were when the status line last showed them. */
+let hudWas = { lives: -1, health: -1, coins: -1, found: -1 };
 let pickups: PickupState | null = null;
 /** Drawn instance for each pickup, or -1 for one that is not drawn (hidden tokens, spares). */
 let pickupDrawIndex: number[] = [];
@@ -1229,6 +1460,9 @@ function setPlaying(on: boolean): void {
     input.detach();
     sound?.stop();
     music?.disable();
+    // Nothing drives the HUD outside play, so take it off the screen.
+    hudPainter?.clear();
+    viewer.setWorldCards([], []);
   }
 }
 
@@ -1241,6 +1475,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   if (!viewer || !player || !playerRuntime || !currentCollisionWorld) return;
 
   if (player.fellOut) { void respawn(); return; }
+  const levelNow = levelNumber(levels[levelEl.selectedIndex]?.id ?? '') ?? 0;
   // The camera's bearing to the player, taken from the sim camera rather than
   // the rendered one, so the controls do not depend on how the view is drawn.
   const cameraYaw = bearing ?? (camera ? yawOf(player.x - camera.x, player.z - camera.z) : 0);
@@ -1307,6 +1542,10 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       // Hand the camera back where it is, so it eases rather than snapping.
       if (camera && player) camera = createCamera(player);
     }
+    // The world and the HUD keep drawing under the box; the HUD slides out
+    // of the way on its own, which is what `talking` does to its phases.
+    drawCoins();
+    drawHud(levelNow);
     return;
   }
 
@@ -1356,7 +1595,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
 
   // The level's talkers. Only while nothing else is being said.
   if (creatureSim && tasks && !talk && exeBytes) {
-    const level = levelNumber(levels[levelEl.selectedIndex]?.id ?? '') ?? 0;
+    const level = levelNow;
     const table = LEVEL_TASKS[level];
     if (table) {
       const request = stepTasks(
@@ -1435,6 +1674,8 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       infoEl.textContent = `coins ${pickups.coins}  health ${pickups.health}/14  lives ${pickups.lives}  tokens ${slots}/5`;
     }
   }
+  drawCoins();
+  drawHud(levelNow);
   poseAnimation(Math.hypot(held.moveX, held.moveY) > 0);
 }
 

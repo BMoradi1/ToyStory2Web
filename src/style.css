@@ -89,6 +89,20 @@ select {
 #view { width: 100%; height: 100%; display: block; }
 
 /*
+ * The HUD sits exactly over the canvas and never takes a pointer event. Its
+ * backing store is sized to the canvas's device pixels in main.ts, so the
+ * sprites land on whole texels.
+ */
+#hud {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 100%;
+  width: 100%;
+  pointer-events: none;
+  image-rendering: pixelated;
+}
+
+/*
  * The talk box. The original scales a red panel open from its centre in a
  * 512 x 256 sprite layer and draws the text in its own font at half scale
  * (docs/LEVELS.md, "The text box"). This keeps the position, the two-row

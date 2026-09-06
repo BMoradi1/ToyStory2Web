@@ -68,11 +68,24 @@ same divisor.
     FUN_00493dc0  x/320  1:1, colour given               icons
     FUN_00493a60  x/512  1:1, blend given                loading screen
 
+**Later calls draw BEHIND earlier ones**, found while building this
+(2026-09-06). `FUN_004b8cc0` fills its buffer from the end downward
+(`DAT_005086fc` counts down) and the renderer walks it forward, so a frame
+lands in the reverse of the order it was submitted. It has to work that way:
+every bar is submitted before the frame around it, and the frames are opaque
+black inside, so drawing in call order paints over the bar. The port keeps
+the engine's call order and flushes its queue backward.
+
 Colour is (r, g, b) with **0x80 neutral** (0xff doubles). The mode word's
 bits 5..6 pick alpha and blend: 0 is alpha 0x80 with normal blending
 (0xc40), 0x20 is additive (0x4840) at full alpha, 0x40 subtractive
 (0x20840), 0x60 opaque with `0xff - (mode >> 8)` as alpha, so a fade rides
 in the high byte.
+
+Sprite 6, the one every bar is drawn from, is a single texel of
+**(190, 190, 190)**, not white, so a bar's colour on screen is
+`190 * colour / 0x80` clamped: the (0x80, 0x80, 0) spin bar comes out
+(190, 190, 0).
 
 World sprites go through `FUN_004b8e60` (camera-facing) or `FUN_004b8a30`
 (laid flat) with a position in LEVEL units as floats, a rotation, a width
@@ -103,11 +116,15 @@ folded into a triangle give the pulse `0x50 + 4 * tri` (0x50..0x8c).
                         0x800; fill = pixel (6) at (0x1dc, 0x2f-h)/512,
                         5 wide, h = 2*health+2 tall, colour
                         (0x80, 6h, 0); glass (12) at (0x128, 0x10)/320.
-                        h < 5 blinks                       0xb4 on change
+                        h < 5 blinks. The battery is the LABEL and the
+                        glass column beside it is the gauge: the fill
+                        sits inside the glass, which is why the glass is
+                        submitted last and so lands behind it
+                                                           0xb4 on change
     2  bottom-left      coins: coin (16) at (0x1a, 0xe0)/512 scale
                         (0xccd, 0x800), frame = a 0..23 counter / 2;
-                        tens and units font at (0x33, 0x3f)/512
-                                                           0xb4 on a coin
+                        tens and units font at x 0x33 and 0x3f, both at
+                        the same y as the coin                0xb4 on a coin
     3  bottom-right     spin charge: wings (14) at (0x110, 0xde)/320
                         scale 0x800; bar pixel at (0x1b6, 0xda)/512,
                         width (charge/2)*0x1838, height 3, yellow
@@ -169,11 +186,20 @@ which is sprite 16. It is drawn camera-facing at its position, **100 x 100
 level units**, frame `counter >> 1` where the counter runs 0..19 over 20
 ticks, and each successive record in the list starts two frames later
 (wrapping at ten), so neighbouring coins spin out of phase. Alpha fades
-with distance: `((R^2 - d^2) >> 6)` capped at 0xff. Under it the shadow:
-the 31 x 31 texel rect at (96, 96) of slot 31, laid flat at the record's
-floor height minus 10, 80 x 80 level units, black at alpha 0x88 (or
-subtractive grey when render flag `DAT_00e4d96c & 4`). The floor height
-is `+0xe` of the record, found by a ground ray at load.
+with distance: `((R^2 - d^2 + 100) >> 6)` capped at 0xff, measured from the
+CAMERA in 16-unit steps with `R = DAT_0054bef0 / 4 = 0x680 / 4 = 416`, so a
+coin is dropped past about 6,656 level units and fades over the last 300 of
+them. Under it the shadow: sprite 4, the 31 x 31 rect at (96, 96) of slot
+31, laid flat 10 level units above the record's floor, 80 x 80 level units.
+
+The engine has two paths for it and the art settles which is meant. The
+sprite is a **light disc fading to a black rim**, which only makes sense
+subtracted: the bright middle takes the most light out of the floor and the
+rim takes none. That is the `0xffaaaaaa` subtractive path, taken when render
+flag `DAT_00e4d96c & 4` is set; the other draws it as a flat black disc at
+alpha 0x88. The port uses the subtractive one. The floor height is `+0xe`
+of the record, a ground ray at load, and the engine stores 0x7fff when the
+floor is more than 0x1800 level units down.
 
 A record with an id of 0x30 or more is a **mesh**, the level object itself,
 and tumbles: its three rotation angles advance by `10`, `((i >> 2 & 3) * 3
@@ -209,14 +235,27 @@ card's mode gives texture slot and blend. They are chandelier flames and
 the like. The PC build never draws them, because pconv baked them into the
 `.ngn`, so drawing them in the browser is a choice: they are the PSX look.
 
-## What to build
+## What is built
 
-1. **Coins as sprites**, replacing the octahedra: sprite 16 on slot 31,
-   100 x 100 level units, ten-frame spin with the per-coin phase, distance
-   fade, and the flat shadow. Tokens and the other class objects are their
-   own meshes, tumbling.
-2. **The HUD** as a screen-space quad layer over the canvas, from the table
-   above, with the slide and blink. The status line is the stand-in.
-3. **The talk box and its font** from the same layer (docs/LEVELS.md has
-   the layout in the same 512 x 256 space).
+**Coins and the HUD are in** (2026-09-06). `src/formats/sprite-table.ts`
+reads the table, `src/render/world-sprites.ts` draws camera-facing and flat
+cards, `src/render/hud-draw.ts` paints the overlay and `src/sim/hud.ts`
+holds the timers and slide phases. Checked in the browser: the coin spins
+and fades with its shadow on the floor under it, and the lives, health,
+coin, spin-charge and laser elements slide in, count and blink.
+
+Two things about the port worth knowing. Buzz's spin counter runs -240..0
+over the whole charged spin where the engine's runs -120..0 over the dizzy
+tail, so the bar's recovery sliver only appears over the last 120 ticks.
+And the ammo counters are wired to pickup categories 6, 7 and 10, which no
+level 1 object uses, so those two elements have not been seen on screen.
+
+Left to build:
+
+1. **The talk box and its font** from the same layer (docs/LEVELS.md has
+   the layout in the same 512 x 256 space). It is a plain HTML panel today.
+2. **The pause menu and the token screen**, which the same function draws.
+3. A collected class object should hide its own level mesh, and the ones
+   still out there should tumble; the renderer cannot yet move a single
+   object of the level.
 4. The level's sprite records, if the PSX look is wanted.

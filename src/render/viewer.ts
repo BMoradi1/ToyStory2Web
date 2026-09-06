@@ -17,6 +17,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { MeshData } from '../formats/all.ts';
 import { WORLD_SCALE, type GeometryGroup, type LevelGeometry } from '../formats/dat.ts';
 import { isWalkable, type CollisionGroup } from '../formats/collision.ts';
+import { SpriteBatch, type WorldSprite } from './world-sprites.ts';
 
 /** The original's frame pacing, in seconds. Game logic steps at this rate. */
 // Take every colour literally. three.js otherwise treats a `THREE.Color` as
@@ -34,6 +35,8 @@ export const NATIVE_ASPECT = 4 / 3;
 export class Viewer {
   readonly scene = new THREE.Scene();
   readonly camera: THREE.PerspectiveCamera;
+  /** The canvas being drawn to, so an overlay can be laid over it exactly. */
+  readonly view: HTMLCanvasElement;
   private readonly renderer: THREE.WebGLRenderer;
   private readonly controls: OrbitControls;
   private accumulator = 0;
@@ -90,6 +93,7 @@ export class Viewer {
   private zoneFilter: Set<number> | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
+    this.view = canvas;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     // No output transform either: see the ColorManagement note above.
@@ -374,6 +378,17 @@ export class Viewer {
   private play = false;
 
   private pickups: THREE.InstancedMesh | null = null;
+
+  /**
+   * The engine's own 2D cards in the world: coins facing the camera and their
+   * shadows lying on the floor (docs/HUD.md). Both are rebuilt against the
+   * live camera every frame in `frame`, so they face the right way whatever
+   * order the caller filled them in.
+   */
+  private readonly coinCards = new SpriteBatch(false, 'normal');
+  private readonly coinShadows = new SpriteBatch(true, 'subtract');
+  private cards: readonly WorldSprite[] = [];
+  private shadows: readonly WorldSprite[] = [];
   private pickupAt: THREE.Vector3[] = [];
   private creatures: THREE.InstancedMesh | null = null;
 
@@ -536,6 +551,26 @@ export class Viewer {
    * chandeliers, which pconv already converted to quads in the `.ngn`. An
    * earlier version of this comment sent the reader to the wrong file.
    */
+  /**
+   * The sheet the world cards come from: texture slot 31 of the level's own
+   * `.ngn`, which is where the coin and its shadow live. Null takes them
+   * away, which is what a scene without that slot gets.
+   */
+  setCardSheet(texture: THREE.Texture | null): void {
+    this.coinCards.setSheet(texture);
+    this.coinShadows.setSheet(texture);
+    if (!this.coinCards.mesh.parent) {
+      this.scene.add(this.coinCards.mesh);
+      this.scene.add(this.coinShadows.mesh);
+    }
+  }
+
+  /** What to draw as cards this frame: the upright ones and the flat ones. */
+  setWorldCards(cards: readonly WorldSprite[], shadows: readonly WorldSprite[]): void {
+    this.cards = cards;
+    this.shadows = shadows;
+  }
+
   setPickups(positions: { x: number; y: number; z: number; colour?: number }[]): void {
     if (this.pickups) {
       this.scene.remove(this.pickups);
@@ -776,6 +811,11 @@ export class Viewer {
     }
 
     if (!this.play) this.controls.update();
+    // Cards face the camera, so they are built after it has settled and
+    // before anything is drawn.
+    this.camera.updateMatrixWorld();
+    this.coinCards.update(this.cards, this.camera);
+    this.coinShadows.update(this.shadows, this.camera);
     this.renderer.render(this.scene, this.camera);
   }
 }

@@ -249,16 +249,19 @@ creature in the install patrols correctly (tools/creature-probe.ts), and
 they are drawn as their own models posed by animState. The handlers that
 the token tasks needed are in.
 
- THE 2D LAYER - DECODED 2026-09-06, an Opus job now. docs/HUD.md: the
-exe's sprite table (parsed and validated, src/formats/sprite-table.ts), the
-draw primitive and its two screen spaces, every HUD element with its
-sprite, position, colour, timer, slide and blink, the coin as a world
-sprite with its spin, phase, fade and shadow, the tumbling class objects,
-and the effects' draw side. Build order: coins as sprites, then the HUD as
-a quad layer over the canvas, then the talk box in the game's own font.
-The sheets are texture slots 31 and 32 of every levelNN/level.ngn, which
-the viewer already decodes. Open: what the second marker list's signposts
-mark (sprite 30), and the pause menu layout.
+ THE 2D LAYER - DECODED AND MOSTLY BUILT 2026-09-06. docs/HUD.md holds
+the decode; the coins and the HUD are in and working in the browser
+(src/formats/sprite-table.ts, src/render/world-sprites.ts,
+src/render/hud-draw.ts, src/sim/hud.ts). One thing the build corrected that
+matters to anything else drawn this way: the sprite buffer fills BACKWARD,
+so a later call lands behind an earlier one, which is the only reason a bar
+shows through the frame submitted after it.
+
+Left, all Opus work: the talk box and its font in the same layer, the pause
+menu and the token screen, and making a collected object hide its own mesh
+while the rest tumble. Open questions for a Fable pass, neither blocking:
+what the second marker list's signposts mark (sprite 30), and whether the
+ammo elements look right, which needs a level with pickup categories 6 or 7.
 
  THE TOKEN TASKS - DONE 2026-09-06. All five slots on all ten non-boss
 levels: Hamm's fifty coins, the find-five owners, the two shapes of race,

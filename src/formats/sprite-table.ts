@@ -51,6 +51,37 @@ const TABLE_CAPACITY = 128;
 /** Every section of toy2.exe is mapped at its file offset plus this. */
 const IMAGE_BASE = 0x400000;
 
+/**
+ * The texture slot the HUD, the coins and the effect sprites share, and the
+ * one carrying the font and the power-up icons. Every `levelNN/level.ngn`
+ * holds both.
+ */
+export const SPRITE_SHEET = 31;
+export const FONT_SHEET = 32;
+
+/** The coin and its shadow, in level units, from `FUN_00440f70`. */
+export const COIN_DRAW = {
+  /** The card's size. */
+  size: 100,
+  /** The shadow's size, and how far below the floor it is laid. */
+  shadowSize: 80,
+  shadowDrop: 10,
+  /** Ticks the spin takes; the frame is the counter halved. */
+  spinTicks: 24,
+  /** Each successive coin starts this many frames later, wrapping at ten. */
+  phaseStep: 2,
+  phaseWrap: 10,
+  /**
+   * The draw distance, `DAT_0054bef0 / 4`, in 16-level-unit steps. Beyond it
+   * a coin is not drawn; inside it the alpha is
+   * `(radius^2 - (d^2 - 100)) >> 6` capped at 255, so they fade in over the
+   * last few steps rather than popping.
+   */
+  radius: 0x680 / 4,
+  fadeShift: 6,
+  fadeBias: 100,
+} as const;
+
 export interface SpriteHeader {
   /** Address of the header in toy2.exe. */
   address: number;

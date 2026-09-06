@@ -4,7 +4,7 @@
 An open-source reimplementation of the engine behind **Toy Story 2: Buzz
 Lightyear to the Rescue** (Traveller's Tales, 1999), running in the browser.
 
-🤖 Documentation and Code written with Claude Code under an agentic workflow. This project is testing the limits of what current models can implement with proper direction. Project is using a mix of Fable 5 and Opus 5 with hand-offs manually. 🤖
+🤖 Documentation and Code written with Claude Code under an agentic workflow. This project is testing the limits of what current models can implement with proper direction. Project is using a mix of Fable 5 and Opus 5 with manual monitored hand-offs ensuring token cost efficency. 🤖
 
 
 ## Screenshots

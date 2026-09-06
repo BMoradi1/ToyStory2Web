@@ -26,8 +26,8 @@ Every scene directory holds a `level.raw` (and `level1.raw` for the second
 scene): an RNC ProPack method-2 container, each record unpacking to a
 payload whose first `u32` is a **record type**. The level loader
 `FUN_00452310` ("Loading packet data") walks the records and keeps two:
-type **0x23**, which it logs as `CreatListRam`, and 0x24 (a paletted image,
-not yet understood). The other thirty-odd types are the PlayStation side of
+type **0x23**, which it logs as `CreatListRam`, and 0x24 (the level's
+backdrop image, docs/FORMATS.md). The other thirty-odd types are the PlayStation side of
 the level and are read elsewhere or not at all.
 
 Type 0x23 is copied whole into a static 2 KB block: **64 slots of 32
@@ -429,8 +429,7 @@ private timer, and end a creature by calling `FUN_00405d20` themselves.
 
 ## Not yet decoded
 
-- record type 0x24 (a 25 KB paletted image the loader samples colours
-  from) and the other `.raw` record types
+- the other `.raw` record types (0x24 is the backdrop, docs/FORMATS.md)
 - what the flying creatures' shadow list is drawn as
 
 `FUN_00447bd0` (settled 2026-09-05) is the visibility pass over the near

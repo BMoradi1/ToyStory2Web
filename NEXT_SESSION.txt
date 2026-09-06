@@ -130,7 +130,8 @@
         (readHitShapes), the entity's centre offset and hit radius are
         that group's entry words, and animState indexes the .anm slot
         table directly - so creatures can be drawn and hit-tested from
-        the files. Only record 0x24 is left.)
+        the files. Record 0x24 is the level backdrop image, 192 x 128
+        paletted, the .ngn's bgr36; nothing is left on this item.)
       - (the two per-level tables are DECODED 2026-09-05: FUN_004025c0
         loads the HINT SIGNS and FUN_00402610 opens their talk box - the
         "camera trigger" was a tutorial signpost; FUN_004335d0 loads the

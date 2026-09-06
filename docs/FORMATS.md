@@ -445,7 +445,14 @@ Each record's payload starts with a `u32` **record type**. This file is the
 PlayStation side of a level — `FUN_00452310` logs it as "Loading packet
 data" — and the PC loader keeps two records: **0x23 `CreatListRam`**, the
 64-slot creature placement list (docs/CREATURES.md, `src/formats/creatures.ts`),
-and **0x24**, a 25 KB paletted image it samples a few colours from. The
+and **0x24**, the level's **backdrop**: `u32 0x24; i32 slot; i16 width,
+height; i16 paletteBytes (768); i16 1;` then 256 x `u8 r, g, b` and
+`width x height` palette indices — 192 x 128 in every level, the same
+picture the `.ngn` carries as texture `bgr36` (the neighbourhood behind
+Andy's windows on level 1). The PC draws the `.ngn` copy and keeps only two
+pixels of this one: the top-left colour (`DAT_004f73b4..bc`, which level 7's
+init copies into `DAT_00559e84`) and the bottom-right colour
+(`DAT_004f73c0..c8`, packed to a 15-bit pixel by the 2D drawing code). The
 `data/gfx/levelNx.raw` texture sets are the same container holding types
 0xd and 0x25; the scene packets also carry 0x0–0x13 (fixed-size blocks),
 0x101/0x102/0x103 (per-object arrays, sizes tracking the scene) and

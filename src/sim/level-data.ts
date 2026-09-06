@@ -277,6 +277,17 @@ export interface LevelTasks {
   hamm?: { creature: number; pathTag: number; playerYaw: number; creatureYaw: number; slot: number };
   /** `FUN_004a1e60(creature, pathTag, hints)`: says what is still to do. */
   hintNpc?: { creature: number; pathTag: number; hints: readonly number[] };
+  /**
+   * The level's race (`slot 2`): who offers it, and the box whose edge is the
+   * finish line. The engine turns the player's position into four bits, one
+   * per side of that box, and counts a lap each time he crosses the first
+   * bit's edge outward having crossed it inward (level 1's tick).
+   */
+  race?: {
+    creature: number; pathTag: number; text: number;
+    xMin: number; xMax: number; zMin: number; zMax: number;
+    laps: number; slot: number;
+  };
   /** The find-five owner: their two lines and the slot the second one reveals. */
   findFive?: {
     creature: number; pathTag: number;
@@ -305,6 +316,11 @@ export interface LevelTasks {
 export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
   1: {
     hamm: { creature: 0x1e, pathTag: 0x1d, playerYaw: 0xe10, creatureYaw: 0x6e0, slot: 0 },
+    race: {
+      creature: 0x1d, pathTag: 0x1b, text: 0x4f042c,
+      xMin: 0x2900, xMax: 0x21000, zMin: -0x1e000, zMax: -0x1a000,
+      laps: 3, slot: 2,
+    },
     hintNpc: {
       creature: 0x23, pathTag: 0x27,
       hints: [0x4f0c78, 0x4f0cac, 0x4f0cf0, 0x4f0d54, 0x4f0e18],

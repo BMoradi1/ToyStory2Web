@@ -149,6 +149,14 @@ token slot:
   points are within `r` in 256-game-unit steps. `0x280` (= 640 × 256) is the
   usual trigger reach.
 
+**The race is ported** (2026-09-05, `src/sim/tasks.ts`). The laps are
+counted on BUZZ's position, not the car's, so it works without the car
+driving its route: four bits, one per side of a box, and a lap each time he
+leaves across the first bit's edge. The flag starts blocked so the lap in
+progress when the challenge is accepted does not count, and coming back in
+over the same edge blocks it again, which is what stops laps being scored by
+stepping over the line and back. Only level 1's box is read out.
+
 Level 1's race: entering the garage zone with the R.C. car flag `0x200`
 opens the challenge dialogue; state `DAT_0052f2f8` steps 1 → 2 → 3 through a
 four-quadrant lap counter (`DAT_0052f584`, bits for the garage's x/z

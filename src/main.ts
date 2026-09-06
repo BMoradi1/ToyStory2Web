@@ -537,8 +537,19 @@ async function open(dir: GameDir): Promise<void> {
         player.x = item.x * S; player.y = item.y * S; player.z = item.z * S;
         return { id: item.id, of: signs.length, x: player.x, y: player.y, z: player.z };
       },
+      /** Move the player straight to a spot, for tests that need a route. */
+      setPlayerPos(x: number, z: number, y?: number) {
+        if (!player) return null;
+        player.x = x; player.z = z;
+        if (y !== undefined) player.y = y;
+        player.vx = 0; player.vz = 0;
+        return { x: player.x, y: player.y, z: player.z };
+      },
       get tasks() {
-        return tasks ? { done: tasks.done, hintIndex: tasks.hintIndex } : null;
+        return tasks ? {
+          done: tasks.done, hintIndex: tasks.hintIndex,
+          race: tasks.race, laps: tasks.laps, quadrant: tasks.raceQuadrant, blocked: tasks.raceBlocked,
+        } : null;
       },
       get talk() {
         if (!talk) return null;
@@ -870,6 +881,7 @@ async function spawnPlayer(): Promise<void> {
   drawPushBlocks();
 
   tasks = createTasks();
+  revealedSlots = new Set();
   pickups = createPickups(currentLevel.level, level);
   for (const slot of tokenSlotsAtStart(level)) revealToken(pickups, slot);
   drawPickups();
@@ -1138,6 +1150,8 @@ let pushBlocks: PushState | null = null;
 let tasks: TaskState | null = null;
 /** The slot the talk box will reveal when it closes, or -1. */
 let talkSlot = -1;
+/** Slots whose token has already been put in the world this level. */
+let revealedSlots = new Set<number>();
 /** toy2.exe, kept because the hint text lives inside it. */
 let exeBytes: Uint8Array | null = null;
 let pickups: PickupState | null = null;
@@ -1241,6 +1255,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       // put its token in the world (`FUN_004a0db0`).
       if (talkSlot >= 0 && tasks && pickups) {
         markSlotDone(tasks, talkSlot);
+        revealedSlots.add(talkSlot);
         revealToken(pickups, talkSlot);
         drawPickups();
         infoEl.textContent = `pizza planet token ${talkSlot + 1} of 5`;
@@ -1311,9 +1326,19 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
           found: creatureSim.sheepFound,
           rand: creatureSim.rand,
           talking: false,
+          x: player.x, z: player.z,
         },
       );
       if (request) startDialogue(request);
+      // A slot the race awarded has no dialogue to close, so reveal here.
+      for (let slot = 0; slot < 5; slot++) {
+        if (pickups && (tasks.done & (1 << slot)) !== 0 && !revealedSlots.has(slot)) {
+          revealedSlots.add(slot);
+          revealToken(pickups, slot);
+          drawPickups();
+          infoEl.textContent = `pizza planet token ${slot + 1} of 5`;
+        }
+      }
     }
   }
 

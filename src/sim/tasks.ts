@@ -32,6 +32,18 @@ export interface DialogueRequest {
   slot: number;
 }
 
+/** How far the level's race has got (`DAT_0052f2f8`). */
+export const enum RaceState {
+  /** Not offered yet. */
+  Idle = 0,
+  /** The challenge has been accepted; waiting for the box to close. */
+  Accepted = 1,
+  /** Running: laps are being counted. */
+  Running = 2,
+  /** Over. */
+  Done = 3,
+}
+
 export interface TaskState {
   /** Bit per slot, the engine's own per-level byte of saved token bits. */
   done: number;
@@ -40,10 +52,25 @@ export interface TaskState {
   hintChatter: number;
   /** The hint NPC's rotating hint, or -1 before Buzz first comes near. */
   hintIndex: number;
+  /** The race. */
+  race: RaceState;
+  laps: number;
+  /** The four side bits of the lap box, from last tick. */
+  raceQuadrant: number;
+  /**
+   * Blocks the next outward crossing from counting. It starts set, so the
+   * lap you are on when the flag drops does not count, and crossing the line
+   * back inward sets it again — which is what stops a player scoring laps by
+   * stepping over the line and back.
+   */
+  raceBlocked: boolean;
 }
 
 export function createTasks(): TaskState {
-  return { done: 0, hammChatter: 0, hintChatter: 0, hintIndex: -1 };
+  return {
+    done: 0, hammChatter: 0, hintChatter: 0, hintIndex: -1,
+    race: RaceState.Idle, laps: 0, raceQuadrant: 0, raceBlocked: true,
+  };
 }
 
 /** Has this slot been earned? */
@@ -82,9 +109,53 @@ export function stepTasks(
   tasks: TaskState,
   level: LevelTasks,
   creatureAt: (index: number) => Creature | undefined,
-  world: { coins: number; found: number; rand: RandomStream; talking: boolean },
+  world: {
+    coins: number; found: number; rand: RandomStream; talking: boolean;
+    /** Where Buzz is, for the race's lap box. Game units. */
+    x: number; z: number;
+  },
   dt = 1,
 ): DialogueRequest | null {
+  // --- the race: accept it, then count laps round the box.
+  const race = level.race;
+  if (race && !slotDone(tasks, race.slot)) {
+    if (tasks.race === RaceState.Idle) {
+      const car = creatureAt(race.creature);
+      if (car && tookTalk(car)) {
+        tasks.race = RaceState.Accepted;
+        tasks.laps = 0;
+        tasks.raceQuadrant = 0;
+        tasks.raceBlocked = true;
+        return {
+          creature: race.creature, pathTag: race.pathTag, text: race.text,
+          playerYaw: 0, creatureYaw: 0, slot: -1,
+        };
+      }
+    } else if (tasks.race === RaceState.Accepted) {
+      // The engine waits for the talk box to shut before the flag drops.
+      if (!world.talking) tasks.race = RaceState.Running;
+    } else if (tasks.race === RaceState.Running) {
+      // One bit per side of the box; 0xf is inside it.
+      let bits = world.z < race.zMax ? 1 : 0;
+      if (world.x > race.xMin) bits |= 2;
+      if (world.x < race.xMax) bits |= 4;
+      if (world.z > race.zMin) bits |= 8;
+      if (bits === 0xe) {
+        if (tasks.raceQuadrant === 0xf) {
+          if (!tasks.raceBlocked) tasks.laps += 1;
+          tasks.raceBlocked = false;
+        }
+      } else if (bits === 0xf && tasks.raceQuadrant === 0xe) {
+        tasks.raceBlocked = true;
+      }
+      tasks.raceQuadrant = bits;
+      if (tasks.laps >= race.laps) {
+        tasks.race = RaceState.Done;
+        markSlotDone(tasks, race.slot);
+      }
+    }
+  }
+
   // --- Hamm: fifty coins for his token.
   const hamm = level.hamm;
   if (hamm) {

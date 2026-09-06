@@ -1,4 +1,4 @@
-import { buildMeshData, parseAll, type AllFile } from './formats/all.ts';
+import { GroupType, buildMeshData, parseAll, readHitShapes, type AllFile } from './formats/all.ts';
 import {
   DEFAULT_ANIMATION_FPS, buildPosedMeshData, parseAnm,
   type AnmFile, type Animation,
@@ -19,17 +19,21 @@ import {
   createPlayer, createRuntime, groundFromCollision, stepPlayer,
   type PlayerRuntime, type PlayerState,
 } from './sim/player.ts';
-import { toRadians, yawOf } from './sim/trig.ts';
+import { cos as cosOf, sin as sinOf, toRadians, yawOf } from './sim/trig.ts';
 import { createCamera, stepCamera, cameraTarget, type CameraState } from './sim/camera.ts';
 import { SoundBank, PLAYER_EFFECTS } from './audio/sfx.ts';
 import { createPickups, PickupKind, revealToken, stepPickups, type PickupState } from './sim/pickups.ts';
 import { levelNumber, SPAWN_TABLE, tokenSlotsAtStart } from './sim/level-data.ts';
 import { unpackRaw } from './formats/rnc.ts';
-import { CREATURE_LIST_TYPE, parseCreatureList, parseCreatureNames, type CreaturePlacement } from './formats/creatures.ts';
+import {
+  CREATURE_LIST_TYPE, parseCreatureList, parseCreatureModels, parseCreatureNames,
+  type CreaturePlacement,
+} from './formats/creatures.ts';
 import { AI_SCRIPTS } from './sim/creature-data.ts';
 import {
-  RandomStream, createCreatureSim, creatureWorldFromCollision, stepCreatures,
-  CREATURE_FLAGS, type Creature, type CreatureSim,
+  RandomStream, attackFromPlayer, contactCreatures, createCreatureSim,
+  creatureWorldFromCollision, setCreatureModels, stepCreatures,
+  CREATURE_FLAGS, type Creature, type CreatureModel, type CreatureSim,
 } from './sim/creatures.ts';
 import {
   createAnimation, stepAnimation, type AnimationPlayback,
@@ -61,6 +65,12 @@ let creatureNames = new Map<number, string>();
 let creatureSim: CreatureSim | null = null;
 /** `data/rand.dat`: every random choice a creature makes comes out of it. */
 let randomBytes: Uint8Array | null = null;
+/** The opened install, kept so creature models can be read on demand. */
+let currentDir: GameDir | null = null;
+/** Where each creature type's model lives, from creatures.cfg's third field. */
+let creatureModelPaths = new Map<number, { name: string; path: string }>();
+/** The hit geometry per type, read from those models on demand. */
+const creatureModels = new Map<number, CreatureModel>();
 /** The scene's collision hull, loaded lazily the first time it is shown. */
 let currentCollision: CollisionGroup[] | null = null;
 let currentCollisionWorld: CollisionWorld | null = null;
@@ -287,6 +297,7 @@ async function showLevel(index: number): Promise<void> {
 async function open(dir: GameDir): Promise<void> {
   const problem = validateGameDir(dir);
   if (problem) return setStatus(problem, true);
+  currentDir = dir;
 
   // Each stage announces itself and yields, so if one hangs the last message
   // on screen names it. The drop panel deliberately stays up until the first
@@ -300,6 +311,8 @@ async function open(dir: GameDir): Promise<void> {
   creatureNames = cfg ? parseCreatureNames(new TextDecoder('latin1').decode(await cfg.read())) : new Map();
   const rand = dir.get('data/rand.dat');
   randomBytes = rand ? await rand.read() : null;
+  creatureModelPaths = cfg ? parseCreatureModels(new TextDecoder('latin1').decode(await cfg.read())) : new Map();
+  creatureModels.clear();
   sound = new SoundBank(dir);
   if (levels.length === 0) return setStatus('No levels found under data/.', true);
 
@@ -392,9 +405,18 @@ async function open(dir: GameDir): Promise<void> {
        */
       tickCreatures(ticks = 1) {
         if (!creatureSim || !player) return null;
-        for (let i = 0; i < ticks; i++) stepCreatures(creatureSim, player);
+        let touches = 0;
+        for (let i = 0; i < ticks; i++) {
+          stepCreatures(creatureSim, player);
+          // The same contact pass the real tick runs, so a test sees what
+          // play sees.
+          const hits = contactCreatures(creatureSim, player, attackFromPlayer(player));
+          touches += hits.length;
+          for (const touch of hits) applyCreatureTouch(touch.angle, touch.reaction);
+          creatureSim.sounds.length = 0;
+        }
         drawCreatures();
-        return { ticks, updated: creatureSim.near.length, total: creatureSim.creatures.length };
+        return { ticks, touches, updated: creatureSim.near.length, total: creatureSim.creatures.length };
       },
       /** Put the player beside a creature, so it comes into the update radius. */
       goToCreature(slot: number) {
@@ -492,6 +514,37 @@ async function loadCollision(): Promise<CollisionGroup[] | null> {
   currentCollision = parsed.groups;
   currentCollisionWorld = buildCollisionWorld(parsed.groups);
   return currentCollision;
+}
+
+/**
+ * Read the hit geometry of each creature type from its `.all`, caching as it
+ * goes. The last group of a creature model is type 9: its entry carries the
+ * coarse sphere the near and contact tests use, and its payload one hit
+ * ellipsoid per animation state (docs/CREATURES.md).
+ */
+async function loadCreatureModels(types: ReadonlySet<number>): Promise<void> {
+  if (!currentDir) return;
+  for (const type of types) {
+    if (creatureModels.has(type)) continue;
+    const entry = creatureModelPaths.get(type);
+    if (!entry) continue;
+    const file = currentDir.get(entry.path);
+    if (!file) continue;
+    try {
+      const groups = parseAll(await file.read()).groups;
+      const last = groups[groups.length - 1];
+      if (!last || last.type !== GroupType.HitShapes || !last.hitSphere) continue;
+      const shapes = readHitShapes(last);
+      if (!shapes) continue;
+      creatureModels.set(type, {
+        offsetX: last.hitSphere.x, offsetY: last.hitSphere.y, offsetZ: last.hitSphere.z,
+        hitRadius: last.hitSphere.radius,
+        shapes,
+      });
+    } catch (err) {
+      console.warn(`creature type ${type} (${entry.name}): ${(err as Error).message}`);
+    }
+  }
 }
 
 /**
@@ -644,6 +697,11 @@ async function spawnPlayer(): Promise<void> {
         new RandomStream(randomBytes),
         level,
       );
+      // Nothing can be touched until its hit geometry is loaded, so read the
+      // model of every type this scene uses. A type whose model is missing is
+      // marked "no model" and drops out of the near list, as in the original.
+      await loadCreatureModels(new Set(currentCreatures.map((c) => c.type)));
+      setCreatureModels(creatureSim, creatureModels);
     }
   }
   pickups = createPickups(currentLevel.level, level);
@@ -698,6 +756,25 @@ function drawCreatures(): void {
     x: c.x * S * GAME_TO_RENDER, y: -c.y * S * GAME_TO_RENDER, z: -c.z * S * GAME_TO_RENDER,
     yaw: toRadians((c.facing << 4) & 0xfff), colour: creatureColour(c),
   })));
+}
+
+/**
+ * Buzz's half of a touch (`FUN_004071e0`): bit 1 pushes him away along the
+ * contact angle, bit 2 hurts him as well. The original's full reaction — the
+ * knock-down animation, the invulnerability window, losing a life — is not
+ * ported; this is the push and the hit stun.
+ */
+function applyCreatureTouch(angle: number, reaction: number): void {
+  if (!player || reaction === 0) return;
+  if ((reaction & 1) !== 0) {
+    player.vx = Math.trunc(sinOf(angle) / 16);
+    player.vz = Math.trunc(cosOf(angle) / 16);
+  }
+  if ((reaction & 2) !== 0 && player.hitStun <= 0) {
+    player.hitStun = 90;
+    player.vy = -0x200;
+    if (pickups && pickups.health > 0) pickups.health -= 1;
+  }
 }
 
 /** As `creatureColour`, but a creature the sim is actually updating shows brighter. */
@@ -795,6 +872,12 @@ function playTick(): void {
 
   if (creatureSim) {
     stepCreatures(creatureSim, player);
+    for (const touch of contactCreatures(creatureSim, player, attackFromPlayer(player))) {
+      applyCreatureTouch(touch.angle, touch.reaction);
+    }
+    // The sounds a script raises are event numbers, which need the event
+    // table in docs/LEVELS.md that is not ported; they are dropped for now.
+    creatureSim.sounds.length = 0;
     drawCreatures();
   }
 

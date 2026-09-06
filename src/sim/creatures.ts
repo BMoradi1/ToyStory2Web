@@ -7,11 +7,15 @@
  * explains where every field and constant came from; this file is the
  * transcription, so read that first and treat any disagreement as a bug here.
  *
+ * Damage and contact are here too, from `FUN_00408a60` and `FUN_00407440`.
+ * They need the creature's model: `setCreatureModels` supplies the coarse
+ * sphere and the per-state hit ellipsoids read out of its `.all`, and until
+ * it is called nothing can be touched.
+ *
  * What is NOT here yet: the per-type C handlers (`CREATURE_TYPES[t].handler`),
- * damage and contact, and the model-derived fields — `offset` and `hitRadius`
- * come from the creature's `.all` and default to 0 until the caller supplies
- * them through `setModelFields`, which only makes the wake radius smaller than
- * the original's.
+ * the laser and the dive (kinds 4 and 5 never arise), and the drawn flag —
+ * the engine's draw code re-sets it every frame, while here it keeps whatever
+ * the placement started it with.
  *
  * Units are the engine's throughout: game units (32 per level unit), +Y down,
  * 12-bit yaw, the sine table scaled to 0x4000 (the movement code shifts it
@@ -19,7 +23,8 @@
  */
 
 import type { CreaturePlacement } from '../formats/creatures.ts';
-import { AI_SCRIPTS, ANIM_SCRIPTS, CREATURE_TYPES } from './creature-data.ts';
+import type { HitShape } from '../formats/all.ts';
+import { AI_SCRIPTS, ANIM_SCRIPTS, CREATURE_TYPES, DAMAGE_KINDS } from './creature-data.ts';
 import { cos, idiv, sin, YAW_MASK, yawOf } from './trig.ts';
 
 /** Entity flags at +0x40. The placement's +0x12 word is the initial value. */
@@ -143,6 +148,8 @@ export interface Creature {
   condition: boolean;
   /** The exe name of the per-type C function, or null. Not called yet. */
   handler: string | null;
+  /** One hit ellipsoid per animation state, from the model. Null until loaded. */
+  hitShapes: readonly HitShape[] | null;
 }
 
 /** What the creature code needs of the world. */
@@ -185,6 +192,12 @@ export interface CreatureSim {
   level: number;
   /** Drained by the caller each tick. */
   sounds: CreatureSound[];
+  /** Hit sparks a damaging blow asked for, for the caller to draw. */
+  sparks: { x: number; y: number; z: number }[];
+  /** The slot killed this tick, whose respawn timer does not start yet. */
+  lastKilled: number;
+  /** Per-type model data, once supplied. */
+  models: ReadonlyMap<number, CreatureModel> | null;
   /** Indices of the creatures updated this tick, in near-list order. */
   near: number[];
 }
@@ -254,6 +267,7 @@ export function buildCreature(record: CreatureRecord, fromList: boolean, previou
     timer: 0,
     condition: false,
     handler: fromList ? (type?.handler ?? null) : (previous?.handler ?? null),
+    hitShapes: previous?.hitShapes ?? null,
   };
 }
 
@@ -269,7 +283,7 @@ export function createCreatureSim(
   for (const c of creatures) {
     if (c.type === 24) { c.health = 0; c.respawn = 10000; }
   }
-  return { creatures, world, rand, level, sounds: [], near: [] };
+  return { creatures, world, rand, level, sounds: [], sparks: [], near: [], lastKilled: -1, models: null };
 }
 
 /** Supply the fields the engine reads out of the creature's model. */
@@ -796,6 +810,7 @@ export function stepCreatures(
   focus: { x: number; y: number; z: number } = player,
 ): void {
   sim.sounds.length = 0;
+  sim.sparks.length = 0;
   const near: number[] = [];
   const distances: number[] = [];
 
@@ -809,7 +824,7 @@ export function stepCreatures(
       if (c.respawn === 0) {
         // The original waits until it is off screen unless flag 0x40 is set.
         sim.creatures[i] = buildCreature(c.record, false, c);
-      } else if (c.respawn < 5000) {
+      } else if (c.respawn < 5000 && c.slot !== sim.lastKilled) {
         c.respawn -= dt;
         if (c.respawn < 0) c.respawn = 0;
       }
@@ -875,4 +890,186 @@ export function killCreature(c: Creature, what: number): void {
     c.flags &= ~(CREATURE_FLAGS.awake | CREATURE_FLAGS.near);
     c.health = 0;
   }
+}
+
+// --- damage and contact ------------------------------------------------------
+
+/**
+ * The model data the creature code reads out of a type's `.all`: the coarse
+ * sphere from the type-9 group's entry, and one hit ellipsoid per animation
+ * state from its payload (docs/CREATURES.md, "Where the model-derived fields
+ * come from").
+ */
+export interface CreatureModel {
+  offsetX: number; offsetY: number; offsetZ: number; hitRadius: number;
+  shapes: readonly HitShape[];
+}
+
+/**
+ * Give every creature of a type its model numbers. A type with no model gets
+ * flag 0x2000, which is exactly what the engine's visibility pass does, and
+ * keeps it out of the near list so it is never updated or touched.
+ */
+export function setCreatureModels(sim: CreatureSim, models: ReadonlyMap<number, CreatureModel>): void {
+  for (const c of sim.creatures) {
+    const model = models.get(c.type);
+    if (!model) { c.flags |= CREATURE_FLAGS.noModel; continue; }
+    c.offsetX = model.offsetX;
+    c.offsetY = model.offsetY;
+    c.offsetZ = model.offsetZ;
+    c.hitRadius = model.hitRadius;
+    c.hitShapes = model.shapes;
+    c.flags &= ~CREATURE_FLAGS.noModel;
+  }
+  sim.models = models;
+}
+
+/** Damage kinds, as `FUN_00408a60`'s table is indexed. */
+export const DAMAGE = {
+  /** A plain touch: shove only. */
+  touch: 0,
+  /** Running into a spinning Buzz. */
+  spinBody: 1,
+  spinSweep: 2,
+  chargedSpinSweep: 3,
+  laser: 4,
+  dive: 5,
+  /** What the level code uses to kill something outright. */
+  instant: 6,
+} as const;
+
+/**
+ * Hurt one creature (`FUN_00408a60`). `angle` is the direction to shove it in,
+ * 12-bit; `kind` indexes `DAMAGE_KINDS`.
+ *
+ * Mode 2 (the spin sweep) only lands when the placement's `vulnerable` bit 0
+ * is set, which is how the data marks what a spin can hurt. A creature whose
+ * `accelSide` is 0xff is never shoved, and level 6 shoves nothing.
+ */
+export function damageCreature(sim: CreatureSim, c: Creature, angle: number, kind: number): void {
+  const row = DAMAGE_KINDS[kind];
+  if (!row) return;
+  if (row.mode === 2 && (c.record.vulnerable & 1) === 0) return;
+
+  sim.lastKilled = -1;
+  if (c.record.accelSide !== 0xff && sim.level !== 6) {
+    c.vx = idiv(sin(angle), 32);
+    c.vz = idiv(cos(angle), 32);
+    c.flags &= ~CREATURE_FLAGS.keepMomentum;
+  }
+  if (c.stun !== 0) return;
+
+  c.stun = row.stun;
+  if (row.mode === 0) return;
+  if (row.mode === 1) sim.sparks.push({ x: c.x, y: c.y, z: c.z });
+  if (c.health < CREATURE_HEALTH.invulnerable) {
+    c.health -= row.damage;
+    sim.sounds.push({ event: 9, x: c.x, y: c.y, z: c.z });
+  }
+  if (c.health < 1) {
+    // Dying: keep only the flags that survive, and run the "show, yield, loop"
+    // script while the death timer plays out.
+    c.flags &= 0xfe63;
+    c.health = CREATURE_HEALTH.dead;
+    c.wait = 0;
+    c.script = AI_SCRIPTS[2]!;
+    c.pc = 0;
+    sim.lastKilled = c.slot;
+    killCreature(c, 1);
+  }
+}
+
+/** What Buzz is doing that a creature can run into, from `FUN_00407440`. */
+export interface PlayerAttack {
+  /** A `DAMAGE` kind, or 0 when he is not attacking. */
+  kind: number;
+  /** How far the contact test reaches: 150 idle, 400 while attacking. */
+  reach: number;
+}
+
+/**
+ * Read the attack out of the player's state. The engine tests its own globals:
+ * the spin timer past 20 of its 48 ticks, or the charged spin still in its
+ * damaging phase. The dive is not ported, so kind 5 never appears yet.
+ */
+export function attackFromPlayer(p: { spin: number; spinCharge: number }): PlayerAttack {
+  if (p.spin > 20 || p.spinCharge < -119) return { kind: DAMAGE.spinBody, reach: 400 };
+  return { kind: 0, reach: 150 };
+}
+
+/** One creature touching Buzz this tick. */
+export interface CreatureContact {
+  /** Index into `sim.creatures`. */
+  index: number;
+  /** Direction from the creature to the player, 12-bit. */
+  angle: number;
+  /** Bit 1: push the player away. Bit 2: hurt him as well. */
+  reaction: number;
+}
+
+/**
+ * Test the near list against Buzz (`FUN_00407440`) and apply what happens to
+ * the creatures. Returns what should happen to the player, for the caller to
+ * apply — this module does not reach into the player's state.
+ *
+ * Two tests in sequence: a sphere of `hitRadius + reach` about the creature's
+ * centre offset against Buzz's chest, then the ellipsoid for the creature's
+ * current animation state, turned by its heading and scaled per axis. Only a
+ * creature the draw code has flagged (0x080) can be touched at all.
+ */
+export function contactCreatures(
+  sim: CreatureSim,
+  player: { x: number; y: number; z: number },
+  attack: PlayerAttack,
+): CreatureContact[] {
+  const chestY = player.y - 0x1cc0;
+  const out: CreatureContact[] = [];
+
+  for (const index of sim.near) {
+    const c = sim.creatures[index]!;
+    if (c.stun < 0) continue;
+
+    const dx = (c.offsetX - player.x + c.x) >> 5;
+    const dy = (c.offsetY - chestY + c.y) >> 5;
+    const dz = (c.offsetZ - player.z + c.z) >> 5;
+    const coarse = c.hitRadius + attack.reach;
+    if (dx * dx + dy * dy + dz * dz >= coarse * coarse) continue;
+
+    const shape = c.hitShapes?.[c.animState];
+    if (!shape) continue;
+    // The ellipsoid is stored in the creature's own frame, so bring the
+    // player into it: turn by the heading, then scale each axis by its own
+    // factor (0x2000 is 1.0 once the shift below is taken into account).
+    const s = sin(c.heading - 0x800) >> 2;
+    const k = sin(c.heading - 0x400) >> 2;
+    const px = ((shape.offset.x * k + shape.offset.z * s) >> 12) - player.x + c.x;
+    const pz = ((shape.offset.z * k - shape.offset.x * s) >> 12) - player.z + c.z;
+    const ex = (((k * pz - s * px) >> 12) * shape.scale.z) >> 13;
+    const ez = (((s * pz + k * px) >> 12) * shape.scale.x) >> 13;
+    const ey = ((shape.offset.y - chestY + c.y) * shape.scale.y) >> 13;
+    const reach = shape.radius + attack.reach;
+    if (ex * ex + ez * ez + ey * ey >= reach * reach) continue;
+    if ((c.flags & CREATURE_FLAGS.drawn) === 0) continue;
+
+    const angle = yawOf(player.x - c.x, player.z - c.z) & YAW_MASK;
+    c.flags |= CREATURE_FLAGS.touched;
+
+    // The attack only counts if the creature is open to body attacks, and a
+    // dive only counts when Buzz comes down on it from above.
+    let kind = attack.kind;
+    if (kind === 0 || (c.record.vulnerable & 2) === 0 || (kind === DAMAGE.dive && ey < 0)) kind = 0;
+
+    // What Buzz gets back: pushed, and hurt too when the creature hurts on
+    // touch and he was not the one attacking. The harmless never do either.
+    let reaction: number;
+    if ((c.flags & CREATURE_FLAGS.hurts) === 0 || attack.kind !== 0) {
+      reaction = c.health === CREATURE_HEALTH.harmless || kind !== 0 ? 0 : 1;
+    } else {
+      reaction = 3;
+    }
+
+    damageCreature(sim, c, (angle + 0x800) & YAW_MASK, kind);
+    out.push({ index, angle, reaction });
+  }
+  return out;
 }

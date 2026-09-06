@@ -101,7 +101,9 @@ level.
   leaps them, turns them and pens each one inside its patrol box. The Zurg
   toys of level 1 patrol and lunge; the hover bots drift and keep station
   above Buzz. All 373 creatures in the game are exercised by a probe tool.
-  They are still drawn as markers, and nothing can hurt them yet.
+  Buzz's spin kills what the data says it can kill, and the ones marked
+  dangerous hurt him back, using each creature's own hit ellipsoid read out
+  of its model. They are still drawn as markers rather than posed models.
 - **Hint signs and push blocks, decoded.** The tutorial signposts (a talk
   box with a scripted camera flight, also how every character speaks) and
   the crates Buzz shoves along rails are read out of the executable and

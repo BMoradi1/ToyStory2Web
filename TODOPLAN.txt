@@ -423,16 +423,20 @@
                 viewer (36 on level 1). LEFT: moving props, which the level
                 scripts drive by object id. Paths (30) are their rails.
  P3.2b [PART]   Creature behaviour port. DONE 2026-09-05: the entity, the
-                tick, the 12-step update and all 34 script opcodes are in
-                src/sim/creatures.ts, running in the viewer from the moment
-                the player spawns and drawn as markers at their live
-                positions. tools/creature-probe.ts exercises all 373
-                creatures in the install: every one patrols inside its home
-                box and runs its script. Two spec errors were caught against
+                tick, the 12-step update, all 34 script opcodes, the damage
+                routine and the contact test are in src/sim/creatures.ts,
+                running in the viewer from the moment the player spawns and
+                drawn as markers at their live positions. Buzz's spin kills
+                what it should and enemies hurt him back; the hit geometry
+                comes from each type's .all (the type-9 group).
+                tools/creature-probe.ts exercises all 373 creatures in the
+                install: every one patrols inside its home box, runs its
+                script, and hurts Buzz exactly when its flags say. Two spec errors were caught against
                 the decompile while porting - placement +0x12 is the initial
                 FLAGS word, not a yaw, and the per-type ground-ray argument
                 is a shadow radius, not a probe reach.
-                LEFT: the per-type C handlers, damage/contact, and posed
+                LEFT: the per-type C handlers, the laser and dive damage
+                kinds, the player's full knock-down reaction, and posed
                 models instead of markers.
                 Original spec <- docs/CREATURES.md:
                 entity fields, the tick, the update in 12 steps, all 34

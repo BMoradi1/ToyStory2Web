@@ -29,21 +29,26 @@
  */
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseAll } from '../src/formats/all.ts';
+import { GroupType, parseAll, readHitShapes } from '../src/formats/all.ts';
 import { buildCollisionWorld, groundBelow, parseCollision } from '../src/formats/collision.ts';
 import { unpackRaw } from '../src/formats/rnc.ts';
-import { CREATURE_LIST_TYPE, parseCreatureList, parseCreatureNames } from '../src/formats/creatures.ts';
 import {
-  CREATURE_FLAGS, RandomStream, createCreatureSim, creatureWorldFromCollision, stepCreatures,
+  CREATURE_LIST_TYPE, parseCreatureList, parseCreatureModels, parseCreatureNames,
+} from '../src/formats/creatures.ts';
+import {
+  CREATURE_FLAGS, CREATURE_HEALTH, RandomStream, attackFromPlayer, contactCreatures,
+  createCreatureSim, creatureWorldFromCollision, setCreatureModels, stepCreatures,
+  type CreatureModel,
 } from '../src/sim/creatures.ts';
 import { GAME_UNITS_PER_LEVEL_UNIT } from '../src/sim/player-constants.ts';
 import { levelNumber } from '../src/sim/level-data.ts';
 
-const root = process.argv[2];
-if (!root) {
+const rootArg = process.argv[2];
+if (!rootArg) {
   console.error('usage: npx tsx tools/creature-probe.ts <game dir> [scene] [ticks]');
   process.exit(1);
 }
+const root: string = rootArg;
 const onlyScene = process.argv[3];
 const TICKS = Number(process.argv[4] ?? 300);
 const S = GAME_UNITS_PER_LEVEL_UNIT;
@@ -51,7 +56,30 @@ const S = GAME_UNITS_PER_LEVEL_UNIT;
 const randPath = join(root, 'data', 'rand.dat');
 if (!existsSync(randPath)) { console.error(`${randPath} is missing`); process.exit(1); }
 const randBytes = readFileSync(randPath);
-const names = parseCreatureNames(new TextDecoder('latin1').decode(readFileSync(join(root, 'data', 'creatures.cfg'))));
+const cfgText = new TextDecoder('latin1').decode(readFileSync(join(root, 'data', 'creatures.cfg')));
+const names = parseCreatureNames(cfgText);
+const modelPaths = parseCreatureModels(cfgText);
+
+/** Hit geometry per type, read from the model named in creatures.cfg. */
+const models = new Map<number, CreatureModel>();
+function modelFor(type: number): CreatureModel | null {
+  if (models.has(type)) return models.get(type)!;
+  const entry = modelPaths.get(type);
+  if (!entry) return null;
+  const path = join(root, entry.path);
+  if (!existsSync(path)) return null;
+  const groups = parseAll(readFileSync(path)).groups;
+  const last = groups[groups.length - 1];
+  if (!last || last.type !== GroupType.HitShapes || !last.hitSphere) return null;
+  const shapes = readHitShapes(last);
+  if (!shapes) return null;
+  const model: CreatureModel = {
+    offsetX: last.hitSphere.x, offsetY: last.hitSphere.y, offsetZ: last.hitSphere.z,
+    hitRadius: last.hitSphere.radius, shapes,
+  };
+  models.set(type, model);
+  return model;
+}
 
 /** The type the constructor deliberately starts dormant. */
 const DORMANT_TYPE = 24;
@@ -93,11 +121,21 @@ for (const scene of scenes) {
   });
   const level = levelNumber(scene) ?? 0;
 
-  let escaped = 0, idle = 0, stuck = 0;
+  // Hit geometry for every type this scene uses, so the near test and the
+  // contact test see the radii the original does.
+  const sceneModels = new Map<number, CreatureModel>();
+  for (const type of new Set(placements.map((p) => p.type))) {
+    const model = modelFor(type);
+    if (model) sceneModels.set(type, model);
+  }
+
+  let escaped = 0, idle = 0, stuck = 0, wrongTouch = 0;
+  let touchable = 0;
   const notes: string[] = [];
   for (const target of placements) {
     // A fresh sim per creature, so one run cannot disturb the next.
     const sim = createCreatureSim(placements, ground, new RandomStream(randBytes), level);
+    setCreatureModels(sim, sceneModels);
     const c = sim.creatures.find((q) => q.slot === target.slot)!;
     const player = { x: c.x + 400, y: c.y, z: c.z + 400 };
     const cursors = new Set<number>();
@@ -120,7 +158,9 @@ for (const scene of scenes) {
     creaturesRun++;
     const label = `${names.get(c.type) ?? `type ${c.type}`} slot ${c.slot}`;
     if (left > 0) { escaped++; notes.push(`${label} left its home box on ${left} ticks`); }
-    const excused = c.type === DORMANT_TYPE || (c.record.flags & CREATURE_FLAGS.noModel) !== 0;
+    // A creature with no model is excused: the engine drops those from the
+    // near list too, and the four stale 1998 lists are full of them.
+    const excused = c.type === DORMANT_TYPE || (c.flags & CREATURE_FLAGS.noModel) !== 0;
     if (updated === 0 && !excused) { idle++; notes.push(`${label} was never updated`); }
 
     // Second pass, with the player outside the home box so nothing chases.
@@ -129,6 +169,7 @@ for (const scene of scenes) {
     const away = target.rangeX * 256 + 8000;
     if (!excused && c.script.length > 6 && away < OUTSIDE_REACH) {
       const sim2 = createCreatureSim(placements, ground, new RandomStream(randBytes), level);
+      setCreatureModels(sim2, sceneModels);
       const c2 = sim2.creatures.find((q) => q.slot === target.slot)!;
       const seen = new Set<number>();
       let ran = 0;
@@ -142,12 +183,45 @@ for (const scene of scenes) {
         notes.push(`${label} never moved its script cursor off word ${c2.pc} with nothing chasing`);
       }
     }
+
+    // Third run: stand on it, idle, and see what a touch does. A creature
+    // that hurts on touch must hurt; a harmless one must never.
+    if (!excused && sceneModels.has(c.type)) {
+      const sim3 = createCreatureSim(placements, ground, new RandomStream(randBytes), level);
+      setCreatureModels(sim3, sceneModels);
+      const c3 = sim3.creatures.find((q) => q.slot === target.slot)!;
+      const idlePlayer = { x: c3.x, y: c3.y, z: c3.z };
+      let touched = 0, wrong = 0;
+      for (let t = 0; t < 60; t++) {
+        idlePlayer.x = c3.x + 200; idlePlayer.y = c3.y; idlePlayer.z = c3.z + 200;
+        stepCreatures(sim3, idlePlayer);
+        // Read the flag now: a script can set or clear "hurts on touch" as it
+        // runs, so the placement's initial value is not what contact sees.
+        const hurtsNow = (c3.flags & CREATURE_FLAGS.hurts) !== 0;
+        for (const touch of contactCreatures(sim3, idlePlayer, attackFromPlayer({ spin: 0, spinCharge: 0 }))) {
+          // Only this creature: standing on one often touches its neighbours,
+          // and their reactions say nothing about this one's flag.
+          if (sim3.creatures[touch.index] !== c3) continue;
+          touched++;
+          // Idle Buzz: hurt exactly when the creature hurts on touch.
+          if (((touch.reaction & 2) !== 0) !== hurtsNow) wrong++;
+        }
+      }
+      if (touched > 0) {
+        touchable++;
+        if (wrong > 0) {
+          wrongTouch++;
+          notes.push(`${label} hurt Buzz on ${wrong} of ${touched} touches against its own "hurts" flag`);
+        }
+      }
+    }
   }
 
-  const bad = escaped + idle + stuck;
+  const bad = escaped + idle + stuck + wrongTouch;
   failures += bad;
   console.log(
-    `${scene.padEnd(16)} ${String(placements.length).padStart(3)} creatures  `
+    `${scene.padEnd(16)} ${String(placements.length).padStart(3)} creatures, `
+    + `${String(sceneModels.size).padStart(2)} models, ${String(touchable).padStart(3)} touchable  `
     + `${bad === 0 ? 'ok' : `${bad} PROBLEM(S)`}`);
   for (const note of notes) console.log(`    ${note}`);
 }

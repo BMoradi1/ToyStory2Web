@@ -56,6 +56,13 @@ export interface AllGroup {
    * Checked on all 24 push blocks across eight levels.
    */
   objectNumber: number;
+  /**
+   * On a `HitShapes` group, the coarse sphere the creature code keeps in its
+   * entity: the centre offset at entry +0x2c/+0x2e/+0x30 (signed — a creature's
+   * centre sits above its feet, which is negative with +Y down) and the hit
+   * radius at +0x32. Null on every other group.
+   */
+  hitSphere: { x: number; y: number; z: number; radius: number } | null;
   payload: Uint8Array;
 }
 
@@ -174,6 +181,14 @@ export function parseAll(buffer: ArrayBuffer | Uint8Array): AllFile {
         z: view.getInt32(entry + 0x0c, true),
       },
       objectNumber: view.getUint16(entry + 0x1a, true) - 1,
+      hitSphere: view.getUint32(entry + 0x10, true) === GroupType.HitShapes
+        ? {
+          x: view.getInt16(entry + 0x2c, true),
+          y: view.getInt16(entry + 0x2e, true),
+          z: view.getInt16(entry + 0x30, true),
+          radius: view.getInt16(entry + 0x32, true),
+        }
+        : null,
       payload,
     });
   }

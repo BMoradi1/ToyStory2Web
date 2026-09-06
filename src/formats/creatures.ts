@@ -122,3 +122,23 @@ export function parseCreatureNames(text: string): Map<number, string> {
   }
   return names;
 }
+
+/**
+ * The same file's third field: where each type's model lives. `..\CHARS4`
+ * means `data/chars4/<name>.all`, which is what the executable's own type
+ * loader builds (`FUN_0043b0c0` switches on the type to a `chars<n>/<name>`
+ * string). Paths come back lower case and forward-slashed, ready for
+ * `GameDir.get`.
+ */
+export function parseCreatureModels(text: string): Map<number, { name: string; path: string }> {
+  const models = new Map<number, { name: string; path: string }>();
+  for (const line of text.split(/\r?\n/)) {
+    const m = /^CREATURE\s+(\d+)\s+(\S+)\s+(\S+)/.exec(line);
+    if (!m) continue;
+    const name = m[2]!.toLowerCase();
+    // `..\CHARS4` is relative to a sibling of data/; only the last part matters.
+    const dir = m[3]!.replace(/\\/g, '/').split('/').pop()!.toLowerCase();
+    models.set(Number(m[1]), { name: m[2]!, path: `data/${dir}/${name}.all` });
+  }
+  return models;
+}

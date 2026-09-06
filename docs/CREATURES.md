@@ -7,11 +7,15 @@ against the decompile (`tools/ghidra/README.md`).
 
 **Ported** (2026-09-05): the placement file (`src/formats/rnc.ts`,
 `src/formats/creatures.ts`), the behaviour data (`src/sim/creature-data.ts`,
-generated), and the entity, the tick, the twelve-step update and all 34
-script opcodes in `src/sim/creatures.ts`. `tools/creature-probe.ts` runs
-every creature in the install and checks it patrols inside its home box.
-**Not ported**: the per-type C handlers, damage and contact, and the drawing
-— the viewer still shows markers rather than posed models.
+generated), and in `src/sim/creatures.ts` the entity, the tick, the
+twelve-step update, all 34 script opcodes, the damage routine and the
+contact test. The hit geometry is read from each type's `.all`
+(`setCreatureModels`). `tools/creature-probe.ts` runs every creature in the
+install and checks it patrols inside its home box, runs its script, and
+hurts Buzz exactly when its flags say it should.
+**Not ported**: the per-type C handlers, the laser and the dive (damage
+kinds 4 and 5), the player's full knock-down reaction, and the drawing —
+the viewer still shows markers rather than posed models.
 
 Two things in this document were wrong until the port was written against
 the decompile, and are corrected below: the placement's `+0x12` is the
@@ -415,8 +419,15 @@ drawn (flag 0x080): flag 0x200 is set, the creature is shoved with kind 0
 (or the attack's kind if `vulnerable` allows and, for the dive, the
 creature is below), and the player reacts (`FUN_004071e0`): pushed away
 along the contact angle, and hurt too when the creature has flag 0x100
-and Buzz was not attacking. Harmless (102) creatures neither push nor
-hurt.
+and Buzz was not attacking.
+
+The reaction is exactly two branches. **Flag 0x100 set and Buzz not
+attacking** gives push *and* hurt, whatever the creature's health.
+Otherwise it is push only, or nothing at all when the health is 102 or the
+attack landed. So health 102 does not by itself make a creature safe to
+touch — it only matters in the second branch. No creature in the game
+carries both 102 and flag 0x100, so in practice the harmless never hurt,
+but that is a property of the data and not of the code.
 
 ## Death and respawn (`FUN_00405d20(entity, what)`)
 

@@ -796,8 +796,21 @@ word (`FUN_004b6760` → the state cache `FUN_004b6320`):
     material 0x10  blend SRCALPHA / ONE, no z-write    (additive)
     material 0x20  blend ZERO / INVSRCCOLOR, no z-write (subtractive stand-in)
     material 0x08  CULLMODE=NONE                       (double-sided)
-    material 0x04  draw the gobj a second time with a global material
-                   (`FUN_004b85e0`, DAT_009f5fe4); its look is not yet known
+    material 0x04  REFLECTION PASS: draw the group a second time with a
+                   global material (`FUN_004b85e0`, DAT_009f5fe4) — the
+                   texture named `tex14` (a 128 x 128 spherical environment
+                   map: sky, horizon and three highlights, present in every
+                   level's .ngn), colour and opacity halved at creation
+                   (`FUN_004b9630`, `FUN_004c2630(mat, 0.5)`), normal alpha
+                   blend, and per-vertex UVs generated from the view-space
+                   normal (`FUN_004b7710`): u = (n.R0 + 1) / 2,
+                   v = (1 - n.R1) / 2 with R0, R1 the first two rows of the
+                   model-to-view rotation, vertex alpha 0x60. Materials
+                   0x40 and 0x80 select additive and subtractive siblings of
+                   the same pass; no material in the install carries them
+                   (120 carry 0x04). A separate per-material reflection
+                   path (flag 0x100, `FUN_004b75e0`) never runs: no .ngn
+                   material has the render bits 0x400/0x800 that set it
     default        CULLMODE=2 (D3DCULL_CW) — everything is ONE-SIDED unless
                    the material says otherwise (`FUN_004ce8b0` sets 0x20)
 
@@ -852,18 +865,17 @@ blending with vertex alpha 255 (inference, not read from code).
 cull) and emits the opaque buckets first. Two deliberate divergences from the
 original: colour-key cutouts are drawn in the opaque queue with an alpha test
 rather than blended with depth writes off, which removes a dependence on exact
-back-to-front order; and the extra-pass material is not implemented, because
-what the global material it draws with actually looks like has not been read
-out of the executable yet. Also note that three.js must have colour management
+back-to-front order; and the reflection pass (material 0x04, above) is not
+implemented yet — it is specified now, a sphere-mapped `tex14` overlay at
+alpha 0x60 over the same triangles. Also note that three.js must have colour management
 turned off entirely, not merely a linear output transform — otherwise it still
 converts `THREE.Color` values, and a byte no longer survives the trip to the
 screen unchanged.
 
 **Still unknown:** the 20-byte ref list (not positional under either record
 pairing — test membership, not distance); `Object.flags`; the `aux` block;
-zone `a`/`b` beyond "portal pair"; what
-the extra-pass global material looks like; and chunks `0x102`/`0x103`/`0x105`
-of the `.ngn` scene, which look like paths, portals and a name table.
+zone `a`/`b` beyond "portal pair"; and chunks `0x102`/`0x103`/`0x105` of the
+`.ngn` scene, which look like paths, portals and a name table.
 
 ### `.vis` / `.kp2` / `.kep` / `.new`
 
@@ -874,6 +886,10 @@ shape, same marker records, dated September against October 1999.
 records in the first section (no `0x10` field), and carry no object table or
 mesh pool. Same container, different payload. Confirmed **not** a PVS bitset,
 so the extension is misleading; an earlier note in this file guessed otherwise.
+**The PC executable never opens any of the four**: it contains no `.vis`,
+`.kp2`, `.kep` or `.new` string at all, and builds only `level*.dat`,
+`level*.raw` and the `.ngn` names (`FUN_00452fc0`). They are PlayStation-side
+or tool-side files, and nothing in the port depends on them.
 
 ## Game structure
 

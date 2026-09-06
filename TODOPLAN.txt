@@ -495,6 +495,13 @@
 ================================================================================
  PARKED FORMATS (not on the critical path)
 ================================================================================
+ [READY]  The reflection pass (material 0x04, 120 materials): SPECIFIED
+          2026-09-05 in FORMATS.md - tex14 sphere-mapped from the
+          view-space normal, alpha 0x60, drawn again over the same
+          triangles. A viewer job.
+ [CLOSED] .vis / .kp2 - the PC executable never opens them (no such
+          string in toy2.exe, 2026-09-05); PlayStation/tool-side only.
+          Format notes kept below for the record:
  [OPEN]   .vis / .kp2 - same container as .dat, 12-byte first-section
           records, no object table or mesh pool. NOT a visibility set.
  [DONE]   .kep / .new - older revisions of level.dat itself.

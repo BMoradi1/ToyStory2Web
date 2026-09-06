@@ -154,10 +154,12 @@
         PSX decompile, rebuilt this session, gave the draw semantics.)
       - (section 4 is SOLVED 2026-09-05: two placement tables and the
         object-id list, parsed and documented in docs/FORMATS.md)
-      - what the extra-pass material (mode bit 0x08) actually draws
+      - (the extra-pass material is DECODED 2026-09-05: a reflection pass,
+        tex14 sphere-mapped from the view-space normal at alpha 0x60;
+        docs/FORMATS.md material table. Opus can add it to the viewer.)
       - level10/level, whose object order does not match its scene, and
         level06/level1, one object short
-      - .vis and .kp2, still undecoded
+      - (.vis and .kp2 are CLOSED 2026-09-05: the PC never opens them.)
 
 ================================================================================
  WHAT DOES NOT NEED FABLE

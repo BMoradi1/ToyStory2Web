@@ -435,9 +435,13 @@
                 the decompile while porting - placement +0x12 is the initial
                 FLAGS word, not a yaw, and the per-type ground-ray argument
                 is a shadow radius, not a probe reach.
-                LEFT: the per-type C handlers, the laser and dive damage
-                kinds, the player's full knock-down reaction, and posed
-                models instead of markers.
+                The sheep and hover-bot handlers are ported too (the sheep
+                counts level 1's find-five task; the bot opens, fires twice
+                and closes on a 360-tick cycle while Buzz is in its box).
+                LEFT: the remaining per-type handlers - the tin robot's and
+                the R.C. car's are level-script work, so they belong with
+                P3.3 - the laser and dive damage kinds, the player's full
+                knock-down reaction, and posed models instead of markers.
                 Original spec <- docs/CREATURES.md:
                 entity fields, the tick, the update in 12 steps, all 34
                 script opcodes, damage table, death/respawn. Data is in

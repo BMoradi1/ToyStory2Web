@@ -111,6 +111,8 @@ export interface Creature {
   heading: number;
   /** The heading it is easing toward. */
   wantYaw: number;
+  /** +0x10: a hover offset the per-type handlers ease; read by the draw code. */
+  hover: number;
   /** The `.anm` slot the anim opcode selected. */
   animState: number;
   /** 16.16: the whole part is the frame number. */
@@ -194,6 +196,13 @@ export interface CreatureSim {
   sounds: CreatureSound[];
   /** Hit sparks a damaging blow asked for, for the caller to draw. */
   sparks: { x: number; y: number; z: number }[];
+  /** Bolts a handler fired this tick. The projectile itself is not ported. */
+  shots: { x: number; y: number; z: number; heading: number }[];
+  /**
+   * `DAT_0052b7d8`: how many sheep have been sent home. Level 1's find-five
+   * task reads it (docs/LEVELS.md), and the sheep handler counts it up.
+   */
+  sheepFound: number;
   /** The slot killed this tick, whose respawn timer does not start yet. */
   lastKilled: number;
   /** Per-type model data, once supplied. */
@@ -240,6 +249,7 @@ export function buildCreature(record: CreatureRecord, fromList: boolean, previou
     x, y, z,
     heading,
     wantYaw: heading,
+    hover: 0,
     animState: 0,
     frame: 0,
     floorY: INT_MIN,
@@ -283,7 +293,11 @@ export function createCreatureSim(
   for (const c of creatures) {
     if (c.type === 24) { c.health = 0; c.respawn = 10000; }
   }
-  return { creatures, world, rand, level, sounds: [], sparks: [], near: [], lastKilled: -1, models: null };
+  return {
+    creatures, world, rand, level,
+    sounds: [], sparks: [], shots: [], near: [],
+    sheepFound: 0, lastKilled: -1, models: null,
+  };
 }
 
 /** Supply the fields the engine reads out of the creature's model. */
@@ -587,6 +601,10 @@ export function updateCreature(
 ): number {
   const rec = c.record;
   let bits = 0;
+  // The fifth field of the handler's argument block: bit 0 is "the player is
+  // inside my home box this tick". The update zeroes it at the top and the
+  // chase test ORs it in, and it is what a hover bot fires on.
+  let chasing = false;
   let jump = JUMP_NONE;
 
   const halfX = rec.rangeX * 0x100;
@@ -626,6 +644,7 @@ export function updateCreature(
     const inX = (((dx * boxCos - dz * boxSin) >> 7) + halfX) >>> 0 < (rec.rangeX << 9) >>> 0;
     const inZ = (((dz * boxCos + dx * boxSin) >> 7) + halfZ) >>> 0 < (rec.rangeZ << 9) >>> 0;
     if (inX && inZ) {
+      chasing = true;
       let pauseScript = true;
       targetX = player.x;
       targetZ = player.z;
@@ -792,9 +811,102 @@ export function updateCreature(
     if (((c.frame ^ before) & 0xffff0000) !== 0) { bits |= 4; advanceAnim(c); }
   }
 
-  // 12. The per-type C handler would run here, with these bits.
+  // 12. The per-type C handler, if this type has one.
+  const handler = c.handler ? CREATURE_HANDLERS[c.handler] : undefined;
+  if (handler) handler(sim, c, { bits, chasing, fwd: across, side: along, dt });
   return bits;
 }
+
+// --- the per-type C handlers -------------------------------------------------
+
+/**
+ * What the update hands a handler. The engine passes a small stack struct:
+ * the entity, `bits`, this `chasing` word, and the two speed components.
+ * `chasing` sits at +6 and is easy to miss — both builds read it, and the
+ * update writes it at the top and ORs bit 0 in from the chase test.
+ */
+export interface HandlerArgs {
+  /** 1 driving, 2 grounded, 4 the animation frame changed. */
+  bits: number;
+  /** The player is inside this creature's home box. */
+  chasing: boolean;
+  /** Across the heading; only `velocityToTarget` sets it. */
+  fwd: number;
+  /** Along the heading: what the scripts drive with. */
+  side: number;
+  /** Ticks elapsed, normally 1. The engine's handlers scale by it. */
+  dt: number;
+}
+
+type CreatureHandler = (sim: CreatureSim, c: Creature, args: HandlerArgs) => void;
+
+/**
+ * The sheep (`FUN_00416a60`). Touching one sends it home: it counts toward
+ * level 1's find-five task and is removed. The puff of smoke it leaves
+ * (`FUN_00410410`) is not ported.
+ */
+function sheep(sim: CreatureSim, c: Creature): void {
+  if ((c.flags & CREATURE_FLAGS.touched) === 0) return;
+  sim.sheepFound++;
+  sim.sounds.push({ event: 0x20, x: c.x, y: c.y, z: c.z });
+  killCreature(c, 2);
+}
+
+/**
+ * The hover bot (`FUN_00406220`). It hums, eases its hover toward its own
+ * speed, and while the player is in its box runs a 0x168-tick cycle: open at
+ * 200, fire at 0xb6 and 0xa6, close at 0x88, then turn a half-quarter left or
+ * right and drift off again. Out of the box it closes up and resets.
+ */
+function hoverBot(sim: CreatureSim, c: Creature, args: HandlerArgs): void {
+  const lean = args.fwd > 0x100 ? 0x100 : args.fwd < -0x100 ? -0x100 : args.fwd;
+  c.hover -= idiv((c.hover + lean) * args.dt, 16);
+  if (c.deathTimer >= 0) sim.sounds.push({ event: 0x2c, x: c.x, y: c.y, z: c.z });
+
+  const setAnim = (state: number, script: number) => {
+    c.animState = state;
+    c.animScript = ANIM_SCRIPTS[script]!;
+    c.animIndex = 0;
+    c.frame = (c.animScript[0]! * 0x10000) >>> 0;
+  };
+
+  if (!args.chasing) {
+    if (c.animState === 1) setAnim(0, 7);
+    c.timer = 0x104;
+    return;
+  }
+
+  const before = c.timer;
+  c.timer -= args.dt;
+  if (c.timer < 0) {
+    // Cycle over: pick a new drift, a half-quarter turn either side.
+    c.timer = 0x168;
+    const turn = sim.rand.byte() < 0x80 ? -0x200 : 0x200;
+    const a = (c.heading + turn) & YAW_MASK;
+    c.vx = sin(a) >> 4;
+    c.vz = cos(a) >> 4;
+    return;
+  }
+  const crossed = (at: number) => before > at && c.timer <= at;
+  if (crossed(200)) setAnim(1, 8);
+  if (crossed(0xb6) || crossed(0xa6)) {
+    // The bolt itself (`FUN_0040fae0` kind 0x26) is not ported.
+    sim.shots.push({ x: c.x, y: c.y, z: c.z, heading: c.heading });
+    sim.sounds.push({ event: 0xd, x: c.x, y: c.y, z: c.z });
+  }
+  if (crossed(0x88)) setAnim(0, 7);
+}
+
+/**
+ * The handlers that are ported, by the name `CREATURE_TYPES` gives them.
+ * The rest are per-level work: the tin robot's (`FUN_00416ab0`) drives level
+ * 1's boss state and its token reveal, and the R.C. car's is the level's own
+ * race, so both belong with the level script port rather than here.
+ */
+export const CREATURE_HANDLERS: Record<string, CreatureHandler> = {
+  FUN_00416a60: sheep,
+  LAB_00406220: hoverBot,
+};
 
 /**
  * The whole cast for one tick (`FUN_004086f0`): respawn timers, the wake
@@ -811,6 +923,7 @@ export function stepCreatures(
 ): void {
   sim.sounds.length = 0;
   sim.sparks.length = 0;
+  sim.shots.length = 0;
   const near: number[] = [];
   const distances: number[] = [];
 

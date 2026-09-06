@@ -13,7 +13,9 @@ contact test. The hit geometry is read from each type's `.all`
 (`setCreatureModels`). `tools/creature-probe.ts` runs every creature in the
 install and checks it patrols inside its home box, runs its script, and
 hurts Buzz exactly when its flags say it should.
-**Not ported**: the per-type C handlers, the laser and the dive (damage
+Two of the per-type handlers are ported as well: the sheep, which counts
+level 1's find-five task, and the hover bot's firing cycle.
+**Not ported**: the rest of the handlers, the laser and the dive (damage
 kinds 4 and 5), the player's full knock-down reaction, and the drawing —
 the viewer still shows markers rather than posed models.
 
@@ -273,8 +275,14 @@ placement.
     Each whole frame the cursor crosses advances the anim script
     (`FUN_00405c80`, below).
 12. **Handler.** If the type has a C function it is called with
-    `{ entity, bits, fwd, side }`: bit 1 = driving (step 6 ran), bit 2 =
-    grounded, bit 4 = the frame changed this tick.
+    `{ entity, bits, chasing, fwd, side }`. `bits`: 1 = driving (step 6
+    ran), 2 = grounded, 4 = the frame changed this tick. `chasing` is a
+    separate word at +6 of the argument block, zeroed at the top of the
+    update and ORed with 1 by the chase test in step 4, so it means "the
+    player is inside my home box this tick". It is easy to miss — the
+    struct's other four fields are written next to each other and this one
+    is not — and it is what a hover bot decides to open fire on. Both the
+    PC and PlayStation builds read it at the same offset.
 
 ## The script interpreter
 
@@ -448,7 +456,14 @@ constructor (position, health, script — everything) once out of view.
 
 ## Per-type C handlers
 
-`CREATURE_TYPES[type].handler` names them. Defined and readable in the
+`CREATURE_TYPES[type].handler` names them, and `CREATURE_HANDLERS` in
+`src/sim/creatures.ts` holds the ported ones — **the sheep and the hover
+bot** so far. The other two of level 1's four are level-script work rather
+than creature work: the tin robot's (`FUN_00416ab0`) drives the boss state,
+the taunt dialogue and the token reveal that all live in level 1's own
+script, and the R.C. car's is the level's race. Both belong with P3.3.
+
+Defined and readable in the
 dump after `DefineFuncs.java` on the eight the first pass missed
 (`0x406220`, `0x4064a0`, `0x406620`, `0x4068e0`, `0x406960`, `0x406a60`,
 `0x406a90`, `0x406c70`). Level 1's four are described above; the rest are

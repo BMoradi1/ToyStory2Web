@@ -755,6 +755,12 @@ export interface GeometryGroup {
   /** Constant vertex alpha: 1 for opaque faces, 0.5 for the PSX half-blend. */
   alpha: number;
   /**
+   * Mode bit 0x08: the engine draws these faces a second time with a global
+   * material, a sphere-mapped environment texture (docs/FORMATS.md, the
+   * material table). 120 materials in the install carry it.
+   */
+  reflect: boolean;
+  /**
    * Which zone these faces belong to, or null if the caller supplied no zone
    * for the object. Zones are the unit of visibility: the engine draws the
    * one the camera is in plus whatever it can see through portals.
@@ -935,6 +941,7 @@ export function buildLevelGeometry(level: DatLevel, options: GeometryOptions = {
         blend: blendMode(face.mode),
         doubleSided: isDoubleSided(face.mode),
         alpha: faceAlpha(face.mode),
+        reflect: (face.mode & 0x08) !== 0,
         zone,
       });
 

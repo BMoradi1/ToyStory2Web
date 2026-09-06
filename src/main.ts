@@ -240,9 +240,11 @@ async function showLevel(index: number): Promise<void> {
   // scene. The scene is the only place object zones are recorded, so it is
   // read here too rather than only for the art.
   let sceneBytes: Uint8Array | null = null;
+  let textureList: NgnTexture[] = [];
   if (level.ngn) {
     sceneBytes = await level.ngn.read();
     const textures = parseNgn(sceneBytes);
+    textureList = textures;
     textureCount = textures.length;
     texturesEl.replaceChildren(...(await Promise.all(textures.map(drawTexture))));
     setStatus(`${level.id}: decoding ${textures.length} textures\u2026`);
@@ -285,7 +287,10 @@ async function showLevel(index: number): Promise<void> {
 
       setStatus(`${level.id}: uploading ${geometry.triangleCount} triangles\u2026`);
       await yieldToBrowser();
-      viewer.setLevel(geometry, gpuTextures);
+      // tex14 is the environment map the reflection pass uses; every level's
+      // .ngn carries one under that name (docs/FORMATS.md).
+      const reflectionSlot = textureList.find((t) => t.tag === 'tex14')?.slot ?? null;
+      viewer.setLevel(geometry, gpuTextures, reflectionSlot === null ? undefined : gpuTextures.get(reflectionSlot));
 
       setStatus(`${level.id}: ready`);
       await yieldToBrowser();

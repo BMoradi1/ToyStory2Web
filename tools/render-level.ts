@@ -112,6 +112,7 @@ const groups: GeometryGroup[] = geo.groups.map((g) => {
     doubleSided: level.doubleSided ?? true,
     alpha: level.alpha ?? 1,
     zone: level.zone ?? null,
+    reflect: level.reflect ?? false,
   };
 });
 

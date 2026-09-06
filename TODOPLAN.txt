@@ -553,10 +553,10 @@
 ================================================================================
  PARKED FORMATS (not on the critical path)
 ================================================================================
- [READY]  The reflection pass (material 0x04, 120 materials): SPECIFIED
-          2026-09-05 in FORMATS.md - tex14 sphere-mapped from the
-          view-space normal, alpha 0x60, drawn again over the same
-          triangles. A viewer job.
+ [DONE]   The reflection pass (material 0x04, 120 materials): drawn
+          2026-09-05 as a matcap overlay of tex14 over the flagged
+          triangles, at the half material alpha times the 0x60 vertex
+          alpha. Level 1's one reflective group is the token.
  [CLOSED] .vis / .kp2 - the PC executable never opens them (no such
           string in toy2.exe, 2026-09-05); PlayStation/tool-side only.
           Format notes kept below for the record:

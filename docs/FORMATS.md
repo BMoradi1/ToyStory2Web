@@ -881,9 +881,11 @@ blending with vertex alpha 255 (inference, not read from code).
 cull) and emits the opaque buckets first. Two deliberate divergences from the
 original: colour-key cutouts are drawn in the opaque queue with an alpha test
 rather than blended with depth writes off, which removes a dependence on exact
-back-to-front order; and the reflection pass (material 0x04, above) is not
-implemented yet — it is specified now, a sphere-mapped `tex14` overlay at
-alpha 0x60 over the same triangles. Also note that three.js must have colour management
+back-to-front order; and the reflection pass (material 0x04, above) is drawn
+as a second mesh over the same triangles with a matcap material, which is
+exactly the mapping the engine generates by hand — the texture indexed by the
+view-space normal — so no shader is needed. Level 1's one reflective group is
+its Pizza Planet token. Also note that three.js must have colour management
 turned off entirely, not merely a linear output transform — otherwise it still
 converts `THREE.Color` values, and a byte no longer survives the trip to the
 screen unchanged.

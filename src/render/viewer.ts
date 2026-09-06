@@ -72,7 +72,11 @@ export class Viewer {
    */
   singleMaterial = false;
 
-  private lastLevel: { geometry: LevelGeometry; textures: Map<number, THREE.Texture> } | null = null;
+  private lastLevel: {
+    geometry: LevelGeometry; textures: Map<number, THREE.Texture>; reflection?: THREE.Texture;
+  } | null = null;
+  /** The reflection pass drawn over the level, if this scene has one. */
+  private reflections: THREE.Mesh | null = null;
 
   /**
    * Zones to draw, or null for all of them.
@@ -173,9 +177,18 @@ export class Viewer {
    * images built for a 1999 console, and smoothing them looks wrong rather
    * than better.
    */
-  setLevel(geometry: LevelGeometry, textures: Map<number, THREE.Texture>): void {
+  setLevel(
+    geometry: LevelGeometry,
+    textures: Map<number, THREE.Texture>,
+    /**
+     * The environment map for the reflection pass: the texture the level's
+     * `.ngn` calls `tex14`. Faces whose material asks for a second pass get
+     * it sphere-mapped over them (docs/FORMATS.md, the material table).
+     */
+    reflection?: THREE.Texture,
+  ): void {
     this.clearModel();
-    this.lastLevel = { geometry, textures };
+    this.lastLevel = { geometry, textures, reflection };
     if (geometry.triangleCount === 0) return;
 
     const buffer = new THREE.BufferGeometry();
@@ -201,6 +214,29 @@ export class Viewer {
 
     this.current = new THREE.Mesh(buffer, materials);
     this.scene.add(this.current);
+
+    // The reflection pass: the same triangles again, sphere-mapped. A matcap
+    // material is exactly the mapping the engine generates by hand — the
+    // texture is indexed by the view-space normal — so the overlay is one
+    // extra mesh sharing this geometry's attributes rather than a shader.
+    const reflectGroups = geometry.groups.filter((g) => g.reflect);
+    if (reflection && reflectGroups.length > 0) {
+      const overlay = new THREE.BufferGeometry();
+      overlay.setAttribute('position', buffer.getAttribute('position'));
+      overlay.setAttribute('normal', buffer.getAttribute('normal'));
+      overlay.setAttribute('uv', buffer.getAttribute('uv'));
+      for (const group of reflectGroups) overlay.addGroup(group.start, group.count, 0);
+      this.reflections = new THREE.Mesh(overlay, new THREE.MeshMatcapMaterial({
+        matcap: reflection,
+        transparent: true,
+        // Half from the material the engine builds, and the 0x60 vertex alpha
+        // its generated UVs carry.
+        opacity: 0.5 * (0x60 / 0xff),
+        depthWrite: false,
+      }));
+      this.scene.add(this.reflections);
+    }
+
     this.frameObject(buffer);
     // A rebuild makes fresh materials, so reapply whatever filter was set.
     if (this.zoneFilter) this.setVisibleZones(this.zoneFilter);
@@ -626,7 +662,7 @@ export class Viewer {
   /** Toggle the single-material diagnostic and redraw. Returns the new state. */
   toggleSingleMaterial(): string {
     this.singleMaterial = !this.singleMaterial;
-    if (this.lastLevel) this.setLevel(this.lastLevel.geometry, this.lastLevel.textures);
+    if (this.lastLevel) this.setLevel(this.lastLevel.geometry, this.lastLevel.textures, this.lastLevel.reflection);
     return this.singleMaterial ? 'single material, no draw groups' : 'one material per texture page';
   }
 
@@ -676,6 +712,12 @@ export class Viewer {
   }
 
   private clearModel(): void {
+    if (this.reflections) {
+      this.scene.remove(this.reflections);
+      this.reflections.geometry.dispose();
+      (this.reflections.material as THREE.Material).dispose();
+      this.reflections = null;
+    }
     if (!this.current) return;
     this.scene.remove(this.current);
     this.current.geometry.dispose();

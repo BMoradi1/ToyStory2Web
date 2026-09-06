@@ -293,6 +293,15 @@ export interface LevelTasks {
  *
  * The other levels' tables are the same shape and are not read out yet.
  */
+/**
+ * Every level's talkers, read from the `FUN_004a1ce0` / `FUN_004a1e60` calls
+ * in its tick and the find-five owner's pair of lines. The five boss arenas
+ * (3, 6, 9, 12, 15) have no tasks of their own.
+ *
+ * The find-five counter is per level and lives in that level's creature
+ * handler: only level 1's sheep are counted so far, so the other owners keep
+ * asking. Everything else works on all ten.
+ */
 export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
   1: {
     hamm: { creature: 0x1e, pathTag: 0x1d, playerYaw: 0xe10, creatureYaw: 0x6e0, slot: 0 },
@@ -301,8 +310,107 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
       hints: [0x4f0c78, 0x4f0cac, 0x4f0cf0, 0x4f0d54, 0x4f0e18],
     },
     findFive: {
-      creature: 1, pathTag: 0x1c,
+      creature: 0x1, pathTag: 0x1c,
       askText: 0x4f036c, doneText: 0x4f03e0, slot: 1, needed: 5,
+    },
+  },
+  2: {
+    hamm: { creature: 0xf, pathTag: 0x8, playerYaw: 0xc00, creatureYaw: 0x400, slot: 0 },
+    hintNpc: {
+      creature: 0x1b, pathTag: 0xb,
+      hints: [0x4f11a0, 0x4f11f4, 0x4f126c, 0x4f1358, 0x4f13a8],
+    },
+    findFive: {
+      creature: 0x6, pathTag: 0x7,
+      askText: 0x4f0fc0, doneText: 0x4f1078, slot: 1, needed: 5,
+    },
+  },
+  4: {
+    hamm: { creature: 0x14, pathTag: 0x1d, playerYaw: 0xe10, creatureYaw: 0x6e0, slot: 0 },
+    hintNpc: {
+      creature: 0x11, pathTag: 0x23,
+      hints: [0x4f196c, 0x4f199c, 0x4f19ec, 0x4f1a30, 0x4f1a6c],
+    },
+    findFive: {
+      creature: 0x12, pathTag: 0x20,
+      askText: 0x4f15d4, doneText: 0x4f1650, slot: 1, needed: 5,
+    },
+  },
+  5: {
+    hamm: { creature: 0x14, pathTag: 0xf, playerYaw: -1, creatureYaw: 0x0, slot: 0 },
+    hintNpc: {
+      creature: 0x22, pathTag: 0x14,
+      hints: [0x4f1f20, 0x4f1f58, 0x4f1fa4, 0x4f200c, 0x4f2070],
+    },
+    findFive: {
+      creature: 0x13, pathTag: 0x10,
+      askText: 0x4f1d5c, doneText: 0x4f1dec, slot: 1, needed: 5,
+    },
+  },
+  7: {
+    hamm: { creature: 0x1, pathTag: 0x3, playerYaw: 0xe10, creatureYaw: 0x6e0, slot: 0 },
+    hintNpc: {
+      creature: 0x1f, pathTag: 0xb,
+      hints: [0x4f2598, 0x4f25c4, 0x4f26bc, 0x4f2718, 0x4f2804],
+    },
+    findFive: {
+      creature: 0xc, pathTag: 0x4,
+      askText: 0x4f23a4, doneText: 0x4f2418, slot: 1, needed: 5,
+    },
+  },
+  8: {
+    hamm: { creature: 0x0, pathTag: 0xa, playerYaw: -1, creatureYaw: 0x0, slot: 0 },
+    hintNpc: {
+      creature: 0x29, pathTag: 0x5,
+      hints: [0x4f2c08, 0x4f2c3c, 0x4f2c94, 0x4f2d0c, 0x4f2d68],
+    },
+    findFive: {
+      creature: 0x2, pathTag: 0xb,
+      askText: 0x4f2ae4, doneText: 0x4f2b58, slot: 1, needed: 5,
+    },
+  },
+  10: {
+    hamm: { creature: 0x6, pathTag: 0x1d, playerYaw: -1, creatureYaw: 0x0, slot: 0 },
+    hintNpc: {
+      creature: 0x17, pathTag: 0x26,
+      hints: [0x4f33fc, 0x4f3464, 0x4f34cc, 0x4f3520, 0x4f3574],
+    },
+    findFive: {
+      creature: 0x0, pathTag: 0x1e,
+      askText: 0x4f2fe0, doneText: 0x4f3058, slot: 1, needed: 5,
+    },
+  },
+  11: {
+    hamm: { creature: 0x0, pathTag: 0xf, playerYaw: -1, creatureYaw: 0x0, slot: 0 },
+    hintNpc: {
+      creature: 0xc, pathTag: 0x14,
+      hints: [0x4f3a3c, 0x4f3abc, 0x4f3afc, 0x4f3b40, 0x4f3c08],
+    },
+    findFive: {
+      creature: 0x1, pathTag: 0x11,
+      askText: 0x4f3874, doneText: 0x4f3900, slot: 1, needed: 5,
+    },
+  },
+  13: {
+    hamm: { creature: 0x6, pathTag: 0x1d, playerYaw: -1, creatureYaw: 0x0, slot: 0 },
+    hintNpc: {
+      creature: 0x21, pathTag: 0x22,
+      hints: [0x4f4410, 0x4f4448, 0x4f4498, 0x4f44f4, 0x4f4578],
+    },
+    findFive: {
+      creature: 0x7, pathTag: 0x21,
+      askText: 0x4f419c, doneText: 0x4f4210, slot: 1, needed: 5,
+    },
+  },
+  14: {
+    hamm: { creature: 0x27, pathTag: 0x2, playerYaw: -1, creatureYaw: 0x0, slot: 0 },
+    hintNpc: {
+      creature: 0x2f, pathTag: 0xa,
+      hints: [0x4f488c, 0x4f48b0, 0x4f48f8, 0x4f4998, 0x4f4a6c],
+    },
+    findFive: {
+      creature: 0x28, pathTag: 0x3,
+      askText: 0x4f47cc, doneText: 0x4f4844, slot: 1, needed: 5,
     },
   },
 };

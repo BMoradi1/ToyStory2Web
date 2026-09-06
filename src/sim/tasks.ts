@@ -145,6 +145,19 @@ export function stepTasks(
   },
   dt = 1,
 ): DialogueRequest | null {
+  // --- a slot that is simply offered: the line reveals its token and
+  //     reaching it is the task.
+  const offer = level.offer;
+  if (offer && !slotDone(tasks, offer.slot)) {
+    const c = creatureAt(offer.creature);
+    if (c && tookTalk(c)) {
+      return {
+        creature: offer.creature, pathTag: offer.pathTag, text: offer.text,
+        playerYaw: -1, creatureYaw: 0, slot: offer.slot,
+      };
+    }
+  }
+
   // --- the collect-five challenge, where a level has one instead of a race.
   const challenge = level.challenge;
   if (challenge && !slotDone(tasks, challenge.slot)) {

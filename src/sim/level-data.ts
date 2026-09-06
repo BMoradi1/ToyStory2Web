@@ -351,6 +351,12 @@ export interface LevelTasks {
     playerYaw: number; creatureYaw: number;
   };
   /**
+   * A slot that is simply offered: talking once reveals its token, and
+   * getting to where the token then sits is the whole task. Level 14's
+   * "if you can reach the end" is one of these.
+   */
+  offer?: { creature: number; pathTag: number; text: number; slot: number };
+  /**
    * The collect-five-objects challenge that earns slot 2 on the levels that
    * have no race. Talking accepts it and zeroes the counter; talking again
    * hurries Buzz along or hands the token over. The count is category-9
@@ -535,6 +541,7 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
     },
   },
   14: {
+    offer: { creature: 0x26, pathTag: 4, text: 0x4f471c, slot: 2 },
     boss: { creature: 0x2e, slot: 4, delay: 0x78 },
     hamm: { creature: 0x27, pathTag: 0x2, playerYaw: -1, creatureYaw: 0x0, slot: 0 },
     hintNpc: {

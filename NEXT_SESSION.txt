@@ -179,6 +179,32 @@
         death bursts the creature port raises but cannot draw, the hover
         bot's shots, and the sparkles over unspent secrets.
 
+      - WHICH ZONE THE PLAYER IS IN. Small, and it blocks more than it
+        looks like it should. Every level's tick is written per zone,
+        and eight of the nine boss fights start on a zone test: level 5's
+        is "the player is in zone 2, then taunt, then kick the boss's
+        script to word 14". Level 1's boss is the exception - its trigger
+        is a height band - which is why it is the only one that can be
+        started so far.
+
+        What is settled: `FUN_00440f70` sets the player's zone from
+        `FUN_004885c0(camera position)`, and that walks the collision
+        objects, finds the nearest surface below the point, and returns a
+        byte at `DAT_007295d6 + object * 0x1a`. So a zone is a property of
+        the collision surface you are standing on, not a region of space.
+
+        What is not: where the collision loader (`FUN_00489c30`) gets that
+        byte. It is not an obvious field of the `.all` group entry - the
+        only bytes there that vary over a small range are the object
+        number at +0x1a, already identified, and the LOD bits at +0x29.
+        Finding it is a field hunt over unlabelled data, so it is a Fable
+        job rather than a guess; the wrong guess would make bosses taunt
+        in the wrong rooms.
+
+        Everything else about the boss fights is ported and waiting on it:
+        each level's boss creature, its script's wake word (14 everywhere
+        but level 4, which is 12), and the token award.
+
       - nothing else is left on this list. The rest is item 3.
 
  3. THE REMAINING FORMAT UNKNOWNS.  None block anything, all are the same

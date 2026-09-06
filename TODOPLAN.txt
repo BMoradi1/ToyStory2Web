@@ -497,8 +497,13 @@
                 handler-driven award.
                 Level 14's slot 2 is in: it is simply offered, and
                 reaching the token it reveals is the task.
-                LEFT: the slot-2 tasks on levels 7, 8 and 10 (an egg
-                timer, a saucer race, a mouse challenge); levels 7 and
+                Levels 8 and 10's slot 2 are in as well: 8 is "beat me
+                to the top", accept then get inside a box, and 10 is
+                another offered token. So slot 2 works on 1, 2, 4, 5, 8,
+                10, 11, 13 and 14.
+                LEFT: level 7's slot 2, an egg that has to be reached
+                twice - the token is offered on the second attempt, which
+                needs its attempt counter and timer; levels 7 and
                 10's Mr Potato Head paths, which are variables; and the
                 eight boss taunts, which all start on a ZONE test and so
                 wait on knowing which zone the player is in - see

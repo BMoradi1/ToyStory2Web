@@ -357,6 +357,18 @@ export interface LevelTasks {
    */
   offer?: { creature: number; pathTag: number; text: number; slot: number };
   /**
+   * "Beat me to the top": accept the challenge, then get inside a box. The
+   * engine's own test is an axis-aligned box in x and z with a height to be
+   * under (`FUN_0049f460`), which is level 8's slot 2.
+   */
+  reachBox?: {
+    creature: number; pathTag: number; text: number;
+    xMin: number; xMax: number; zMin: number; zMax: number;
+    /** Buzz has to be above this, so smaller: +Y is down. */
+    yMax: number;
+    slot: number;
+  };
+  /**
    * The collect-five-objects challenge that earns slot 2 on the levels that
    * have no race. Talking accepts it and zeroes the counter; talking again
    * hurries Buzz along or hands the token over. The count is category-9
@@ -491,6 +503,7 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
     },
   },
   8: {
+    reachBox: { creature: 1, pathTag: 0x0c, text: 0x4f2ba0, xMin: -468572, xMax: -393436, zMin: 76232, zMax: 102728, yMax: -0x1419a, slot: 2 },
     hamm: { creature: 0x0, pathTag: 0xa, playerYaw: -1, creatureYaw: 0x0, slot: 0 },
     hintNpc: {
       creature: 0x29, pathTag: 0x5,
@@ -502,6 +515,7 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
     },
   },
   10: {
+    offer: { creature: 0x16, pathTag: 0x21, text: 0x4f3284, slot: 2 },
     boss: { creature: 0x8, slot: 4, delay: 0x78 },
     hamm: { creature: 0x6, pathTag: 0x1d, playerYaw: -1, creatureYaw: 0x0, slot: 0 },
     hintNpc: {

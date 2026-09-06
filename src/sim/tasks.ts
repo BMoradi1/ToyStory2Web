@@ -56,6 +56,8 @@ export interface TaskState {
   boss: number;
   /** Counts up once the boss is gone, to the delay before its token. */
   bossGone: number;
+  /** The reach-a-box challenge: 0 not offered, 1 accepted, 2 running. */
+  reach: number;
   /**
    * Mr Potato Head's missing part (`DAT_00830d48`): the level's part number
    * while it is still out there, its negative once Buzz is carrying it, and
@@ -93,7 +95,7 @@ export function startLevelTasks(tasks: TaskState, level: number): void {
 export function createTasks(): TaskState {
   return {
     done: 0, hammChatter: 0, hintChatter: 0, hintIndex: -1,
-    boss: 0, bossGone: 0, potatoPart: 0, powerUps: 0, potatoChatter: 0, challenge: 0, challengeFrom: 0,
+    boss: 0, bossGone: 0, reach: 0, potatoPart: 0, powerUps: 0, potatoChatter: 0, challenge: 0, challengeFrom: 0,
     race: RaceState.Idle, laps: 0, raceQuadrant: 0, checkpoint: 0, raceBlocked: true,
   };
 }
@@ -145,6 +147,31 @@ export function stepTasks(
   },
   dt = 1,
 ): DialogueRequest | null {
+  // --- beat me to the top: accept, then get into the box.
+  const reach = level.reachBox;
+  if (reach && !slotDone(tasks, reach.slot)) {
+    const c = creatureAt(reach.creature);
+    if (tasks.reach === 0) {
+      if (c && tookTalk(c)) {
+        tasks.reach = 1;
+        return {
+          creature: reach.creature, pathTag: reach.pathTag, text: reach.text,
+          playerYaw: -1, creatureYaw: 0, slot: -1,
+        };
+      }
+    } else if (tasks.reach === 1 && !world.talking) {
+      tasks.reach = 2;
+    } else if (tasks.reach === 2) {
+      const inside = world.x > reach.xMin && world.x < reach.xMax
+        && world.z > reach.zMin && world.z < reach.zMax
+        && world.y < reach.yMax;
+      if (inside) {
+        tasks.reach = 3;
+        markSlotDone(tasks, reach.slot);
+      }
+    }
+  }
+
   // --- a slot that is simply offered: the line reveals its token and
   //     reaching it is the task.
   const offer = level.offer;

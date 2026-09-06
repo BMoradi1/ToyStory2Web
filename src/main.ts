@@ -24,7 +24,12 @@ import { createCamera, stepCamera, cameraTarget, type CameraState } from './sim/
 import { SoundBank, PLAYER_EFFECTS } from './audio/sfx.ts';
 import { MUSIC_TRACKS, MusicPlayer, trackForLevel } from './audio/music.ts';
 import { createPickups, PickupKind, revealToken, stepPickups, type PickupState } from './sim/pickups.ts';
-import { levelNumber, SPAWN_TABLE, tokenSlotsAtStart } from './sim/level-data.ts';
+import {
+  exeString, HINT_SIGNS, levelNumber, SPAWN_TABLE, TALK_SCRIPTS, tokenSlotsAtStart,
+} from './sim/level-data.ts';
+import {
+  BoxPhase, TALK_SCRIPT, startTalk, stepTalk, talkVisibleRows, type TalkState,
+} from './sim/talk.ts';
 import { unpackRaw } from './formats/rnc.ts';
 import {
   CREATURE_LIST_TYPE, parseCreatureList, parseCreatureModels, parseCreatureNames,
@@ -49,6 +54,9 @@ const levelEl = $<HTMLSelectElement>('level');
 const modelEl = $<HTMLSelectElement>('model');
 const animEl = $<HTMLSelectElement>('anim');
 const infoEl = $<HTMLSpanElement>('info');
+const talkEl = $<HTMLDivElement>('talk');
+const talkTextEl = $<HTMLParagraphElement>('talktext');
+const talkHintEl = $<HTMLSpanElement>('talkhint');
 const texturesEl = $<HTMLDivElement>('textures');
 
 let viewer: Viewer | null = null;
@@ -208,6 +216,8 @@ async function showLevel(index: number): Promise<void> {
   currentCollision = null;
   currentCollisionWorld = null;
   creatureSim = null;
+  talk = null;
+  talkEl.hidden = true;
   creatureArt.clear();
   viewer?.clearCreatureMeshes();
   music?.stop();
@@ -319,6 +329,10 @@ async function open(dir: GameDir): Promise<void> {
   creatureNames = cfg ? parseCreatureNames(new TextDecoder('latin1').decode(await cfg.read())) : new Map();
   const rand = dir.get('data/rand.dat');
   randomBytes = rand ? await rand.read() : null;
+  // The hint signs' text is inside the executable, so it is read from the
+  // user's own copy at run time rather than kept in this repository.
+  const exe = dir.get('toy2.exe');
+  exeBytes = exe ? await exe.read() : null;
   creatureModelPaths = cfg ? parseCreatureModels(new TextDecoder('latin1').decode(await cfg.read())) : new Map();
   creatureModels.clear();
   sound = new SoundBank(dir);
@@ -442,6 +456,25 @@ async function open(dir: GameDir): Promise<void> {
         }
         drawCreatures();
         return { ticks, touches, updated: creatureSim.near.length, total: creatureSim.creatures.length };
+      },
+      /** Stand the player on a hint sign, so touching it opens the talk box. */
+      goToHintSign(which = 0) {
+        if (!player || !pickups) return null;
+        const signs = pickups.items.filter((i) => i.kind === PickupKind.HintSign && i.enabled);
+        const item = signs[which];
+        if (!item) return null;
+        const S = GAME_UNITS_PER_LEVEL_UNIT;
+        player.x = item.x * S; player.y = item.y * S; player.z = item.z * S;
+        return { id: item.id, of: signs.length, x: player.x, y: player.y, z: player.z };
+      },
+      get talk() {
+        if (!talk) return null;
+        return {
+          phase: BoxPhase[talk.phase], scale: talk.scale, rows: talk.lines.length,
+          topRow: talk.topRow, shown: talk.shown, flying: talk.flying,
+          visible: talkVisibleRows(talk).map((r) => r.text),
+          eye: talk.eye, look: talk.look,
+        };
       },
       /** Put the player beside a creature, so it comes into the update radius. */
       goToCreature(slot: number) {
@@ -856,6 +889,69 @@ function applyCreatureTouch(angle: number, reaction: number): void {
   }
 }
 
+/**
+ * Open the talk box for a hint sign (`FUN_00402610`): find the sign's record
+ * for this level, take its path out of the scene, and run the hint script.
+ * The text is read from the user's own toy2.exe, never stored here.
+ */
+function startHintTalk(objectId: number): boolean {
+  if (!currentLevel || !exeBytes) return false;
+  const level = levelNumber(levels[levelEl.selectedIndex]?.id ?? '') ?? 0;
+  const sign = HINT_SIGNS[level]?.find((h) => h.objectId === objectId);
+  if (!sign) return false;
+  const path = currentLevel.level.paths.find((p) => p.id === sign.pathTag);
+  if (!path || path.points.length < 3) return false;
+
+  const S = GAME_UNITS_PER_LEVEL_UNIT;
+  let text: string;
+  try {
+    text = exeString(exeBytes, sign.text);
+  } catch {
+    return false;
+  }
+  talk = startTalk(
+    TALK_SCRIPT.hint,
+    { points: path.points.map((p) => ({ x: p.x * S, y: p.y * S, z: p.z * S })) },
+    text,
+  );
+  // The sign sets Buzz's own heading; the script's face opcode leaves it.
+  if (player) player.yaw = sign.playerYaw & 0xfff;
+  return true;
+}
+
+/** Show whatever the talk box has revealed so far. */
+function drawTalk(): void {
+  if (!talk) { talkEl.hidden = true; return; }
+  talkEl.hidden = false;
+  talkEl.style.setProperty('--talk-scale', String(Math.max(0.04, talk.scale / 0x1000)));
+  talkTextEl.replaceChildren();
+  for (const row of talkVisibleRows(talk)) {
+    const line = document.createElement('span');
+    // A `^...^` pair in the string is the game's own highlight.
+    let run = '';
+    let marked = row.marks[0] ?? false;
+    const flush = () => {
+      if (!run) return;
+      const part = document.createElement('span');
+      if (marked) part.className = 'mark';
+      part.textContent = run;
+      line.append(part);
+      run = '';
+    };
+    for (let i = 0; i < row.text.length; i++) {
+      const m = row.marks[i] ?? false;
+      if (m !== marked) { flush(); marked = m; }
+      run += row.text[i];
+    }
+    flush();
+    line.append('\n');
+    talkTextEl.append(line);
+  }
+  talkHintEl.textContent = talk.phase === BoxPhase.Waiting || talk.phase === BoxPhase.Done
+    ? 'press jump to continue'
+    : '';
+}
+
 /** As `creatureColour`, but a creature the sim is actually updating shows brighter. */
 function liveCreatureColour(c: Creature): number {
   const base = c.health >= 100 ? 0x60d060 : c.record.respawn > 0 ? 0xe04040 : 0xa0a0a0;
@@ -888,10 +984,16 @@ let camera: CameraState | null = null;
 /** Effects, read from the install. Silent until play starts. */
 let sound: SoundBank | null = null;
 let music: MusicPlayer | null = null;
+/** The talk box in progress, if any. Buzz is frozen while it is up. */
+let talk: TalkState | null = null;
+/** toy2.exe, kept because the hint text lives inside it. */
+let exeBytes: Uint8Array | null = null;
 let pickups: PickupState | null = null;
 /** Drawn instance for each pickup, or -1 for one that is not drawn (hidden tokens, spares). */
 let pickupDrawIndex: number[] = [];
 let pickupSpin = 0;
+/** Last frame's jump and fire, so the box sees presses rather than holds. */
+let talkHeld = { jump: false, fire: false };
 /** Stand-in colours: coins gold, tokens red, health green, lives blue, the rest grey. */
 const PICKUP_COLOURS: Partial<Record<PickupKind, number>> = {
   [PickupKind.Coin]: 0xffd24a,
@@ -932,6 +1034,45 @@ function playTick(): void {
   // the rendered one, so the controls do not depend on how the view is drawn.
   const cameraYaw = camera ? yawOf(player.x - camera.x, player.z - camera.z) : 0;
   const held = input.read();
+
+  // A talk freezes Buzz and takes the camera: the engine sets its "no player
+  // control" bit and drives the camera from the talk script rather than the
+  // follow camera (docs/LEVELS.md). Everything else still ticks.
+  if (talk) {
+    const pressed = { jump: held.jump && !talkHeld.jump, fire: held.fire && !talkHeld.fire };
+    talkHeld = { jump: held.jump, fire: held.fire };
+    const request = stepTalk(talk, pressed);
+    if (request.moveTo) {
+      // The script teleports him to a path node; the engine then drops a
+      // ground ray so he stands on the floor rather than at the node's height.
+      const S = GAME_UNITS_PER_LEVEL_UNIT;
+      player.x = request.moveTo.x;
+      player.z = request.moveTo.z;
+      const floor = groundBelow(currentCollisionWorld, player.x / S, request.moveTo.y / S, player.z / S);
+      player.y = floor ? floor.y * S : request.moveTo.y;
+      player.vx = 0; player.vy = 0; player.vz = 0;
+    }
+    if (request.faceYaw !== null) player.yaw = request.faceYaw;
+    for (const effect of talk.sounds) sound?.play(effect);
+    talk.sounds.length = 0;
+    viewer.setPlayerTransform(
+      player.x * GAME_TO_RENDER, -player.y * GAME_TO_RENDER, -player.z * GAME_TO_RENDER,
+      Math.PI - toRadians(player.yaw),
+    );
+    viewer.placeCamera(
+      talk.eye.x * GAME_TO_RENDER, -talk.eye.y * GAME_TO_RENDER, -talk.eye.z * GAME_TO_RENDER,
+      talk.look.x * GAME_TO_RENDER, -talk.look.y * GAME_TO_RENDER, -talk.look.z * GAME_TO_RENDER,
+    );
+    drawTalk();
+    if (talk.finished) {
+      talk = null;
+      drawTalk();
+      // Hand the camera back where it is, so it eases rather than snapping.
+      if (camera && player) camera = createCamera(player);
+    }
+    return;
+  }
+
   stepPlayer(player, held, playerRuntime, groundFromCollision(currentCollisionWorld), cameraYaw);
 
   // Game space to renderer space. A game facing of (sin yaw, cos yaw) becomes
@@ -971,7 +1112,10 @@ function playTick(): void {
     // PICKUP1 is the engine's own name for a collect; which of PICKUP1 and
     // PICKUP5 belongs to which collectible is in the sound EVENT table, which
     // is not ported (docs/PLAYER.md).
-    if (taken.length > 0) sound?.play('PICKUP1');
+    // A hint sign is reported but never consumed; touching one opens its box.
+    const sign = taken.find((t) => t.kind === PickupKind.HintSign);
+    if (sign && !talk) startHintTalk(pickups.items[sign.index]!.id);
+    if (taken.some((t) => t.kind !== PickupKind.HintSign)) sound?.play('PICKUP1');
     pickupSpin = (pickupSpin + 0.06) % (Math.PI * 2);
     const gone = new Set<number>();
     for (let i = 0; i < pickups.items.length; i++) {

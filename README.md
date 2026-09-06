@@ -80,6 +80,10 @@ level.
   it decides what an object is by counting its polygons, and that rule is
   ported as found. The shapes standing in for them are placeholders: the real
   coin art is a sprite inside the executable that is not extracted yet.
+- **Hint signs talk.** Touch one of the tutorial signposts and the game
+  does what it always did: freezes Buzz, flies the camera along the sign's
+  own path, and types the hint out a character at a time. The words come
+  from your executable, not from this repository.
 - **Music.** Each level's theme streams from your install's own `audio`
   folder, chosen the way the game chooses it and mixed through the volume
   curve out of the executable. Press `n` to mute it.

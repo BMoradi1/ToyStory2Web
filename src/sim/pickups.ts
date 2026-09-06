@@ -203,8 +203,9 @@ export function stepPickups(state: PickupState, p: PlayerState): PickupEvent[] {
         break;
       case PickupKind.HintSign:
         // A trigger, not a collectable: the original opens the hint's talk
-        // box (`FUN_00402610`, docs/LEVELS.md) and leaves the record live.
-        // The talk box is not ported, so it is skipped rather than consumed.
+        // box (`FUN_00402610`, docs/LEVELS.md) and leaves the record live so
+        // it can be read again. Reported, but never consumed.
+        taken.push({ index: i, kind: item.kind });
         continue;
       default:
         // Power-ups and the unknown kinds: consumed, effect not ported.

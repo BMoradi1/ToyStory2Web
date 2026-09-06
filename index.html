@@ -27,6 +27,12 @@
       </header>
       <div id="textures"></div>
       <canvas id="view"></canvas>
+      <!--
+        The talk box. The original draws it in its own sprite layer with the
+        game's font (docs/LEVELS.md); this is a plain overlay in its place,
+        laid out where the original puts it but not pretending to be it.
+      -->
+      <div id="talk" hidden><p id="talktext"></p><span id="talkhint"></span></div>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

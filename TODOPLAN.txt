@@ -473,7 +473,16 @@
                 install; decode, then write.
  P3.7 [BLOCKED] Level 3 boss              <- P3.3. Forces the scripting model
                 before it is generalised.
- P3.8 [READY]   The talk box: DECODED 2026-09-05 (docs/LEVELS.md "Hint signs
+ P3.8 [PART]    The talk box: DONE for hint signs 2026-09-05
+                (src/sim/talk.ts). Touching a signpost freezes Buzz, flies
+                the camera along the sign's path with the engine's own
+                two-cursor easing, and reveals the hint a character at a
+                time in a 36-column box that pages on jump. The text is
+                read from the user's own toy2.exe at run time. LEFT: the
+                character dialogue variant (the same script with its four
+                arguments patched, needs the creatures to be talkable) and
+                the token reveal a dialogue does when it closes.
+                Original note: DECODED 2026-09-05 (docs/LEVELS.md "Hint signs
                 and the talk box"). Hint signs are the six-polygon pickup
                 category (was "camera trigger"); touching one freezes Buzz,
                 flies the camera along a path and shows a tutorial line. The

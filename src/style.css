@@ -51,7 +51,7 @@ code { background: var(--panel); padding: 1px 5px; border-radius: 4px; }
 #status { color: var(--dim); font-size: 13px; min-height: 1.5em; }
 #status.error { color: #e6795a; }
 
-#app { height: 100%; display: grid; grid-template-rows: auto auto 1fr; }
+#app { height: 100%; display: grid; grid-template-rows: auto auto 1fr; position: relative; }
 header {
   display: flex;
   align-items: center;
@@ -87,3 +87,29 @@ select {
 }
 #textures figcaption { color: var(--dim); font-size: 11px; margin-top: 3px; }
 #view { width: 100%; height: 100%; display: block; }
+
+/*
+ * The talk box. The original scales a red panel open from its centre in a
+ * 512 x 256 sprite layer and draws the text in its own font at half scale
+ * (docs/LEVELS.md, "The text box"). This keeps the position, the two-row
+ * window and the highlight colour, and uses a plain monospace font: the
+ * game's font sprites are not extracted yet, so imitating it exactly would
+ * be pretending.
+ */
+#talk {
+  position: absolute;
+  left: 50%;
+  bottom: 12%;
+  transform: translateX(-50%) scaleY(var(--talk-scale, 1));
+  width: min(74%, 60rem);
+  padding: 0.6rem 1rem;
+  background: rgba(120, 20, 20, 0.72);
+  border: 2px solid #000;
+  color: #d8d800;
+  font: 500 clamp(0.8rem, 1.7vw, 1.2rem)/1.5 ui-monospace, "DejaVu Sans Mono", monospace;
+  text-align: center;
+  pointer-events: none;
+}
+#talk p { margin: 0; white-space: pre-wrap; min-height: 3em; }
+#talk .mark { color: #d8d8d8; }
+#talkhint { display: block; margin-top: 0.3rem; color: #fff; font-size: 0.8em; opacity: 0.85; }

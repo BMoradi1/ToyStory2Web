@@ -372,3 +372,25 @@ Left to build:
    a different set of sprites on `level00`'s own texture slots.
 
 The pause menu and the token screen are both built (src/sim/menu.ts).
+
+## Which music plays
+
+Decoded 2026-09-05, wired 2026-09-07. Every level's tick ends by asking
+`FUN_0049eac0` for its music, and that function reads two of the HUD
+timers above:
+
+    if the boss bar's timer (DAT_0052c832) is running      -> 15 miniboss
+    else if the race counter's timer (DAT_0052c830) is and
+         the race state (DAT_0052f2f8) is 2 or more         -> 16 minirace
+    else                                                     -> the level's track
+
+Each branch only restarts the track when it is not already the one
+playing, so the call is safe every tick. The boss bar's timer is what each
+level's tick sets to 90 while its boss fight is on (its own condition per
+level: level 1 wants the boss awake and Buzz inside an x/z box, level 2
+Buzz below a height, and so on), which is why the theme lingers a second
+and a half after the fight. The race counter's timer is set to 5 while
+the race state is 1 or 2. The level's track is the table at 0x4eccd8
+indexed by the level-select cursor (docs/FORMATS.md "The save file").
+`musicFor` in src/main.ts is the same three-way test over
+`src/sim/hud.ts`'s timers.

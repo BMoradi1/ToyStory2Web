@@ -439,8 +439,10 @@
                 level's track from the user's audio/ directory through an
                 <audio> element (8 MB a track, so not decodeAudioData),
                 with the exe's own 151-entry volume curve and `n` to mute.
-                The mini-boss and race overrides wait on those systems.
-                Still absent: any positional mixing.
+                The mini-boss and race overrides landed 2026-09-07: the
+                engine reads the HUD's boss-bar and race-counter timers,
+                and so does musicFor in main.ts. Still absent: any
+                positional mixing.
 
  P2.8 [DONE]    Pickups, decoded from toy2.exe and ported (src/sim/pickups.ts,
                 docs/PLAYER.md "Pickups and Pizza Planet tokens").

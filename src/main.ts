@@ -40,7 +40,7 @@ import { EFFECT_FLAGS, EFFECT_KIND, readEffectTable } from './formats/effect-tab
 import { SoundBank, PLAYER_EFFECTS } from './audio/sfx.ts';
 import { commitProgress, exportProgress, forgetProgress, loadProgress, type Progress } from './loader/save.ts';
 import { selectIndexOf, tokenCount } from './formats/save-file.ts';
-import { MUSIC_SLIDER_MAX, MUSIC_TRACKS, MUSIC_VOLUME_CURVE, MusicPlayer, trackForLevel } from './audio/music.ts';
+import { MUSIC, MUSIC_SLIDER_MAX, MUSIC_TRACKS, MUSIC_VOLUME_CURVE, MusicPlayer, trackForLevel } from './audio/music.ts';
 import {
   PICKUP, createPickups, pickupObjects, PickupKind, revealToken, stepPickups, type PickupState,
 } from './sim/pickups.ts';
@@ -502,7 +502,7 @@ async function open(dir: GameDir): Promise<void> {
       get music() {
         if (!music) return null;
         const level = levelNumber(levels[levelEl.selectedIndex]?.id ?? '') ?? 0;
-        const want = trackForLevel(level);
+        const want = musicFor(level);
         return {
           enabled: music.enabled, playing: music.current, name: music.currentName,
           level, wantTrack: want, wantName: want === null ? null : MUSIC_TRACKS[want],
@@ -656,6 +656,8 @@ async function open(dir: GameDir): Promise<void> {
        * death rather than the shortcut below, which skips straight to
        * removal.
        */
+      /** Force the race state, for the harness. 2 is running. */
+      setRace(state: number) { if (!tasks) return false; tasks.race = state; return true; },
       hurtCreature(slot: number, kind = 1) {
         if (!creatureSim || !player) return null;
         const c = creatureSim.creatures.find((q) => q.slot === slot);
@@ -1507,6 +1509,11 @@ function drawHud(level: number): void {
 
   stepHud(hud, talk !== null);
   if (offsetOf(hud, HudElement.Coins) < 1) stepCoinSpin(hud);
+  // The engine asks for its music every tick, right here: `FUN_0049eac0`
+  // reads the HUD's own timers, so the boss theme plays while the boss bar
+  // is up and the race theme while the race counter is, and the level's
+  // track otherwise (src/audio/music.ts).
+  music?.want(musicFor(level));
 
   // The overlay covers the game's own rectangle inside the canvas, not the
   // whole canvas: the picture is fitted to the engine's 4:3 screen and the
@@ -1712,6 +1719,20 @@ function applyMenu(action: ReturnType<typeof stepMenu>): void {
   if (sound) sound.volume = (action.sfx / MENU.volumeSteps) * 0.6;
   if (music) music.volume = Math.round((action.bgm / MENU.volumeSteps) * MUSIC_SLIDER_MAX);
   saveProgress();
+}
+
+/**
+ * Which track the level wants this tick (`FUN_0049eac0`). The "mini-boss
+ * timer" it reads is the boss bar's show timer, which each level's tick sets
+ * to 90 while its boss fight is on; the "racing" flag is the race counter's
+ * timer, set to 5 while the race state is 1 or 2. The test on the state is
+ * the engine's own, so a race that has just finished keeps its theme for
+ * the five ticks the counter takes to go.
+ */
+function musicFor(level: number): number | null {
+  if (hud.timer[HudElement.Boss]! > 0) return MUSIC.miniboss;
+  if (hud.timer[HudElement.TimedRun]! > 0 && tasks && tasks.race >= RaceState.Running) return MUSIC.minirace;
+  return trackForLevel(level);
 }
 
 /** The pause menu's rows, with the selected one pulsing. */

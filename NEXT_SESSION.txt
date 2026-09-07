@@ -275,10 +275,11 @@ second, push blocks when the controller exposes a per-group contact normal.
 MUSIC - DONE 2026-09-05 (src/audio/music.ts). The level's track starts
  when play does, `n` mutes it, and the options volume curve is the
  executable's own 151-entry table. Every one of the 15 levels resolves to
- a track that exists in the install. What is left is the two overrides,
- which need systems that do not exist yet: the mini-boss theme wants the
- creature timer and the race theme wants the race. The decode notes are
- kept below because they describe those.
+ a track that exists in the install. The two overrides landed 2026-09-07
+ once the race and the boss bar existed: the "mini-boss timer" is the boss
+ bar's HUD timer and the "racing" flag the race counter's, so main.ts's
+ musicFor reads the same two timers the engine does. The decode notes are
+ kept below.
 
  MUSIC - decoded 2026-09-05.  Nothing left to
  find; this was a wiring job against src/audio/sfx.ts's GameDir handle.

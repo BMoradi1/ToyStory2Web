@@ -30,6 +30,25 @@ ticks of flying up and falling back. Giving every type one tick made a
 killed enemy blink out of existence. The laser is ported too (both the coin
 and the burst are effects, docs/EFFECTS.md).
 
+The R.C. car's handler is ported (2026-09-07, `raceCar`): the handler's
+`side` is the car's speed along its path and `fwd` its slide across it.
+While the race runs it picks animation 1 (slot 0xb) below half its top
+speed, 2 or 3 (slot 0xc) when the slide outweighs the speed, else 0 (slot
+2), and leaving 1 for 0 waits for frame 14. The engine sound (event 0x37,
+CARENGIN) runs while it moves, with a pitch of `speed * 4 + 0x800` that the
+port's mixer cannot set. While near, the two front wheels (parts 0 and 1,
+the model's first four parts are the wheels) turn by `speed * dt / 8` a
+tick and the rear pair (2 and 3) by 0xa0 a tick in a skid, else the same
+as the front; the angles are two globals, `DAT_0050a548` and
+`DAT_0050a544`, written over the animation's rotation for those parts by
+`FUN_0043c070(part, angle, 0, 0)`. A skid (state 1, or a slide over
+0x200) puts a puff of dust (kind 0x2a, spawn mode 10, spin a random byte
+less 0x80) 0x2000 out at heading +/- 0x680 and 0x800 up, with the skid
+sound 0x36; the original only throws the dust with the detail setting
+above 3, the port always does. Walked on level 1: it accelerates in state
+1 with the rear wheels at the skid rate and dust behind it, settles into
+state 0 at speed, and both sounds are raised.
+
 **Not ported**: the rest of the handlers, the per-type death animation
 scripts, the dive (damage
 kinds 4 and 5), and the player's full knock-down reaction.

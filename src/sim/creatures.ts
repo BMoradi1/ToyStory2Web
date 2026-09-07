@@ -113,6 +113,12 @@ export interface Creature {
   wantYaw: number;
   /** +0x10: a hover offset the per-type handlers ease; read by the draw code. */
   hover: number;
+  /**
+   * Per-part rotations a handler has set over the animation's, 12-bit turns
+   * about the part's X axis (`FUN_0043c070(part, angle, 0, 0)`); null when
+   * none. The race car's wheels.
+   */
+  partSpin: number[] | null;
   /** The `.anm` slot the anim opcode selected. */
   animState: number;
   /** 16.16: the whole part is the frame number. */
@@ -196,6 +202,13 @@ export interface CreatureSim {
   sounds: CreatureSound[];
   /** Hit sparks a damaging blow asked for, for the caller to draw. */
   sparks: { x: number; y: number; z: number }[];
+  /** Skid dust the race car asked for: kind 0x2a from spawn mode 10, with its spin. */
+  dust: { x: number; y: number; z: number; spin: number }[];
+  /** The level's race state (`DAT_0052f2f8`), fed in each tick; 2 is running. */
+  raceState: number;
+  /** The car's wheel angles, `DAT_0050a548` (front pair) and `DAT_0050a544` (rear pair). */
+  carFront: number;
+  carRear: number;
   /**
    * Where a creature just died for the first time, and what its type asks
    * for. `FUN_00405d20` spills one coin (gated on the same "has died before"
@@ -267,6 +280,7 @@ export function buildCreature(record: CreatureRecord, fromList: boolean, previou
     heading,
     wantYaw: heading,
     hover: 0,
+    partSpin: null,
     animState: 0,
     frame: 0,
     floorY: INT_MIN,
@@ -312,7 +326,7 @@ export function createCreatureSim(
   }
   return {
     creatures, world, rand, level,
-    sounds: [], sparks: [], shots: [], deaths: [], near: [],
+    sounds: [], sparks: [], dust: [], raceState: 0, carFront: 0, carRear: 0, shots: [], deaths: [], near: [],
     foundCount: 0, lastKilled: -1, models: null,
     bossLastHealth: -1, bossSlotEarned: false,
   };
@@ -970,10 +984,65 @@ function tinRobot(sim: CreatureSim, c: Creature): void {
 }
 
 /**
+ * The R.C. car (`FUN_00406a60`, which picks `FUN_00416f30` on level 1 and
+ * `FUN_00418720` on level 2; the two are the same function). The car's
+ * motion is the level's path ride (docs/LEVELS.md "How the car drives");
+ * this is everything else about it.
+ *
+ * `side` is its speed along the path and `fwd` how hard it is sliding
+ * across it. While the race is running it picks an animation: 1 (slot 0xb)
+ * below half its top speed, 2 or 3 (slot 0xc) when the slide outweighs the
+ * speed, else 0 (slot 2); leaving state 1 for 0 waits for frame 14. The
+ * engine sound runs while it moves, its pitch from the speed (not ported:
+ * the mixer has no pitch). While near, the front wheels turn with the
+ * speed and the rear pair spin at 0xa0 a tick in a skid, and a skid puts a
+ * puff of dust behind each rear wheel with the skid sound. The original
+ * only throws the dust at detail settings above 3; here it always does.
+ */
+function raceCar(sim: CreatureSim, c: Creature, args: HandlerArgs): void {
+  const speed = args.side;
+  const slide = Math.abs(args.fwd);
+  if (speed > 0) sim.sounds.push({ event: 0x37, x: c.x, y: c.y, z: c.z });
+
+  let state = 0;
+  if (sim.raceState >= 2) {
+    let anim = 2;
+    if (speed < c.record.speed * 8) { state = 1; anim = 0xb; }
+    if (slide > speed) { state = args.fwd < 0 ? 2 : 3; anim = 0xc; }
+    if (state !== c.animState && (state !== 0 || c.animState !== 1 || (c.frame >>> 16) > 0xd)) {
+      c.animState = state;
+      c.animScript = ANIM_SCRIPTS[anim]!;
+      c.animIndex = 0;
+      c.frame = (c.animScript[0]! * 0x10000) >>> 0;
+    }
+  }
+
+  if ((c.flags & CREATURE_FLAGS.near) === 0) return;
+  const skidding = state === 1 || slide > 0x200;
+  if (speed > 0) {
+    sim.carFront = (sim.carFront + ((speed * args.dt) >> 3)) & YAW_MASK;
+    sim.carRear = (sim.carRear + (skidding ? args.dt * 0xa0 : (speed * args.dt) >> 3)) & YAW_MASK;
+    c.partSpin = [sim.carFront, sim.carFront, sim.carRear, sim.carRear];
+  }
+  if (skidding) {
+    // Behind each rear wheel: 0x2000 out at heading +/- 0x680, 0x800 up.
+    for (const turn of [0x680, -0x680]) {
+      sim.dust.push({
+        x: c.x + (sin(c.heading + turn) >> 1),
+        y: c.y - 0x800,
+        z: c.z + (cos(c.heading + turn) >> 1),
+        spin: sim.rand.byte() - 0x80,
+      });
+    }
+    sim.sounds.push({ event: 0x36, x: c.x, y: c.y, z: c.z });
+  }
+}
+
+/**
  * The handlers that are ported, by the name `CREATURE_TYPES` gives them.
- * The rest are per-level work: the tin robot's (`FUN_00416ab0`) drives level
- * 1's boss state and its token reveal, and the R.C. car's is the level's own
- * race, so both belong with the level script port rather than here.
+ * The rest are per-level work; the tin robot's (`FUN_00416ab0`) drives level
+ * 1's boss state and its token reveal, and the R.C. car's motion is the
+ * level's own race (its handler only dresses it).
  */
 export const CREATURE_HANDLERS: Record<string, CreatureHandler> = {
   // The ten find-five collectables, one per level.
@@ -989,6 +1058,7 @@ export const CREATURE_HANDLERS: Record<string, CreatureHandler> = {
   FUN_0042d620: collectable,
   LAB_00406220: hoverBot,
   FUN_00416ab0: tinRobot,
+  LAB_00406a60: raceCar,
 };
 
 /**

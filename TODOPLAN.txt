@@ -234,8 +234,11 @@
           hide near-list objects beyond D1 and far-list objects inside D0
           by object distance each frame — the second is simpler and
           leaves only the engine's own 1,500-unit crossfade band.
- [DONE]   THE RACE CAR drives. Ported 2026-09-07 for levels 1 and 2; the
-          handler's wheel spin and exhaust are still cosmetic gaps.
+ [DONE]   THE RACE CAR drives. Ported 2026-09-07 for levels 1 and 2, and
+          its handler the same day: animation by speed and slide, wheel
+          spin over the animation, skid dust and the two sounds. Left:
+          the engine sound's pitch (the mixer has none), and level 2
+          unwalked.
  [was]    THE RACE CAR does not move. Decoded 2026-09-07 (docs/LEVELS.md,
           "How the car drives"): the level tick sets the car entity's
           TARGET to the next node of a path and steps the node within 600

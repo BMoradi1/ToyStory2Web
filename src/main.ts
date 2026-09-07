@@ -76,6 +76,7 @@ import {
   RandomStream, attackFromPlayer, contactCreatures, createCreatureSim, damageCreature,
   creatureWorldFromCollision, killCreature, setCreatureModels, stepCreatures,
   CREATURE_FLAGS, type Creature, type CreatureModel, type CreatureSim,
+  CREATURE_HEALTH,
 } from './sim/creatures.ts';
 import {
   createAnimation, stepAnimation, type AnimationPlayback,
@@ -463,7 +464,9 @@ async function open(dir: GameDir): Promise<void> {
             targetX: c.targetX, targetZ: c.targetZ,
             bodyRadius: c.bodyRadius, hitRadius: c.hitRadius,
             offsetX: c.offsetX, offsetY: c.offsetY, offsetZ: c.offsetZ,
-            stun: c.stun, respawn: c.respawn, deathTimer: c.deathTimer,
+            stun: c.stun, respawn: c.respawn, deathTimer: c.deathTimer, partSpin: c.partSpin,
+            speed: c.record.speed, speedMax: c.record.speedMax, turnRate: c.record.turnRate, accel: c.record.accel, accelSide: c.record.accelSide,
+            vx: c.vx, vz: c.vz, handler: c.handler,
             rangeX: c.record.rangeX, rangeZ: c.record.rangeZ, rangeYaw: c.record.rangeYaw,
             live: true,
           }));
@@ -656,8 +659,20 @@ async function open(dir: GameDir): Promise<void> {
        * death rather than the shortcut below, which skips straight to
        * removal.
        */
-      /** Force the race state, for the harness. 2 is running. */
-      setRace(state: number) { if (!tasks) return false; tasks.race = state; return true; },
+      /** Force the race state, for the harness. 2 is running; anything past idle also does what accepting does to the car. */
+      setRace(state: number) {
+        if (!tasks) return false;
+        tasks.race = state;
+        const level = levelNumber(levels[levelEl.selectedIndex]?.id ?? '') ?? 0;
+        const race = LEVEL_TASKS[level]?.race;
+        const car = race && creatureSim ? creatureSim.creatures.find((c) => c.slot === race.creature) : undefined;
+        if (state >= 1 && car) {
+          tasks.laps = 0; tasks.carNode = 0; tasks.carLaps = 0;
+          car.flags |= CREATURE_FLAGS.scriptVelocity;
+          car.health = CREATURE_HEALTH.alwaysAwake;
+        }
+        return true;
+      },
       hurtCreature(slot: number, kind = 1) {
         if (!creatureSim || !player) return null;
         const c = creatureSim.creatures.find((q) => q.slot === slot);
@@ -1187,6 +1202,12 @@ function spawnCreatureEffects(): void {
     spawnEffect(effects, world, spark.x, spark.y, spark.z, 0, 0, 0, 0, 0, 0, 0x11);
   }
   creatureSim.sparks.length = 0;
+  // The car's skid dust: kind 0x2a from spawn mode 10, then its own spin.
+  for (const d of creatureSim.dust) {
+    const e = spawnChild(effects, world, d.x, d.y, d.z, 0x2a, 10);
+    if (e) e.spin = d.spin;
+  }
+  creatureSim.dust.length = 0;
   // The coin a creature spills when it dies, thrown up out of the body. Its
   // floor is asked for at once so it lands instead of falling through, which
   // is what the original does at the same spot.
@@ -1584,12 +1605,18 @@ function drawCreatures(): void {
       const animation = art.anm.animations[c.animState];
       if (!animation) continue;
       const frame = (c.frame >>> 16) % Math.max(1, animation.frameCount);
-      const key = `${c.animState}:${frame}`;
+      // A handler's part rotations are part of the pose too, at a sixteenth
+      // of a turn's resolution so the cache is not defeated by every tick.
+      const spin = c.partSpin ? c.partSpin.map((a) => a >> 4) : null;
+      const key = `${c.animState}:${frame}:${spin ? spin.join(',') : ''}`;
       if (creaturePosed.get(c.slot) === key) continue;
       creaturePosed.set(c.slot, key);
       viewer.setCreatureMesh(
         c.slot,
-        buildPosedMeshData(art.model, art.anm, animation, frame),
+        buildPosedMeshData(
+          art.model, art.anm, animation, frame, null,
+          spin ? spin.map((a) => (a << 4) * (Math.PI * 2 / 4096)) : null,
+        ),
         sceneTextures,
       );
     }
@@ -2208,6 +2235,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   }
 
   if (creatureSim) {
+    creatureSim.raceState = tasks?.race ?? 0;
     stepCreatures(creatureSim, player);
     for (const touch of contactCreatures(creatureSim, player, attackFromPlayer(player))) {
       applyCreatureTouch(touch.angle, touch.reaction);

@@ -230,6 +230,12 @@ export function buildPosedMeshData(
    * entirely rather than leaving them at rest.
    */
   layer?: { animation: Animation; frame: number } | null,
+  /**
+   * Rotations set over the animation's for particular bones, radians about
+   * X, the way `FUN_0043c070(part, angle, 0, 0)` replaces a part's rotation
+   * after the animation has posed it. The race car's wheels.
+   */
+  partSpin?: readonly (number | undefined)[] | null,
 ): MeshData {
   const buckets = new Map<number | null, { pos: number[]; col: number[]; uv: number[] }>();
   const bucketFor = (page: number | null) => {
@@ -243,9 +249,11 @@ export function buildPosedMeshData(
     if (group.type !== GroupType.GfxMesh) continue;
     bone++;
 
-    const pose = poseBone(file, animation, frame, bone)
+    let pose = poseBone(file, animation, frame, bone)
       ?? (layer ? poseBone(file, layer.animation, layer.frame, bone) : null);
     if (!pose) continue;
+    const spin = partSpin?.[bone];
+    if (spin !== undefined) pose = { ...pose, rotation: { x: spin, y: 0, z: 0 } };
     const m = poseMatrix(pose);
     const t = pose.translation;
 

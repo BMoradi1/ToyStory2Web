@@ -188,9 +188,10 @@ reveals slot 2 with the camera cut.
 **How the car drives** (decoded and ported 2026-09-07, `driveCar` in
 src/sim/tasks.ts; walked on level 1: three laps of 45 nodes in about 900
 ticks each, and a race left standing is lost when the car finishes). The car's handler (`FUN_00406a60` → level 1
-`FUN_00416f30`, level 2 `FUN_00418720`) only picks its animation from
-speed and steering, spins the wheel bones and spawns exhaust; it does not
-move it. The LEVEL TICK does, through the car's own creature entity — slot
+`FUN_00416f30`, level 2 `FUN_00418720`, the same function twice) only
+picks its animation from speed and steering, spins the wheel bones and
+spawns skid dust; it does not move it. That handler is ported too
+(`raceCar` in src/sim/creatures.ts, 2026-09-07; docs/CREATURES.md). The LEVEL TICK does, through the car's own creature entity — slot
 0x1d on both levels, at `0x52c840 + 0x1d * 0x9c` = `0x52d9ec` — using the
 fields every creature has (docs/CREATURES.md): +0x40 flags, +0x50 HOME,
 +0x5c TARGET, +0x7e health.

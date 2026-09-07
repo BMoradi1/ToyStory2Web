@@ -4,12 +4,11 @@
  session that made Buzz playable, 2026-09-05 after the pickups/tokens
  decode, and 2026-09-06 when the creature port and the token tasks were
  finished, and later that day when the zone byte, the effect system and
- the follow camera were decoded AND PORTED. NOTHING IS WAITING ON FABLE:
- every item under "WHAT TO GIVE FABLE, IN ORDER" is closed. The one thing
- a Fable pass would still pay for is two small things, neither blocking:
- effect modes 0x2f/0x30/0x34 (level 10's and level 12's boss handlers,
- unnamed functions with no template to match), and two camera constants
- behind FPU expressions Ghidra dropped. Everything else is Opus work.
+ the follow camera were decoded AND PORTED, and 2026-09-07 when the last two loose ends
+ (three level-specific effect modes, and the camera's three dropped
+ float expressions - read off the machine code with objdump, all square
+ roots) were closed. NOTHING IS WAITING ON FABLE and nothing is queued
+ for it. Everything left is Opus work in TODOPLAN.txt.
 ================================================================================
 
  Read TODOPLAN.txt for WHAT to do. This file is about WHO should do it and what

@@ -126,7 +126,7 @@ export const CAMERA = {
   lookAbove: 0x1800,
   /** Inside this distance the view aims steeper, by `(reachNear - d) * 2`. */
   reachNear: 400,
-  /** Under this the camera is lifted off Buzz; see `tooClose`. */
+  /** Within 400 level units of his head the camera is lifted onto that sphere. */
   tooCloseSq: 160000,
 } as const;
 
@@ -277,14 +277,14 @@ export function stepCamera(
     const delta = { x: head.x - camera.x, y: head.y - camera.y, z: head.z - camera.z };
     const { fraction } = cast(world, camera, delta, CAMERA.rayRadius);
     if (fraction < 1) {
-      const line = Math.hypot(delta.x, delta.y, delta.z) / S;
-      camera.distance = Math.max(CAMERA.distanceFloor, camera.distance - line * (1 - fraction));
-      // The original also steps the camera to the hit point when the amount
-      // it just subtracted is under 300. That amount is behind a float
-      // conversion Ghidra dropped, the same gap as the lift below, so the
-      // reading taken here is the one that cannot teleport the view: step
-      // only while the step itself is under 300 level units.
-      if (line * fraction < 300) {
+      // Read from the machine code (docs/CAMERA.md): the cast shortens the
+      // line to the wall, and what is subtracted is THAT length — how far
+      // the camera is from the wall — so the new follow distance is the
+      // wall's own distance from Buzz. Under 300 level units the camera is
+      // also put on the wall this tick rather than easing there.
+      const toWall = (Math.hypot(delta.x, delta.y, delta.z) * fraction) / S;
+      camera.distance = Math.max(CAMERA.distanceFloor, camera.distance - Math.round(toWall));
+      if (toWall < 300) {
         camera.x += delta.x * fraction;
         camera.y += delta.y * fraction;
         camera.z += delta.z * fraction;
@@ -292,14 +292,15 @@ export function stepCamera(
     }
   }
 
-  // Too close to Buzz: the original lifts the eye to `p.y - headroom - k * 32`
-  // for a `k` that is another dropped float conversion (docs/CAMERA.md). What
-  // it is for is keeping the view above him rather than inside him, so this
-  // raises the eye to its wanted height and never lowers it.
-  const dx = (p.x - camera.x) / S, dy = (p.y - camera.y - CAMERA.headroom) / S;
-  const dz = (p.z - camera.z) / S;
+  // Too close to Buzz: put the camera on a sphere of radius 400 level units
+  // around his head. `k = sqrt(400^2 - dx^2 - dz^2)` is the height that
+  // does it, and the eye goes to `head - k`, above him. Read from the
+  // machine code, which Ghidra had folded into a bare float conversion.
+  const dx = (p.x - camera.x) >> 5, dy = (p.y - camera.y - CAMERA.headroom) >> 5;
+  const dz = (p.z - camera.z) >> 5;
   if (dx * dx + dy * dy + dz * dz < CAMERA.tooCloseSq) {
-    camera.y = Math.min(camera.y, camera.wantY);
+    const k = Math.trunc(Math.sqrt(Math.max(0, CAMERA.tooCloseSq - dx * dx - dz * dz)));
+    camera.y = p.y - CAMERA.headroom - k * S;
   }
 }
 
@@ -365,7 +366,9 @@ function standing(
   };
   const { fraction } = cast(world, from, delta, standoff);
   if (fraction < 1) {
-    camera.distance = Math.max(CAMERA.distanceFloor, Math.round(CAMERA.distance * fraction));
+    // The distance becomes the length of the shortened line, in level units.
+    const toWall = (Math.hypot(delta.x, delta.y, delta.z) * fraction) / S;
+    camera.distance = Math.max(CAMERA.distanceFloor, Math.round(toWall));
   }
 }
 

@@ -663,10 +663,92 @@ function behave(sim: EffectSim, world: EffectWorld, e: Effect, dt: number): numb
       }
       return 0;
     }
-    // 0x2f, 0x30 and 0x34 are level-specific handlers (levels 12 and 10) that
-    // were not decoded; they behave as mode 0 here rather than guess.
+    case 0x2f: return zurgBall(sim, world, e, dt);
+    case 0x30:
+      // The same "gone near the target" test as 0x2f, and a trail of 0x6f.
+      if (nearZurgTarget(e)) e.life = 0;
+      if (e.life > 4 && sim.gate.four) {
+        spawnChild(sim, world, e.x - e.vx * dt, e.y, e.z - e.vz * dt, 0x6f, 2);
+      }
+      return 0;
+    case 0x34: {
+      // Level 10's bouncer: kept inside a box round the origin, turning back
+      // off each wall with a sound (`FUN_00425ad0`).
+      const b = ARENA.level10;
+      let hit = false;
+      if (e.x < b.xMin) { e.vx = Math.abs(e.vx); hit = true; }
+      if (e.x > b.xMax) { e.vx = -Math.abs(e.vx); hit = true; }
+      if (e.z < b.zMin) { e.vz = Math.abs(e.vz); hit = true; }
+      if (e.z > b.zMax) { e.vz = -Math.abs(e.vz); hit = true; }
+      if (hit) sound(sim, 0x4a, e);
+      return 0;
+    }
     default: return 0;
   }
+}
+
+/**
+ * The two levels whose bosses throw things around an arena, with the
+ * arena's edges in game units (`FUN_0042b090`, `FUN_0042b250`,
+ * `FUN_00425ad0`). Level 12's ball dies within 1,024 level units of a fixed
+ * point, which is where the boss stands.
+ */
+const ARENA = {
+  level12: {
+    /** The pit: inside it the ball has a floor at `floorY`, outside it none. */
+    pit: { xMin: -0x256d6, xMax: 0xe0aa, zMin: -0x1b3e9, zMax: 0x1b297 },
+    floorY: -0x12bd3,
+    /** The whole room, whose walls turn the ball back. */
+    room: { xMin: -0x29b56, xMax: 0x2a62a, zMin: -0x230e9, zMax: 0x22b97 },
+    target: { x: -0xbd7c, z: 0x99 },
+    targetRadiusSq: 0x100000,
+  },
+  level10: { xMin: -0x169eb, xMax: 0x16915, zMin: -0x16cef, zMax: 0x16991 },
+} as const;
+
+/** Within 1,024 level units of level 12's boss, in x and z. */
+function nearZurgTarget(e: Effect): boolean {
+  const t = ARENA.level12.target;
+  const dx = (t.x - e.x) >> 5, dz = (t.z - e.z) >> 5;
+  return dx * dx + dz * dz < ARENA.level12.targetRadiusSq;
+}
+
+/**
+ * Mode 0x2f: level 12's bouncing ball. A trail of 0x6e behind it, a floor
+ * only inside the pit that it bounces off at seven eighths, the room's four
+ * walls that reflect it, and it dies near the boss. Any bounce sounds 0x43.
+ */
+function zurgBall(sim: EffectSim, world: EffectWorld, e: Effect, dt: number): number {
+  const a = ARENA.level12;
+  let bounced = false;
+  if (e.life > 4 && sim.gate.four) {
+    spawnChild(sim, world, e.x - e.vx * dt, e.y, e.z - e.vz * dt, 0x6e, 2);
+  }
+  const inPit = e.x > a.pit.xMin && e.x < a.pit.xMax && e.z > a.pit.zMin && e.z < a.pit.zMax;
+  if (!inPit) {
+    e.floor = 400000;
+  } else {
+    if (e.floor === null) e.floor = a.floorY;
+    if (e.y < a.floorY + 1) {
+      e.floor = a.floorY;
+      mark(sim, e, a.floorY);
+    } else if (e.floor === a.floorY) {
+      e.y = a.floorY;
+      bounced = true;
+      e.vy = -Math.abs(idiv(e.vy * 7, 8));
+    } else {
+      e.vx = -e.vx;
+      e.vz = -e.vz;
+      bounced = true;
+    }
+  }
+  if (e.x < a.room.xMin) { e.vx = Math.abs(e.vx); bounced = true; }
+  if (e.x > a.room.xMax) { e.vx = -Math.abs(e.vx); bounced = true; }
+  if (e.z < a.room.zMin) { e.vz = Math.abs(e.vz); bounced = true; }
+  if (e.z > a.room.zMax) { e.vz = -Math.abs(e.vz); bounced = true; }
+  if (nearZurgTarget(e)) e.life = 0;
+  if (bounced) sound(sim, 0x43, e);
+  return 0;
 }
 
 /** Mode 0x1c: the bouncing spark that also trails. */

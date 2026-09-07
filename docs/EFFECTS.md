@@ -180,11 +180,12 @@ mark at the record's floor. `sound N` is the sound event N at the record.
 | 0x2c | floor; die 0x1000 below it; while drawn and L > 4: 1-in-4 spawn 0x2c in 4 with 2/3 of its velocity, 1-in-6 spawn 0x69 in 2 with its rotation, 1-in-8 spawn 0x6a in 2 rotated ±0x180..0x280 randomly | — |
 | 0x2d | shrink `per`/tick, `h = w/2` | 2 |
 | 0x2e | grow `per`/tick; light (b, b/2, 0) | 1 |
-| 0x2f, 0x30 | `FUN_0042b090`, `FUN_0042b250` (level 12's boss) | — |
+| 0x2f | level 12's ball (`FUN_0042b090`): trail 0x6e in 2 behind it on 1-in-4 ticks; inside the pit x (-0x256d6, 0xe0aa) z (-0x1b3e9, 0x1b297) it has a floor at y -0x12bd3 which it lands on and bounces off at 7/8, outside it none; the room's walls x (-0x29b56, 0x2a62a) z (-0x230e9, 0x22b97) reflect it; within 1,024 level units of (-0xbd7c, 0x99) in x/z it dies; any bounce sounds 0x43 | — |
+| 0x30 | level 12's other ball (`FUN_0042b250`): the same "dies near (-0xbd7c, 0x99)" test, trail 0x6f in 2 | — |
 | 0x31 | sound 0x40; place object 0x19 at the record and face it along the yaw (`FUN_004cce30`, `FUN_004ccc70`); on `c2` ticks while L > 4 spawn 0x2e with its own velocity | — |
 | 0x32 | colour ramps up over the first 0x12 ticks (from L 0x52) | 2 |
 | 0x33 | on 1-in-4 ticks while L > 4 spawn kind `per/2` in 2 with random spin; `per` == 0x76 fades | 2 if per == 0x76 |
-| 0x34 | `FUN_00425ad0` (level 10) | — |
+| 0x34 | level 10's bouncer (`FUN_00425ad0`): kept inside x (-0x169eb, 0x16915) z (-0x16cef, 0x16991), each wall reflecting it with sound 0x4a | — |
 | 0x35 | `w = sin(L*0x40) / per`; on 1-in-16 ticks while L > 4 spawn 0x2e in 2 with life 0x30 and size 0x2000/per | — |
 
 **Fades**, applied after the mode, scale the template colour by the life:
@@ -282,8 +283,7 @@ The names of the two light-like helpers are read from their shape:
 `FUN_0044f200` projects the point, tests the line to the camera and keeps
 up to eight per frame (a glow drawn later); `FUN_0049ee50` keeps eight
 positions with a colour and a countdown that the character lighting reads
-(a point light). The level-specific modes 0x2f, 0x30 and 0x34 were not
-read. `FUN_0049e660` with a negative event number plays a sequence from
+(a point light). `FUN_0049e660` with a negative event number plays a sequence from
 `PTR_DAT_00503828` rather than an event; the coin pickup is one.
 
 ## Ported
@@ -305,9 +305,9 @@ a creature with `vulnerable` 7 the bolt closed from 1,148 level units to
 149 and landed damage kind 4, taking it from 4 health to 2, which is the
 2 that `DAMAGE_KINDS[4]` carries.
 
-Three things are not as the original has them, and each is named at its
-site: modes 0x2f, 0x30 and 0x34 are level-specific handlers that were not
-decoded and behave as mode 0; the bolt's starting pitch is aimed at its
+Two things are not as the original has them, and each is named at its
+site (modes 0x2f, 0x30 and 0x34 were read and ported on 2026-09-07): the
+bolt's starting pitch is aimed at its
 target because where `FUN_00434990` gets the aim it passes was not read,
 and level it passes over anything much above the wrist; and the laser
 targets the nearest creature that is in this tick's near list rather than

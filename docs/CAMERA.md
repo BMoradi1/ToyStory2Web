@@ -137,9 +137,9 @@ camera, 1, 1)` says whether the line is blocked and how far in: distance
 also moved along the line.
 
 **Too close.** If the camera is within 400 level units of Buzz's head it
-is lifted: `y = by - 0x1000 - k * 0x20` for a `k` Ghidra rendered as a
-float conversion and this pass could not read; the port keeps its
-distance floor of Buzz's radius plus the near plane instead.
+is put onto that sphere: `k = sqrt(160000 - dx^2 - dz^2)` (dy not
+subtracted) and `y = by - 0x1000 - k * 0x20`, so it ends exactly 400 level
+units from the head, above it.
 
 ## The collision flags the camera sees
 
@@ -160,11 +160,21 @@ expands by 1.39 for the broadphase, so 200 is a thin ray and the
 standing cast's 0xb18 is a fat one); `sweepSphere` at that radius is the
 same query, and `cast` in the module wraps it.
 
-Two numbers could not be read and are named where they are used: the
-amount the occlusion pull-in subtracts before it also steps the camera to
-the hit point, and the lift applied when the camera ends up within 400
-level units of Buzz. Both sit behind `__ftol()` calls whose float
-expression Ghidra dropped. The port takes the bounded reading of each.
+The three float conversions Ghidra dropped were read from the machine
+code on 2026-09-07 (objdump on the exe) and every one is a square root:
+
+- **the standing ray**: `FUN_0048c860` shortens the line to the hit, and
+  the distance becomes that line's length, `sqrt(dx^2 + dy^2 + dz^2)` with
+  each component `>> 5`, so level units, floored at 10;
+- **the occlusion pull-in**: the same length of the line `FUN_0048d530`
+  shortened, which is how far the CAMERA is from the wall. That is what is
+  subtracted from the distance — so the new follow distance is the wall's
+  own distance from Buzz — and when it is under 300 the camera is put on
+  the wall this tick as well. An earlier reading here subtracted the
+  remainder instead, which was backwards;
+- **the too-close lift**: `k = sqrt(160000 - dx^2 - dz^2)`, dy left out,
+  and `y = head - k * 32`. It puts the camera ON the sphere of radius 400
+  level units around his head, above him, rather than merely lifting it.
 
 Measured after the port, walking, strafing, turning and jumping around
 level 1 for 480 ticks: the camera's worst single-tick move is **81 level

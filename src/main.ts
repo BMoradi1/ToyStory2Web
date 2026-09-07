@@ -29,7 +29,7 @@ import { cos as cosOf, sin as sinOf, toRadians, yawOf } from './sim/trig.ts';
 import { createCamera, stepCamera, cameraTarget, type CameraState } from './sim/camera.ts';
 import { createZones, stepZones, type ZoneState } from './sim/zones.ts';
 import {
-  MENU, createMenu, highlight, menuRows, openMenu, stepMenu,
+  MENU, MENU_TEXT, MenuPage, createMenu, highlight, menuRows, openMenu, openTokenScreen, stepMenu,
   type MenuInput, type MenuState,
 } from './sim/menu.ts';
 import {
@@ -1676,7 +1676,7 @@ function startDialogue(request: import('./sim/tasks.ts').DialogueRequest): void 
 /** What the menu asked for. Everything it offers is something we have. */
 function applyMenu(action: ReturnType<typeof stepMenu>): void {
   if (!action) return;
-  if (action.kind === 'resume') return;
+  if (action.kind === 'resume' || action.kind === 'token') return;
   if (action.kind === 'exit') { void togglePlay(); return; }
   if (action.kind === 'camera') {
     cameraPassive = action.passive;
@@ -1694,15 +1694,27 @@ function menuDraw(): MenuDraw | null {
   if (!menu.open || !exeBytes) return null;
   const { title, items, ys } = menuRows(menu, (address) => exeString(exeBytes!, address));
   const lit = highlight(menu);
+  const token = menu.page === MenuPage.Token;
   return {
     title,
+    titleY: token ? MENU.tokenTitleY : MENU.titleY,
+    // The pause menu's text is yellow; the token screen's is white.
+    titleColour: token
+      ? [MENU.steady, MENU.steady, MENU.steady]
+      : [MENU.steady, MENU.steady, 0],
     rows: items.map((text, i) => ({
       text,
       y: ys[i] ?? 0,
       colour: (i === menu.item
-        ? [lit, lit, 0]
-        : [MENU.steady, MENU.steady, 0]) as readonly [number, number, number],
+        ? (token ? [lit, lit, lit] : [lit, lit, 0])
+        : (token
+          ? [MENU.steady, MENU.steady, MENU.steady]
+          : [MENU.steady, MENU.steady, 0])) as readonly [number, number, number],
     })),
+    hint: token
+      ? { text: exeString(exeBytes, MENU_TEXT.jumpToSelect), y: MENU.tokenHintY }
+      : null,
+    box: token ? MENU.tokenBox : null,
   };
 }
 
@@ -2098,6 +2110,14 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     if (tasks && tasks.potatoPart > 0 && taken.some((t) => t.kind === PickupKind.None)) {
       tasks.potatoPart = -tasks.potatoPart;
       infoEl.textContent = "you picked up mr potato head's missing part";
+    }
+    // Walking into a Pizza Planet token brings up the screen that asks
+    // whether to keep playing or leave (docs/HUD.md).
+    const token = taken.find((t) => t.kind === PickupKind.Token);
+    if (token) {
+      const item = pickups.items[token.index];
+      openTokenScreen(menu, item?.tokenSlot ?? -1);
+      playEvent(0x33, player);
     }
     // A hint sign is reported but never consumed; touching one opens its box.
     const sign = taken.find((t) => t.kind === PickupKind.HintSign);

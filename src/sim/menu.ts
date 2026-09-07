@@ -26,6 +26,14 @@ export enum MenuPage {
   Camera = 1,
   Volume = 2,
   Confirm = 3,
+  /**
+   * The screen that comes up on earning a Pizza Planet token. The same
+   * drawing and the same two-item shape, but its own colours: the rows are
+   * WHITE and the selected one pulses grey, where the pause menu's are
+   * yellow. It sits on a blue panel and carries a third, static line telling
+   * you which button picks.
+   */
+  Token = 4,
 }
 
 /** Addresses of the menu's text in `toy2.exe`, for `exeString`. */
@@ -42,11 +50,15 @@ export const MENU_TEXT = {
   yes: 0x502710,
   /** Drawn at y 200 when the pad has gone away. Not used here. */
   insertController: 0x5027c0,
+  tokenTitle: 0x502770,
+  keepPlaying: 0x50278c,
+  exitLevelQuery: 0x50279c,
+  jumpToSelect: 0x502890,
 } as const;
 
 export const MENU = {
   /** `DAT_005039bc`: how many items each page has. */
-  items: [4, 2, 2, 2] as const,
+  items: [4, 2, 2, 2, 2] as const,
   /** Rows, in the 320-wide text space. */
   titleY: 0x54,
   /** Item rows on the four-item page, and on a two-item page. */
@@ -59,6 +71,12 @@ export const MENU = {
   pulseHigh: 0x7e,
   /** The volume rows are ten steps of asterisk. */
   volumeSteps: 10,
+  /** The token screen's own rows, and the panel behind it. */
+  tokenTitleY: 0x5e,
+  tokenRows: [0x6a, 0x72] as const,
+  tokenHintY: 0x7c,
+  /** `FUN_00401b60(0x4d, 0x5b, 0x166000, 0x2d000, 0, 0, 0x80)`, the 512 space. */
+  tokenBox: { x: 0x4d, y: 0x5b, width: 0x166, height: 0x2d, r: 0, g: 0, b: 0x80 },
   /** Sound events: moving, going in, coming back out. */
   moveEvent: 0x3f,
   enterEvent: 0x3d,
@@ -68,6 +86,7 @@ export const MENU = {
 /** What a press asked the game to do. */
 export type MenuAction =
   | { kind: 'resume' }
+  | { kind: 'token'; slot: number }
   | { kind: 'exit' }
   | { kind: 'camera'; passive: boolean }
   | { kind: 'volume'; sfx: number; bgm: number };
@@ -84,16 +103,26 @@ export interface MenuState {
   phase: number;
   /** Sound events raised this tick, for the caller. */
   events: number[];
+  /** Which token slot the token screen is showing. */
+  slot: number;
 }
 
 export function createMenu(sfx = 7, bgm = 6): MenuState {
-  return { open: false, page: MenuPage.Root, item: 0, sfx, bgm, phase: 0, events: [] };
+  return { open: false, page: MenuPage.Root, item: 0, sfx, bgm, phase: 0, events: [], slot: -1 };
 }
 
 export function openMenu(menu: MenuState): void {
   menu.open = true;
   menu.page = MenuPage.Root;
   menu.item = 0;
+}
+
+/** Show the token screen. `slot` is only carried back to the caller. */
+export function openTokenScreen(menu: MenuState, slot: number): void {
+  menu.open = true;
+  menu.page = MenuPage.Token;
+  menu.item = 0;
+  menu.slot = slot;
 }
 
 /** The buttons the menu reads, each as a PRESS rather than a hold. */
@@ -134,6 +163,12 @@ export function menuRows(
         title: text(MENU_TEXT.areYouSure),
         items: [text(MENU_TEXT.no), text(MENU_TEXT.yes)],
         ys: MENU.rowsTwo,
+      };
+    case MenuPage.Token:
+      return {
+        title: text(MENU_TEXT.tokenTitle),
+        items: [text(MENU_TEXT.keepPlaying), text(MENU_TEXT.exitLevelQuery)],
+        ys: MENU.tokenRows,
       };
     default:
       return {
@@ -183,6 +218,14 @@ export function stepMenu(menu: MenuState, input: MenuInput): MenuAction | null {
   }
 
   if (!input.select && !input.back) return null;
+
+  // The token screen has no page above it, and its own hint says "jump to
+  // select", so either button dismisses it.
+  if (menu.page === MenuPage.Token) {
+    menu.open = false;
+    menu.events.push(MENU.backEvent);
+    return menu.item === 1 ? { kind: 'exit' } : { kind: 'token', slot: menu.slot };
+  }
 
   // Back always climbs one page, and on the root page it resumes.
   if (input.back) {

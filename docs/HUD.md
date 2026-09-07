@@ -182,7 +182,7 @@ counters come from the pickup switch: category 6 adds 5 to `DAT_00882938`
 (cap 10, icon 33) and zeroes the other; category 7 adds 10 to
 `DAT_00882964` (cap 30, the disc); category 10 starts the 0x4b0-tick power
 timer. The same function draws the pause menu and the "you have collected
-a token" screen. The menu is laid out below; the token screen is not.
+a token" screen. Both are laid out below.
 
 ### The pause menu (`FUN_0049f4b0` input, the tail of `FUN_0049fd40` draw)
 
@@ -211,6 +211,25 @@ therefore the row that MOVES, and it is never brighter than the rest.
 Input: pad 0x40 down and 0x10 up within the page's count, 0x20 and 0x80
 right and left for the sliders, 0x1000 select and 0x4000 back. Sound event
 0x3f on a move, 0x3d going in, 0x3e coming back out.
+
+### The token screen
+
+Comes up on walking into a Pizza Planet token, on game state
+`DAT_00830cc4 == 9`. Same helper, same two-item shape, different dress:
+
+    y 0x5e   you have collected a token!     0x502770
+    y 0x6a   keep on playing                 0x50278c
+    y 0x72   exit level?                     0x50279c
+    y 0x7c   jump to select                  0x502890
+
+Its rows are WHITE — `(0x80, 0x80, 0x80)`, which is neutral on all three
+channels and so shows the font's own colour — where the pause menu kills
+the blue. The selection pulses on all three channels rather than two, and
+`jump to select` never pulses. Behind it,
+`FUN_00401b60(0x4d, 0x5b, 0x166000, 0x2d000, 0, 0, 0x80)`: a half-alpha
+BLUE panel in the 512 space at (77, 91), 358 x 45, framed in black the
+same way the talk box is. One button both moves and confirms, which is
+what the hint line is telling you.
 
 The two volume rows are not static strings: the original rewrites its own
 copy in place, `sfx ` or `bgm ` followed by one asterisk per step and

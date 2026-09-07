@@ -89,7 +89,14 @@ const MENU_TITLE_Y = 0x54;
 
 export interface MenuDraw {
   title: string;
+  /** Where the title sits and what colour it is. */
+  titleY: number;
+  titleColour: readonly [number, number, number];
   rows: { text: string; y: number; colour: readonly [number, number, number] }[];
+  /** A static line under the rows, e.g. "jump to select". */
+  hint?: { text: string; y: number } | null;
+  /** A panel behind the whole thing, in the 512 space. */
+  box?: { x: number; y: number; width: number; height: number; r: number; g: number; b: number } | null;
 }
 
 export interface TalkDraw {
@@ -474,8 +481,26 @@ export class HudPainter {
         let x = 0xa0 - s.length * 4;
         for (const ch of s) { glyph(ch, x, y, colour); x += 8; }
       };
-      centred(menu.title, MENU_TITLE_Y, [NEUTRAL, NEUTRAL, 0]);
+      centred(menu.title, menu.titleY, menu.titleColour);
       for (const row of menu.rows) centred(row.text, row.y, row.colour);
+      if (menu.hint) centred(menu.hint.text, menu.hint.y, [NEUTRAL, NEUTRAL, NEUTRAL]);
+      // The panel goes in last so it lands BEHIND the text: the buffer fills
+      // backward (see the note at the bottom of this method).
+      if (menu.box) {
+        const b = menu.box;
+        const header = table[SPRITE.pixel];
+        if (header) {
+          const solid = (x: number, y: number, w: number, h: number,
+            cr: number, cg: number, cb: number, alpha: number) => {
+            bar(x, y, w, h, cr, cg, cb, px512, alpha);
+          };
+          solid(b.x, b.y, 2, b.height, 0, 0, 0, 1);
+          solid(b.x + b.width - 2, b.y, 2, b.height, 0, 0, 0, 1);
+          solid(b.x, b.y, b.width, 1, 0, 0, 0, 1);
+          solid(b.x, b.y + b.height - 1, b.width, 1, 0, 0, 0, 1);
+          solid(b.x + 2, b.y + 1, b.width - 4, b.height - 2, b.r, b.g, b.b, 0.5);
+        }
+      }
     }
 
     // The buffer fills backward, so the frame lands in the reverse of the

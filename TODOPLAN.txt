@@ -224,12 +224,10 @@
           reads the camera's), the portal walk starting from the camera
           zone, the boss taunts onto their level's zone test (table in the
           doc), and the two per-level overrides (levels 4 and 10).
-          DONE 2026-09-06 except the boss taunts and the two per-level
-          overrides: src/sim/zones.ts keeps both zones and stepTasks takes
-          them, so level 7's timed egg can fail. What is left is reading
-          each of the other eight levels' taunt blocks out of its tick
-          (level 1's is the only one in src/sim/level-data.ts) and adding
-          a zone to the taunt record beside its height band.
+          DONE 2026-09-06 except the two per-level camera overrides:
+          src/sim/zones.ts keeps both zones, stepTasks takes them, level
+          7's timed egg can fail, and all nine boss taunts are in with
+          their triggers (docs/LEVELS.md "What starts a boss fight").
  P1.6 [ACTIVE]  Parity harness. Half done: tools/render-level.ts now takes
                 --eye/--target/--size/--fovy and matches three.js (vertical
                 FOV, the viewer's clear colour, the same two draw queues and

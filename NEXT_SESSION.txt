@@ -6,9 +6,10 @@
  finished, and later that day when the zone byte, the effect system and
  the follow camera were decoded AND PORTED. NOTHING IS WAITING ON FABLE:
  every item under "WHAT TO GIVE FABLE, IN ORDER" is closed. The one thing
- a Fable pass would still pay for is small and named in TODOPLAN: the
- eight remaining boss taunts, one zone test each, buried in each level's
- 4 KB tick. Everything else is ordinary Opus work.
+ a Fable pass would still pay for is two small things, neither blocking:
+ effect modes 0x2f/0x30/0x34 (level 10's and level 12's boss handlers,
+ unnamed functions with no template to match), and two camera constants
+ behind FPU expressions Ghidra dropped. Everything else is Opus work.
 ================================================================================
 
  Read TODOPLAN.txt for WHAT to do. This file is about WHO should do it and what

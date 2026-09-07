@@ -1935,6 +1935,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
           tokens: pickups?.tokens ?? 0,
           cameraZone: zones.camera,
           playerZone: zones.player,
+          onGround: player.onGround,
         },
       );
       if (request) startDialogue(request);

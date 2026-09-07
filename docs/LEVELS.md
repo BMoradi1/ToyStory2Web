@@ -630,3 +630,44 @@ zone, `DAT_005d2a8c` = player zone):
 The port's `stepTasks` currently takes one `zone`; it should take both, and
 the boss taunts that were gated by level 1's height band should move to
 their level's zone test above.
+
+## What starts a boss fight
+
+Decoded 2026-09-06. Nine of the ten non-boss levels carry a mini-boss in
+slot 4 (level 8 has none). Each idles in a closed script loop until its
+taunt has been seen; the level's tick opens that taunt through the same
+`FUN_004027f0(creature, pathTag, text, playerYaw, creatureYaw, slot)` the
+hint NPCs use, and once the box closes it kicks the script to `wakeWord`
+and sets the chase flag. Every taunt's text begins "ha ha ha ha, defeat
+the...", which is what makes them findable in the ticks.
+
+What differs is only the trigger, and no two levels use the same set. All
+are in `src/sim/level-data.ts` under `boss.taunt`:
+
+| level | boss | tag | trigger |
+|---|---|---|---|
+| 1 | 8 tin robot | 0x1a | grounded, height band |
+| 2 | 0x1a Zurg | 9 | grounded, `y < -0x72000`, x/z box |
+| 4 | 0x18 jack | 0x22 | grounded, `y < -0x9bfc5`, within 300 of a point |
+| 5 | 3 clown | 0xd | grounded, camera zone 2 |
+| 7 | 0 dino | 5 | grounded, `y >= -0x63b`, camera zone 4 |
+| 10 | 8 spider | 0x1f | grounded, height band |
+| 11 | 0xb gunslinger | 0x10 | `y < 0x1f448`, x/z box |
+| 13 | 0x20 prospector | 0x20 | grounded, `y < -0x3660e`, within 300 of a point |
+| 14 | 0x2e blacksmith | 1 | within 300 of a point |
+
+`FUN_0049f400(a, b, r)` is a distance test in steps of 256 game units, so
+a radius of 300 is 2,400 level units; `FUN_0049f460(p, xMin, xMax, zMin,
+zMax)` is a plain x/z box. `wakeWord` is 14 everywhere except level 1 (10)
+and level 4 (12).
+
+**One thing is not the original's.** The three "within 300 of a point"
+levels measure to a fixed point that lives in `.bss` — zero in the image
+and written at run time by something the decompile does not show. The
+port measures to the boss's own placement instead, which has to be inside
+that radius of wherever the point is.
+
+Walked in the browser: the taunt fires on levels 2, 4, 5, 7, 11, 13 and 14
+by standing in each trigger, and level 1's already did. Level 10's band
+was not walked — its arena is up a shaft Buzz falls past when placed by
+hand — but the band brackets that boss's own height.

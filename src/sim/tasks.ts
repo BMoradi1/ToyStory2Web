@@ -157,6 +157,8 @@ export function stepTasks(
     items: number;
     /** Bit per token slot already taken, for the timed runs. */
     tokens: number;
+    /** `DAT_0052f38e`: most boss taunts will not fire while Buzz is airborne. */
+    onGround: boolean;
     /**
      * Which room the game thinks we are in, -1 over a hole. The scripts read
      * two of these and mean different things by them (docs/LEVELS.md
@@ -336,9 +338,21 @@ export function stepTasks(
     const taunt = boss.taunt;
     if (c && taunt && tasks.boss < 2) {
       if (tasks.boss === 0) {
-        // The height band is what keeps it from taunting through the ceiling.
-        const inBand = world.y > taunt.yMin && world.y < taunt.yMax;
-        if (inBand && (c.flags & CREATURE_FLAGS.near) !== 0 && c.animState !== 7) {
+        // Every trigger the level names has to hold. Between them the nine
+        // levels use a height band, an x/z box, a radius around the boss and
+        // the camera's zone; what they have in common is keeping the taunt
+        // from firing through a wall or a ceiling.
+        const dx = (world.x - c.x) >> 8, dy = (world.y - c.y) >> 8, dz = (world.z - c.z) >> 8;
+        const holds = (taunt.grounded !== true || world.onGround)
+          && (taunt.yMin === undefined || world.y > taunt.yMin)
+          && (taunt.yMax === undefined || world.y < taunt.yMax)
+          && (taunt.zone === undefined || world.cameraZone === taunt.zone)
+          && (taunt.box === undefined
+            || (world.x > taunt.box.xMin && world.x < taunt.box.xMax
+              && world.z > taunt.box.zMin && world.z < taunt.box.zMax))
+          && (taunt.nearBoss === undefined
+            || dx * dx + dy * dy + dz * dz < taunt.nearBoss * taunt.nearBoss);
+        if (holds && (c.flags & CREATURE_FLAGS.near) !== 0 && c.animState !== 7) {
           tasks.boss = 1;
           return {
             creature: boss.creature, pathTag: taunt.pathTag, text: taunt.text,

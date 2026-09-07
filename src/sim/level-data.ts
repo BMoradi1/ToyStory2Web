@@ -325,16 +325,39 @@ export interface LevelTasks {
      */
     delay: number;
     /**
-     * Level 1's boss also has to be woken: its script idles in a closed loop
-     * until its taunt has been seen, and the level's tick then kicks the
-     * script to `wakeWord`. Only level 1's is read out.
+     * A boss has to be woken: its script idles in a closed loop until its
+     * taunt has been seen, and the level's tick then kicks the script to
+     * `wakeWord` and gives it the chase flag.
+     *
+     * Every trigger present must hold, and they are all optional because no
+     * two levels use the same set. The nine boss levels between them use a
+     * height band (1, 10), an x/z box (2, 11), a radius around a fixed point
+     * (4, 13, 14) and the camera's zone (5, 7); most also want Buzz on the
+     * ground. Read out of each level's tick, all nine of them.
      */
     taunt?: {
       pathTag: number; text: number;
       playerYaw: number; creatureYaw: number;
-      /** Buzz has to be between these heights, game units, +Y down. */
-      yMin: number; yMax: number;
       wakeWord: number;
+      /** `DAT_0052f38e`: the mover found floor this tick. */
+      grounded?: boolean;
+      /** Buzz has to be between these heights, game units, +Y down. */
+      yMin?: number; yMax?: number;
+      /** ...and inside this x/z box (`FUN_0049f460`), game units. */
+      box?: { xMin: number; xMax: number; zMin: number; zMax: number };
+      /**
+       * ...and within this of the boss (`FUN_0049f400`), in steps of 256
+       * game units, so 300 is 2,400 level units.
+       *
+       * The original measures to a fixed point per level, and those points
+       * live in `.bss` — zero in the image and written at run time by
+       * something the decompile does not show. The boss's own placement is
+       * the stand-in, which is where those points must be to within far less
+       * than this radius.
+       */
+      nearBoss?: number;
+      /** ...and the camera's zone is this (docs/LEVELS.md "Zones"). */
+      zone?: number;
     };
   };
   /**
@@ -479,7 +502,16 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
     },
   },
   2: {
-    boss: { creature: 0x1a, slot: 4, delay: 0x78 },
+    boss: {
+      creature: 0x1a,
+      slot: 4,
+      delay: 0x78,
+      taunt: {
+        pathTag: 9, text: 0x4f10bc, playerYaw: -1, creatureYaw: 0, wakeWord: 14,
+        grounded: true, yMax: -0x72000,
+        box: { xMin: 0x20cc6, xMax: 0x35fc6, zMin: 0x2d174, zMax: 0x4c7f4 },
+      },
+    },
     race: {
       style: 'checkpoints',
       creature: 0x1d, pathTag: 5, text: 0x4f10f8,
@@ -500,7 +532,15 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
     },
   },
   4: {
-    boss: { creature: 0x18, slot: 4, delay: 0x78 },
+    boss: {
+      creature: 0x18,
+      slot: 4,
+      delay: 0x78,
+      taunt: {
+        pathTag: 0x22, text: 0x4f169c, playerYaw: 0x580, creatureYaw: 0xdc0, wakeWord: 12,
+        grounded: true, yMax: -0x9bfc5, nearBoss: 300,
+      },
+    },
     challenge: { creature: 0x1a, pathTag: 0x1f, askText: 0x4f1710, hurryText: 0x4f178c, doneText: 0x4f17c0, needed: 5, slot: 2 },
     potato: { creature: 0x15, pathTag: 0x1e, askText: 0x4f1818, thanksText: 0x4f18a0, explainText: 0x4f192c, playerYaw: 0x440, creatureYaw: 0xc40 },
     hamm: { creature: 0x14, pathTag: 0x1d, playerYaw: 0xe10, creatureYaw: 0x6e0, slot: 0 },
@@ -514,7 +554,15 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
     },
   },
   5: {
-    boss: { creature: 0x3, slot: 4, delay: 0x78 },
+    boss: {
+      creature: 0x3,
+      slot: 4,
+      delay: 0x78,
+      taunt: {
+        pathTag: 0xd, text: 0x4f1d10, playerYaw: -1, creatureYaw: 0, wakeWord: 14,
+        grounded: true, zone: 2,
+      },
+    },
     challenge: { creature: 0x12, pathTag: 0x0e, askText: 0x4f1e3c, hurryText: 0x4f1eb0, doneText: 0x4f1ed4, needed: 5, slot: 2 },
     hamm: { creature: 0x14, pathTag: 0xf, playerYaw: -1, creatureYaw: 0x0, slot: 0 },
     hintNpc: {
@@ -533,7 +581,15 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
       askText: 0x4f2460, hurryText: 0x4f24f0, againText: 0x4f2520,
       firstClock: 0x96, secondClock: 0x7e, failZone: 4,
     },
-    boss: { creature: 0x0, slot: 4, delay: 0x78 },
+    boss: {
+      creature: 0x0,
+      slot: 4,
+      delay: 0x78,
+      taunt: {
+        pathTag: 5, text: 0x4f2358, playerYaw: -1, creatureYaw: 0, wakeWord: 14,
+        grounded: true, yMin: -0x63b, zone: 4,
+      },
+    },
     hamm: { creature: 0x1, pathTag: 0x3, playerYaw: 0xe10, creatureYaw: 0x6e0, slot: 0 },
     hintNpc: {
       creature: 0x1f, pathTag: 0xb,
@@ -559,7 +615,15 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
   10: {
     potato: { creature: 7, pathTag: 0x25, pathTagDone: 0x20, askText: 0x4f30a0, thanksText: 0x4f3120, explainText: 0x4f31ec, playerYaw: -1, creatureYaw: 0xe00 },
     offer: { creature: 0x16, pathTag: 0x21, text: 0x4f3284, slot: 2 },
-    boss: { creature: 0x8, slot: 4, delay: 0x78 },
+    boss: {
+      creature: 0x8,
+      slot: 4,
+      delay: 0x78,
+      taunt: {
+        pathTag: 0x1f, text: 0x4f2f90, playerYaw: -1, creatureYaw: 0, wakeWord: 14,
+        grounded: true, yMin: -0x1c2509, yMax: -0x1ac1c9,
+      },
+    },
     hamm: { creature: 0x6, pathTag: 0x1d, playerYaw: -1, creatureYaw: 0x0, slot: 0 },
     hintNpc: {
       creature: 0x17, pathTag: 0x26,
@@ -571,7 +635,16 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
     },
   },
   11: {
-    boss: { creature: 0xb, slot: 4, delay: 0x78 },
+    boss: {
+      creature: 0xb,
+      slot: 4,
+      delay: 0x78,
+      taunt: {
+        pathTag: 0x10, text: 0x4f3828, playerYaw: -1, creatureYaw: 0, wakeWord: 14,
+        yMax: 0x1f448,
+        box: { xMin: -728526, xMax: -659150, zMin: -241532, zMax: -177452 },
+      },
+    },
     challenge: { creature: 2, pathTag: 0x12, askText: 0x4f3948, hurryText: 0x4f39c0, doneText: 0x4f39ec, needed: 5, slot: 2 },
     hamm: { creature: 0x0, pathTag: 0xf, playerYaw: -1, creatureYaw: 0x0, slot: 0 },
     hintNpc: {
@@ -584,7 +657,15 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
     },
   },
   13: {
-    boss: { creature: 0x20, slot: 4, delay: 0x78 },
+    boss: {
+      creature: 0x20,
+      slot: 4,
+      delay: 0x78,
+      taunt: {
+        pathTag: 0x20, text: 0x4f4068, playerYaw: -1, creatureYaw: 0, wakeWord: 14,
+        grounded: true, yMax: -0x3660e, nearBoss: 300,
+      },
+    },
     challenge: { creature: 5, pathTag: 0x1e, askText: 0x4f40b4, hurryText: 0x4f4124, doneText: 0x4f414c, needed: 5, slot: 2 },
     potato: { creature: 8, pathTag: 0x1f, askText: 0x4f4268, thanksText: 0x4f42b8, explainText: 0x4f4384, playerYaw: -1, creatureYaw: 0xe00 },
     hamm: { creature: 0x6, pathTag: 0x1d, playerYaw: -1, creatureYaw: 0x0, slot: 0 },
@@ -599,7 +680,15 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
   },
   14: {
     offer: { creature: 0x26, pathTag: 4, text: 0x4f471c, slot: 2 },
-    boss: { creature: 0x2e, slot: 4, delay: 0x78 },
+    boss: {
+      creature: 0x2e,
+      slot: 4,
+      delay: 0x78,
+      taunt: {
+        pathTag: 1, text: 0x4f46d0, playerYaw: -1, creatureYaw: 0, wakeWord: 14,
+        nearBoss: 300,
+      },
+    },
     hamm: { creature: 0x27, pathTag: 0x2, playerYaw: -1, creatureYaw: 0x0, slot: 0 },
     hintNpc: {
       creature: 0x2f, pathTag: 0xa,

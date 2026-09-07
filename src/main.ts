@@ -1056,7 +1056,7 @@ async function spawnPlayer(): Promise<void> {
   const slope = (Math.acos(Math.min(1, -ground.normal.y)) * 180) / Math.PI;
   infoEl.textContent =
     `${entry.name} standing on floor ${(ground.y / WORLD_SCALE).toFixed(2)} ` +
-    `(${slope.toFixed(0)}\u00b0 slope), ${fromTable ? "the level's own start point" : `${area} cells of floor to walk on`}. Enter to play.`;
+    `(${slope.toFixed(0)}\u00b0 slope), ${fromTable ? "the level's own start point" : `${area} cells of floor to walk on`}. Enter to play, escape to stop.`;
 }
 
 /** Hand the viewer the pickups that are currently visible. */
@@ -2091,9 +2091,18 @@ window.addEventListener('keydown', (ev) => {
   // Enter toggles play; while playing, the movement keys belong to the game
   // and the inspection shortcuts would collide with them.
   if (ev.key === 'Enter') {
-    // While a box is open Enter pages it, as jump does; leaving play
-    // mid-dialogue left the box up with nothing driving it.
-    if (talk && viewer.playMode) { talkEnter = true; return; }
+    // Enter belongs to the GAME while play is on: it pages a text box, and
+    // otherwise does nothing. It used to fall through to leaving play, which
+    // meant that pressing it once more after a box closed dropped you out of
+    // a race that was already running. Escape is the way out now.
+    if (viewer.playMode) {
+      if (talk) talkEnter = true;
+      return;
+    }
+    void togglePlay();
+    return;
+  }
+  if (ev.key === 'Escape' && viewer.playMode) {
     void togglePlay();
     return;
   }

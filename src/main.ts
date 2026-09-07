@@ -1668,7 +1668,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     if (currentCollision && currentLevel) {
       stepZones(zones, currentCollision, currentLevel.level.zones, camera, player);
     }
-    const look = cameraTarget(player);
+    const look = cameraTarget(player, camera);
     viewer.placeCamera(
       camera.x * GAME_TO_RENDER, -camera.y * GAME_TO_RENDER, -camera.z * GAME_TO_RENDER,
       look.x * GAME_TO_RENDER, -look.y * GAME_TO_RENDER, -look.z * GAME_TO_RENDER,

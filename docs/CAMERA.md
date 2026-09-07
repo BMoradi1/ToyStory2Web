@@ -149,15 +149,24 @@ sweeps (`FUN_00484380`, `FUN_00485940`) — camera-only walls; bit 0x200
 makes it invisible to the camera's broadphase (`FUN_0048a4c0`) — the
 camera passes through it; bit 0x400 is a zone floor (docs/LEVELS.md).
 
-## Porting
+## Ported
 
-What the skeleton lacks, in the order it pays off: the position lag (an
-eighth a tick, which alone removes most "spazzing" — every other rule
-feeds a target the camera then eases to); the two heights `h1`/`h2` and
-the jump rule; the pitch and its modes; the three side rays and
-`autoTurn`; the eased view angles as the look-at rather than Buzz
-himself; the passive mode and the centre button; `lookAt` from the talk
-scripts; the mover blend; the shake. `FUN_0048c860` is a ray cast against
-the hull that shortens its direction to the hit and reports the hit
-normal's y in `DAT_0072869a`; the port's `sweepSphere` with a small
-radius stands in for it.
+`src/sim/camera.ts` is now all of the above except the mover blend
+(`onMover`, which needs "Buzz is standing on a type-8 collision group")
+and the states that pull the view behind him — a ledge grab, the rocket
+boots, a hang, the grapple — none of which exist yet. `FUN_0048c860` is a
+ray cast against the hull with a THICKNESS (its fifth argument, which it
+expands by 1.39 for the broadphase, so 200 is a thin ray and the
+standing cast's 0xb18 is a fat one); `sweepSphere` at that radius is the
+same query, and `cast` in the module wraps it.
+
+Two numbers could not be read and are named where they are used: the
+amount the occlusion pull-in subtracts before it also steps the camera to
+the hit point, and the lift applied when the camera ends up within 400
+level units of Buzz. Both sit behind `__ftol()` calls whose float
+expression Ghidra dropped. The port takes the bounded reading of each.
+
+Measured after the port, walking, strafing, turning and jumping around
+level 1 for 480 ticks: the camera's worst single-tick move is **81 level
+units** and no tick exceeds 100. Before the position lag it was 310, and
+before the distance fix in the previous session it was 1,224.

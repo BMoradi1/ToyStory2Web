@@ -1,259 +1,582 @@
 /**
- * The follow camera, from `FUN_004045e0` in toy2.exe.
+ * The follow camera, ported from `FUN_004045e0` in toy2.exe.
  *
- * Not a full port. That function is 4.7 KB and interleaves the chase camera
- * with mode switching, auto-centring, look-ahead and level-specific cases.
- * What is here is its skeleton and its numbers: where the camera sits, how its
- * yaw lags the player's, and that it does not go through walls. The parts left
- * out are listed at the bottom so the next person knows what is missing rather
- * than guessing from behaviour.
+ * The decode is docs/CAMERA.md, which carries the whole function with its
+ * numbers; this is that written out. The shape of it:
  *
- * Game units, +Y down, 12-bit yaw — the same conventions as the controller.
- * The camera struct in the original lives right after the player block, at
- * 0x52f3a0; field offsets are given so values can be checked in a debugger.
+ *   - a **yaw** that lags Buzz's facing while he moves and eases behind him
+ *     once he has stood still long enough;
+ *   - a **pitch** that rests at 0x40 and is pushed up or down by what three
+ *     short rays find around the camera, which is also what slides the view
+ *     sideways out of a corner rather than pulling it into Buzz's head;
+ *   - a **distance** that a blocked line sets outright and that walks back
+ *     out at 32 level units a tick;
+ *   - two **height followers** that track Buzz upward and while he runs, but
+ *     not while he falls, so stepping off a ledge leaves the camera high;
+ *   - and a **position** that eases toward all of that at an eighth a tick
+ *     rather than being placed on it, which is what makes the view calm.
+ *
+ * Game units (32 per level unit), +Y down, 12-bit yaw — the controller's
+ * conventions — EXCEPT `distance`, which is in level units because the
+ * original keeps it that way and every constant around it is in that space.
+ * The camera struct in the original is at 0x52f3a0; field offsets are given
+ * so values can be checked against a debugger.
  */
-import { groundBelow, sweepSphere, type CollisionWorld } from '../formats/collision.ts';
+import { sweepSphere, type CollisionWorld } from '../formats/collision.ts';
 import { GAME_UNITS_PER_LEVEL_UNIT } from './player-constants.ts';
-import { cos, idiv, sin, YAW_MASK, yawDelta } from './trig.ts';
+import { cos, idiv, sin, YAW_MASK, yawDelta, yawOf } from './trig.ts';
 import type { PlayerState } from './player.ts';
 
 const S = GAME_UNITS_PER_LEVEL_UNIT;
 
 export const CAMERA = {
   /**
-   * Distance behind the player. `+0x26` in the camera struct, initialised to
-   * 0x4b0 = 1200 by `FUN_00403450`, which is in level units — the position
-   * build multiplies by the 0x4000-scale sine and shifts right by 9, landing
-   * in game units. 1,200 level units is about 2.6 of Buzz's body heights.
+   * Resting distance behind Buzz, LEVEL units. `DAT_0050a128`, set once to
+   * 0x4b0 by `FUN_00403450` and never changed.
    */
-  distance: 1200 * S,
-  /** How fast the distance eases toward its target: `dt << 5` per tick. */
-  distanceRate: 32 * S,
+  distance: 0x4b0,
+  /** The distance walks back out at `dt << 5` level units a tick. */
+  distanceRate: 32,
   /**
-   * Height above the player. The initialiser clamps the camera to at least
-   * 0x4000 game units above the player's origin, and that is the resting
-   * framing.
+   * How close a blocked line may pull it in, level units. The engine's own
+   * floor; safe here only because the side rays and the auto-turn below now
+   * slide the view around a corner instead of into Buzz.
    */
-  height: 0x4000,
-  /**
-   * The camera looks this far above the player's origin — `player.y - 0x1000`
-   * in the position build.
-   */
-  lookAbove: 0x1000,
-  /**
-   * Yaw lag. The camera turns toward the player's facing by `diff / (0x2a * 2)`
-   * per tick, which is a little over one percent: slow enough that running in a
-   * circle swings the view behind you rather than snapping it.
-   */
+  distanceFloor: 10,
+
+  // --- yaw
+  /** While moving, the yaw closes on the facing by `delta / yawLag` a tick. */
   yawLag: 0x2a * 2,
-  /** While skidding the lag is longer still, so a hard turn does not whip the view. */
+  /** Longer during a skid, so a hard turn does not whip the view. */
   yawLagSkid: 0x60 * 2,
-  /**
-   * Past this the camera takes the short way round and hurries, at three times
-   * the rate — the original's `if (|diff| > 0x600) diff = (±0x800 - diff) * 3`.
-   */
+  /** Past this the view swings the SHORT way round, at three times the rate. */
   yawHurryThreshold: 0x600,
   /**
-   * Radius of the sphere the camera is swept as. Not the engine's: it casts
-   * a bare ray, which lets a wall come closer than the near plane and be
-   * seen through. The renderer's near plane is 0.1 renderer units, which is
-   * 819 game units, so the sphere is a little wider than that and the wall
-   * is stopped before it can cross the plane.
+   * A ledge grab, the rocket boots, a hang or the script flag pull the view
+   * behind Buzz as well: the delta clamped to `swingClamp`, over `swingLag`.
    */
-  radius: 1000,
-  /**
-   * How close a blocked line may pull the camera in.
-   *
-   * The original floors its distance field at TEN level units, which puts
-   * the camera inside Buzz. It gets away with that because it has four
-   * camera modes and three more ray casts that push the view sideways out of
-   * a corner instead of straight in; none of that is ported (see the list at
-   * the bottom of this module). Until it is, the floor here is Buzz's own
-   * collision radius plus the renderer's near plane, so a corner leaves the
-   * camera looking at his back rather than through his head. Geometry may
-   * clip instead, which is the lesser of the two.
-   */
-  minDistance: 4000 + 1000,
-
-  /**
-   * Swinging the camera by hand: `(dt << 5) / 2` per tick, the original's
-   * "camera left" and "camera right".
-   */
+  swingClamp: 0x200,
+  swingLag: 32,
+  /** Camera left/right, by hand: `(dt << 5) / 2` a tick. */
   manualTurn: 16,
-  /** A hand turn resets the auto-centre timer to this, so it waits again. */
-  centreAfterManual: 0x42,
-  /**
-   * Auto-centring. While the player is essentially stopped the camera does
-   * NOT chase his facing — it holds where it is and a timer runs. Past
-   * `centreDelay` it eases behind him, gathering pace over `centreRamp` ticks.
-   * At 0xf0 the timer stops climbing. This is why standing still and turning
-   * on the spot does not drag the view around with you.
-   */
+
+  // --- standing still and auto-centring
+  /** Below this on both horizontal axes Buzz counts as standing. */
+  stillSpeed: 4,
+  /** `stillFor` jumps this far the first time it passes `settled`. */
+  settled: 0x42,
+  /** Centring starts here and gathers pace over `centreRamp` ticks. */
   centreDelay: 100,
   centreRamp: 8,
   centreDivisor: 0x180,
   centreTimerMax: 0xf0,
-  /** Below this speed on both axes the player counts as stopped. */
-  stillSpeed: 4,
+  /** The narrowest and widest centring window, and where it locks wide open. */
+  centreWindow: 0x140,
+  centreWindowHeld: 0x280,
+  centreLocked: 0xa4,
+  /** Passive mode centres at a flat rate once settled. */
+  passiveCentre: 10,
+
+  // --- pitch
+  pitchRest: 0x40,
+  pitchRate: 8,
+  /** A ceiling overhead lifts it here; a wall in front drops it there. */
+  pitchMax: 0x300,
+  pitchMin: -0x200,
+
+  // --- sliding out of a corner
+  autoTurnRate: 8,
+  autoTurnMax: 0x60,
+  autoTurnDecay: 16,
+
+  // --- heights
+  /** Both followers converge on `player.y - headroom`. */
+  headroom: 0x1000,
+  /** `h1` may never be further than this from Buzz. */
+  heightClamp: 0x4000,
+  /** How far the eye sits below the second follower before the pitch lift. */
+  eyeDrop: 0x2000,
+
+  // --- easing
+  /**
+   * `DAT_0052ad98`. The position and the view angles ease by
+   * `delta * dt / (smooth * 2 >> 2)`, so an eighth a tick at rest. Level 1's
+   * tick sets 0x40 for a slow pull-back and it decays 2 a tick to 0x10.
+   */
+  smoothRest: 0x10,
+  smoothDecay: 2,
+
+  // --- rays
+  /** Radius of the three short rays, game units. */
+  rayRadius: 200,
+  /** How far to either side, below and above the camera they are cast. */
+  raySide: 0x800,
+  rayDrop: 0xf00,
+  rayLift: 0xc00,
+  /** The standing ray's radius ramps from here to `standoffMax`. */
+  standoffBase: 200,
+  standoffStep: 0x50,
+  standoffMax: 0xb18,
+  /** The long ray leaves Buzz from here. */
+  standingEye: 0x1f00,
+  /** A side hit whose normal is at least this far down is a ceiling, 2.14. */
+  ceilingNormal: 12000 / 0x4000,
+
+  // --- what the camera looks at
+  lookAbove: 0x1800,
+  /** Inside this distance the view aims steeper, by `(reachNear - d) * 2`. */
+  reachNear: 400,
+  /** Under this the camera is lifted off Buzz; see `tooClose`. */
+  tooCloseSq: 160000,
 } as const;
 
+/** What the three short rays found. Kept so the passive turn can read it. */
+export const RAY = { left: 1, right: 2, up: 4, ceiling: 8 } as const;
+
 export interface CameraState {
-  /** `+0x00`, `+0x04`, `+0x08`: where the camera is, game units. */
+  /** `+0x00`: where the camera is, game units. Eased toward `wanted`. */
   x: number; y: number; z: number;
-  /** `+0x28`: the camera's own yaw, which lags the player's. */
-  yaw: number;
-  /** `+0x26`: current follow distance, eased toward `CAMERA.distance`. */
+  /** `+0x0c`: where it wants to be this tick. */
+  wantX: number; wantY: number; wantZ: number;
+  /** `+0x18`, `+0x1c`: Buzz's height, followed once and then again. */
+  h1: number; h2: number;
+  /** `+0x20`, `+0x22`: the direction the view looks, eased. */
+  viewPitch: number; viewYaw: number;
+  /** `+0x26`: follow distance, LEVEL units. */
   distance: number;
-  /**
-   * `DAT_0050a534`: how long the player has been standing still. Drives
-   * auto-centring; reset by moving or by turning the camera by hand.
-   */
+  /** `+0x28`: which side of Buzz the camera is on. */
+  yaw: number;
+  /** `+0x2e`: how high it sits. 0x40 at rest. */
+  pitch: number;
+  /** `+0x32`: what the rays found, as a `RAY` mask. */
+  mode: number;
+  /** `DAT_0050a534`: how long Buzz has stood still. */
   stillFor: number;
+  /** `DAT_0050a4b4`: the sideways drift out of a corner. */
+  autoTurn: number;
+  /** `DAT_0050a4e4`: the centring window, latched when centring starts. */
+  turnRate: number;
+  /** `DAT_0052ad98`: how slowly the position and view angles follow. */
+  smooth: number;
+  /** `DAT_0050a12c`: last tick's ray mask, which passive mode reads. */
+  rayFlags: number;
+  /**
+   * `DAT_0050a118`: a point a script asked the view to turn toward, taken
+   * once and cleared.
+   */
+  lookAt: { x: number; y: number; z: number } | null;
+  /** `DAT_0050a510`: a shake, which tilts the view as it decays. */
+  shake: number;
 }
 
 export function createCamera(p: PlayerState): CameraState {
   const camera: CameraState = {
-    x: p.x, y: p.y, z: p.z, yaw: p.yaw, distance: CAMERA.distance, stillFor: 0,
+    x: p.x, y: p.y, z: p.z,
+    wantX: p.x, wantY: p.y, wantZ: p.z,
+    h1: p.y - CAMERA.headroom, h2: p.y - CAMERA.headroom,
+    viewPitch: 0, viewYaw: p.yaw,
+    distance: CAMERA.distance,
+    yaw: p.yaw,
+    pitch: CAMERA.pitchRest,
+    mode: 0,
+    stillFor: 0, autoTurn: 0, turnRate: CAMERA.centreWindow,
+    smooth: CAMERA.smoothRest, rayFlags: 0, lookAt: null, shake: 0,
   };
   place(camera, p);
+  camera.x = camera.wantX; camera.y = camera.wantY; camera.z = camera.wantZ;
+  aim(camera, p, true);
   return camera;
 }
 
-/** Put the camera at its resting offset behind a facing, with no easing. */
+/** Where the camera wants to be, from its yaw, pitch, distance and height. */
 function place(camera: CameraState, p: PlayerState): void {
-  camera.x = p.x - idiv(sin(camera.yaw) * camera.distance, 0x4000);
-  camera.z = p.z - idiv(cos(camera.yaw) * camera.distance, 0x4000);
-  camera.y = p.y - CAMERA.height;
+  // `r = C(pitch) * distance >> 14` is the horizontal reach; the >> 9 against
+  // the 0x4000 sine table is what turns level units into game units.
+  const r = (cos(camera.pitch) * camera.distance) >> 14;
+  camera.wantX = p.x - idiv(sin(camera.yaw) * r, 512);
+  camera.wantZ = p.z - idiv(cos(camera.yaw) * r, 512);
+  camera.wantY = camera.h2 - CAMERA.eyeDrop
+    + idiv(sin((camera.pitch - 0x800) & YAW_MASK) * camera.distance, 512);
+}
+
+/**
+ * Cast one of the camera's rays. Returns how much of `delta` was clear, as a
+ * fraction, and the normal of whatever stopped it.
+ *
+ * The original's `FUN_0048c860` is a ray with a thickness — its fifth
+ * argument, which it expands by 1.39 for the broadphase — so a swept sphere
+ * of that radius is the same query.
+ */
+function cast(
+  world: CollisionWorld,
+  from: { x: number; y: number; z: number },
+  delta: { x: number; y: number; z: number },
+  radius: number,
+): { fraction: number; normalY: number } {
+  const whole = Math.hypot(delta.x, delta.y, delta.z);
+  if (whole < 1) return { fraction: 1, normalY: 0 };
+  const swept = sweepSphere(world, from, delta, radius, { scale: S, passes: 1 });
+  const travelled = Math.hypot(swept.x - from.x, swept.y - from.y, swept.z - from.z);
+  if (!swept.touched || travelled >= whole) return { fraction: 1, normalY: 0 };
+  return { fraction: travelled / whole, normalY: swept.contacts[0]?.normal.y ?? 0 };
 }
 
 /**
  * Advance the camera one tick.
  *
- * `world` is optional: without it the camera ignores scenery, which is what the
- * offline tests want.
+ * `world` is optional: without it the camera ignores scenery, which is what
+ * the offline tests want.
  */
 export function stepCamera(
   camera: CameraState, p: PlayerState, world: CollisionWorld | null,
   input: { cameraLeft: boolean; cameraRight: boolean } = { cameraLeft: false, cameraRight: false },
+  options: { passive?: boolean; centre?: boolean } = {},
 ): void {
-  // --- yaw -----------------------------------------------------------------
-  // Turning it by hand wins, and puts the auto-centre back on its timer.
-  let manual = 0;
-  if (input.cameraRight) manual += CAMERA.manualTurn;
-  if (input.cameraLeft) manual -= CAMERA.manualTurn;
-  if (manual !== 0) {
-    camera.yaw = (camera.yaw + manual) & YAW_MASK;
-    camera.stillFor = CAMERA.centreAfterManual;
+  const dt = 1;
+  const passive = options.passive ?? false;
+  const centre = options.centre ?? false;
+
+  // The distance always walks back out toward its resting value; a blocked
+  // line below overwrites it. Easing the DISTANCE rather than moving the
+  // camera is the whole trick: the camera never teleports when a line clears.
+  if (camera.distance > CAMERA.distance) {
+    camera.distance = Math.max(CAMERA.distance, camera.distance - CAMERA.distanceRate * dt);
+  } else if (camera.distance < CAMERA.distance) {
+    camera.distance = Math.min(CAMERA.distance, camera.distance + CAMERA.distanceRate * dt);
   }
 
+  const manual = (input.cameraRight ? 1 : 0) - (input.cameraLeft ? 1 : 0);
   const still = Math.abs(p.vx) < CAMERA.stillSpeed && Math.abs(p.vz) < CAMERA.stillSpeed
-    && p.onGround;
+    && p.coyote > 0;
 
   if (still) {
-    // Standing: hold the view where it is and start counting. Only once the
-    // timer is past the delay does the camera drift back behind the player,
-    // and it gathers pace as the timer climbs. Turning on the spot therefore
-    // does not drag the camera round with you, which is the whole point.
-    camera.stillFor = Math.min(CAMERA.centreTimerMax, camera.stillFor + 1);
-    if (camera.stillFor >= CAMERA.centreDelay && manual === 0) {
-      const stage = Math.min(camera.stillFor - CAMERA.centreDelay, CAMERA.centreRamp);
-      const offset = yawDelta(camera.yaw, p.yaw);
-      const step = idiv(Math.abs(offset) * stage, CAMERA.centreDivisor);
-      if (step > 0) {
-        camera.yaw = Math.abs(offset) <= step
-          ? p.yaw
-          : (camera.yaw - Math.sign(offset) * step) & YAW_MASK;
+    standing(camera, p, world, manual, passive, centre, dt);
+  } else {
+    moving(camera, p, world, manual, passive, centre, dt);
+  }
+
+  // --- place, then ease toward it ------------------------------------------
+  place(camera, p);
+  if (camera.smooth > CAMERA.smoothRest) {
+    camera.smooth = Math.max(CAMERA.smoothRest, camera.smooth - CAMERA.smoothDecay * dt);
+  }
+  if (centre) {
+    camera.x = camera.wantX; camera.y = camera.wantY; camera.z = camera.wantZ;
+  } else {
+    const ease = (camera.smooth * 2) >> 2;
+    camera.x -= idiv((camera.x - camera.wantX) * dt, ease);
+    camera.y -= idiv((camera.y - camera.wantY) * dt, ease);
+    camera.z -= idiv((camera.z - camera.wantZ) * dt, ease);
+  }
+
+  aim(camera, p, centre);
+
+  // Moving only: if the line from the camera to Buzz is blocked, pull in.
+  if (!still && world) {
+    const head = { x: p.x, y: p.y - CAMERA.lookAbove, z: p.z };
+    const delta = { x: head.x - camera.x, y: head.y - camera.y, z: head.z - camera.z };
+    const { fraction } = cast(world, camera, delta, CAMERA.rayRadius);
+    if (fraction < 1) {
+      const line = Math.hypot(delta.x, delta.y, delta.z) / S;
+      camera.distance = Math.max(CAMERA.distanceFloor, camera.distance - line * (1 - fraction));
+      // The original also steps the camera to the hit point when the amount
+      // it just subtracted is under 300. That amount is behind a float
+      // conversion Ghidra dropped, the same gap as the lift below, so the
+      // reading taken here is the one that cannot teleport the view: step
+      // only while the step itself is under 300 level units.
+      if (line * fraction < 300) {
+        camera.x += delta.x * fraction;
+        camera.y += delta.y * fraction;
+        camera.z += delta.z * fraction;
       }
     }
-  } else if (manual === 0) {
-    camera.stillFor = 0;
-    // Moving: lag toward the facing.
-    let diff = yawDelta(camera.yaw, p.yaw);
-    const lag = p.skid > 0 ? CAMERA.yawLagSkid : CAMERA.yawLag;
-    if (Math.abs(diff) > CAMERA.yawHurryThreshold) {
-      // Nearly behind us: swing round the short way and hurry.
-      diff = ((diff > 0 ? 0x800 : -0x800) - diff) * 3;
-    }
-    camera.yaw = (camera.yaw - idiv(diff, lag)) & YAW_MASK;
   }
 
-  // --- distance: a wall sets it, and it eases back out ---------------------
-  // The camera never dodges scenery by moving itself. What changes is HOW FAR
-  // BACK it sits, and that number is rate limited: a blocked line sets it
-  // outright, and every tick it walks back out toward the resting distance at
-  // `distanceRate`. Moving the camera instead — sweeping its position and
-  // using wherever the sweep ended — teleports it a whole follow distance the
-  // moment the line clears, which is what walking along a wall does over and
-  // over. The original keeps the distance in one field (`+0x26`), eases it at
-  // `dt << 5` at the top of its tick and lets the wall test overwrite it
-  // later, floored at ten.
-  const wanted = CAMERA.distance;
-  if (camera.distance > wanted) camera.distance = Math.max(wanted, camera.distance - CAMERA.distanceRate);
-  else if (camera.distance < wanted) camera.distance = Math.min(wanted, camera.distance + CAMERA.distanceRate);
-
-  /** Where the camera sits relative to the player, at a given distance. */
-  const offsetOf = (distance: number) => ({
-    x: -idiv(sin(camera.yaw) * distance, 0x4000),
-    y: CAMERA.lookAbove - CAMERA.height,
-    z: -idiv(cos(camera.yaw) * distance, 0x4000),
-  });
-
-  if (world) {
-    // How much of the line from Buzz out to the resting position is clear.
-    // The sweep is the camera's own sphere rather than a bare ray, so it also
-    // keeps the view off a wall it is sliding past.
-    const from = { x: p.x, y: p.y - CAMERA.lookAbove, z: p.z };
-    const full = offsetOf(camera.distance);
-    const swept = sweepSphere(world, from, full, CAMERA.radius, { scale: S, passes: 1 });
-    const travelled = Math.hypot(swept.x - from.x, swept.y - from.y, swept.z - from.z);
-    const whole = Math.hypot(full.x, full.y, full.z);
-    if (whole > 0 && travelled < whole) {
-      camera.distance = Math.max(CAMERA.minDistance, (camera.distance * travelled) / whole);
-    }
-  }
-
-  // --- position ------------------------------------------------------------
-  const offset = offsetOf(camera.distance);
-  camera.x = p.x + offset.x;
-  camera.y = p.y - CAMERA.height;
-  camera.z = p.z + offset.z;
-  if (!world) return;
-
-  // Keep it out of the floor it ended over, so it does not end up under a
-  // step. The tolerance has to be small: `groundBelow` will happily return a
-  // surface far ABOVE the query point, and with a generous one the camera gets
-  // yanked up to the next storey the moment it passes under a landing.
-  const floor = groundBelow(world, camera.x / S, camera.y / S, camera.z / S, CAMERA.radius / S);
-  if (floor !== null) {
-    const limit = floor.y * S - CAMERA.radius;
-    if (camera.y > limit) camera.y = limit;
+  // Too close to Buzz: the original lifts the eye to `p.y - headroom - k * 32`
+  // for a `k` that is another dropped float conversion (docs/CAMERA.md). What
+  // it is for is keeping the view above him rather than inside him, so this
+  // raises the eye to its wanted height and never lowers it.
+  const dx = (p.x - camera.x) / S, dy = (p.y - camera.y - CAMERA.headroom) / S;
+  const dz = (p.z - camera.z) / S;
+  if (dx * dx + dy * dy + dz * dz < CAMERA.tooCloseSq) {
+    camera.y = Math.min(camera.y, camera.wantY);
   }
 }
 
-/** Where the camera is pointing: the player, raised by the original's offset. */
-export function cameraTarget(p: PlayerState): { x: number; y: number; z: number } {
-  return { x: p.x, y: p.y - CAMERA.lookAbove, z: p.z };
+/** Buzz is standing: hold the view, and ease behind him once he settles. */
+function standing(
+  camera: CameraState, p: PlayerState, world: CollisionWorld | null,
+  manual: number, passive: boolean, centre: boolean, dt: number,
+): void {
+  camera.stillFor += dt;
+  // The timer skips the first time it crosses `settled`, so the ramp below
+  // starts from a standing position rather than from the moment you stop.
+  if (camera.stillFor - dt < CAMERA.settled && camera.stillFor > CAMERA.settled - 1) {
+    camera.stillFor += CAMERA.settled;
+  }
+  const settled = camera.stillFor > CAMERA.centreTimerMax - 1;
+  if (settled) camera.stillFor = CAMERA.centreTimerMax;
+
+  let turned = false;
+  if (passive) {
+    if (centre) camera.yaw = p.yaw;
+    if (manual !== 0) {
+      camera.yaw = (camera.yaw + manual * CAMERA.manualTurn * dt) & YAW_MASK;
+      camera.stillFor = CAMERA.settled;
+      turned = true;
+    } else if (settled) {
+      turned = ease(camera, p.yaw, CAMERA.passiveCentre * dt);
+    }
+  } else {
+    // Active: the window is latched when the timer first reaches the delay,
+    // widened while a camera button is held, and pinned wide once settled.
+    const window = manual !== 0 ? CAMERA.centreWindowHeld : CAMERA.centreWindow;
+    if (camera.stillFor >= CAMERA.centreDelay && camera.stillFor - dt < CAMERA.centreDelay) {
+      camera.turnRate = yawDelta(p.targetYaw, camera.yaw);
+    }
+    if (Math.abs(camera.turnRate) < window) camera.turnRate = window;
+    if (camera.stillFor > CAMERA.centreLocked) camera.turnRate = window;
+    if (camera.stillFor >= CAMERA.centreDelay) {
+      const stage = Math.min(CAMERA.centreRamp, camera.stillFor - CAMERA.centreDelay);
+      const step = idiv(Math.abs(camera.turnRate) * stage, CAMERA.centreDivisor) * dt;
+      if (step > 0) turned = ease(camera, p.targetYaw, step);
+    }
+  }
+  if (turned) restPitch(camera, dt);
+
+  // Heights: standing, both followers always run.
+  camera.h1 -= (camera.h1 - p.y + CAMERA.headroom) >> 5;
+  camera.h2 -= ((camera.h2 - camera.h1) * dt) >> 4;
+  takeLookAt(camera, p);
+
+  // One fat ray out to the RESTING distance. Its radius ramps as Buzz
+  // settles, from a thin line to nearly three of his own widths, so a
+  // camera that has come to rest sits well clear of the scenery.
+  if (!world) return;
+  const standoff = camera.stillFor < CAMERA.settled
+    ? idiv(camera.stillFor, 2) * CAMERA.standoffStep + CAMERA.standoffBase
+    : CAMERA.standoffMax;
+  const r = (cos(camera.pitch) * CAMERA.distance) >> 14;
+  const from = { x: p.x, y: p.y - CAMERA.standingEye, z: p.z };
+  const delta = {
+    x: -idiv(sin(camera.yaw) * r, 512),
+    y: camera.h2 - p.y + idiv(sin((camera.pitch - 0x800) & YAW_MASK) * CAMERA.distance, 512),
+    z: -idiv(cos(camera.yaw) * r, 512),
+  };
+  const { fraction } = cast(world, from, delta, standoff);
+  if (fraction < 1) {
+    camera.distance = Math.max(CAMERA.distanceFloor, Math.round(CAMERA.distance * fraction));
+  }
+}
+
+/** Buzz is moving: lag behind his facing, and read the walls around us. */
+function moving(
+  camera: CameraState, p: PlayerState, world: CollisionWorld | null,
+  manual: number, passive: boolean, centre: boolean, dt: number,
+): void {
+  camera.stillFor = 0;
+
+  // Heights. `h1` never strays far from Buzz, and follows him only while he
+  // runs on the ground or RISES — so a jump brings the view up with him and
+  // stepping off a ledge leaves it high enough to see the drop.
+  if (camera.h1 + CAMERA.heightClamp < p.y) camera.h1 = p.y - CAMERA.heightClamp;
+  if (p.y < camera.h1 - CAMERA.heightClamp) camera.h1 = p.y + CAMERA.heightClamp;
+  if ((p.coyote > 0 && p.forwardSpeed !== 0) || p.y < camera.h1 + CAMERA.headroom) {
+    camera.h1 -= (camera.h1 - p.y + CAMERA.headroom) >> 5;
+  }
+  camera.h2 -= ((camera.h2 - camera.h1) * dt) >> 4;
+
+  // Yaw.
+  if (passive) {
+    if (manual !== 0) {
+      // A wall on that side blocks the hand turn, which is what stops you
+      // pushing the view into the scenery.
+      const blocked = manual > 0
+        ? (camera.rayFlags & (RAY.right | RAY.ceiling)) === (RAY.right | RAY.ceiling)
+        : (camera.rayFlags & (RAY.left | RAY.ceiling)) === (RAY.left | RAY.ceiling);
+      if (!blocked) camera.yaw = (camera.yaw + manual * CAMERA.manualTurn * dt) & YAW_MASK;
+    }
+    if (centre) camera.yaw = p.yaw;
+  } else {
+    let delta = yawDelta(camera.yaw, p.yaw);
+    const lag = p.skid > 0 ? CAMERA.yawLagSkid : CAMERA.yawLag;
+    if (Math.abs(delta) > CAMERA.yawHurryThreshold) {
+      // Nearly behind us: go the short way, and hurry.
+      delta = ((delta > 0 ? 0x800 : -0x800) - delta) * 3;
+    }
+    camera.yaw = (camera.yaw - idiv(delta * dt, lag)) & YAW_MASK;
+  }
+
+  // A ledge grab, the rocket boots, a hang, the grapple or a script flag also
+  // pull the view behind Buzz, by the clamped delta over `swingLag`. None of
+  // those moves exist yet, so there is nothing to test here.
+
+  // --- the three short rays ------------------------------------------------
+  let flags = 0;
+  if (world) {
+    const r = (cos(camera.pitch) * camera.distance) >> 14;
+    const base = {
+      x: p.x - idiv(sin(camera.yaw) * r, 512),
+      y: camera.h2 + idiv(sin((camera.pitch - 0x800) & YAW_MASK) * camera.distance, 512),
+      z: p.z - idiv(cos(camera.yaw) * r, 512),
+    };
+    const sideX = sin((camera.yaw + 0x400) & YAW_MASK) >> 3;
+    const sideZ = sin((camera.yaw - 0x800) & YAW_MASK) >> 3;
+    const side = (sign: number, bit: number) => {
+      const from = {
+        x: base.x + sign * sideX, y: base.y - CAMERA.rayDrop, z: base.z + sign * sideZ,
+      };
+      const delta = { x: -sign * sideX, y: 0, z: -sign * sideZ };
+      const { fraction, normalY } = cast(world, from, delta, CAMERA.rayRadius);
+      if (fraction >= 1) return;
+      flags |= bit;
+      if (normalY > CAMERA.ceilingNormal) flags |= RAY.ceiling;
+    };
+    side(-1, RAY.left);
+    side(1, RAY.right);
+    const up = { x: base.x, y: base.y + CAMERA.rayLift, z: base.z };
+    if (cast(world, up, { x: 0, y: -CAMERA.rayLift, z: 0 }, CAMERA.rayRadius).fraction < 1) {
+      flags |= RAY.up;
+    }
+  }
+  camera.rayFlags = flags;
+  camera.mode = modeFor(camera, p, flags);
+
+  // --- what the mode does --------------------------------------------------
+  const sides = camera.mode & 3;
+  if (sides === 0) {
+    // Nothing either side: let the drift die away.
+    if (camera.autoTurn > 0) camera.autoTurn = Math.max(0, camera.autoTurn - CAMERA.autoTurnDecay * dt);
+    else if (camera.autoTurn < 0) camera.autoTurn = Math.min(0, camera.autoTurn + CAMERA.autoTurnDecay * dt);
+  } else {
+    if (sides === 1) {
+      if (camera.autoTurn > 0) camera.autoTurn = 0;
+      camera.autoTurn = Math.max(-CAMERA.autoTurnMax, camera.autoTurn - CAMERA.autoTurnRate * dt);
+    }
+    if (sides === 2) {
+      if (camera.autoTurn < 0) camera.autoTurn = 0;
+      camera.autoTurn = Math.min(CAMERA.autoTurnMax, camera.autoTurn + CAMERA.autoTurnRate * dt);
+    }
+    camera.yaw = (camera.yaw + idiv(camera.autoTurn * dt, 2)) & YAW_MASK;
+  }
+
+  if ((camera.mode & RAY.up) !== 0) {
+    camera.pitch = Math.max(CAMERA.pitchMin, camera.pitch - CAMERA.pitchRate * dt);
+  }
+  if ((camera.mode & RAY.ceiling) !== 0) {
+    camera.pitch = Math.min(CAMERA.pitchMax, camera.pitch + CAMERA.pitchRate * dt);
+  }
+  if ((camera.mode & (RAY.up | RAY.ceiling)) === 0) restPitch(camera, dt);
+
+  takeLookAt(camera, p);
 }
 
 /**
- * Not ported, and worth knowing before trusting this. `FUN_004045e0` is
- * decoded in full in docs/CAMERA.md (2026-09-06), so the rest is a
- * transcription job; the list below is what the doc adds. The first thing
- * to take is the position lag: the original eases the camera toward its
- * wanted spot at an eighth a tick, and this module places it outright.
- *
- * - the camera **modes** (`FUN_00405860` switches between four, and the menu
- *   strings "camera mode", "camera left" and "camera right" belong to them).
- *   The wall handling lives with them: the original casts its long ray with a
- *   length that depends on how long the player has been still
- *   (`(stillFor / 2) * 0x50 + 200`, or 0xb18 once settled) and then three
- *   short ones of 200, which is how it slides the view out of a corner
- *   sideways rather than pulling it into the player. That is why its distance
- *   floor of ten works and ours cannot be that small
- * - **look-ahead** and the height ramp `DAT_0050a4e0`, which rises to 0xc0 at
- *   2 per tick while the player is grounded and moving
- * - the pitch field `+0x2e`, eased toward 0x40 at 8 a tick, and the smoothed
- *   height in `+0x18`/`+0x1c`; a fixed height stands in for both, which is
- *   why the view does not tilt as Buzz climbs or drops
- * - every level-specific case, of which there are several in the original
+ * Which of the camera's modes the rays add up to. Bit 8 (a ceiling found by a
+ * side ray) counts as both sides; 3 and 7 — boxed in — fall back to how far
+ * the view has drifted from Buzz's facing.
  */
+function modeFor(camera: CameraState, p: PlayerState, flags: number): number {
+  const boxed = (flags & RAY.ceiling) !== 0 ? 3 : flags & 7;
+  switch (boxed) {
+    case 0: return 0;
+    case 1: return RAY.left;
+    case 2: return RAY.right;
+    case 4: return RAY.ceiling;
+    case 5: return (camera.mode & RAY.left) !== 0 ? camera.mode : RAY.ceiling;
+    case 6: return (camera.mode & RAY.right) !== 0 ? camera.mode : RAY.ceiling;
+    default: break;
+  }
+  const delta = yawDelta(camera.yaw, p.yaw);
+  const size = Math.abs(delta);
+  if (size > 0x400) return delta < 1 ? RAY.ceiling | RAY.right : RAY.ceiling | RAY.left;
+  if (size > 0x200) return delta < 1 ? RAY.right : RAY.left;
+  // Rising fast: look down at him rather than up past him.
+  return p.vy < -0x80 ? RAY.up : RAY.ceiling;
+}
+
+/** Ease the pitch back to its resting value, snapping the last step. */
+function restPitch(camera: CameraState, dt: number): void {
+  if (camera.pitch < CAMERA.pitchRest + 1) {
+    camera.pitch += CAMERA.pitchRate * dt;
+    if (camera.pitch > CAMERA.pitchRest - 1) camera.pitch = CAMERA.pitchRest;
+  } else {
+    camera.pitch -= CAMERA.pitchRate * dt;
+    if (camera.pitch < CAMERA.pitchRest + 1) camera.pitch = CAMERA.pitchRest;
+  }
+}
+
+/** Turn the yaw toward `want` by at most `step`, snapping on overshoot. */
+function ease(camera: CameraState, want: number, step: number): boolean {
+  const delta = yawDelta(camera.yaw, want);
+  if (delta === 0 || step <= 0) return false;
+  camera.yaw = Math.abs(delta) <= step
+    ? want
+    : (camera.yaw - Math.sign(delta) * step) & YAW_MASK;
+  return true;
+}
+
+/** A script asked the view to turn toward a point: take an eighth of it. */
+function takeLookAt(camera: CameraState, p: PlayerState): void {
+  if (!camera.lookAt) return;
+  const want = yawOf(camera.lookAt.x - p.x, camera.lookAt.z - p.z);
+  camera.yaw = (camera.yaw - (yawDelta(camera.yaw, want) >> 3)) & YAW_MASK;
+  camera.lookAt = null;
+}
+
+/**
+ * Where the view points, eased. The original does not look straight at Buzz:
+ * it aims along angles that follow him at the same rate the position does,
+ * and it flattens the pitch by comparing SQUARES — `atan2(±dy², reach²)` —
+ * which is why the view stays level through a jump instead of tilting after
+ * him.
+ */
+function aim(camera: CameraState, p: PlayerState, snap: boolean): void {
+  const dropIn = camera.distance < CAMERA.reachNear
+    ? (CAMERA.reachNear - camera.distance) * 2
+    : 0;
+  const reach = CAMERA.distance - dropIn;
+  const bearing = yawOf(p.x - camera.x, p.z - camera.z);
+  const rx = (sin(bearing) * reach) >> 14;
+  const rz = (cos(bearing) * reach) >> 14;
+  const dy = (p.y - camera.y - CAMERA.lookAbove) >> 5;
+
+  let shakeTilt = 0;
+  if (camera.shake > 0) {
+    const phase = ((camera.shake * -3) & 0x1f) * 0x80;
+    shakeTilt = idiv(sin(phase & YAW_MASK), (camera.shake - 0x32) * 0x10);
+    camera.shake = Math.max(0, camera.shake - 1);
+  }
+
+  const wantPitch = yawOf(-Math.abs(dy) * dy, rx * rx + rz * rz);
+  const wantYaw = bearing;
+  const ease = Math.max(1, camera.smooth >> 1);
+  if (snap) {
+    camera.viewPitch = (wantPitch + shakeTilt) & YAW_MASK;
+    camera.viewYaw = wantYaw;
+    return;
+  }
+  camera.viewPitch = (camera.viewPitch
+    + idiv(yawDelta(camera.viewPitch, (wantPitch + shakeTilt) & YAW_MASK) * -1, ease)) & YAW_MASK;
+  camera.viewYaw = (camera.viewYaw
+    + idiv(yawDelta(camera.viewYaw, wantYaw) * -1, ease)) & YAW_MASK;
+}
+
+/**
+ * Where the view is pointing, as a point in front of the camera.
+ *
+ * The original hands the renderer an eye and two angles; ours takes an eye
+ * and a look-at, so the angles are walked out one follow distance.
+ */
+export function cameraTarget(
+  p: PlayerState, camera?: CameraState,
+): { x: number; y: number; z: number } {
+  if (!camera) return { x: p.x, y: p.y - CAMERA.headroom, z: p.z };
+  const reach = CAMERA.distance * S;
+  const flat = (cos(camera.viewPitch) * reach) >> 14;
+  return {
+    x: camera.x + idiv(sin(camera.viewYaw) * flat, 0x4000),
+    y: camera.y - idiv(sin(camera.viewPitch) * reach, 0x4000),
+    z: camera.z + idiv(cos(camera.viewYaw) * flat, 0x4000),
+  };
+}

@@ -63,6 +63,20 @@ export interface AllGroup {
    * radius at +0x32. Null on every other group.
    */
   hitSphere: { x: number; y: number; z: number; radius: number } | null;
+  /**
+   * The visibility zone this group STANDS FOR, or null for ordinary
+   * collision. Read from the word at entry +0x28: bit 0x400 marks a zone
+   * floor and the low byte is its zone number. The executable copies that
+   * word straight into the collision record (`FUN_00489980`, record +0x2e),
+   * keeps zone floors OUT of the spatial index the sweeps use, and lists them
+   * separately for `FUN_004885c0`, which answers "what zone is over this
+   * point" by finding the zone floor nearest below it. They are authored at
+   * a QUARTER of the level's scale, which is why that lookup divides its
+   * query by four and why they must never be walked on (docs/LEVELS.md,
+   * "Zones"). Validated on every scene by tools/zone-validate.ts. Bits 0x100
+   * and 0x200 of the same word gate two sweep passes and are unread.
+   */
+  zone: number | null;
   payload: Uint8Array;
 }
 
@@ -189,6 +203,7 @@ export function parseAll(buffer: ArrayBuffer | Uint8Array): AllFile {
           radius: view.getInt16(entry + 0x32, true),
         }
         : null,
+      zone: (view.getUint16(entry + 0x28, true) & 0x400) !== 0 ? view.getUint16(entry + 0x28, true) & 0xff : null,
       payload,
     });
   }

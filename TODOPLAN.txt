@@ -202,9 +202,16 @@
           view, narrowing the frustum to each outline, instead of taking a
           fixed one-step neighbourhood. Needs the portal corners projected
           per frame; level.zones already carries them.
- [BLOCKED] Camera's own zone          <- P2. The engine tracks it as the
-          player crosses portals, so it arrives with the character
-          controller. Until then the zone is picked by hand.
+ [READY]  Camera's own zone and the player's. DECODED 2026-09-06
+          (docs/LEVELS.md "Zones"): both are `zoneAt` (src/formats/
+          collision.ts) on the render camera over the ZONE FLOORS, with
+          the player's raised position as the fallback and a one-tick
+          portal-crossing correction; the camera's is held to the player's
+          zone or a portal neighbour. Wire: a zone step in the sim after
+          the camera moves, both zones into stepTasks (level 7's failZone
+          reads the camera's), the portal walk starting from the camera
+          zone, the boss taunts onto their level's zone test (table in the
+          doc), and the two per-level overrides (levels 4 and 10).
  P1.6 [ACTIVE]  Parity harness. Half done: tools/render-level.ts now takes
                 --eye/--target/--size/--fovy and matches three.js (vertical
                 FOV, the viewer's clear colour, the same two draw queues and

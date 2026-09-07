@@ -3,9 +3,10 @@
  Written 2026-09-03 at the end of Phase 1; updated 2026-09-04, after the
  session that made Buzz playable, 2026-09-05 after the pickups/tokens
  decode, and 2026-09-06 when the creature port and the token tasks were
- finished. TWO THINGS ARE WAITING ON FABLE and nothing else is: the effect
- system, and which zone the player is in. Both are written up under "WHAT
- TO GIVE FABLE, IN ORDER".
+ finished, and later that day when the zone byte was decoded. TWO THINGS
+ ARE WAITING ON FABLE and nothing else is: the effect system, and the
+ camera's four modes. Both are written up under "WHAT TO GIVE FABLE, IN
+ ORDER".
 ================================================================================
 
  Read TODOPLAN.txt for WHAT to do. This file is about WHO should do it and what
@@ -182,41 +183,20 @@
         death bursts the creature port raises but cannot draw, the hover
         bot's shots, and the sparkles over unspent secrets.
 
-      - WHICH ZONE THE PLAYER IS IN. Small, and it blocks more than it
-        looks like it should. Every level's tick is written per zone,
-        and eight of the nine boss fights start on a zone test: level 5's
-        is "the player is in zone 2, then taunt, then kick the boss's
-        script to word 14". Level 1's boss is the exception - its trigger
-        is a height band - which is why it is the only one that can be
-        started so far.
-
-        What is settled: `FUN_00440f70` sets the player's zone from
-        `FUN_004885c0(camera position)`, and that walks the collision
-        objects, finds the nearest surface below the point, and returns a
-        byte at `DAT_007295d6 + object * 0x1a`. So a zone is a property of
-        the collision surface you are standing on, not a region of space.
-
-        What is not: where the collision loader (`FUN_00489c30`) gets that
-        byte. It is not an obvious field of the `.all` group entry - the
-        only bytes there that vary over a small range are the object
-        number at +0x1a, already identified, and the LOD bits at +0x29.
-        Finding it is a field hunt over unlabelled data, so it is a Fable
-        job rather than a guess; the wrong guess would make bosses taunt
-        in the wrong rooms.
-
-        Everything else about the boss fights is ported and waiting on it:
-        each level's boss creature, its script's wake word (14 everywhere
-        but level 4, which is 12), and the token award.
-
-        One more thing waits on the same byte, found 2026-09-05: level 7's
-        timed egg run is supposed to fail the moment Buzz leaves the area,
-        which its tick writes as "zone 4 slams the clock to 99". The run
-        itself is ported and works; that one rule is stubbed out behind a
-        `failZone` field, so the byte switches it on with no other change.
-        Nothing else about the timed tasks is open - the run state, the
-        clock's floor of 100 and its 1-in-64 frame divider are all written
-        up in docs/LEVELS.md.
-
+      - (WHICH ZONE THE PLAYER IS IN is DECODED 2026-09-06: docs/LEVELS.md
+        "Zones". The byte is bit 0x400 + low byte of the word at +0x28 of a
+        TERRAIN.ALL group entry, marking ZONE FLOORS: slabs at a quarter of
+        the level's scale that nothing collides with and that FUN_004885c0
+        searches under a point. The scripts read two globals - the camera's
+        zone (most levels) and the player's (levels 7, 8, 10, 11, 13) - and
+        both are that lookup on the render camera, with the player's own
+        position as the fallback and a portal-crossing correction. zoneAt is
+        in src/formats/collision.ts, tools/zone-validate.ts checks all nine
+        scenes against their portals (0 contradictions), and the zone floors
+        are out of buildCollisionWorld, where they had been a phantom
+        quarter-scale floor. Opus wires: cameraZone/playerZone in the sim,
+        both into stepTasks, level 7's failZone, and the boss taunts onto
+        each level's zone test - the table at the end of the section.)
       - (the 2D layer is DECODED 2026-09-06: docs/HUD.md. The coin sprite,
         the HUD and the text box are Opus work now, and are done.)
       - THE FOLLOW CAMERA'S FOUR MODES. Small on the list and large in the

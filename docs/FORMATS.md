@@ -167,8 +167,17 @@ The consequence matters: **level visual geometry is not in `.ALL` at all.**
                   otherwise: the id the executable's tables and the level
                   scripts move the group by (`FUN_00488510(id, x, y, z)`).
                   Checked against all 24 push blocks (docs/LEVELS.md).
-      +0x28  u8   collision category
-      +0x29  bit 0x04 = LOD
+      +0x28  u16  ZONE FLOOR word (TERRAIN.ALL / TERR1.ALL only): bit 0x400
+                  marks a zone floor and the low byte is its visibility zone;
+                  0xff00-ish on every other collision group. Copied whole into
+                  the runtime collision record (+0x2e) by `FUN_00489980`.
+                  The earlier reading, "collision category / LOD bit", was a
+                  guess. Zone floors are authored at a QUARTER of the level's
+                  scale, the engine never collides with them, and `FUN_004885c0`
+                  finds the one under a point to say which room it is in:
+                  docs/LEVELS.md "Zones", tools/zone-validate.ts. Bits 0x100
+                  and 0x200 of the word each exclude the group from one of
+                  the sweep passes; what they mean is unread.
 
     types: 0x0001 gfx mesh        0x0006 collision      0x0008 dyn collision
            0x0009 creature hit shapes                    0x0101 infinite wall

@@ -33,10 +33,12 @@ Cases 16 and 17 are the front end, not levels. The level number is
 `DAT_0088278c`; which scene file a number plays in is in
 `src/sim/level-data.ts` (`sceneForLevel`).
 
-A level's tick is written **per visibility zone**: it tests the player's
-current zone (`DAT_0054dea0`) and runs that zone's block — the race exists
-only while you are in the garage, the sheep hunt only in the garden. Level 1's
-tick is 4 KB and every other level's is the same shape.
+A level's tick is written **per visibility zone**: it tests the zone Buzz is
+in (`DAT_0054dea0`, the camera's zone — see "Zones" below, and note that five
+levels test the player's own `DAT_005d2a8c` as well) and runs that zone's
+block — the race exists only while you are in the garage, the sheep hunt
+only in the garden. Level 1's tick is 4 KB and every other level's is the
+same shape.
 
 ## What an init does
 
@@ -204,8 +206,9 @@ line and nothing else. The first run ends when the chick (entity 6) is gone,
 which the tick reads straight off that entity's type field, and NO reward is
 handed over at that moment. It arrives the next time Buzz speaks to him, on
 the line that offers a second, quicker 0x7e run — and that line is the one
-carrying slot 2. Standing in zone 4 slams the clock to 99, failing the run
-on the spot; that rule waits on the player-zone byte and is stubbed out.
+carrying slot 2. Standing in zone 4 (the camera's zone, `DAT_0054dea0`)
+slams the clock to 99, failing the run on the spot; the zone is decoded
+below and the rule sits behind `failZone` in `src/sim/level-data.ts`.
 While a run is going the chick's flag word gets bits 0x81 (awake and drawn)
 forced on, and they are cleared the moment it is not.
 
@@ -524,3 +527,106 @@ loads the global table then the level's at `level` start. Examples: event
 level 1 events 0x24/0x25 are `ELECDRIL`/`ELECSAW` and 0x21 `SPADEFAL`. Events
 0xb2..0xb5 name effects 78..81, which no table supplies — the characters'
 speech, absent on PC.
+
+## Zones: which room Buzz is in
+
+Decoded 2026-09-06. The renderer's zones — every object's zone from the
+`.ngn` scene, the portal quads in `level.dat` — are not what the level
+scripts read. They read two globals that the render pass and the camera code
+set every frame:
+
+| global | meaning | who tests it |
+|---|---|---|
+| `DAT_005d2a8c` | the player's zone | levels 7 (helper), 8, 10, 11, 13 |
+| `DAT_0054dea0` | the camera's zone, held to the player's neighbourhood | levels 1, 2, 4, 5, 6, 7, 10, 11; the portal walk starts here |
+
+Both come from one lookup over a third set of geometry.
+
+**Zone floors.** In `TERRAIN.ALL` / `TERR1.ALL`, a collision group whose entry
+word at +0x28 has bit 0x400 is a zone floor, and the word's low byte is its
+zone. They follow the ordinary collision in the group table in ascending
+zone order, one or more per zone (91 across the nine scenes that have
+portals; boss levels have none), and they are authored at a **quarter of the
+level's scale**: level 1's real collision spans about ±23,000 level units, its
+zone floors ±6,000. The loader (`FUN_00489980`) copies the word into the
+runtime record at +0x2e; `FUN_00489c30` then keeps every flagged group out of
+the spatial index and the wall list and puts them in their own list
+(`DAT_0072d2b0` from index `DAT_0072848c`, count `DAT_0072848e`), after the
+dynamic groups. Nothing ever collides with a zone floor. The port drops them
+from `buildCollisionWorld` for the same reason (`CollisionGroup.zone`).
+
+**The lookup**, `FUN_004885c0(point)`, point in game units: divide by four
+(that is the quarter scale), then over every zone floor whose x/z bounds
+contain the point (0x1000 slack) and every polygon of it whose footprint
+does (cell bounds with 0x100 slack, then the exact edge tests, two triangles
+for a quad), take the plane's height at the point's x/z and keep the nearest
+one **at or below** the point — +Y is down, so the smallest y that is not
+less than the point's. Return that floor's zone; -1 when nothing is below.
+Ported as `zoneAt` in `src/formats/collision.ts`.
+
+**Every frame**, in this order:
+
+1. The render pass (`FUN_00440f70`) sets BOTH globals to
+   `zoneAt(render camera)`, the camera at `DAT_00555314`.
+2. `FUN_004402b0`: if that gave -1 — or always on level 2 — the player's
+   zone is `zoneAt(player position raised by 0x2000 game units)`, 256 level
+   units up his body. Otherwise `FUN_0043fef0` applies the **portal-crossing
+   correction**: for each portal out of the player's zone (the adjacency
+   table `DAT_0054f39c + zone * 0x20`, pairs of (portal slot, zone it leads
+   to) ending in 0xff, filled by the `level.dat` loader `FUN_0043e6e0` from
+   the zone quads with their corners `>> 2`), if the player is within 0x4000
+   of the quad's first or third corner on every axis (positions `>> 7`, so
+   both are in quarter level units), and his position moved from the front of
+   the quad's plane (dot with its normal >= 0) to behind it this tick, and the
+   crossing point lies in either of the quad's two triangles with 400 units
+   of slack (`FUN_00480ae0`), the player's zone becomes the portal's `to`.
+   A portal to zone 15 is skipped while `DAT_005d2a90` is set, which
+   `FUN_0044ff50` does when the level has a backdrop sheet (sprite sheets
+   0x24, 0x28-0x2f or 0x58 up): 15 is "outside" everywhere but level 10,
+   where it is a room. The previous position for the test is last tick's
+   raised position (`DAT_0054d920/24/28`).
+   In effect the player's zone is the camera floor's zone, corrected on the
+   one tick Buzz walks through a doorway.
+3. The camera's zone: `c = zoneAt(camera)` again; it becomes `c` if `c` is
+   the player's zone or the camera-blend counter `DAT_0050a148` is running;
+   the player's zone if `c` is -1, the player's zone is -1, or the player's
+   zone has no portals; otherwise `c` if a portal out of the player's zone
+   leads to `c`, else the player's zone. A result of 0xff becomes 1. This is
+   the zone the portal walk starts from.
+4. Per-level overrides in the render pass, on the level number
+   `DAT_0088278c`, with the Direct3D camera in level units (game / 32,
+   `_DAT_00e4d980/84/88`): level 4 — player zone 2 with the camera above
+   -7,900 makes all of them zone 1; level 10 — camera zone 4 with the camera
+   inside x in (-800, 800), y below -40,800, z in (-5,500, -3,900) makes the
+   camera's zone 5. Level 2's height bands, and levels 3, 9 and 11 lifting
+   the draw distance in some zones, only touch rendering.
+
+**Validation** (`tools/zone-validate.ts`, every scene with portals): the set
+of zones the floors name equals the set the portals join on all nine scenes;
+and probing `zoneAt` 150 level units either side of each of the 204 portal
+quads finds the two joined zones on both sides of 173, one of them or a
+neighbouring room on 26 (the slabs are hand-laid and overlap or stop short
+at some doorways), nothing below on 5, and a room the doorway does not
+connect to on none. Level 1's interior has zone 2's slab ending 230 units
+before a doorway zone 6's slab covers, so the engine calls that strip zone
+6; the validator accepts neighbours for that reason.
+
+**What each level's tick tests**, for the port (`DAT_0054dea0` = camera
+zone, `DAT_005d2a8c` = player zone):
+
+| level | camera zone | player zone |
+|---|---|---|
+| 1 `FUN_00417680` | blocks for 1, 2, 3, 4, 5, 6; the race wants not 2 | |
+| 2 `FUN_004190c0` | 1 | |
+| 4 helper `FUN_0041ddb0` | 2 | |
+| 5 `FUN_0041e880` | 2, twice (the second beside `DAT_0052f38e`) | |
+| 6 helpers `FUN_00420a30/af0` | 1, 6, 7 or 8; 4 three times | |
+| 7 `FUN_00421340` | 4 (the egg run's fail, and the test beside `DAT_0052f38e` and `y < -0x63b`) | helper `FUN_00422660`: 5 |
+| 8 `FUN_00423200` | | 4; 2 with `x < 0x1b467`; 5 with `y >= -0x27a7f` |
+| 10 `FUN_00425f60` | helper `FUN_004282d0`: 2 | 7 or 12; helper `FUN_004295b0(zone)` compares its argument |
+| 11 `FUN_0042a130` | not 1, 4 or 8; 2 (a countdown); not 4 | 1; 5; 4 (a countdown) |
+| 13 `FUN_0042ca60` | | 2, 4 or 5; 4; 3 twice |
+
+The port's `stepTasks` currently takes one `zone`; it should take both, and
+the boss taunts that were gated by level 1's height band should move to
+their level's zone test above.

@@ -65,6 +65,13 @@ export interface CollisionGroup {
   dynamic: boolean;
   /** The number the level code moves a dynamic group by (`AllGroup.objectNumber`), -1 if none. */
   objectNumber: number;
+  /**
+   * Set on a ZONE FLOOR: a slab standing for one visibility zone, at a
+   * quarter of the level's scale, that the engine never collides with and
+   * only ever asks "which zone is above this point" (`AllGroup.zone`,
+   * docs/LEVELS.md "Zones"). Null on real collision.
+   */
+  zone: number | null;
 }
 
 /**
@@ -124,7 +131,7 @@ export function parseCollisionGroup(group: AllGroup): CollisionGroup | null {
     if (view.getUint32(pos, true) === GROUP_TERMINATOR) {
       // The terminator must close the payload exactly.
       return pos + 4 === p.length
-        ? { meshes, position: group.position, dynamic: group.type === GroupType.DynamicCollision, objectNumber: group.objectNumber }
+        ? { meshes, position: group.position, dynamic: group.type === GroupType.DynamicCollision, objectNumber: group.objectNumber, zone: group.zone }
         : null;
     }
     if (pos + MESH_HEADER > p.length) return null;
@@ -167,6 +174,55 @@ export function parseCollision(file: AllFile): { groups: CollisionGroup[]; skipp
     if (parsed) groups.push(parsed); else skipped++;
   }
   return { groups, skipped };
+}
+
+/**
+ * Which visibility zone is over a point: `FUN_004885c0`, transcribed.
+ *
+ * The engine keeps one list of ZONE FLOORS per scene (`CollisionGroup.zone`
+ * non-null), coarse slabs the level designer laid over each room at a
+ * quarter of the level's scale. The lookup divides the query by four to
+ * land in their space, keeps every floor polygon whose footprint contains
+ * the point's x/z and whose plane is at or below it (+Y is down, so "below"
+ * is a larger y), and returns the zone of the nearest one. -1 when nothing
+ * is below the point.
+ *
+ * `position` is in game units, `scale` game units per level unit (32). The
+ * original passes the render camera's position every frame and the player's
+ * (raised 0x2000 game units) only when the camera finds nothing — see
+ * docs/LEVELS.md "Zones" for the whole rule, including the portal-crossing
+ * correction that follows.
+ */
+export function zoneAt(
+  groups: readonly CollisionGroup[],
+  position: { x: number; y: number; z: number },
+  scale = 32,
+): number {
+  const qx = position.x / scale / 4, qy = position.y / scale / 4, qz = position.z / scale / 4;
+  let best = Infinity, zone = -1;
+  for (const group of groups) {
+    if (group.zone === null) continue;
+    const o = group.position;
+    for (const mesh of group.meshes) {
+      for (const poly of mesh.polys) {
+        const vs = poly.vertices;
+        // Point in the polygon's x/z footprint, perimeter order.
+        let inside = false;
+        for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+          const a = vs[i]!, b = vs[j]!;
+          const az = a.z + o.z, bz = b.z + o.z, ax = a.x + o.x, bx = b.x + o.x;
+          if (az > qz !== bz > qz && qx < ((bx - ax) * (qz - az)) / (bz - az) + ax) inside = !inside;
+        }
+        if (!inside) continue;
+        const n = poly.normal;
+        if (Math.abs(n.y) < 1e-6) continue;
+        const v0 = vs[0]!;
+        const sy = v0.y + o.y - ((qx - v0.x - o.x) * n.x + (qz - v0.z - o.z) * n.z) / n.y;
+        if (sy >= qy && sy < best) { best = sy; zone = group.zone; }
+      }
+    }
+  }
+  return zone;
 }
 
 /**
@@ -236,6 +292,11 @@ export interface CollisionWorld {
 export function buildCollisionWorld(groups: CollisionGroup[], cellSize = 1024): CollisionWorld {
   const world: CollisionWorld = { polys: [], groups: [], cells: new Map(), cellSize, lowestY: -Infinity };
   for (const group of groups) {
+    // Zone floors are not scenery. The original's loader leaves them out of
+    // the spatial index (`FUN_00489c30` skips flag 0x400), and at a quarter of
+    // the level's scale they would otherwise be a phantom floor near the
+    // origin. They are answered by zoneAt-style lookups, not by sweeps.
+    if (group.zone !== null) continue;
     const groupIndex = world.groups.length;
     world.groups.push({ objectNumber: group.objectNumber, dynamic: group.dynamic, polys: [] });
     for (const mesh of group.meshes) {

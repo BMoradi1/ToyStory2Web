@@ -31,6 +31,8 @@ export interface WorldSprite {
   alpha: number;
   /** Modulate, 0..1 each; 1 leaves the texel alone. */
   r?: number; g?: number; b?: number;
+  /** Spin about the view axis, radians. Effects use it; coins do not. */
+  rotation?: number;
 }
 
 const VERTEX = /* glsl */`
@@ -61,7 +63,7 @@ const FRAGMENT = /* glsl */`
   }
 `;
 
-export type SpriteBlend = 'normal' | 'subtract';
+export type SpriteBlend = 'normal' | 'subtract' | 'add';
 
 /** One draw call's worth of cards, all on the same sheet. */
 export class SpriteBatch {
@@ -90,11 +92,13 @@ export class SpriteBatch {
           blendSrc: THREE.OneFactor,
           blendDst: THREE.OneFactor,
         }
-        : {}),
+        : blend === 'add'
+          ? { blending: THREE.AdditiveBlending }
+          : {}),
     });
     this.mesh = new THREE.Mesh(this.geometry, this.material);
     this.mesh.frustumCulled = false;
-    this.mesh.renderOrder = blend === 'subtract' ? 1 : 2;
+    this.mesh.renderOrder = blend === 'subtract' ? 1 : blend === 'add' ? 3 : 2;
     this.mesh.visible = false;
   }
 
@@ -130,8 +134,16 @@ export class SpriteBatch {
       const s = sprites[i]!;
       const hw = s.width / 2;
       const hh = s.height / 2;
-      const ax = rx * hw, ay = ry * hw, az = rz * hw;
-      const bx = ux * hh, by = uy * hh, bz = uz * hh;
+      // A card that spins turns its two in-plane axes rather than the quad,
+      // which keeps it facing the camera while it rolls.
+      let arx = rx, ary = ry, arz = rz, aux = ux, auy = uy, auz = uz;
+      if (s.rotation) {
+        const c = Math.cos(s.rotation), n = Math.sin(s.rotation);
+        arx = rx * c + ux * n; ary = ry * c + uy * n; arz = rz * c + uz * n;
+        aux = ux * c - rx * n; auy = uy * c - ry * n; auz = uz * c - rz * n;
+      }
+      const ax = arx * hw, ay = ary * hw, az = arz * hw;
+      const bx = aux * hh, by = auy * hh, bz = auz * hh;
       let o = i * 12;
       // top-left, top-right, bottom-right, bottom-left
       p[o] = s.x - ax + bx; p[o + 1] = s.y - ay + by; p[o + 2] = s.z - az + bz;

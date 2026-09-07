@@ -532,8 +532,17 @@ export class Viewer {
    */
   private readonly coinCards = new SpriteBatch(false, 'normal');
   private readonly coinShadows = new SpriteBatch(true, 'subtract');
+  /**
+   * The effects (docs/EFFECTS.md). Their templates pick one of four blends;
+   * these are the two that matter — most sparks, smoke and bolts are
+   * additive, and the rest ride the coins' translucent batch.
+   */
+  private readonly effectCards = new SpriteBatch(false, 'add');
+  private readonly effectFlat = new SpriteBatch(true, 'add');
   private cards: readonly WorldSprite[] = [];
   private shadows: readonly WorldSprite[] = [];
+  private effects: readonly WorldSprite[] = [];
+  private effectsFlat: readonly WorldSprite[] = [];
   private creatures: THREE.InstancedMesh | null = null;
 
   /**
@@ -688,10 +697,20 @@ export class Viewer {
   setCardSheet(texture: THREE.Texture | null): void {
     this.coinCards.setSheet(texture);
     this.coinShadows.setSheet(texture);
+    this.effectCards.setSheet(texture);
+    this.effectFlat.setSheet(texture);
     if (!this.coinCards.mesh.parent) {
       this.scene.add(this.coinCards.mesh);
       this.scene.add(this.coinShadows.mesh);
+      this.scene.add(this.effectCards.mesh);
+      this.scene.add(this.effectFlat.mesh);
     }
+  }
+
+  /** The additive effect cards this frame: the upright ones and the flat ones. */
+  setEffectCards(cards: readonly WorldSprite[], flat: readonly WorldSprite[]): void {
+    this.effects = cards;
+    this.effectsFlat = flat;
   }
 
   /** What to draw as cards this frame: the upright ones and the flat ones. */
@@ -916,6 +935,8 @@ export class Viewer {
     this.camera.updateMatrixWorld();
     this.coinCards.update(this.cards, this.camera);
     this.coinShadows.update(this.shadows, this.camera);
+    this.effectCards.update(this.effects, this.camera);
+    this.effectFlat.update(this.effectsFlat, this.camera);
 
     // Black the whole canvas, then draw the game into its own rectangle.
     const canvas = this.renderer.domElement;

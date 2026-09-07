@@ -28,6 +28,11 @@ import {
 import { cos as cosOf, sin as sinOf, toRadians, yawOf } from './sim/trig.ts';
 import { createCamera, stepCamera, cameraTarget, type CameraState } from './sim/camera.ts';
 import { createZones, stepZones, type ZoneState } from './sim/zones.ts';
+import {
+  createEffects, liveEffects, spawnEffect, stepEffects, touchPlayer,
+  type EffectSim, type EffectWorld,
+} from './sim/effects.ts';
+import { EFFECT_FLAGS, EFFECT_KIND, readEffectTable } from './formats/effect-table.ts';
 import { SoundBank, PLAYER_EFFECTS } from './audio/sfx.ts';
 import { MUSIC_TRACKS, MUSIC_VOLUME_CURVE, MusicPlayer, trackForLevel } from './audio/music.ts';
 import {
@@ -62,7 +67,7 @@ import {
 } from './formats/creatures.ts';
 import { AI_SCRIPTS } from './sim/creature-data.ts';
 import {
-  RandomStream, attackFromPlayer, contactCreatures, createCreatureSim,
+  RandomStream, attackFromPlayer, contactCreatures, createCreatureSim, damageCreature,
   creatureWorldFromCollision, killCreature, setCreatureModels, stepCreatures,
   CREATURE_FLAGS, type Creature, type CreatureModel, type CreatureSim,
 } from './sim/creatures.ts';
@@ -439,6 +444,7 @@ async function open(dir: GameDir): Promise<void> {
             script: c.record.script, scriptWords: c.script.length,
             x: c.x, y: c.y, z: c.z, heading: c.heading, health: c.health,
             flags: c.flags, near: (c.flags & CREATURE_FLAGS.near) !== 0,
+            vulnerable: c.record.vulnerable,
             pc: c.pc, wait: c.wait, animState: c.animState, frame: c.frame >>> 16,
             homeX: c.homeX, homeZ: c.homeZ,
             targetX: c.targetX, targetZ: c.targetZ,
@@ -669,6 +675,27 @@ async function open(dir: GameDir): Promise<void> {
       /** Which room the level scripts think Buzz is in (docs/LEVELS.md). */
       get zones() {
         return { camera: zones.camera, player: zones.player };
+      },
+      /** The effect pool, for a test that wants to see what is alive. */
+      get effects() {
+        if (!effects) return null;
+        const live = liveEffects(effects);
+        return {
+          hits: effects.hits.length,
+          cards: effectCards.length, flat: effectFlat.length,
+          lastHitAngle: effects.hits[0]?.angle ?? null,
+          live: live.length,
+          kinds: live.map((e) => e.kind),
+          sprites: live.map((e) => e.sprite),
+          first: live[0]
+            ? {
+              kind: live[0].kind, x: live[0].x, y: live[0].y, z: live[0].z,
+              life: live[0].life, mode: live[0].mode, pitch: live[0].pitch,
+              yaw: live[0].gravity, flags: live[0].flags,
+              target: live[0].target ? { x: live[0].target.x, y: live[0].target.y, z: live[0].target.z } : null,
+            }
+            : null,
+        };
       },
       /**
        * Enter or leave play. A shot taken without this shows the ORBIT
@@ -995,6 +1022,15 @@ async function spawnPlayer(): Promise<void> {
   // executable, and its second half is per level (docs/HUD.md).
   spriteTable = exeBytes ? readSpriteTable(exeBytes, level) : [];
   soundTable = exeBytes ? readSoundTable(exeBytes, level) : null;
+  // The effect pool: the laser bolt, the robots' shots, sparks, dust and the
+  // coins a creature spills (docs/EFFECTS.md). Its templates come from the
+  // user's own executable, like the sprite and sound tables.
+  effects = exeBytes && creatureSim
+    ? (() => {
+      const table = readEffectTable(exeBytes!);
+      return createEffects(table.kinds, table.modes, creatureSim!.rand);
+    })()
+    : null;
   viewer.setCardSheet(sceneTextures.get(SPRITE_SHEET) ?? null);
   hud = createHud();
   startHud(hud);
@@ -1036,6 +1072,172 @@ function drawPickups(): void {
     if (!item.enabled || item.collected) hidden.add(item.objectIndex);
   }
   viewer.setHiddenObjects(hidden);
+}
+
+/**
+ * One tick of the effect pool, then what it raised.
+ *
+ * The engine runs this after the player and the creatures, which is where it
+ * sits here: a bolt fired this tick moves on the next one, and a creature
+ * that died this tick spills its coins now.
+ */
+function stepEffectsNow(): void {
+  if (!effects || !player || !camera) return;
+  const world = effectWorld();
+  effects.spinning = player.spin > 0;
+  stepEffects(effects, world);
+  touchPlayer(effects, world);
+
+  // Damage the laser landed. The creature port already knows what kind 4 is.
+  if (creatureSim) {
+    for (const hit of effects.hits) {
+      const c = creatureSim.creatures.find((x) => x === hit.target);
+      if (c) damageCreature(creatureSim, c, hit.angle, hit.kind);
+    }
+  }
+  for (const raised of effects.sounds) playEvent(raised.event, raised);
+  effects.sounds.length = 0;
+
+  if (effects.coins > 0 && pickups) {
+    pickups.coins = Math.min(99, pickups.coins + effects.coins);
+    showHud(hud, HudElement.Coins, HUD.counterTicks);
+    if (pickups.coins >= 50) playEvent(0x4f, player);
+  }
+  // A shot that reached him hurts him, the same way a creature's touch does.
+  if (effects.hurt !== null && player.hitStun <= 0 && !player.dying) {
+    player.vx = Math.trunc(sinOf(effects.hurt) / 16);
+    player.vz = Math.trunc(cosOf(effects.hurt) / 16);
+    hurtPlayer();
+  }
+}
+
+/**
+ * What the creature tick raised, as effects: the shots a handler fired, the
+ * sparks a blow struck, and the coins a dying creature spills.
+ */
+function spawnCreatureEffects(): void {
+  if (!effects || !creatureSim || !player || !camera) return;
+  const world = effectWorld();
+  for (const shot of creatureSim.shots) {
+    // The hover bot fires from a gun on each side; the port has one heading
+    // per shot, so the bolt leaves along it rather than across it.
+    spawnEffect(effects, world, shot.x, shot.y, shot.z,
+      sinOf(shot.heading) >> 4, -0x200, cosOf(shot.heading) >> 4,
+      0x40, 0, 0x80, EFFECT_KIND.hoverShot);
+  }
+  creatureSim.shots.length = 0;
+  for (const spark of creatureSim.sparks) {
+    spawnEffect(effects, world, spark.x, spark.y, spark.z, 0, 0, 0, 0, 0, 0, 0x11);
+  }
+  creatureSim.sparks.length = 0;
+}
+
+/** What the effect tick needs to know about the rest of the world. */
+function effectWorld(): EffectWorld {
+  const S2 = GAME_UNITS_PER_LEVEL_UNIT;
+  const look = camera ? cameraTarget(player!, camera) : { x: 0, y: 0, z: 0 };
+  return {
+    cameraX: look.x, cameraY: look.y, cameraZ: look.z,
+    playerX: player!.x, playerY: player!.y, playerZ: player!.z,
+    playerYaw: player!.yaw, playerVx: player!.vx, playerVz: player!.vz,
+    groundAt: (x, y, z) => {
+      if (!currentCollisionWorld) return null;
+      const hit = groundBelow(currentCollisionWorld, x / S2, y / S2, z / S2);
+      return hit ? hit.y * S2 : null;
+    },
+    waterY: null,
+  };
+}
+
+/**
+ * Buzz fires (`FUN_004a4960`). The bolt is an effect: kind 0x47 homes on the
+ * nearest creature that can be hurt, and kind 0x48 flies straight when
+ * nothing is in range. A creature whose `vulnerable` byte is 4 bounces the
+ * homing one, which the effect tick handles.
+ *
+ * The original fires from the wrist bone; this fires from Buzz's centre,
+ * which is the same place to within his own width.
+ */
+function fireLaser(aim: number): void {
+  if (!effects || !player || !camera) return;
+  const world = effectWorld();
+  const x = player.x, y = player.y - 0x1cc0, z = player.z;
+
+  let best: typeof creatureSim extends null ? never : NonNullable<typeof creatureSim>['creatures'][number] | null = null;
+  let least = Infinity;
+  if (creatureSim) {
+    for (const c of creatureSim.creatures) {
+      if (c.record.vulnerable === 0 || c.deathTimer < 0) continue;
+      // The original wants flags 0x1 and 0x2 together. 0x2 is "in this
+      // tick's near list", which is the part that means "the game is
+      // running this creature"; 0x1 is the always-awake bit a script or a
+      // level rule sets, and requiring it here would leave the homing bolt
+      // with almost nothing to aim at. Near and alive is the test used.
+      if ((c.flags & CREATURE_FLAGS.near) === 0) continue;
+      const dx = (c.x - player.x) >> 5, dy = (c.y - player.y) >> 5, dz = (c.z - player.z) >> 5;
+      const d = dx * dx + dy * dy + dz * dz;
+      if (d < least) { least = d; best = c; }
+    }
+  }
+  if (best && least < 0x1000000) {
+    const bolt = spawnEffect(effects, world, x, y, z, 0, -2, 0, aim << 2, 0, 0, EFFECT_KIND.laserBolt);
+    if (bolt) {
+      const at = best;
+      const tx = at.x + at.offsetX, ty = at.y + at.offsetY, tz = at.z + at.offsetZ;
+      // The original passes an aim into `FUN_004a4960` and keeps it as the
+      // bolt's pitch. Where that number comes from inside `FUN_00434990` was
+      // not read; starting level, the pitch's 20-tick lag leaves the bolt
+      // passing over anything much above or below the wrist, so it starts
+      // pointed at what it is chasing.
+      bolt.pitch = (yawOf(Math.round(Math.hypot(tx - x, tz - z)) >> 5, (ty - y) >> 5) - 0x400) & 0xfff;
+      const target = {
+        x: tx, y: ty, z: tz,
+        alive: true, vulnerable: at.record.vulnerable, creature: at,
+        follow: () => {
+          target.x = at.x + at.offsetX;
+          target.y = at.y + at.offsetY;
+          target.z = at.z + at.offsetZ;
+          target.vulnerable = at.record.vulnerable;
+          target.alive = at.deathTimer >= 0 && at.health > 0;
+        },
+      };
+      bolt.target = target;
+    }
+  } else {
+    const flat = cosOf(aim);
+    spawnEffect(effects, world, x, y, z,
+      Math.trunc(((sinOf(player.yaw) * flat) >> 14) / 3),
+      Math.trunc(-sinOf(aim) / 3),
+      Math.trunc(((cosOf(player.yaw) * flat) >> 14) / 3),
+      0, 0, 0, EFFECT_KIND.laserStraight);
+  }
+  playEvent(0x54, player);
+}
+
+/** The effects, as cards. Additive ones go in their own batch. */
+function drawEffects(): void {
+  effectCards.length = 0;
+  effectFlat.length = 0;
+  if (!viewer || !effects) return;
+  const sheet = sceneSheets.get(SPRITE_SHEET);
+  if (!sheet) { viewer.setEffectCards(effectCards, effectFlat); return; }
+  for (const e of liveEffects(effects)) {
+    const header = spriteTable[e.sprite];
+    if (!header) continue;
+    const f = header.frames[e.frame] ?? header.frames[0];
+    if (!f) continue;
+    const card: WorldSprite = {
+      x: e.x / WORLD_SCALE, y: -e.y / WORLD_SCALE, z: -e.z / WORLD_SCALE,
+      u0: f.u / sheet.width, v0: f.v / sheet.height,
+      u1: (f.u + header.width) / sheet.width, v1: (f.v + header.height) / sheet.height,
+      width: e.width / WORLD_SCALE, height: e.height / WORLD_SCALE,
+      alpha: 1,
+      r: e.r / 128, g: e.g / 128, b: e.b / 128,
+      rotation: toRadians(e.rotation),
+    };
+    ((e.flags & EFFECT_FLAGS.flat) !== 0 ? effectFlat : effectCards).push(card);
+  }
+  viewer.setEffectCards(effectCards, effectFlat);
 }
 
 /**
@@ -1482,6 +1684,11 @@ let playerRuntime: PlayerRuntime | null = null;
 let playerModel: { model: AllFile; anm: AnmFile | null } | null = null;
 let playerAnim: AnimationPlayback | null = null;
 let camera: CameraState | null = null;
+/** The effect pool, or null before a level is up. */
+let effects: EffectSim | null = null;
+/** This frame's effect cards, rebuilt each tick. */
+const effectCards: WorldSprite[] = [];
+const effectFlat: WorldSprite[] = [];
 /**
  * Which room the level scripts think Buzz is in. Stepped right after the
  * camera moves, because the engine reads it from where the camera ended up
@@ -1755,8 +1962,13 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       playEvent(raised.event, raised);
     }
     creatureSim.sounds.length = 0;
+    spawnCreatureEffects();
     drawCreatures();
   }
+
+  // Buzz's laser, and then the pool that carries it (docs/EFFECTS.md).
+  if (player.laserFired !== null) fireLaser(player.yaw);
+  stepEffectsNow();
 
   if (pickups) {
     const taken = stepPickups(pickups, player);
@@ -1785,6 +1997,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     }
   }
   drawCoins();
+  drawEffects();
   drawHud(levelNow);
   poseAnimation(Math.hypot(held.moveX, held.moveY) > 0);
 }

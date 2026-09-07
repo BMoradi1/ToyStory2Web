@@ -145,6 +145,12 @@ export interface PlayerState {
   /** `DAT_0053c620` laser phase, `DAT_0053c840` charge. */
   laser: number;
   laserCharge: number;
+  /**
+   * The charge the laser went off at this tick, or null. `FUN_004a4960` is
+   * what the original calls here; the bolt itself is an effect
+   * (docs/EFFECTS.md), which the caller spawns.
+   */
+  laserFired: number | null;
 
   /**
    * `DAT_0052f34c`: the last place the player stood on ground flat enough to
@@ -187,6 +193,7 @@ export function createPlayer(x = 0, y = 0, z = 0, yaw = 0): PlayerState {
     spinCharge: 0,
     laser: 0,
     laserCharge: 0,
+    laserFired: null,
     safeX: x, safeY: y, safeZ: z,
     safeYaw: yaw,
     fellOut: false,
@@ -389,6 +396,7 @@ function spinAttack(p: PlayerState, input: PlayerInput, prev: PlayerInput): void
 
 /** Laser charge. `FUN_00434990`, reduced to its timers. */
 function laser(p: PlayerState, input: PlayerInput, prev: PlayerInput): void {
+  p.laserFired = null;
   const pressed = input.fire && !prev.fire;
   if (pressed && isPlain(p) && p.laser === 0) {
     p.laser = 1;
@@ -402,6 +410,7 @@ function laser(p: PlayerState, input: PlayerInput, prev: PlayerInput): void {
     return;
   }
   p.sounds.push(p.laserCharge >= ATTACK.laserChargeTicks ? 'BUZYLASR' : 'BUZLASER');
+  p.laserFired = p.laserCharge;
   p.laser = 0;
   p.laserCharge = 0;
 }

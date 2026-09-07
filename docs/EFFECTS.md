@@ -286,13 +286,35 @@ positions with a colour and a countdown that the character lighting reads
 read. `FUN_0049e660` with a negative event number plays a sequence from
 `PTR_DAT_00503828` rather than an event; the coin pickup is one.
 
-## Porting
+## Ported
 
-Everything an Opus pass needs is above and in `src/formats/effect-table.ts`:
-a 64-slot pool, the spawner's rules, the tick in the order given with the
-modes as written, the two draw calls the coins already use
-(src/render/world-sprites.ts), the touch test feeding `hurtPlayer`, and
-`damageCreature(sim, c, angle, 4)` for the bolt. The creature port already
-raises the death and hit kinds; `EFFECT_KIND` names the ones the code
-names. Sound events go through `playEvent`. The random stream can be any
-byte generator; the original's `rand.dat` is not needed for behaviour.
+`src/sim/effects.ts` is the pool, the spawner, the child spawner, the tick
+in the order above with every mode the switch names, the seven fades, the
+twelve death codes and the touch test. `src/main.ts` fires the laser, feeds
+the creature port's shots and sparks in, hands hits to `damageCreature`,
+turns a touched coin into a coin and a shot that landed into
+`hurtPlayer()`. The cards are drawn by two additive `SpriteBatch`es beside
+the coins' translucent one, with the template's spin.
+
+Checked in the browser on level 1: firing with nothing in range spawns kind
+0x48 and its mode-0x1e trail, one 0x2c spark per 3-tick gate; firing at a
+creature spawns kind 0x47, which homes in three axes and, against one whose
+`vulnerable` byte is 4, **bounces** — losing `hurts` and `homing`, taking
+mode 0x1e and spawning that same trail, exactly as the decode says. Against
+a creature with `vulnerable` 7 the bolt closed from 1,148 level units to
+149 and landed damage kind 4, taking it from 4 health to 2, which is the
+2 that `DAMAGE_KINDS[4]` carries.
+
+Three things are not as the original has them, and each is named at its
+site: modes 0x2f, 0x30 and 0x34 are level-specific handlers that were not
+decoded and behave as mode 0; the bolt's starting pitch is aimed at its
+target because where `FUN_00434990` gets the aim it passes was not read,
+and level it passes over anything much above the wrist; and the laser
+targets the nearest creature that is in this tick's near list rather than
+the original's "near list AND explicitly awake", which would leave it with
+almost nothing to aim at.
+
+One thing the port had to get right that the decode only implies: the
+original re-reads the target's hit-shape centre EVERY tick, so a bolt
+tracks what it is chasing. Snapshotting it at spawn leaves the bolt
+orbiting the spot a flier has left.

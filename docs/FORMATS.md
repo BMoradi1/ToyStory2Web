@@ -741,15 +741,32 @@ the option's row every frame and then forces row 2 where a level wants
 the far view: levels 3 and 9 always; level 4 with Buzz in zone 2 or
 within 250 steps of 256 game units of (0x51b97, -0x104fd, 0x5e58e);
 level 11 with the camera in zone 5 or 7. Ported 2026-09-07 as
-`detailRowFor` in src/sim/zones.ts. The same pass sets the scene's fog
-each frame, a linear band from 24,000 to 48,000 level units in the clear
-colour halved (level 14 narrows it to 46,000) unless one of two flags is
-up; that and the rows' own two fog columns are recorded here, not ported.
+`detailRowFor` in src/sim/zones.ts.
 
-    row   D0      D1      fog     fog     A       B
+**Fog.** The same pass would set a linear fog from 24,000 to 48,000 level
+units (`FUN_004b2cf0`: Direct3D table fog, start, end, colour) in the
+clear colour halved — `DAT_00559e84..8c` is 0x20 a channel, so 0x10 —
+but only when neither backdrop flag is up, and `FUN_0044ff50` raises one
+of them for any scene holding a texture in slots 0x24, 0x25, 0x28-0x2f or
+0x58-0x5f. Every shipped scene has `tex37` in slot 0x25, so that band
+never shows. What does is level 14's own `case 0xe`: 24,000 to 46,000 in
+the same colour. Fog is only ever cleared by the renderer's start-up
+(`FUN_004b3630`), so in the original it stays on from level 14 through
+whatever is played after it in the same session; the port turns it on
+for level 14 alone (`Viewer.setFog`, 2026-09-07). Level 7's init also
+replaces the clear colour with its backdrop's top-left pixel, which the
+port does not read.
+
+    row   D0      D1      near1   near0   A       B
     0     3000    3500    50      55      10000   0
     1     5000    6500    40      60      10000   0
     2     10000   12000   40      60      12000   1000
+
+(`near1` and `near0` are the projection's near plane for the two passes,
+written with D0/D1 into the draw block at 0x508d04..18 by `FUN_004cdd10`;
+the far plane is a fixed 48,000, the block's resting value, and A and B
+are squared into 0x5088b0/b4 for the object gate. An earlier reading of
+these two columns as fog was wrong.)
 
 So at the default the near detail is cut off by the clip plane at 6,500
 level units and the far detail cannot start before 5,000; the 1,500 in

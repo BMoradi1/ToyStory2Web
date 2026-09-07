@@ -341,6 +341,12 @@ async function showLevel(index: number): Promise<void> {
       // .ngn carries one under that name (docs/FORMATS.md).
       const reflectionSlot = textureList.find((t) => t.tag === 'tex14')?.slot ?? null;
       viewer.setLevel(geometry, gpuTextures, reflectionSlot === null ? undefined : gpuTextures.get(reflectionSlot));
+      // The render pass's fog. Every shipped scene carries the slot-0x25
+      // sheet that keeps the engine's general band off, so only level 14's
+      // own 24,000-46,000 band ever shows; its colour is the clear colour
+      // halved, 0x20 a channel to 0x10 (docs/FORMATS.md).
+      const fog = FOG_BY_LEVEL[levelNumber(level.id) ?? 0];
+      viewer.setFog(fog ? FOG_COLOUR : null, fog?.[0], fog?.[1]);
 
       setStatus(`${level.id}: ready`);
       await yieldToBrowser();
@@ -1877,6 +1883,10 @@ const effectFlat: WorldSprite[] = [];
  * (docs/LEVELS.md "Zones").
  */
 const zones: ZoneState = createZones();
+/** `FUN_00440f70`'s `case 0xe`: level 14's fog band, level units. */
+const FOG_BY_LEVEL: Record<number, readonly [number, number] | undefined> = { 14: [24000, 46000] };
+/** The clear colour `DAT_00559e84` (0x20 a channel) halved, as the pass builds it. */
+const FOG_COLOUR = 0x101010;
 /** The pause menu (docs/HUD.md, src/sim/menu.ts). */
 const menu: MenuState = createMenu();
 /**

@@ -884,6 +884,15 @@ export class Viewer {
   }
 
   /**
+   * The scene's fog (`FUN_004b2cf0`): a linear band in level units, in the
+   * clear colour halved, or none. Only level 14 sets one in the shipped game
+   * (docs/FORMATS.md "The two detail lists").
+   */
+  setFog(colour: number | null, start = 0, end = 1): void {
+    this.scene.fog = colour === null ? null : new THREE.Fog(colour, start / WORLD_SCALE, end / WORLD_SCALE);
+  }
+
+  /**
    * Which row of the engine's detail table to draw with, 0..2, or null for
    * everything at once. Returns a description for the status line.
    */

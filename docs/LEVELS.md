@@ -187,7 +187,8 @@ reveals slot 2 with the camera cut.
 
 **How the car drives** (decoded and ported 2026-09-07, `driveCar` in
 src/sim/tasks.ts; walked on level 1: three laps of 45 nodes in about 900
-ticks each, and a race left standing is lost when the car finishes). The car's handler (`FUN_00406a60` → level 1
+ticks each, and a race left standing is lost when the car finishes; and
+on level 2: three laps of 65 nodes in about 70 seconds to the same end). The car's handler (`FUN_00406a60` → level 1
 `FUN_00416f30`, level 2 `FUN_00418720`, the same function twice) only
 picks its animation from speed and steering, spins the wheel bones and
 spawns skid dust; it does not move it. That handler is ported too

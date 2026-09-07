@@ -641,7 +641,7 @@ async function open(dir: GameDir): Promise<void> {
         if (!creatureSim) return null;
         const c = creatureSim.creatures.find((q) => q.slot === slot);
         if (!c) return null;
-        killCreature(c, 3);
+        killCreature(c, 3, creatureSim);
         drawCreatures();
         return { slot, type: c.type };
       },
@@ -1130,6 +1130,15 @@ function spawnCreatureEffects(): void {
     spawnEffect(effects, world, spark.x, spark.y, spark.z, 0, 0, 0, 0, 0, 0, 0x11);
   }
   creatureSim.sparks.length = 0;
+  // The coin a creature spills when it dies, thrown up out of the body. Its
+  // floor is asked for at once so it lands instead of falling through, which
+  // is what the original does at the same spot.
+  for (const at of creatureSim.deaths) {
+    const coin = spawnEffect(effects, world,
+      at.x, at.y - 0x1000, at.z, 0, -0x800, 0, 0x80, 0, 0, EFFECT_KIND.coin);
+    if (coin) coin.floor = world.groundAt(coin.x, coin.y, coin.z) ?? coin.y;
+  }
+  creatureSim.deaths.length = 0;
 }
 
 /** What the effect tick needs to know about the rest of the world. */

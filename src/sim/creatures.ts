@@ -196,6 +196,12 @@ export interface CreatureSim {
   sounds: CreatureSound[];
   /** Hit sparks a damaging blow asked for, for the caller to draw. */
   sparks: { x: number; y: number; z: number }[];
+  /**
+   * Where a creature just died for the first time. `FUN_00405d20` spills one
+   * coin there, gated on the same "has died before" bit, and the caller
+   * spawns it (docs/EFFECTS.md).
+   */
+  deaths: { x: number; y: number; z: number }[];
   /** Bolts a handler fired this tick. The projectile itself is not ported. */
   shots: { x: number; y: number; z: number; heading: number }[];
   /**
@@ -304,7 +310,7 @@ export function createCreatureSim(
   }
   return {
     creatures, world, rand, level,
-    sounds: [], sparks: [], shots: [], near: [],
+    sounds: [], sparks: [], shots: [], deaths: [], near: [],
     foundCount: 0, lastKilled: -1, models: null,
     bossLastHealth: -1, bossSlotEarned: false,
   };
@@ -1049,7 +1055,7 @@ export function stepCreatures(
     updateCreature(sim, c, player, dt);
     if (c.deathTimer > 0) {
       c.deathTimer -= dt;
-      if (c.deathTimer <= 0) { c.deathTimer = 0; killCreature(c, 1); }
+      if (c.deathTimer <= 0) { c.deathTimer = 0; killCreature(c, 1, sim); }
     } else if (c.deathTimer < 0) {
       c.deathTimer += dt;
       if (c.deathTimer >= 0) { c.deathTimer = 0; killCreature(c, 2); }
@@ -1062,8 +1068,14 @@ export function stepCreatures(
  * The particle bursts and per-type death animations are not ported; the state
  * changes are.
  */
-export function killCreature(c: Creature, what: number): void {
+export function killCreature(c: Creature, what: number, sim?: CreatureSim): void {
   if ((what & 1) !== 0) {
+    // The coin a creature spills, once ever. The original spawns it here,
+    // 0x1000 above the body and thrown upward, and asks for the ground under
+    // it at once so it lands rather than falling through.
+    if (sim && (c.flags & CREATURE_FLAGS.diedOnce) === 0) {
+      sim.deaths.push({ x: c.x, y: c.y, z: c.z });
+    }
     if ((c.flags & CREATURE_FLAGS.diedOnce) === 0) {
       c.flags |= CREATURE_FLAGS.diedOnce;
       c.animRateGround = 0xe0;
@@ -1163,7 +1175,7 @@ export function damageCreature(sim: CreatureSim, c: Creature, angle: number, kin
     c.script = AI_SCRIPTS[2]!;
     c.pc = 0;
     sim.lastKilled = c.slot;
-    killCreature(c, 1);
+    killCreature(c, 1, sim);
   }
 }
 

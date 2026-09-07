@@ -22,7 +22,12 @@ The tin robot idles in a closed three-word loop until its taunt dialogue has
 been seen; the level's tick is what kicks its script out of that. The viewer
 draws each creature as its own model, posed by its `animState` and frame,
 which works because `animState` is a slot in that creature's `.anm`.
-**Not ported**: the rest of the handlers, the laser and the dive (damage
+**Ported since**: the coin a creature spills when it dies for the first
+time, which `FUN_00405d20` spawns at the body under the same "has died
+before" gate, and the laser (both are effects, docs/EFFECTS.md).
+
+**Not ported**: the rest of the handlers, the per-type death animations,
+the dive (damage
 kinds 4 and 5), and the player's full knock-down reaction.
 
 Two things in this document were wrong until the port was written against

@@ -3,10 +3,9 @@
  Written 2026-09-03 at the end of Phase 1; updated 2026-09-04, after the
  session that made Buzz playable, 2026-09-05 after the pickups/tokens
  decode, and 2026-09-06 when the creature port and the token tasks were
- finished, and later that day when the zone byte was decoded. TWO THINGS
- ARE WAITING ON FABLE and nothing else is: the effect system, and the
- camera's four modes. Both are written up under "WHAT TO GIVE FABLE, IN
- ORDER".
+ finished, and later that day when the zone byte and the effect system
+ were decoded. ONE THING IS WAITING ON FABLE and nothing else is: the
+ camera's four modes, written up under "WHAT TO GIVE FABLE, IN ORDER".
 ================================================================================
 
  Read TODOPLAN.txt for WHAT to do. This file is about WHO should do it and what
@@ -151,38 +150,20 @@
       - (the wall-line list DAT_007290f4 is CLOSED 2026-09-05: the machine
         code never writes it - zeroed at level load, read three times -
         so the line collision is dead on PC. docs/PLAYER.md.)
-      - THE EFFECT SYSTEM. This is the one thing on the whole list that
-        an Opus pass should not attempt, and the reason is measured
-        rather than felt. What is settled, from a read on 2026-09-05:
-
-          * the records are 0x3c bytes at DAT_00529e58, spawned by
-            FUN_0040fae0(x, y, z, vx, vy, vz, a, b, c, kind) and updated
-            by FUN_00410f40
-          * the spawner writes position at +0, velocity halved at +0xc,
-            and then COPIES thirteen bytes out of a 16-byte per-kind
-            template at 0x4ec160 into +0x24..+0x3a, doing no arithmetic
-            on them. A second table at 0x4ec948 (0x18 bytes) supplies
-            randomisation modes 1..6 for the velocity
-          * 127 of the template rows are non-empty, so there are 127
-            effect kinds
-          * kinds seen at call sites: 0x3d the creature death burst,
-            0x26 the hover bot's shot, 0x23/0x11/99 death sparks,
-            0x71/0x73 the sparkle points on path tag 58, 2 the push
-            block's dust, 0x7e/0x7f a pair spawned together
-
-        What is NOT settled is what any of those thirteen template bytes
-        MEAN. Their only definition is FUN_00410f40 itself: 912 lines of
-        decompiled C with 60 case labels. Working them out is forming a
-        hypothesis about unlabelled data, and the oracle is weak -
-        particles are visual, there is no .ngn copy to join against, and
-        a wrong reading yields something that looks plausible and is
-        wrong. That is exactly the failure this split exists to catch.
-
-        Porting it unlocks a lot at once: the laser bolt (damage kind 4,
-        which the creature code already handles), the hit sparks and
-        death bursts the creature port raises but cannot draw, the hover
-        bot's shots, and the sparkles over unspent secrets.
-
+      - (THE EFFECT SYSTEM is DECODED 2026-09-06: docs/EFFECTS.md. The
+        thirteen template bytes are sprite, frame period, life, frame
+        count, death code, width, height, flags, mode and colour; the
+        mode byte drives a 54-case switch whose cases are all written up,
+        with the seven fades and the twelve death codes. Buzz's laser IS
+        an effect - kind 0x47 homes on the nearest vulnerable creature and
+        damages it with kind 4, or bounces off one whose vulnerable byte
+        is 4 - and so are the hover bot's shots (0x26), a dead creature's
+        coins (0x3d, collected by touch in FUN_004100f0, which also lets a
+        spinning Buzz deflect missiles), the stomp's shockwave and the
+        sparkles. src/formats/effect-table.ts reads the 127 templates and
+        29 spawn modes from the user's exe; tools/effect-table.ts checks
+        every one against the sprite tables and the decode. Opus ports
+        the pool, tick, draw and touch test - the "Porting" section.)
       - (WHICH ZONE THE PLAYER IS IN is DECODED 2026-09-06: docs/LEVELS.md
         "Zones". The byte is bit 0x400 + low byte of the word at +0x28 of a
         TERRAIN.ALL group entry, marking ZONE FLOORS: slabs at a quarter of

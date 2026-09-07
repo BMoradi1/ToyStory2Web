@@ -202,6 +202,15 @@
           view, narrowing the frustum to each outline, instead of taking a
           fixed one-step neighbourhood. Needs the portal corners projected
           per frame; level.zones already carries them.
+ [READY]  The effect system. DECODED 2026-09-06 (docs/EFFECTS.md,
+          src/formats/effect-table.ts, tools/effect-table.ts). Port in
+          this order: the 64-slot pool with spawn/child-spawn and the tick
+          (move, animate, spin, ground, cull, the mode switch, the fades,
+          the death hook), the drawer on the coin's two sprite calls, then
+          the touch test (coins by touch, shots hurt, spinning deflects),
+          then the laser (FUN_004a4960: target pick, kinds 0x47/0x48) and
+          the creature sites (death coins 0x3d, hover shots 0x26). That
+          gives Buzz his laser and makes the robots' attacks visible.
  [READY]  Camera's own zone and the player's. DECODED 2026-09-06
           (docs/LEVELS.md "Zones"): both are `zoneAt` (src/formats/
           collision.ts) on the render camera over the ZONE FLOORS, with

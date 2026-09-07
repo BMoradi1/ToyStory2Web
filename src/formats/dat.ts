@@ -752,6 +752,15 @@ export interface GeometryGroup {
   blend: BlendMode;
   /** Drawn from both sides, rather than back-face culled. */
   doubleSided: boolean;
+  /**
+   * Which of the level's two detail lists these faces are from: 0 the full
+   * detail (the object table's first section), 1 the low detail (its
+   * quarter-scale second section, a coarser copy of the same scenery). The
+   * engine draws list 1 only beyond a distance and list 0 only within one,
+   * split by the clip planes; drawn together they z-fight (docs/FORMATS.md,
+   * "The two passes are two levels of detail").
+   */
+  list: 0 | 1;
   /** Constant vertex alpha: 1 for opaque faces, 0.5 for the PSX half-blend. */
   alpha: number;
   /**
@@ -947,7 +956,7 @@ export function buildLevelGeometry(level: DatLevel, options: GeometryOptions = {
   interface Bucket { pos: number[]; col: number[]; uv: number[]; group: Omit<GeometryGroup, 'start' | 'count'> }
   const buckets = new Map<string, Bucket>();
   const bucketFor = (group: Omit<GeometryGroup, 'start' | 'count'>) => {
-    const key = `${group.page}|${group.blend}|${group.doubleSided}|${group.zone}|${group.object}`;
+    const key = `${group.page}|${group.blend}|${group.doubleSided}|${group.zone}|${group.object}|${group.list}`;
     let bucket = buckets.get(key);
     if (!bucket) { bucket = { pos: [], col: [], uv: [], group }; buckets.set(key, bucket); }
     return bucket;
@@ -978,6 +987,7 @@ export function buildLevelGeometry(level: DatLevel, options: GeometryOptions = {
         page: face.textured ? texturePage(face.mode) : null,
         blend: blendMode(face.mode),
         doubleSided: isDoubleSided(face.mode),
+        list: u === 4 ? 1 : 0,
         alpha: faceAlpha(face.mode),
         reflect: (face.mode & 0x08) !== 0,
         zone,

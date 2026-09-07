@@ -185,8 +185,9 @@ four-quadrant lap counter (`DAT_0052f584`, bits for the garage's x/z
 halves), `DAT_0052ad64` counts laps, and at three `FUN_004a0db0(2, 0)`
 reveals slot 2 with the camera cut.
 
-**How the car drives** (decoded 2026-09-07; not yet ported — the car sits
-still while you race). The car's handler (`FUN_00406a60` → level 1
+**How the car drives** (decoded and ported 2026-09-07, `driveCar` in
+src/sim/tasks.ts; walked on level 1: three laps of 45 nodes in about 900
+ticks each, and a race left standing is lost when the car finishes). The car's handler (`FUN_00406a60` → level 1
 `FUN_00416f30`, level 2 `FUN_00418720`) only picks its animation from
 speed and steering, spins the wheel bones and spawns exhaust; it does not
 move it. The LEVEL TICK does, through the car's own creature entity — slot

@@ -617,6 +617,7 @@ async function open(dir: GameDir): Promise<void> {
           fetch: tasks.fetch, fetchDone: tasks.fetchDone, fetchClock: tasks.fetchClock,
           slowTick: tasks.slowTick,
           race: tasks.race, laps: tasks.laps, quadrant: tasks.raceQuadrant,
+          carNode: tasks.carNode, carLaps: tasks.carLaps,
           checkpoint: tasks.checkpoint, challenge: tasks.challenge, blocked: tasks.raceBlocked,
         } : null;
       },
@@ -714,6 +715,8 @@ async function open(dir: GameDir): Promise<void> {
             : null,
         };
       },
+      /** The detail split (docs/FORMATS.md): a table row 0..2, or null for everything. */
+      setDetail(row: number | null) { return viewer?.setDetail(row) ?? null; },
       /** The pause menu, for a test: open it, read it, press its keys. */
       get menu() {
         return {
@@ -2065,6 +2068,13 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
           cameraZone: zones.camera,
           playerZone: zones.player,
           onGround: player.onGround,
+          pathPoints: (tag) => currentLevel?.level.paths.find((p) => p.id === tag)?.points ?? null,
+          dust: (x, y, z) => {
+            if (!effects || !camera) return;
+            const off = (effects.rand.byte() - 0x80) * 0x20;
+            effects.rand.byte();
+            spawnChild(effects, effectWorld(), x + off, y, z + off, 0x35, 4);
+          },
         },
       );
       if (request) startDialogue(request);

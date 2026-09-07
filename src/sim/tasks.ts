@@ -13,7 +13,7 @@
  * box and reveals the token, because both of those live above it.
  */
 
-import { CREATURE_FLAGS, type Creature } from './creatures.ts';
+import { CREATURE_FLAGS, CREATURE_HEALTH, type Creature } from './creatures.ts';
 import { HAMM_COINS, POTATO_PARTS, TASK_TEXT, type LevelTasks } from './level-data.ts';
 import type { RandomStream } from './creatures.ts';
 
@@ -87,6 +87,9 @@ export interface TaskState {
   laps: number;
   /** The four side bits of the lap box, from last tick. */
   raceQuadrant: number;
+  /** The car: which node of its path it is heading for, and its own laps. */
+  carNode: number;
+  carLaps: number;
   /** How many of a checkpoint race's gates have been passed, in order. */
   checkpoint: number;
   /**
@@ -108,6 +111,7 @@ export function createTasks(): TaskState {
     done: 0, hammChatter: 0, hintChatter: 0, hintIndex: -1,
     boss: 0, bossGone: 0, reach: 0, fetch: 0, fetchDone: 0, fetchClock: 100, slowTick: 0, potatoPart: 0, powerUps: 0, potatoChatter: 0, challenge: 0, challengeFrom: 0,
     race: RaceState.Idle, laps: 0, raceQuadrant: 0, checkpoint: 0, raceBlocked: true,
+    carNode: 0, carLaps: 0,
   };
 }
 
@@ -139,6 +143,49 @@ function chatter(rand: RandomStream): number {
 }
 
 /**
+ * Drive the race car along its path (level 1's tick and level 2's, the
+ * block after the lap counter; docs/LEVELS.md "How the car drives").
+ *
+ * Every tick the car's TARGET is the current node. Within 600 level units
+ * of it the node is recorded as the car's home and the next one is taken,
+ * wrapping into a new lap; after its third lap the car heads for the last
+ * node and, once past the finish line, has won: a race still running loses
+ * on the spot, and the car's health drops to 1 so it stops being always
+ * awake. The creature mover does the driving.
+ */
+function driveCar(
+  tasks: TaskState,
+  race: NonNullable<LevelTasks['race']>,
+  creatureAt: (index: number) => Creature | undefined,
+  world: { pathPoints: (tag: number) => readonly { x: number; y: number; z: number }[] | null; dust?: (x: number, y: number, z: number) => void },
+): void {
+  const car = creatureAt(race.creature);
+  const points = world.pathPoints(race.car.pathTag);
+  if (!car || !points || points.length === 0) return;
+  const S = 32;
+  if (race.car.holdY !== undefined && car.y > race.car.holdY) {
+    car.y = race.car.holdY;
+    world.dust?.(car.x, race.car.holdY, car.z);
+  }
+  const node = points[tasks.carNode] ?? points[0]!;
+  const dx = node.x - (car.x >> 5), dz = node.z - (car.z >> 5);
+  if (dx * dx + dz * dz < 360000) {
+    car.homeX = node.x * S;
+    car.homeZ = node.z * S;
+    if (tasks.carLaps < race.laps) {
+      tasks.carNode += 1;
+      if (tasks.carNode >= points.length) { tasks.carLaps += 1; tasks.carNode = 0; }
+    } else if (car.z > race.car.finishZ) {
+      if (tasks.race === RaceState.Running && tasks.laps < race.laps) tasks.race = RaceState.Done;
+      car.health = 1;
+    }
+  }
+  const next = points[tasks.carNode] ?? points[0]!;
+  car.targetX = next.x * S;
+  car.targetZ = next.z * S;
+}
+
+/**
  * Run a level's talkers for one tick and return the dialogue to open, if any.
  * `creatureAt` looks a creature up by the index the level's table uses, which
  * is its slot in the placement list.
@@ -159,6 +206,10 @@ export function stepTasks(
     tokens: number;
     /** `DAT_0052f38e`: most boss taunts will not fire while Buzz is airborne. */
     onGround: boolean;
+    /** The level's paths by tag, level units, for the race car. */
+    pathPoints: (tag: number) => readonly { x: number; y: number; z: number }[] | null;
+    /** A dust puff the car asked for, game units. Only level 2's car does. */
+    dust?: (x: number, y: number, z: number) => void;
     /**
      * Which room the game thinks we are in, -1 over a hole. The scripts read
      * two of these and mean different things by them (docs/LEVELS.md
@@ -389,6 +440,12 @@ export function stepTasks(
         tasks.raceQuadrant = 0;
         tasks.checkpoint = 0;
         tasks.raceBlocked = true;
+        // The car is put on script velocity, which is what lets the mover
+        // steer it, and made always-awake so it keeps driving out of sight.
+        tasks.carNode = 0;
+        tasks.carLaps = 0;
+        car.flags |= CREATURE_FLAGS.scriptVelocity;
+        car.health = CREATURE_HEALTH.alwaysAwake;
         return {
           creature: race.creature, pathTag: race.pathTag, text: race.text,
           playerYaw: 0, creatureYaw: 0, slot: -1,
@@ -436,6 +493,9 @@ export function stepTasks(
       }
     }
   }
+
+  // --- the car itself, from the moment the box has closed until it parks.
+  if (race && tasks.race >= RaceState.Running) driveCar(tasks, race, creatureAt, world);
 
   // --- Hamm: fifty coins for his token.
   const hamm = level.hamm;

@@ -721,7 +721,9 @@ table's first section is list 0 and its quarter-scale second section is
 list 1). On level 1, 207 of the 290 second-section objects sit exactly on a
 first-section object (box overlap 0.97–0.99) with FEWER faces: they are the
 same scenery at lower detail. Draw both at once and they z-fight, which is
-what the port did.
+what the port did until 2026-09-07; it now carries each group's list and
+gives every material a clip plane that follows the camera (`Viewer.
+setDetail`), which is the engine's own split.
 
 The engine draws the FAR list first with the near clip plane pushed out,
 then the NEAR list with the far clip plane pulled in, and inside each walk

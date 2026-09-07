@@ -288,6 +288,14 @@ export interface LevelTasks {
   race?: {
     creature: number; pathTag: number; text: number;
     laps: number; slot: number;
+    /**
+     * How the car drives (docs/LEVELS.md "How the car drives"): the level
+     * tick feeds the car creature's TARGET the nodes of this path, stepping
+     * to the next within 600 level units, three laps, and past `finishZ` on
+     * the way home it has won. `holdY` keeps level 2's car at or above the
+     * garden with a dust puff whenever it is pushed back up.
+     */
+    car: { pathTag: number; finishZ: number; holdY?: number };
   } & ({
     /**
      * Level 1's shape: four bits, one per side of a box, and a lap each time
@@ -489,6 +497,7 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
     race: {
       style: 'lap',
       creature: 0x1d, pathTag: 0x1b, text: 0x4f042c,
+      car: { pathTag: 0x1e, finishZ: -0x1a000 },
       xMin: 0x2900, xMax: 0x21000, zMin: -0x1e000, zMax: -0x1a000,
       laps: 3, slot: 2,
     },
@@ -515,6 +524,7 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
     race: {
       style: 'checkpoints',
       creature: 0x1d, pathTag: 5, text: 0x4f10f8,
+      car: { pathTag: 1, finishZ: -0x24269, holdY: 0x2000 },
       codes: [0, 1, 3, 2, 3, 1, 0, 2],
       first: { x: 0x25342, z: 0x3cc17 },
       second: { x: 0xb9c2, z: -0x42069 },

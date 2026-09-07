@@ -35,6 +35,18 @@ THREE.ColorManagement.enabled = false;
 export const TICK_SECONDS = 16949 / 1_000_000;
 export const NATIVE_ASPECT = 4 / 3;
 
+/**
+ * The engine's three-row detail table at 0x508d28, level units: the low
+ * list starts at `nearLimit` (its pass's near clip plane) and the full list
+ * stops at `farLimit` (its pass's far clip plane). Row 1 is the default;
+ * some levels' ticks force row 2 in certain zones (docs/FORMATS.md).
+ */
+export const DETAIL_ROWS: readonly { nearLimit: number; farLimit: number }[] = [
+  { nearLimit: 3000, farLimit: 3500 },
+  { nearLimit: 5000, farLimit: 6500 },
+  { nearLimit: 10000, farLimit: 12000 },
+];
+
 export class Viewer {
   readonly scene = new THREE.Scene();
   readonly camera: THREE.PerspectiveCamera;
@@ -96,6 +108,17 @@ export class Viewer {
   private zoneFilter: Set<number> | null = null;
   /** Objects taken off the screen: collected pickups and unearned tokens. */
   private hiddenObjects: ReadonlySet<number> = new Set();
+  /**
+   * The two detail lists are kept apart the way the engine does it: with
+   * clip planes. The full-detail list is clipped beyond `farLimit` and the
+   * low-detail list inside `nearLimit`, both planes perpendicular to the
+   * view and moved with the camera every frame. Between the two limits both
+   * draw, which is the original's own crossfade band. Null draws everything
+   * (the old behaviour, and what the offline parity tools expect).
+   */
+  private detail: { nearLimit: number; farLimit: number } | null = { ...DETAIL_ROWS[1]! };
+  private readonly nearListPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 1e9);
+  private readonly farListPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 1e9);
   /** The groups the reflection overlay draws, so they can be filtered too. */
   private reflectGroups: readonly GeometryGroup[] = [];
   /**
@@ -125,6 +148,8 @@ export class Viewer {
   constructor(canvas: HTMLCanvasElement) {
     this.view = canvas;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    // The two detail lists are separated by per-material clip planes.
+    this.renderer.localClippingEnabled = true;
     // The frame is cleared by hand: the whole canvas black, then the game's
     // own rectangle inside it.
     this.renderer.autoClear = false;
@@ -832,6 +857,7 @@ export class Viewer {
       map: texture ?? null,
       vertexColors: true,
       side: this.sideOverride ?? (group.doubleSided ? THREE.DoubleSide : THREE.FrontSide),
+      clippingPlanes: [group.list === 1 ? this.farListPlane : this.nearListPlane],
     };
     if (group.blend === 'opaque') {
       return new THREE.MeshBasicMaterial({ ...common, alphaTest: 0.5 });
@@ -856,6 +882,38 @@ export class Viewer {
     }
     return new THREE.MeshBasicMaterial({ ...blended, blending: THREE.NormalBlending });
   }
+
+  /**
+   * Which row of the engine's detail table to draw with, 0..2, or null for
+   * everything at once. Returns a description for the status line.
+   */
+  setDetail(row: number | null): string {
+    this.detail = row === null ? null : { ...DETAIL_ROWS[Math.max(0, Math.min(2, row))]! };
+    this.placeDetailPlanes();
+    return this.detail
+      ? `detail: full within ${this.detail.farLimit}, low beyond ${this.detail.nearLimit} level units`
+      : 'detail: both lists everywhere';
+  }
+
+  /** Move the two clip planes to sit across the view at the current limits. */
+  private placeDetailPlanes(): void {
+    const c = this.camera.position;
+    const f = this.camera.getWorldDirection(this.forward);
+    const along = c.dot(f);
+    if (!this.detail) {
+      // Planes so far away nothing is ever clipped.
+      this.nearListPlane.set(f.clone().negate(), 1e9);
+      this.farListPlane.set(f.clone(), 1e9);
+      return;
+    }
+    const near = this.detail.nearLimit / WORLD_SCALE;
+    const far = this.detail.farLimit / WORLD_SCALE;
+    // A point is kept where normal . p + constant > 0. Full detail: depth
+    // along the view under `far`. Low detail: depth over `near`.
+    this.nearListPlane.set(f.clone().negate(), far + along);
+    this.farListPlane.set(f.clone(), -(along + near));
+  }
+  private readonly forward = new THREE.Vector3();
 
   private clearModel(): void {
     if (this.reflections) {
@@ -933,6 +991,7 @@ export class Viewer {
     // Cards face the camera, so they are built after it has settled and
     // before anything is drawn.
     this.camera.updateMatrixWorld();
+    this.placeDetailPlanes();
     this.coinCards.update(this.cards, this.camera);
     this.coinShadows.update(this.shadows, this.camera);
     this.effectCards.update(this.effects, this.camera);

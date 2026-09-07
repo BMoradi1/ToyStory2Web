@@ -202,7 +202,13 @@
           view, narrowing the frustum to each outline, instead of taking a
           fixed one-step neighbourhood. Needs the portal corners projected
           per frame; level.zones already carries them.
- [READY]  Z-FIGHTING between the two detail levels. Decoded 2026-09-07
+ [DONE]   Z-FIGHTING between the two detail levels. Decoded and fixed
+          2026-09-07: GeometryGroup.list, and per-material clip planes in
+          the viewer at the engine's own limits (row 1 of the detail table
+          by default, Viewer.setDetail to change). Left: the level ticks
+          that force row 2 in some zones, and fog in the crossfade band.
+          The original note follows.
+ [was]    Z-FIGHTING between the two detail levels. Decoded 2026-09-07
           (docs/FORMATS.md, "The two passes are two levels of detail").
           The level.dat's second object section is a low-detail copy of
           the first, and the port draws both. The engine draws the far
@@ -215,7 +221,9 @@
           hide near-list objects beyond D1 and far-list objects inside D0
           by object distance each frame — the second is simpler and
           leaves only the engine's own 1,500-unit crossfade band.
- [READY]  THE RACE CAR does not move. Decoded 2026-09-07 (docs/LEVELS.md,
+ [DONE]   THE RACE CAR drives. Ported 2026-09-07 for levels 1 and 2; the
+          handler's wheel spin and exhaust are still cosmetic gaps.
+ [was]    THE RACE CAR does not move. Decoded 2026-09-07 (docs/LEVELS.md,
           "How the car drives"): the level tick sets the car entity's
           TARGET to the next node of a path and steps the node within 600
           level units, with the car on script velocity and always awake.

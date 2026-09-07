@@ -115,7 +115,18 @@ export interface PlayerState {
    */
   contacts: { group: number; normal: { x: number; y: number; z: number } }[];
   /** +0x98: reduces jump and acceleration while nonzero. */
+  /**
+   * The hit reaction, `+0x94`: 90 on a blow that costs health, counting down.
+   * It is what stops a second hit landing while the first is playing, and
+   * what picks the knocked-back animation.
+   *
+   * The original keeps a second counter beside it at `+0x98`, which gates
+   * whether a blow can hurt at all; only one is ported, so this does both
+   * jobs. The movement table's "hit stun" row is keyed off it either way.
+   */
   hitStun: number;
+  /** Out of health: the death animation runs and the level puts Buzz back. */
+  dying: boolean;
   /** +0x90: animation phase the controller asks for. */
   animPhase: number;
 
@@ -166,6 +177,7 @@ export function createPlayer(x = 0, y = 0, z = 0, yaw = 0): PlayerState {
     coyote: 0,
     contacts: [],
     hitStun: 0,
+    dying: false,
     animPhase: 0,
     fallTimer: 0,
     jumpedFromGround: false,

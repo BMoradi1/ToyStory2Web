@@ -409,6 +409,23 @@ complete mover very much does.
 The controller and the animation scripts both fire sounds, and there are two
 layers between them and a file.
 
+**Taking a blow and dying** (decoded 2026-09-06 from the damage path of
+`FUN_00407150`, ported). A hit that costs health decrements `+0x96`, throws
+Buzz up at `-0x200`, sets the reaction timer `+0x94` to 90 and plays event
+0x1a, which is `BUZJMP3` — the grunt doubles as the hurt sound. The
+animation selector runs state 5 while that timer is above 0x44, so the
+knocked-back animation is the first 22 ticks and the remaining 68 are the
+recovery, during which the original sets a flag on `+0x40` instead: the
+invulnerability flash, which is not ported.
+
+Out of health, the same timer goes to -90, `DAT_0052b7dc` becomes 2 and the
+selector runs state 7, the death. Event 0x15 plays, which is `BUZDIE1`, and
+the lives counter is put on screen. The player reset at `FUN_00407150`'s
+init fills health back to 0xe, which is why a respawn comes back full.
+
+The original keeps a second counter at `+0x98` that gates whether a blow can
+land at all; the port has one field doing both jobs.
+
 **Effects** are 61 names in a table at `0x4fcdc4` — `BUZJMP1`, `BUZSKID`,
 `SPLAT` — and `LoadSoundEffect` turns each into `data/sfx/<name>.wav`, which
 is exactly what is on disc. That half is certain, and it is what

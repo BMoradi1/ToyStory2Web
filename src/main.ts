@@ -30,7 +30,7 @@ import { createCamera, stepCamera, cameraTarget, type CameraState } from './sim/
 import { SoundBank, PLAYER_EFFECTS } from './audio/sfx.ts';
 import { MUSIC_TRACKS, MUSIC_VOLUME_CURVE, MusicPlayer, trackForLevel } from './audio/music.ts';
 import {
-  createPickups, pickupObjects, PickupKind, revealToken, stepPickups, type PickupState,
+  PICKUP, createPickups, pickupObjects, PickupKind, revealToken, stepPickups, type PickupState,
 } from './sim/pickups.ts';
 import {
   COIN_DRAW, SPRITE, SPRITE_SHEET, readSpriteTable, type SpriteHeader,
@@ -1304,11 +1304,32 @@ function applyCreatureTouch(angle: number, reaction: number): void {
     player.vx = Math.trunc(sinOf(angle) / 16);
     player.vz = Math.trunc(cosOf(angle) / 16);
   }
-  if ((reaction & 2) !== 0 && player.hitStun <= 0) {
-    player.hitStun = 90;
-    player.vy = -0x200;
-    if (pickups && pickups.health > 0) pickups.health -= 1;
+  if ((reaction & 2) !== 0 && player.hitStun <= 0 && !player.dying) hurtPlayer();
+}
+
+/**
+ * Buzz takes a blow (the damage path of `FUN_00407150`). One health, a knock
+ * into the air, and the reaction timer that plays the animation and keeps a
+ * second hit from landing on top of the first. Out of health and he dies
+ * instead: the original flips the same timer negative, puts him in animation
+ * state 7 and shows the lives counter.
+ */
+function hurtPlayer(): void {
+  if (!player || player.dying) return;
+  player.vy = HURT_LIFT;
+  player.hitStun = HURT_TICKS;
+  if (!pickups) return;
+  pickups.health -= 1;
+  if (pickups.health >= 0) {
+    playEvent(HURT_EVENT, player);
+    return;
   }
+  pickups.health = 0;
+  player.dying = true;
+  player.hitStun = 0;
+  deathTimer = DEATH_TICKS;
+  if (pickups.lives > 0) pickups.lives -= 1;
+  playEvent(DEATH_EVENT, player);
 }
 
 /**
@@ -1468,6 +1489,18 @@ let spriteTable: readonly (SpriteHeader | null)[] = [];
 let soundTable: SoundTable | null = null;
 /** The last few events raised, for the headless harness. */
 const soundLog: string[] = [];
+/** Ticks left of the death animation before Buzz is put back. */
+let deathTimer = 0;
+
+/** A blow costs one health and holds Buzz for this long. */
+const HURT_TICKS = 0x5a;
+/** How hard it throws him upward. +Y is down. */
+const HURT_LIFT = -0x200;
+/** The death animation runs for the same span before the level puts him back. */
+const DEATH_TICKS = 0x5a;
+/** The sound a blow makes, and the one dying makes. */
+const HURT_EVENT = 0x1a;
+const DEATH_EVENT = 0x15;
 /** The decoded texture sheets, as canvases the HUD's 2D context can blit. */
 let sceneSheets = new Map<number, Sheet>();
 let hud: HudState = createHud();
@@ -1524,10 +1557,18 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
 
   if (player.fellOut) { void respawn(); return; }
   const levelNow = levelNumber(levels[levelEl.selectedIndex]?.id ?? '') ?? 0;
+  if (player.dying) {
+    // Dying takes control away, not physics: the original sets its "no player
+    // control" flag and the rest of the tick carries on, so Buzz falls and
+    // slides to a stop while the animation plays.
+    deathTimer -= 1;
+    if (deathTimer <= 0) { void respawn(); return; }
+  }
   // The camera's bearing to the player, taken from the sim camera rather than
   // the rendered one, so the controls do not depend on how the view is drawn.
   const cameraYaw = bearing ?? (camera ? yawOf(player.x - camera.x, player.z - camera.z) : 0);
-  const held = override ? { ...input.read(), ...override } : input.read();
+  let held = override ? { ...input.read(), ...override } : input.read();
+  if (player.dying) held = { ...held, moveX: 0, moveY: 0, jump: false, spin: false, fire: false };
 
   // A talk freezes Buzz and takes the camera: the engine sets its "no player
   // control" bit and drives the camera from the talk script rather than the
@@ -1761,9 +1802,15 @@ async function respawn(): Promise<void> {
   if (!player) return;
   const safe = { x: player.safeX, y: player.safeY, z: player.safeZ, yaw: player.safeYaw };
   const back = spawnPoint && !Number.isFinite(safe.x) ? spawnPoint : safe;
+  const died = player.dying;
   Object.assign(player, createPlayer(back.x, back.y, back.z, safe.yaw));
   playerRuntime = createRuntime();
-  infoEl.textContent = 'fell out of the level — put back where you last stood';
+  // The engine's own player reset fills the health bar back up.
+  if (pickups) pickups.health = PICKUP.healthMax;
+  if (camera) camera = createCamera(player);
+  infoEl.textContent = died
+    ? 'out of health — put back where you last stood'
+    : 'fell out of the level — put back where you last stood';
 }
 
 /** `space`: start or stop playing, spawning the character if it isn't there. */

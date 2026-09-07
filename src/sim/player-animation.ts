@@ -36,10 +36,24 @@ export enum AnimState {
   JumpRising = 2,
   Falling = 3,
   Landing = 4,
+  /** Knocked back: the first stretch of the hit timer, before it goes to flashing. */
+  Hit = 5,
+  /** Out of health. Buzz's own animation slot, and it does not loop back. */
+  Dying = 7,
   DoubleJump = 8,
   HardFall = 0xc,
   Spin = 9,
 }
+
+/**
+ * How much of the hit timer plays the knocked-back animation.
+ *
+ * A hit sets the timer to 90 and it counts down. Above 0x44 the original runs
+ * animation state 5; below it, it stops animating the hit and sets a flag on
+ * the player's word instead — the invulnerability flash, which is not ported —
+ * so the reaction is the first 22 ticks and the remaining 68 are recovery.
+ */
+export const HIT_ANIMATION_ABOVE = 0x44;
 
 /** One entry of the cursor: 0x10000 is a whole script step. */
 const CURSOR_ONE = 0x10000;
@@ -103,6 +117,10 @@ function readScript(play: AnimationPlayback, entry: AnimationState): number | nu
  * coasting to a stop keeps the walk cycle running until it really stops.
  */
 export function selectState(p: PlayerState, hasInput: boolean): number {
+  // Dying and being hit come last in the original's chain of overrides, so
+  // they beat everything below.
+  if (p.dying) return AnimState.Dying;
+  if (p.hitStun > HIT_ANIMATION_ABOVE) return AnimState.Hit;
   if (p.spin > 0) return AnimState.Spin;
   if (p.fallTimer === 0x50) return AnimState.HardFall;
 

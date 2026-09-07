@@ -4,9 +4,11 @@
  session that made Buzz playable, 2026-09-05 after the pickups/tokens
  decode, and 2026-09-06 when the creature port and the token tasks were
  finished, and later that day when the zone byte, the effect system and
- the follow camera were decoded. NOTHING IS WAITING ON FABLE: every item
- under "WHAT TO GIVE FABLE, IN ORDER" is closed, and what remains is
- Opus work listed in TODOPLAN.txt.
+ the follow camera were decoded AND PORTED. NOTHING IS WAITING ON FABLE:
+ every item under "WHAT TO GIVE FABLE, IN ORDER" is closed. The one thing
+ a Fable pass would still pay for is small and named in TODOPLAN: the
+ eight remaining boss taunts, one zone test each, buried in each level's
+ 4 KB tick. Everything else is ordinary Opus work.
 ================================================================================
 
  Read TODOPLAN.txt for WHAT to do. This file is about WHO should do it and what

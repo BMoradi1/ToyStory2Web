@@ -202,21 +202,18 @@
           view, narrowing the frustum to each outline, instead of taking a
           fixed one-step neighbourhood. Needs the portal corners projected
           per frame; level.zones already carries them.
- [READY]  The follow camera. DECODED 2026-09-06 (docs/CAMERA.md). Port in
-          the doc's order: the eighth-a-tick position lag first, then the
-          two height followers and the no-rise-on-jump rule, the pitch,
-          the three side rays with the auto-turn, the eased view angles,
-          passive mode and the centre button, the scripts' look-at, the
-          mover blend and the shake.
- [READY]  The effect system. DECODED 2026-09-06 (docs/EFFECTS.md,
-          src/formats/effect-table.ts, tools/effect-table.ts). Port in
-          this order: the 64-slot pool with spawn/child-spawn and the tick
-          (move, animate, spin, ground, cull, the mode switch, the fades,
-          the death hook), the drawer on the coin's two sprite calls, then
-          the touch test (coins by touch, shots hurt, spinning deflects),
-          then the laser (FUN_004a4960: target pick, kinds 0x47/0x48) and
-          the creature sites (death coins 0x3d, hover shots 0x26). That
-          gives Buzz his laser and makes the robots' attacks visible.
+ [DONE]   The follow camera. Decoded and ported 2026-09-06
+          (docs/CAMERA.md, src/sim/camera.ts). Worst single-tick move on
+          level 1 is now 81 level units, none over 100; it was 1,224 when
+          the user reported the jitter. Left out because the moves do not
+          exist: the mover height blend, and the states that pull the view
+          behind Buzz.
+ [DONE]   The effect system. Decoded and ported 2026-09-06
+          (docs/EFFECTS.md, src/sim/effects.ts). Buzz's laser homes,
+          bounces off laser-proof creatures and damages the rest; the
+          robots' shots, the death coins and the sparks are effects too.
+          Open: modes 0x2f, 0x30 and 0x34 (level-specific, never decoded),
+          the bolt's starting aim, and the near-list targeting test.
  [READY]  Camera's own zone and the player's. DECODED 2026-09-06
           (docs/LEVELS.md "Zones"): both are `zoneAt` (src/formats/
           collision.ts) on the render camera over the ZONE FLOORS, with
@@ -227,6 +224,12 @@
           reads the camera's), the portal walk starting from the camera
           zone, the boss taunts onto their level's zone test (table in the
           doc), and the two per-level overrides (levels 4 and 10).
+          DONE 2026-09-06 except the boss taunts and the two per-level
+          overrides: src/sim/zones.ts keeps both zones and stepTasks takes
+          them, so level 7's timed egg can fail. What is left is reading
+          each of the other eight levels' taunt blocks out of its tick
+          (level 1's is the only one in src/sim/level-data.ts) and adding
+          a zone to the taunt record beside its height band.
  P1.6 [ACTIVE]  Parity harness. Half done: tools/render-level.ts now takes
                 --eye/--target/--size/--fovy and matches three.js (vertical
                 FOV, the viewer's clear colour, the same two draw queues and

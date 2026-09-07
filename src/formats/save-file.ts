@@ -151,3 +151,47 @@ export function tokenCount(p: SaveProgress): number {
   }
   return n;
 }
+
+/**
+ * A fresh game block, as `FUN_004a2c20` makes one: five lives, full health,
+ * the cursor on the first level and every token and completed byte clear.
+ * The engine's reset does NOT touch the option bytes, which survive a new
+ * game; the port starts them at its own menu defaults, an active camera and
+ * the sliders at 7 and 6.
+ */
+export function freshBlock(): Uint8Array {
+  const block = new Uint8Array(SAVE.blockSize);
+  block[SAVE.lives] = SAVE.freshLives;
+  block[SAVE.health] = SAVE.freshHealth;
+  block[SAVE.optionFlags] = 0xc0;
+  block[SAVE.sfx] = 7;
+  block[SAVE.bgm] = 6;
+  return block;
+}
+
+/** Write a progress record's fields into a release-size block, in place. */
+export function writeProgress(block: Uint8Array, p: SaveProgress): void {
+  if (block.length !== SAVE.blockSize) throw new Error('save file: not a release-size block');
+  block[SAVE.lives] = p.lives & 0xff;
+  block[SAVE.level] = Math.min(14, p.level) & 0xff;
+  block[SAVE.powerUps] = p.powerUps & 0xff;
+  block[SAVE.optionFlags] = (block[SAVE.optionFlags]! & ~SAVE.activeCamera)
+    | (p.activeCamera ? SAVE.activeCamera : 0);
+  block[SAVE.sfx] = p.sfx & 0xff;
+  block[SAVE.bgm] = p.bgm & 0xff;
+  block[SAVE.health] = p.health & 0xff;
+  block[SAVE.health + 1] = (p.health >> 8) & 0xff;
+  for (let n = 1; n <= 15; n++) block[SAVE.tokens + n] = (p.tokens[n] ?? 0) & 0xff;
+  for (let i = 0; i < 15; i++) block[SAVE.completed + i] = p.completed[i] ? 1 : 0;
+  block[SAVE.allTokens] = p.allTokens ? 1 : 0;
+  block[SAVE.gameBeaten] = p.gameBeaten ? 1 : 0;
+}
+
+/** The whole file: the length-prefixed name and then the block. */
+export function encodeSaveFile(name: string, block: Uint8Array): Uint8Array {
+  const out = new Uint8Array(4 + name.length + block.length);
+  new DataView(out.buffer).setUint32(0, name.length, true);
+  for (let i = 0; i < name.length; i++) out[4 + i] = name.charCodeAt(i) & 0xff;
+  out.set(block, 4 + name.length);
+  return out;
+}

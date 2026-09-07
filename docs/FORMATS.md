@@ -1070,3 +1070,14 @@ Validation: all three files parse to the byte; the played 2019 file gives
 lives 5, cursor 0, health 14, camera active, sliders 8 and 8, and ten
 tokens spread over five levels, every field in range and no token byte
 using any bit but 0..4 and 7.
+
+**In the port.** The install is never written, so the record lives in the
+browser's `localStorage` as the same 0x188 bytes, seeded the first time
+from the install's `Toy200.sav` (the release layout only) and otherwise
+fresh (`src/loader/save.ts`). Lives and health are copied into the level
+at spawn, the camera choice and sliders into the menu; a token, a menu
+change and leaving play write back. The "save file" button downloads a
+`Toy200.sav` the player can put in their install themselves. Not wired:
+the completed bytes, the power-up bits, and the two unread words. Whether
+a token already held reappears in its level is not established, so the
+level's tokens are placed as its data says regardless of the record.

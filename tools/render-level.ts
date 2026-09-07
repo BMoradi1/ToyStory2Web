@@ -108,6 +108,7 @@ const groups: GeometryGroup[] = geo.groups.map((g) => {
     start: g.start,
     count: g.count,
     page: g.page,
+    list: level.list ?? 0,
     blend: level.blend ?? 'opaque',
     doubleSided: level.doubleSided ?? true,
     alpha: level.alpha ?? 1,

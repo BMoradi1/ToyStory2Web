@@ -13,8 +13,8 @@
  the race car stands still because the level tick that drives it along
  its path is unported (docs/LEVELS.md). Both are Opus jobs now, specified
  in TODOPLAN.txt, and both were then fixed on Fable at the user's
- request; the save file was decoded the same day (parser and validator
- in the repo; wiring it into play is Opus work). NOTHING IS WAITING ON
+ request; the save file was decoded and wired the same day (localStorage
+ record seeded from the install, a "save file" download button). NOTHING IS WAITING ON
  FABLE.
 ================================================================================
 

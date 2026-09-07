@@ -8,7 +8,9 @@
  */
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { LEVEL_SELECT_ORDER, parseSaveFile, tokenCount } from '../src/formats/save-file.ts';
+import {
+  LEVEL_SELECT_ORDER, encodeSaveFile, parseSaveFile, tokenCount, writeProgress,
+} from '../src/formats/save-file.ts';
 
 const root = process.argv[2];
 if (!root) { console.error('usage: npx tsx tools/save-file.ts <game dir>'); process.exit(1); }
@@ -25,6 +27,17 @@ let fail = 0;
 for (const f of files) {
   const bytes = readFileSync(f.path);
   const save = parseSaveFile(bytes, f.slot);
+  // The encoder must give the file back byte for byte, and writing the
+  // decoded record into the block must change nothing.
+  const again = encodeSaveFile(save.name, save.block);
+  const same = again.length === bytes.length && again.every((b, i) => b === bytes[i]);
+  let stable = true;
+  if (save.progress) {
+    const copy = new Uint8Array(save.block);
+    writeProgress(copy, save.progress);
+    stable = copy.every((b, i) => b === save.block[i]);
+  }
+  if (!same || !stable) { fail++; console.log(`${f.path}: FAIL round trip (encode ${same}, rewrite ${stable})`); }
   const head = `${f.path}: ${bytes.length} bytes, name "${save.name}", block ${save.block.length}${save.release ? '' : ' (older layout)'}`;
   if (!save.progress) { console.log(head + (f.slot === 99 ? ', the options slot' : ', no progress read')); continue; }
   const p = save.progress;
@@ -38,5 +51,5 @@ for (const f of files) {
   console.log(`  tokens ${tokenCount(p)}/50 ${held}`);
   console.log(`  completed ${p.completed.map((c, i) => c ? i : -1).filter((i) => i >= 0).join(',') || 'none'}; all tokens ${p.allTokens}; game beaten ${p.gameBeaten}${ok ? '' : '  FAIL: a field is out of range'}`);
 }
-console.log(fail === 0 ? `\n${files.length} files parse and every field is in range` : `\nFAIL ${fail}`);
+console.log(fail === 0 ? `\n${files.length} files parse and every field is in range; each encodes back byte for byte` : `\nFAIL ${fail}`);
 process.exit(fail === 0 ? 0 : 1);

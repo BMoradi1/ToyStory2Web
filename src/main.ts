@@ -38,6 +38,8 @@ import {
 } from './sim/effects.ts';
 import { EFFECT_FLAGS, EFFECT_KIND, readEffectTable } from './formats/effect-table.ts';
 import { SoundBank, PLAYER_EFFECTS } from './audio/sfx.ts';
+import { commitProgress, exportProgress, forgetProgress, loadProgress, type Progress } from './loader/save.ts';
+import { selectIndexOf, tokenCount } from './formats/save-file.ts';
 import { MUSIC_SLIDER_MAX, MUSIC_TRACKS, MUSIC_VOLUME_CURVE, MusicPlayer, trackForLevel } from './audio/music.ts';
 import {
   PICKUP, createPickups, pickupObjects, PickupKind, revealToken, stepPickups, type PickupState,
@@ -85,6 +87,8 @@ const dropEl = $<HTMLDivElement>('drop');
 const appEl = $<HTMLDivElement>('app');
 const statusEl = $<HTMLParagraphElement>('status');
 const levelEl = $<HTMLSelectElement>('level');
+const saveEl = $<HTMLButtonElement>('save');
+saveEl.onclick = () => downloadSave();
 const modelEl = $<HTMLSelectElement>('model');
 const animEl = $<HTMLSelectElement>('anim');
 const infoEl = $<HTMLSpanElement>('info');
@@ -396,6 +400,11 @@ async function open(dir: GameDir): Promise<void> {
   creatureModels.clear();
   sound = new SoundBank(dir);
   music = new MusicPlayer(dir);
+  // The player's progress: the browser's copy, else the install's own
+  // Toy200.sav, else a fresh record (src/loader/save.ts). The camera choice
+  // and the two sliders come from it, as the original's options do.
+  progress = await loadProgress(dir);
+  applyProgressOptions();
   if (levels.length === 0) return setStatus('No levels found under data/.', true);
 
   setStatus(`${levels.length} scenes, ${models.length} models. Building UI\u2026`);
@@ -726,6 +735,13 @@ async function open(dir: GameDir): Promise<void> {
         };
       },
       openMenu() { openMenu(menu); return menu.open; },
+      /** The save record as decoded, and where it came from. */
+      get save() {
+        return progress ? { origin: progress.origin, ...progress.p, tokenCount: tokenCount(progress.p) } : null;
+      },
+      /** The bytes a download would hold. */
+      exportSave() { return progress ? exportProgress(progress) : null; },
+      forgetSave() { forgetProgress(); return true; },
       pressMenu(which: keyof MenuInput) {
         menuPress = { ...menuPress, [which]: true };
         return true;
@@ -1073,6 +1089,10 @@ async function spawnPlayer(): Promise<void> {
   startLevelTasks(tasks, level);
   revealedSlots = new Set();
   pickups = createPickups(currentLevel.level, level);
+  // Lives and health carry over from the record, as `FUN_004a2cc0` copies
+  // them in. Whether a token already held shows up in the level again is
+  // not established, so the level's tokens are left as it places them.
+  if (progress) { pickups.lives = progress.p.lives; pickups.health = Math.min(PICKUP.healthMax, progress.p.health); }
   for (const slot of tokenSlotsAtStart(level)) revealToken(pickups, slot);
   // Each coin's shadow lies on the floor under it, so the ground is measured
   // once here rather than every frame.
@@ -1684,12 +1704,14 @@ function applyMenu(action: ReturnType<typeof stepMenu>): void {
   if (action.kind === 'camera') {
     cameraPassive = action.passive;
     infoEl.textContent = action.passive ? 'passive camera' : 'active camera';
+    saveProgress();
     return;
   }
   // The sliders are ten steps; the original maps them through two tables and
   // hands the result to its mixer. Ours drive the two volumes we have.
   if (sound) sound.volume = (action.sfx / MENU.volumeSteps) * 0.6;
   if (music) music.volume = Math.round((action.bgm / MENU.volumeSteps) * MUSIC_SLIDER_MAX);
+  saveProgress();
 }
 
 /** The pause menu's rows, with the selected one pulsing. */
@@ -1809,6 +1831,62 @@ const zones: ZoneState = createZones();
 const menu: MenuState = createMenu();
 /** Which camera the menu last chose. Passive means the buttons turn it. */
 let cameraPassive = false;
+/** The save record (docs/FORMATS.md "The save file"), once a directory is open. */
+let progress: Progress | null = null;
+
+/** Push the record's option bytes into the menu, the camera and the mixers. */
+function applyProgressOptions(): void {
+  if (!progress) return;
+  const p = progress.p;
+  menu.sfx = Math.min(MENU.volumeSteps, p.sfx);
+  menu.bgm = Math.min(MENU.volumeSteps, p.bgm);
+  cameraPassive = !p.activeCamera;
+  if (sound) sound.volume = (menu.sfx / MENU.volumeSteps) * 0.6;
+  if (music) music.volume = Math.round((menu.bgm / MENU.volumeSteps) * MUSIC_SLIDER_MAX);
+}
+
+/**
+ * Copy what play has changed into the record and keep it: lives and health
+ * from the pickups, the select cursor from the level. Called on a token, on
+ * a menu change and on leaving play, which is often enough for a record the
+ * original only writes on the way out of a level.
+ */
+function saveProgress(): void {
+  if (!progress) return;
+  const p = progress.p;
+  if (pickups) { p.lives = pickups.lives; p.health = pickups.health; }
+  const level = levelNumber(levels[levelEl.selectedIndex]?.id ?? '') ?? 0;
+  const cursor = selectIndexOf(level);
+  if (cursor >= 0) p.level = cursor;
+  p.sfx = menu.sfx;
+  p.bgm = menu.bgm;
+  p.activeCamera = !cameraPassive;
+  commitProgress(progress);
+}
+
+/** A token taken on this level: its bit in the level's byte, and the fiftieth sets the flag. */
+function recordToken(slot: number): void {
+  if (!progress || slot < 0) return;
+  const level = levelNumber(levels[levelEl.selectedIndex]?.id ?? '') ?? 0;
+  if (level < 1 || level > 15) return;
+  progress.p.tokens[level] = (progress.p.tokens[level] ?? 0) | (1 << slot);
+  if (tokenCount(progress.p) >= 50) progress.p.allTokens = true;
+  saveProgress();
+}
+
+/** Hand the player a Toy200.sav of their progress, through the browser's download. */
+function downloadSave(): void {
+  if (!progress) return;
+  saveProgress();
+  const bytes = exportProgress(progress);
+  const url = URL.createObjectURL(new Blob([bytes.buffer as ArrayBuffer], { type: 'application/octet-stream' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'Toy200.sav';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  infoEl.textContent = `Toy200.sav: ${bytes.length} bytes, ${tokenCount(progress.p)}/50 tokens, ${progress.p.lives} lives`;
+}
 /** Menu buttons seen this frame, cleared as the menu reads them. */
 let menuPress: MenuInput = { up: false, down: false, left: false, right: false, select: false, back: false };
 /** Effects, read from the install. Silent until play starts. */
@@ -1884,6 +1962,7 @@ function setPlaying(on: boolean): void {
     input.detach();
     sound?.stop();
     music?.disable();
+    saveProgress();
     // Nothing drives the HUD outside play, so take it off the screen.
     hudPainter?.clear();
     viewer.setWorldCards([], []);
@@ -2127,6 +2206,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     if (token) {
       const item = pickups.items[token.index];
       openTokenScreen(menu, item?.tokenSlot ?? -1);
+      recordToken(item?.tokenSlot ?? -1);
       playEvent(0x33, player);
     }
     // A hint sign is reported but never consumed; touching one opens its box.

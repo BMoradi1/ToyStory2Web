@@ -29,19 +29,23 @@ import { cos as cosOf, sin as sinOf, toRadians, yawOf } from './sim/trig.ts';
 import { createCamera, stepCamera, cameraTarget, type CameraState } from './sim/camera.ts';
 import { createZones, stepZones, type ZoneState } from './sim/zones.ts';
 import {
+  MENU, createMenu, highlight, menuRows, openMenu, stepMenu,
+  type MenuInput, type MenuState,
+} from './sim/menu.ts';
+import {
   createEffects, liveEffects, spawnChild, spawnEffect, stepEffects, touchPlayer,
   type EffectSim, type EffectWorld,
 } from './sim/effects.ts';
 import { EFFECT_FLAGS, EFFECT_KIND, readEffectTable } from './formats/effect-table.ts';
 import { SoundBank, PLAYER_EFFECTS } from './audio/sfx.ts';
-import { MUSIC_TRACKS, MUSIC_VOLUME_CURVE, MusicPlayer, trackForLevel } from './audio/music.ts';
+import { MUSIC_SLIDER_MAX, MUSIC_TRACKS, MUSIC_VOLUME_CURVE, MusicPlayer, trackForLevel } from './audio/music.ts';
 import {
   PICKUP, createPickups, pickupObjects, PickupKind, revealToken, stepPickups, type PickupState,
 } from './sim/pickups.ts';
 import {
   COIN_DRAW, SPRITE, SPRITE_SHEET, readSpriteTable, type SpriteHeader,
 } from './formats/sprite-table.ts';
-import { HudPainter, type HudReadout, type Sheet, type TalkDraw } from './render/hud-draw.ts';
+import { HudPainter, type HudReadout, type MenuDraw, type Sheet, type TalkDraw } from './render/hud-draw.ts';
 import { readSoundTable, type SoundTable } from './audio/events.ts';
 import {
   HUD, HudElement, createHud, offsetOf, showHud, startHud, stepCoinSpin, stepHud,
@@ -709,6 +713,19 @@ async function open(dir: GameDir): Promise<void> {
             }
             : null,
         };
+      },
+      /** The pause menu, for a test: open it, read it, press its keys. */
+      get menu() {
+        return {
+          open: menu.open, page: menu.page, item: menu.item,
+          sfx: menu.sfx, bgm: menu.bgm,
+          rows: exeBytes ? menuRows(menu, (a) => exeString(exeBytes!, a)) : null,
+        };
+      },
+      openMenu() { openMenu(menu); return menu.open; },
+      pressMenu(which: keyof MenuInput) {
+        menuPress = { ...menuPress, [which]: true };
+        return true;
       },
       /**
        * Enter or leave play. A shot taken without this shows the ORBIT
@@ -1481,7 +1498,7 @@ function drawHud(level: number): void {
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   if (!hudPainter) hudPainter = new HudPainter(hudEl);
   hudPainter.resize(Math.round(rect.width * dpr), Math.round(rect.height * dpr));
-  hudPainter.draw(hud, spriteTable, sceneSheets, r, talkDraw());
+  hudPainter.draw(hud, spriteTable, sceneSheets, r, talkDraw(), menuDraw());
 }
 
 /**
@@ -1656,6 +1673,39 @@ function startDialogue(request: import('./sim/tasks.ts').DialogueRequest): void 
  * needs; the prompt is read from the user's executable like every other
  * line of text.
  */
+/** What the menu asked for. Everything it offers is something we have. */
+function applyMenu(action: ReturnType<typeof stepMenu>): void {
+  if (!action) return;
+  if (action.kind === 'resume') return;
+  if (action.kind === 'exit') { void togglePlay(); return; }
+  if (action.kind === 'camera') {
+    cameraPassive = action.passive;
+    infoEl.textContent = action.passive ? 'passive camera' : 'active camera';
+    return;
+  }
+  // The sliders are ten steps; the original maps them through two tables and
+  // hands the result to its mixer. Ours drive the two volumes we have.
+  if (sound) sound.volume = (action.sfx / MENU.volumeSteps) * 0.6;
+  if (music) music.volume = Math.round((action.bgm / MENU.volumeSteps) * MUSIC_SLIDER_MAX);
+}
+
+/** The pause menu's rows, with the selected one pulsing. */
+function menuDraw(): MenuDraw | null {
+  if (!menu.open || !exeBytes) return null;
+  const { title, items, ys } = menuRows(menu, (address) => exeString(exeBytes!, address));
+  const lit = highlight(menu);
+  return {
+    title,
+    rows: items.map((text, i) => ({
+      text,
+      y: ys[i] ?? 0,
+      colour: (i === menu.item
+        ? [lit, lit, 0]
+        : [MENU.steady, MENU.steady, 0]) as readonly [number, number, number],
+    })),
+  };
+}
+
 function talkDraw(): TalkDraw | null {
   if (!talk) return null;
   return {
@@ -1740,6 +1790,12 @@ const effectFlat: WorldSprite[] = [];
  * (docs/LEVELS.md "Zones").
  */
 const zones: ZoneState = createZones();
+/** The pause menu (docs/HUD.md, src/sim/menu.ts). */
+const menu: MenuState = createMenu();
+/** Which camera the menu last chose. Passive means the buttons turn it. */
+let cameraPassive = false;
+/** Menu buttons seen this frame, cleared as the menu reads them. */
+let menuPress: MenuInput = { up: false, down: false, left: false, right: false, select: false, back: false };
 /** Effects, read from the install. Silent until play starts. */
 let sound: SoundBank | null = null;
 let music: MusicPlayer | null = null;
@@ -1908,6 +1964,18 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     return;
   }
 
+  // The pause menu freezes the game under it, the way the original's does.
+  if (menu.open) {
+    const action = stepMenu(menu, menuPress);
+    menuPress = { up: false, down: false, left: false, right: false, select: false, back: false };
+    for (const event of menu.events) playEvent(event);
+    if (action) applyMenu(action);
+    drawCoins();
+    drawEffects();
+    drawHud(levelNow);
+    return;
+  }
+
   stepPlayer(player, held, playerRuntime, groundFromCollision(currentCollisionWorld), cameraYaw);
 
   // Game space to renderer space. A game facing of (sin yaw, cos yaw) becomes
@@ -1922,7 +1990,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     Math.PI - toRadians(player.yaw),
   );
   if (camera) {
-    stepCamera(camera, player, currentCollisionWorld, held);
+    stepCamera(camera, player, currentCollisionWorld, held, { passive: cameraPassive });
     // The zones come off the camera's new position, which is the order the
     // engine runs them in: the render pass sets both from the camera, and
     // the level ticks read them afterwards.
@@ -2139,6 +2207,26 @@ window.addEventListener('keydown', (ev) => {
   if (!viewer) return;
   // Enter toggles play; while playing, the movement keys belong to the game
   // and the inspection shortcuts would collide with them.
+  // While the pause menu is up it owns the keyboard, and the game under it
+  // is frozen. Escape opens it and backs out of it; "exit level" is how you
+  // leave play, which is what the original's menu does too.
+  if (menu.open) {
+    const k = ev.key;
+    if (k === 'ArrowUp' || k === 'w') menuPress = { ...menuPress, up: true };
+    else if (k === 'ArrowDown' || k === 's') menuPress = { ...menuPress, down: true };
+    else if (k === 'ArrowLeft' || k === 'a') menuPress = { ...menuPress, left: true };
+    else if (k === 'ArrowRight' || k === 'd') menuPress = { ...menuPress, right: true };
+    else if (k === 'Enter' || k === ' ') menuPress = { ...menuPress, select: true };
+    else if (k === 'Escape') menuPress = { ...menuPress, back: true };
+    else return;
+    ev.preventDefault();
+    return;
+  }
+  if (ev.key === 'Escape' && viewer.playMode) {
+    openMenu(menu);
+    ev.preventDefault();
+    return;
+  }
   if (ev.key === 'Enter') {
     // Enter belongs to the GAME while play is on: it pages a text box, and
     // otherwise does nothing. It used to fall through to leaving play, which
@@ -2151,10 +2239,7 @@ window.addEventListener('keydown', (ev) => {
     void togglePlay();
     return;
   }
-  if (ev.key === 'Escape' && viewer.playMode) {
-    void togglePlay();
-    return;
-  }
+
   if (ev.key === 'm' && sound) {
     sound.volume = sound.volume > 0 ? 0 : 0.6;
     infoEl.textContent = sound.volume > 0 ? 'sound on' : 'sound muted';

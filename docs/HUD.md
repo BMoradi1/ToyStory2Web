@@ -181,10 +181,43 @@ bit (`DAT_0052ad88 & 0x800`) shows the three counters for 0x5a. The ammo
 counters come from the pickup switch: category 6 adds 5 to `DAT_00882938`
 (cap 10, icon 33) and zeroes the other; category 7 adds 10 to
 `DAT_00882964` (cap 30, the disc); category 10 starts the 0x4b0-tick power
-timer. The same function draws the pause menu (`DAT_0052adb0` pages,
-`FUN_00401fb0` text at x centred by `0xa0 - 4 * len` in the 320 space,
-box `FUN_00401b60`) and the "you have collected a token" screen; they are
-not laid out here.
+timer. The same function draws the pause menu and the "you have collected
+a token" screen. The menu is laid out below; the token screen is not.
+
+### The pause menu (`FUN_0049f4b0` input, the tail of `FUN_0049fd40` draw)
+
+Four pages, chosen by `DAT_0052adb0`, with `DAT_005039bc` giving each its
+item count — 4, 2, 2, 2. The strings are in the executable:
+
+| page | title | items |
+|---|---|---|
+| 0 | `pause menu` 0x5026d8 | `continue` 0x5026e4, `camera mode` 0x502714, `volume control` 0x502740, `exit level` 0x5026f0 |
+| 1 | `camera mode` | `passive camera` 0x502720, `active camera` 0x502730 |
+| 2 | `volume control` | `sfx **********` 0x502750, `bgm **********` 0x502760 |
+| 3 | `are you sure?` 0x5026fc | `no` 0x50270c, `yes` 0x502710 |
+
+`FUN_00401fb0(y, text, r, g, b, right)` centres a row: the centre is x 160
+of the 320 space (256 when `right`), the start is `centre - 4 * length` and
+each glyph is 8 wide, drawn by the same `FUN_0049b630` the talk box uses.
+The title sits at y 0x54; a four-item page puts its rows at 0x60, 0x68,
+0x70 and 0x78, a two-item page at 100 and 0x6c.
+
+Colour is the interesting part. Every row is drawn at a steady
+`(0x80, 0x80, 0)`, and then the SELECTED row's red and green are
+overwritten with a triangle wave off the frame counter — `(n & 0x3f)`
+folded at 0x20, doubled, plus 0x40, so 0x40 to 0x7e. The selection is
+therefore the row that MOVES, and it is never brighter than the rest.
+
+Input: pad 0x40 down and 0x10 up within the page's count, 0x20 and 0x80
+right and left for the sliders, 0x1000 select and 0x4000 back. Sound event
+0x3f on a move, 0x3d going in, 0x3e coming back out.
+
+The two volume rows are not static strings: the original rewrites its own
+copy in place, `sfx ` or `bgm ` followed by one asterisk per step and
+spaces to ten. The step feeds two tables, 0x5028a8 for effects (0 to 90 by
+9, then times two thirds) and 0x5028c8 for music (0 to 80 by 8, then times
+three halves), whose units were not chased; the port maps the ten steps
+onto its own two volumes.
 
 ## The talk box (`FUN_00401c30`)
 
@@ -315,8 +348,8 @@ frame.
 
 Left to build:
 
-1. **The pause menu and the token screen**, which the HUD function also
-   draws and which are not written up here.
+1. **The token screen**, which the HUD function also draws and which is not
+   written up here. The pause menu above is done (src/sim/menu.ts).
 2. The level's sprite records, if the PSX look is wanted.
 3. Nothing else, unless the front end and its menus are wanted, which are
    a different set of sprites on `level00`'s own texture slots.

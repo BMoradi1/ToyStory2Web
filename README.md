@@ -47,7 +47,7 @@ onto the page instead. Nothing is uploaded either way.
 | key | what it does |
 |---|---|
 | `enter` | play: drive Buzz around the level, on the original's physics. While playing it pages a text box and nothing else |
-| `escape` | stop playing and hand the camera back to the orbit controls |
+| `escape` | pause: the game's own menu (continue, camera mode, volume, exit level). Escape again backs out, and "exit level" hands the camera back to the orbit controls |
 | `0`-`9` | stand in that zone: draw it, zone 0, and whatever its doorways lead to |
 | `a` | show the whole level again |
 | `k` | overlay the collision hull — green where Buzz can stand, red where he cannot |

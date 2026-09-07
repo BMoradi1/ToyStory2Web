@@ -80,6 +80,18 @@ export function glyphOf(ch: string): { frame: number; icon?: number } | null {
 }
 
 /** What the painter needs to draw a talk box. */
+/**
+ * The pause menu, as rows of text to centre (docs/HUD.md, src/sim/menu.ts).
+ * Each row carries its own colour so the selected one can pulse.
+ */
+/** Where the menu's title sits, in the 320 space (`MENU.titleY`). */
+const MENU_TITLE_Y = 0x54;
+
+export interface MenuDraw {
+  title: string;
+  rows: { text: string; y: number; colour: readonly [number, number, number] }[];
+}
+
 export interface TalkDraw {
   /** 0 to 0x1000 as it opens and shuts. */
   scale: number;
@@ -211,6 +223,7 @@ export class HudPainter {
     sheets: ReadonlyMap<number, Sheet>,
     r: HudReadout,
     talk?: TalkDraw | null,
+    menu?: MenuDraw | null,
   ): void {
     this.clear();
     const ctx = this.ctx;
@@ -451,6 +464,18 @@ export class HudPainter {
           }
         }
       }
+    }
+
+    // --- the pause menu, over everything -----------------------------------
+    // Rows are centred on x 160 of the 320 space at 8 pixels a glyph, which
+    // is what `FUN_00401fb0` does with `0xa0 - 4 * length`.
+    if (menu) {
+      const centred = (s: string, y: number, colour: Modulate) => {
+        let x = 0xa0 - s.length * 4;
+        for (const ch of s) { glyph(ch, x, y, colour); x += 8; }
+      };
+      centred(menu.title, MENU_TITLE_Y, [NEUTRAL, NEUTRAL, 0]);
+      for (const row of menu.rows) centred(row.text, row.y, row.colour);
     }
 
     // The buffer fills backward, so the frame lands in the reverse of the

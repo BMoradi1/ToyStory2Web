@@ -73,8 +73,9 @@ export interface AllGroup {
    * point" by finding the zone floor nearest below it. They are authored at
    * a QUARTER of the level's scale, which is why that lookup divides its
    * query by four and why they must never be walked on (docs/LEVELS.md,
-   * "Zones"). Validated on every scene by tools/zone-validate.ts. Bits 0x100
-   * and 0x200 of the same word gate two sweep passes and are unread.
+   * "Zones"). Validated on every scene by tools/zone-validate.ts. Bit 0x100
+   * of the same word hides the surface from the entity sweeps (a camera-only
+   * wall) and bit 0x200 from the camera's broadphase (docs/CAMERA.md).
    */
   zone: number | null;
   payload: Uint8Array;

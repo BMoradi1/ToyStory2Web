@@ -3,9 +3,10 @@
  Written 2026-09-03 at the end of Phase 1; updated 2026-09-04, after the
  session that made Buzz playable, 2026-09-05 after the pickups/tokens
  decode, and 2026-09-06 when the creature port and the token tasks were
- finished, and later that day when the zone byte and the effect system
- were decoded. ONE THING IS WAITING ON FABLE and nothing else is: the
- camera's four modes, written up under "WHAT TO GIVE FABLE, IN ORDER".
+ finished, and later that day when the zone byte, the effect system and
+ the follow camera were decoded. NOTHING IS WAITING ON FABLE: every item
+ under "WHAT TO GIVE FABLE, IN ORDER" is closed, and what remains is
+ Opus work listed in TODOPLAN.txt.
 ================================================================================
 
  Read TODOPLAN.txt for WHAT to do. This file is about WHO should do it and what
@@ -180,32 +181,15 @@
         each level's zone test - the table at the end of the section.)
       - (the 2D layer is DECODED 2026-09-06: docs/HUD.md. The coin sprite,
         the HUD and the text box are Opus work now, and are done.)
-      - THE FOLLOW CAMERA'S FOUR MODES. Small on the list and large in the
-        function: `FUN_004045e0` is 4.7 KB, 600 decompiled lines, and what
-        is ported is its skeleton (src/sim/camera.ts names the gaps at the
-        bottom of the module). It is a decoding job, not a transcription
-        one: the mode switch, the look-ahead, the height ramp and the pitch
-        all hang off unlabelled globals, and half of the tick is conditions
-        on words nothing else in the port has met.
-
-        A user reported the camera misbehaving on 2026-09-06 and one cause
-        was found and fixed without the decode: the port swept the camera's
-        POSITION against the scenery and used wherever the sweep ended,
-        which teleported it a whole follow distance the moment the line
-        cleared - measured at up to 1,224 level units in one tick, over a
-        third of the ticks spent walking into things. The original never
-        moves the camera to dodge anything: it keeps a distance in one field
-        (`+0x26`), a blocked ray sets that outright, and it eases back out at
-        32 level units a tick. That is now what the port does, and the
-        outward motion is rate limited by construction.
-
-        What is left needs the modes. In a hard corner the original slides
-        the view sideways using three short ray casts of length 200 and a
-        long one whose length depends on how long the player has stood
-        still; without them the camera can only come straight in, so its
-        distance floor cannot be the original's ten level units - it is
-        Buzz's collision radius plus the near plane, which keeps the view
-        out of his head at the cost of a close-up in a corner.
+      - (THE FOLLOW CAMERA is DECODED 2026-09-06: docs/CAMERA.md, the
+        whole of FUN_004045e0 with its numbers. The "four modes" are what
+        three short rays find - free, a wall left, a wall right, the
+        ceiling - and each drives an auto-turn or a pitch; the user-facing
+        modes are the pause menu's passive/active camera. The biggest
+        thing the skeleton lacks is that the original EASES the camera's
+        position toward its target at an eighth a tick and looks along
+        eased view angles, where the port places it outright. Opus
+        transcribes from the doc's "Porting" order.)
       - nothing else is left on this list. The rest is item 3.
         For the avoidance of doubt, the token tasks are FINISHED as far as
         decoding goes: all five slots on all ten non-boss levels are ported

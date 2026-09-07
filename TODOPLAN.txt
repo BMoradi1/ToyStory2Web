@@ -202,6 +202,12 @@
           view, narrowing the frustum to each outline, instead of taking a
           fixed one-step neighbourhood. Needs the portal corners projected
           per frame; level.zones already carries them.
+ [READY]  The follow camera. DECODED 2026-09-06 (docs/CAMERA.md). Port in
+          the doc's order: the eighth-a-tick position lag first, then the
+          two height followers and the no-rise-on-jump rule, the pitch,
+          the three side rays with the auto-turn, the eased view angles,
+          passive mode and the centre button, the scripts' look-at, the
+          mover blend and the shake.
  [READY]  The effect system. DECODED 2026-09-06 (docs/EFFECTS.md,
           src/formats/effect-table.ts, tools/effect-table.ts). Port in
           this order: the 64-slot pool with spawn/child-spawn and the tick

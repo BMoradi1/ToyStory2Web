@@ -175,9 +175,10 @@ The consequence matters: **level visual geometry is not in `.ALL` at all.**
                   guess. Zone floors are authored at a QUARTER of the level's
                   scale, the engine never collides with them, and `FUN_004885c0`
                   finds the one under a point to say which room it is in:
-                  docs/LEVELS.md "Zones", tools/zone-validate.ts. Bits 0x100
-                  and 0x200 of the word each exclude the group from one of
-                  the sweep passes; what they mean is unread.
+                  docs/LEVELS.md "Zones", tools/zone-validate.ts. Bit 0x100
+                  hides the group from the entity sweeps (a camera-only
+                  wall) and bit 0x200 from the camera's broadphase
+                  (docs/CAMERA.md).
 
     types: 0x0001 gfx mesh        0x0006 collision      0x0008 dyn collision
            0x0009 creature hit shapes                    0x0101 infinite wall

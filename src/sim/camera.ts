@@ -236,9 +236,11 @@ export function cameraTarget(p: PlayerState): { x: number; y: number; z: number 
 }
 
 /**
- * Not ported, and worth knowing before trusting this. `FUN_004045e0` is 600
- * lines of unlabelled globals and the rest of it is a decoding job, not a
- * transcription one — NEXT_SESSION.txt carries it as such.
+ * Not ported, and worth knowing before trusting this. `FUN_004045e0` is
+ * decoded in full in docs/CAMERA.md (2026-09-06), so the rest is a
+ * transcription job; the list below is what the doc adds. The first thing
+ * to take is the position lag: the original eases the camera toward its
+ * wanted spot at an eighth a tick, and this module places it outright.
  *
  * - the camera **modes** (`FUN_00405860` switches between four, and the menu
  *   strings "camera mode", "camera left" and "camera right" belong to them).

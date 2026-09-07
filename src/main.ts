@@ -670,6 +670,15 @@ async function open(dir: GameDir): Promise<void> {
       get zones() {
         return { camera: zones.camera, player: zones.player };
       },
+      /**
+       * Enter or leave play. A shot taken without this shows the ORBIT
+       * camera, not the follow camera: the orbit controls own the camera
+       * until play mode takes it, and they put it back every frame.
+       */
+      play(on = true) {
+        setPlaying(on);
+        return viewer?.playMode ?? false;
+      },
       revealTokens: revealAllTokens,
       drive(held: Partial<import('./sim/player.ts').PlayerInput>, ticks = 1) {
         if (!player || !playerRuntime || !currentCollisionWorld || !viewer) return null;

@@ -27,6 +27,7 @@ import {
 } from './sim/player.ts';
 import { cos as cosOf, sin as sinOf, toRadians, yawOf } from './sim/trig.ts';
 import { createCamera, stepCamera, cameraTarget, type CameraState } from './sim/camera.ts';
+import { createZones, stepZones, type ZoneState } from './sim/zones.ts';
 import { SoundBank, PLAYER_EFFECTS } from './audio/sfx.ts';
 import { MUSIC_TRACKS, MUSIC_VOLUME_CURVE, MusicPlayer, trackForLevel } from './audio/music.ts';
 import {
@@ -664,6 +665,10 @@ async function open(dir: GameDir): Promise<void> {
       /** The follow camera's own state, in game units. */
       get camera() {
         return camera ? { ...camera } : null;
+      },
+      /** Which room the level scripts think Buzz is in (docs/LEVELS.md). */
+      get zones() {
+        return { camera: zones.camera, player: zones.player };
       },
       revealTokens: revealAllTokens,
       drive(held: Partial<import('./sim/player.ts').PlayerInput>, ticks = 1) {
@@ -1468,6 +1473,12 @@ let playerRuntime: PlayerRuntime | null = null;
 let playerModel: { model: AllFile; anm: AnmFile | null } | null = null;
 let playerAnim: AnimationPlayback | null = null;
 let camera: CameraState | null = null;
+/**
+ * Which room the level scripts think Buzz is in. Stepped right after the
+ * camera moves, because the engine reads it from where the camera ended up
+ * (docs/LEVELS.md "Zones").
+ */
+const zones: ZoneState = createZones();
 /** Effects, read from the install. Silent until play starts. */
 let sound: SoundBank | null = null;
 let music: MusicPlayer | null = null;
@@ -1651,6 +1662,12 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   );
   if (camera) {
     stepCamera(camera, player, currentCollisionWorld, held);
+    // The zones come off the camera's new position, which is the order the
+    // engine runs them in: the render pass sets both from the camera, and
+    // the level ticks read them afterwards.
+    if (currentCollision && currentLevel) {
+      stepZones(zones, currentCollision, currentLevel.level.zones, camera, player);
+    }
     const look = cameraTarget(player);
     viewer.placeCamera(
       camera.x * GAME_TO_RENDER, -camera.y * GAME_TO_RENDER, -camera.z * GAME_TO_RENDER,
@@ -1700,8 +1717,8 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
           x: player.x, y: player.y, z: player.z, level,
           items: pickups?.itemsFound ?? 0,
           tokens: pickups?.tokens ?? 0,
-          // Buzz's own zone is not decoded yet (NEXT_SESSION.txt).
-          zone: -1,
+          cameraZone: zones.camera,
+          playerZone: zones.player,
         },
       );
       if (request) startDialogue(request);

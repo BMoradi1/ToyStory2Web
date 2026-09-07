@@ -158,11 +158,15 @@ export function stepTasks(
     /** Bit per token slot already taken, for the timed runs. */
     tokens: number;
     /**
-     * The zone Buzz is standing in. The engine reads it from the surface
-     * under him (`DAT_0054dea0`); until that byte is decoded this is -1,
-     * which only costs the "leave the area and fail" rule.
+     * Which room the game thinks we are in, -1 over a hole. The scripts read
+     * two of these and mean different things by them (docs/LEVELS.md
+     * "Zones"): `cameraZone` is `DAT_0054dea0`, the zone under the render
+     * camera held to the player's neighbourhood, which most levels test;
+     * `playerZone` is `DAT_005d2a8c`, Buzz's own, which levels 7, 8, 10, 11
+     * and 13 test. src/sim/zones.ts keeps both.
      */
-    zone: number;
+    cameraZone: number;
+    playerZone: number;
   },
   dt = 1,
 ): DialogueRequest | null {
@@ -211,7 +215,7 @@ export function stepTasks(
         tasks.fetch = 0;
       }
       if (tasks.fetch === 2) {
-        if (fetch.failZone >= 0 && world.zone === fetch.failZone) tasks.fetchClock = 99;
+        if (fetch.failZone >= 0 && world.cameraZone === fetch.failZone) tasks.fetchClock = 99;
         else if (slow) tasks.fetchClock -= 1;
         if (tasks.fetchClock < 100) { tasks.fetchClock = 100; tasks.fetch = 0; }
       }

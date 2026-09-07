@@ -64,6 +64,29 @@ export enum AnimState {
 export const SPIN_SLOT = 9;
 
 /**
+ * The laser's animation slot, and the frames it steps through.
+ *
+ * The same shape as the spin: `FUN_004011d0` swaps the primary slot for 0x1a
+ * and takes the frame from the byte table at 0x4df294, indexed by half the
+ * laser phase — `((phase & 1) + table[phase >> 1] * 2) * 0x8000` as a 16.16
+ * cursor. The table runs 0..11 for the wind-up and then cycles 5..11 twice
+ * while the shot is held, which is the arm holding its aim. It is terminated
+ * by 0xff.
+ *
+ * The laser is applied AFTER the spin, so a laser fired out of a spin wins.
+ *
+ * Approximated: the odd half-step. The original's cursor interpolates between
+ * two frames and the pose call here takes a whole one.
+ */
+export const LASER_SLOT = 0x1a;
+export const LASER_FRAMES: readonly number[] = [
+  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
+  5, 6, 7, 8, 9, 10, 11,
+  5, 6, 7, 8, 9, 10, 11,
+  12, 13, 14, 15, 16, 17,
+];
+
+/**
  * How much of the hit timer plays the knocked-back animation.
  *
  * A hit sets the timer to 90 and it counts down. Above 0x44 the original runs
@@ -194,15 +217,30 @@ export function stepAnimation(
   } else {
     play.frame = frame;
   }
-  // The spin, over the top of whatever the state machine chose.
+  // The spin and then the laser, over the top of whatever the state machine
+  // chose. Neither is a state; both replace the resolved slot and drive the
+  // frame themselves. A state whose two slots are equal is one of the special
+  // moves and cannot carry either, so the original cancels instead.
+  let slot = -1;
+  let posed = play.frame;
   if (p.spin > 0) {
     if (entry.slotA === entry.slotB) {
       p.spin = 0;
     } else {
       // `(0x30 - spin) * 0x8000` is a 16.16 cursor, so the frame is half the
       // ticks elapsed: 24 frames over the spin's 48.
-      return { slotA: SPIN_SLOT, slotB: SPIN_SLOT, frame: (ATTACK_SPIN_TICKS - p.spin) >> 1 };
+      slot = SPIN_SLOT;
+      posed = (ATTACK_SPIN_TICKS - p.spin) >> 1;
     }
   }
+  if (p.laser > 0) {
+    if (entry.slotA === entry.slotB) {
+      p.laser = 0;
+    } else {
+      slot = LASER_SLOT;
+      posed = LASER_FRAMES[Math.min(LASER_FRAMES.length - 1, p.laser >> 1)] ?? 0;
+    }
+  }
+  if (slot >= 0) return { slotA: slot, slotB: slot, frame: posed };
   return { slotA: entry.slotA, slotB: entry.slotB, frame: play.frame };
 }

@@ -215,8 +215,11 @@
  [DONE]   Z-FIGHTING between the two detail levels. Decoded and fixed
           2026-09-07: GeometryGroup.list, and per-material clip planes in
           the viewer at the engine's own limits (row 1 of the detail table
-          by default, Viewer.setDetail to change). Left: the level ticks
-          that force row 2 in some zones, and fog in the crossfade band.
+          by default, Viewer.setDetail to change). The render pass's
+          forcing of row 2 (levels 3 and 9 always, 4 and 11 by zone) and
+          its two zone overrides (levels 4 and 10) landed 2026-09-07 in
+          src/sim/zones.ts. Left: fog, both the rows' two columns and the
+          scene's 24,000-48,000 band (docs/FORMATS.md).
           The original note follows.
  [was]    Z-FIGHTING between the two detail levels. Decoded 2026-09-07
           (docs/FORMATS.md, "The two passes are two levels of detail").
@@ -265,7 +268,7 @@
           reads the camera's), the portal walk starting from the camera
           zone, the boss taunts onto their level's zone test (table in the
           doc), and the two per-level overrides (levels 4 and 10).
-          DONE 2026-09-06 except the two per-level camera overrides:
+          DONE 2026-09-06, and the two per-level overrides 2026-09-07:
           src/sim/zones.ts keeps both zones, stepTasks takes them, level
           7's timed egg can fail, and all nine boss taunts are in with
           their triggers (docs/LEVELS.md "What starts a boss fight").

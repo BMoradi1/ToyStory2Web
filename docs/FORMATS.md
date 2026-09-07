@@ -736,8 +736,15 @@ its distance from the camera:
 `d` is the object's distance from the camera in level units (the D3D
 camera is game units / 32). The numbers come from a three-row quality
 table at 0x508d28, six floats a row, picked by the "detail" option
-`DAT_00508d74` (default 1) and forced to row 2 where a level's tick asks
-for the far view:
+`DAT_00508d74` (default 1). The render pass (`FUN_00440f70`) re-applies
+the option's row every frame and then forces row 2 where a level wants
+the far view: levels 3 and 9 always; level 4 with Buzz in zone 2 or
+within 250 steps of 256 game units of (0x51b97, -0x104fd, 0x5e58e);
+level 11 with the camera in zone 5 or 7. Ported 2026-09-07 as
+`detailRowFor` in src/sim/zones.ts. The same pass sets the scene's fog
+each frame, a linear band from 24,000 to 48,000 level units in the clear
+colour halved (level 14 narrows it to 46,000) unless one of two flags is
+up; that and the rows' own two fog columns are recorded here, not ported.
 
     row   D0      D1      fog     fog     A       B
     0     3000    3500    50      55      10000   0

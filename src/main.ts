@@ -27,7 +27,7 @@ import {
 } from './sim/player.ts';
 import { cos as cosOf, sin as sinOf, toRadians, yawOf } from './sim/trig.ts';
 import { createCamera, stepCamera, cameraTarget, type CameraState } from './sim/camera.ts';
-import { createZones, stepZones, type ZoneState } from './sim/zones.ts';
+import { createZones, stepZones, type ZoneState, detailRowFor } from './sim/zones.ts';
 import {
   MENU, MENU_TEXT, MenuPage, createMenu, highlight, menuRows, openMenu, openTokenScreen, stepMenu,
   type MenuInput, type MenuState,
@@ -727,7 +727,9 @@ async function open(dir: GameDir): Promise<void> {
         };
       },
       /** The detail split (docs/FORMATS.md): a table row 0..2, or null for everything. */
-      setDetail(row: number | null) { return viewer?.setDetail(row) ?? null; },
+      setDetail(row: number | null) { detailOption = row; detailNow = row; return viewer?.setDetail(row) ?? null; },
+      /** The detail row drawn this frame, after the level's own forcing. */
+      get detail() { return { option: detailOption, now: detailNow }; },
       /** The pause menu, for a test: open it, read it, press its keys. */
       get menu() {
         return {
@@ -1850,6 +1852,13 @@ const effectFlat: WorldSprite[] = [];
 const zones: ZoneState = createZones();
 /** The pause menu (docs/HUD.md, src/sim/menu.ts). */
 const menu: MenuState = createMenu();
+/**
+ * The detail option (`DAT_00508d74`, default 1) and the row actually drawn
+ * this frame, which a level's render pass can raise to 2 (docs/FORMATS.md).
+ * Null draws both lists everywhere and turns the forcing off.
+ */
+let detailOption: number | null = 1;
+let detailNow: number | null = 1;
 /** Which camera the menu last chose. Passive means the buttons turn it. */
 let cameraPassive = false;
 /** The save record (docs/FORMATS.md "The save file"), once a directory is open. */
@@ -2110,7 +2119,12 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     // engine runs them in: the render pass sets both from the camera, and
     // the level ticks read them afterwards.
     if (currentCollision && currentLevel) {
-      stepZones(zones, currentCollision, currentLevel.level.zones, camera, player);
+      stepZones(zones, currentCollision, currentLevel.level.zones, camera, player, { level: levelNow });
+    }
+    // The far detail row where the level's render pass asks for it.
+    if (detailOption !== null) {
+      const row = detailRowFor(detailOption, levelNow, zones, player);
+      if (row !== detailNow) { detailNow = row; viewer.setDetail(row); }
     }
     const look = cameraTarget(player, camera);
     viewer.placeCamera(

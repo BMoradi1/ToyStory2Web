@@ -14,7 +14,8 @@
  its path is unported (docs/LEVELS.md). Both are Opus jobs now, specified
  in TODOPLAN.txt, and both were then fixed on Fable at the user's
  request; the save file was decoded and wired the same day (localStorage
- record seeded from the install, a "save file" download button). NOTHING IS WAITING ON
+ record seeded from the install, a "save file" download button), then the
+ boss and race music, the two zone overrides and the far-detail forcing. NOTHING IS WAITING ON
  FABLE.
 ================================================================================
 

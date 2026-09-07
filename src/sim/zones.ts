@@ -51,6 +51,22 @@ export const ZONES = {
   fallback: 1,
 } as const;
 
+/**
+ * The render pass's per-level corrections (`FUN_00440f70`, right after both
+ * zones are set), for two doorways the floors get wrong. The camera is the
+ * Direct3D one, in LEVEL units (game / 32, +Y down), which is what the
+ * floats at 0x4dc03c..0x4dc050 are in.
+ */
+export const ZONE_OVERRIDES = {
+  /** Level 4: Buzz in zone 2 with the camera higher than -7,900 puts everyone in zone 1. */
+  level4: { playerZone: 2, cameraAbove: -7900, becomes: 1 },
+  /**
+   * Level 10: the camera in zone 4 and inside this box is called zone 5
+   * (the camera's zone only; Buzz's is left alone).
+   */
+  level10: { cameraZone: 4, xMin: -800, xMax: 800, yBelow: -40800, zMin: -5500, zMax: -3900, becomes: 5 },
+} as const;
+
 export interface ZoneState {
   /** `DAT_0054dea0`. -1 before the first tick, or over a hole. */
   camera: number;
@@ -148,7 +164,7 @@ export function stepZones(
   portals: readonly Zone[],
   camera: Vec,
   player: Vec,
-  options: { blending?: boolean } = {},
+  options: { blending?: boolean; level?: number } = {},
 ): void {
   // Whether zone 15 is a room here or means "outside". The engine asks
   // whether the level loaded a backdrop sheet; the scene says the same thing,
@@ -188,4 +204,47 @@ export function stepZones(
       : state.player;
   }
   state.camera = camZone === 0xff ? ZONES.fallback : camZone;
+
+  if (options.level !== undefined) overrideZones(state, options.level, camera);
+}
+
+/** The two per-level corrections. `camera` is in game units. */
+export function overrideZones(state: ZoneState, level: number, camera: Vec): void {
+  const cx = camera.x / S, cy = camera.y / S, cz = camera.z / S;
+  if (level === 4) {
+    const o = ZONE_OVERRIDES.level4;
+    if (state.player === o.playerZone && cy < o.cameraAbove) {
+      state.player = o.becomes;
+      state.camera = o.becomes;
+    }
+  } else if (level === 10) {
+    const o = ZONE_OVERRIDES.level10;
+    if (state.camera === o.cameraZone && cy < o.yBelow
+      && cx > o.xMin && cx < o.xMax && cz > o.zMin && cz < o.zMax) {
+      state.camera = o.becomes;
+    }
+  }
+}
+
+/**
+ * Which detail row the render pass draws with (`FUN_00440f70` again): the
+ * option's row, except where a level asks for the far view, which forces
+ * row 2. Levels 3 and 9 always; level 4 with Buzz in zone 2 or within 250
+ * steps of 256 game units of a point on it; level 11 with the camera in
+ * zone 5 or 7. Positions in game units.
+ */
+export function detailRowFor(
+  option: number,
+  level: number,
+  state: ZoneState,
+  player: Vec,
+): number {
+  if (level === 3 || level === 9) return 2;
+  if (level === 4) {
+    if (state.player === 2) return 2;
+    const dx = (player.x - 0x51b97) >> 8, dy = (player.y - -0x104fd) >> 8, dz = (player.z - 0x5e58e) >> 8;
+    if (dx * dx + dy * dy + dz * dz < 250 * 250) return 2;
+  }
+  if (level === 11 && (state.camera === 5 || state.camera === 7)) return 2;
+  return option;
 }

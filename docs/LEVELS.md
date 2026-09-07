@@ -627,8 +627,10 @@ Ported as `zoneAt` in `src/formats/collision.ts`.
    `_DAT_00e4d980/84/88`): level 4 — player zone 2 with the camera above
    -7,900 makes all of them zone 1; level 10 — camera zone 4 with the camera
    inside x in (-800, 800), y below -40,800, z in (-5,500, -3,900) makes the
-   camera's zone 5. Level 2's height bands, and levels 3, 9 and 11 lifting
-   the draw distance in some zones, only touch rendering.
+   camera's zone 5. Ported 2026-09-07 (`overrideZones`, src/sim/zones.ts;
+   the floats are at 0x4dc03c). Level 2's height bands only touch the
+   portal walk's start; levels 3, 9, 4 and 11 lifting the draw distance are
+   the detail-row forcing in docs/FORMATS.md.
 
 **Validation** (`tools/zone-validate.ts`, every scene with portals): the set
 of zones the floors name equals the set the portals join on all nine scenes;

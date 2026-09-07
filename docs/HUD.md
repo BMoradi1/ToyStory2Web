@@ -367,8 +367,8 @@ frame.
 
 Left to build:
 
-1. **The token screen**, which the HUD function also draws and which is not
-   written up here. The pause menu above is done (src/sim/menu.ts).
-2. The level's sprite records, if the PSX look is wanted.
-3. Nothing else, unless the front end and its menus are wanted, which are
+1. The level's sprite records, if the PSX look is wanted.
+2. Nothing else, unless the front end and its menus are wanted, which are
    a different set of sprites on `level00`'s own texture slots.
+
+The pause menu and the token screen are both built (src/sim/menu.ts).

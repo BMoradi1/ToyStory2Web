@@ -28,7 +28,7 @@ import {
 import { cos as cosOf, sin as sinOf, toRadians, yawOf } from './sim/trig.ts';
 import { createCamera, stepCamera, cameraTarget, type CameraState } from './sim/camera.ts';
 import { SoundBank, PLAYER_EFFECTS } from './audio/sfx.ts';
-import { MUSIC_TRACKS, MusicPlayer, trackForLevel } from './audio/music.ts';
+import { MUSIC_TRACKS, MUSIC_VOLUME_CURVE, MusicPlayer, trackForLevel } from './audio/music.ts';
 import {
   createPickups, pickupObjects, PickupKind, revealToken, stepPickups, type PickupState,
 } from './sim/pickups.ts';
@@ -36,6 +36,7 @@ import {
   COIN_DRAW, SPRITE, SPRITE_SHEET, readSpriteTable, type SpriteHeader,
 } from './formats/sprite-table.ts';
 import { HudPainter, type HudReadout, type Sheet, type TalkDraw } from './render/hud-draw.ts';
+import { readSoundTable, type SoundTable } from './audio/events.ts';
 import {
   HUD, HudElement, createHud, offsetOf, showHud, startHud, stepCoinSpin, stepHud,
   type HudState,
@@ -414,7 +415,11 @@ async function open(dir: GameDir): Promise<void> {
       get player() { return player; },
       get anim() { return playerAnim; },
       get hasAnm() { return playerModel?.anm ? playerModel.anm.animations.length : null; },
-      get sound() { return sound ? { enabled: sound.enabled, ready: sound.ready } : null; },
+      get sound() {
+        return sound
+          ? { enabled: sound.enabled, ready: sound.ready, raised: [...soundLog] }
+          : null;
+      },
       get pickups() {
         return pickups ? {
           total: pickups.items.length, taken: pickups.taken, coins: pickups.coins,
@@ -504,6 +509,7 @@ async function open(dir: GameDir): Promise<void> {
           const hits = contactCreatures(creatureSim, player, attackFromPlayer(player));
           touches += hits.length;
           for (const touch of hits) applyCreatureTouch(touch.angle, touch.reaction);
+          for (const raised of creatureSim.sounds) playEvent(raised.event, raised);
           creatureSim.sounds.length = 0;
         }
         drawCreatures();
@@ -974,6 +980,7 @@ async function spawnPlayer(): Promise<void> {
   // The sprite table the HUD and the coins draw from lives in the user's own
   // executable, and its second half is per level (docs/HUD.md).
   spriteTable = exeBytes ? readSpriteTable(exeBytes, level) : [];
+  soundTable = exeBytes ? readSoundTable(exeBytes, level) : null;
   viewer.setCardSheet(sceneTextures.get(SPRITE_SHEET) ?? null);
   hud = createHud();
   startHud(hud);
@@ -1090,6 +1097,39 @@ function drawCoins(): void {
   }
   viewer.setWorldCards(coinCards, coinShadows);
   viewer.setObjectAngles(pickupAngleMap);
+}
+
+/**
+ * Play one of the engine's sound events. Everything but the player's own
+ * moves raises a number rather than a name: the level's table says which
+ * effect that is and how loud (src/audio/events.ts). A position makes it
+ * positional, attenuated and panned against the camera; without one it plays
+ * at the record's own volume, which is what the engine does for a sound that
+ * belongs to the screen rather than the world.
+ */
+function playEvent(event: number, at?: { x: number; y: number; z: number }): void {
+  if (!sound || !soundTable) return;
+  const name = soundTable.nameOf(event);
+  // Kept whether or not anything is audible, so a test can see that the right
+  // event was raised without a sound device.
+  soundLog.push(`${event.toString(16)}:${name ?? 'silent'}`);
+  if (soundLog.length > 32) soundLog.shift();
+  if (!name) return;
+  const record = soundTable.events[event];
+  const sustained = record?.sustained ?? false;
+  if (!at || !camera) {
+    const volume = record?.volume ?? 0;
+    if (volume <= 0) return;
+    const dB = MUSIC_VOLUME_CURVE[Math.min(MUSIC_VOLUME_CURVE.length - 1, volume)] ?? 0;
+    if (dB > -10000) sound.play(name, 10 ** (dB / 2000), 0, sustained);
+    return;
+  }
+  sound.playAt(
+    name,
+    { x: at.x - camera.x, y: at.y - camera.y, z: at.z - camera.z },
+    { sin: sinOf(camera.yaw) / 0x4000, cos: cosOf(camera.yaw) / 0x4000 },
+    sustained,
+  );
 }
 
 /** What the HUD needs to know this tick, gathered from the sim. */
@@ -1424,6 +1464,10 @@ let revealedSlots = new Set<number>();
 let exeBytes: Uint8Array | null = null;
 /** The level's sprite table, read from the user's own toy2.exe. */
 let spriteTable: readonly (SpriteHeader | null)[] = [];
+/** What each sound event number plays on this level, also from the exe. */
+let soundTable: SoundTable | null = null;
+/** The last few events raised, for the headless harness. */
+const soundLog: string[] = [];
 /** The decoded texture sheets, as canvases the HUD's 2D context can blit. */
 let sceneSheets = new Map<number, Sheet>();
 let hud: HudState = createHud();
@@ -1640,8 +1684,9 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     for (const touch of contactCreatures(creatureSim, player, attackFromPlayer(player))) {
       applyCreatureTouch(touch.angle, touch.reaction);
     }
-    // The sounds a script raises are event numbers, which need the event
-    // table in docs/LEVELS.md that is not ported; they are dropped for now.
+    for (const raised of creatureSim.sounds) {
+      playEvent(raised.event, raised);
+    }
     creatureSim.sounds.length = 0;
     drawCreatures();
   }

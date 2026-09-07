@@ -465,7 +465,40 @@ effect - 1, pitch, volume, pos, 0)`, which adds the one back before
     i16 priority   2, 3, 4 or -1
     i16 x 3        falloff parameters, e.g. (10, 10, 120)
 
+**The effect word carries two flags**, found while porting this on
+2026-09-06 (`FUN_0049e660`, and `src/audio/events.ts`):
+
+- **0x4000: the effect depends on the level.** The low bits are an index into
+  a list of `(level, effect)` pairs at 0x5028e8, walked four bytes at a time
+  until the level matches. That is how one event number is `ELECDRIL` on one
+  level and `Cockerel` on another. The lists do not cover every level — event
+  0x6b lists 3, 4, 13, 14 and 15 and not 1 — so the engine's own walk runs
+  off the end if a level raises an event it has no entry for. The port stops
+  and plays nothing.
+- **0x8000: the engine's second play path** (`FUN_004a3810` rather than
+  `FUN_004a3b90`), which also passes `volume2` and a falloff number. Forty of
+  the 218 records carry it and they are the sustained sounds — the hover
+  bot's rotor, the lift loops, the wind. The port keeps one voice per such
+  effect rather than starting another each time it is raised.
+
+The index is what is left after masking both flags off, and the table is
+**218 records**, not 200: past 0xd9 the bytes belong to a different table
+whose records are eight bytes, which reads as plausible rubbish with pitch
+values where the effect should be.
+
+Checked across all seventeen tables by `tools/sound-events.ts`: every event
+either resolves to a `.wav` the install actually holds, names the dropped
+speech block (effects 62..86), or names an effect its own level does not
+carry, which is an event that level never raises.
+
 **Attenuation, pan and the slider** (`FUN_004a3c80` → `FUN_0047de50`).
+Two point sources, one per ear, rather than a level and a pan — so a sound a
+little way to one side is louder than the same sound at the camera, since it
+is nearer that ear than either ear is to the middle. Which of the two values
+is the LEFT ear was not established: the sideways axis comes from row 0 of
+the render camera's matrix and nothing here says which way that points. The
+port picks the assignment that puts a sound on the player's left into the
+left speaker.
 A positional play computes two levels, one per ear, from the sound's
 offset to the render camera (`DAT_00555314/18/1c`) in 512-game-unit steps,
 turned into camera space by the camera's rotation rows (`DAT_00555334`,

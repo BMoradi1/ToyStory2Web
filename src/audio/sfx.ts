@@ -6,19 +6,18 @@
  * `data/sfx/<name>.wav`, which is exactly what is on disc. The sim emits those
  * names, so this only has to find the file, decode it once and play it.
  *
- * What is deliberately NOT here: the engine's *event* table, 200 entries at
- * 0x502950 mapping an event number to an effect plus a pitch, a volume and a
- * falloff. The sim names effects directly instead. The event table is real and
- * worth porting — it is where per-sound pitch and 3D falloff live — but the
- * effect index it stores is off by one in a way I have not pinned down, and
- * playing a confidently-wrong sound is worse than playing a plain one. See
- * docs/PLAYER.md.
+ * The player's own moves name their effects directly, because the controller
+ * does. Everything else in the game raises an EVENT number instead, and
+ * src/audio/events.ts turns one into a name and a position; `playAt` is what
+ * plays it, with the engine's own per-ear attenuation and pan.
  *
  * Nothing is bundled. Audio is game data and stays on the user's disc like
  * every other asset; this reads it through the same `GameDir` handle as the
  * models and levels.
  */
 import type { GameDir } from '../loader/gamedir.ts';
+import { MUSIC_VOLUME_CURVE } from './music.ts';
+import { earLevels } from './events.ts';
 
 /** A decoded effect, or `null` once we know the install has no such file. */
 type Slot = AudioBuffer | null;
@@ -28,6 +27,13 @@ export class SoundBank {
   private readonly buffers = new Map<string, Slot>();
   private readonly pending = new Map<string, Promise<Slot>>();
   private gain: GainNode | null = null;
+  /**
+   * Effects playing under the engine's second, sustained path. It reuses one
+   * voice per sound rather than starting another, so a hum that is raised
+   * again every twenty ticks is one continuous hum; here that is a set of
+   * what is still running, and a repeat is dropped until it ends.
+   */
+  private readonly sustaining = new Set<string>();
 
   /** Off until the user asks for it; browsers refuse audio before a gesture anyway. */
   enabled = false;
@@ -66,6 +72,7 @@ export class SoundBank {
 
   stop(): void {
     this.enabled = false;
+    this.sustaining.clear();
   }
 
   /** How many effects are decoded and ready, for the status line. */
@@ -103,7 +110,7 @@ export class SoundBank {
    * and missing files are remembered as absent and cost nothing after the
    * first look.
    */
-  play(name: string, gain = 1): void {
+  play(name: string, gain = 1, pan = 0, sustained = false): void {
     if (!this.enabled || !this.context || !this.gain) return;
     if (this.context.state !== 'running') {
       // Still waiting on a gesture. Nudge it and drop this one rather than
@@ -112,21 +119,63 @@ export class SoundBank {
       return;
     }
     const key = name.toLowerCase();
+    if (sustained && this.sustaining.has(key)) return;
     const buffer = this.buffers.get(key);
     if (buffer === undefined) { void this.load(key); return; }
     if (buffer === null) return;
 
     const source = this.context.createBufferSource();
+    if (sustained) {
+      this.sustaining.add(key);
+      source.onended = () => this.sustaining.delete(key);
+    }
     source.buffer = buffer;
-    if (gain === 1) {
-      source.connect(this.gain);
-    } else {
+    let tail: AudioNode = this.gain;
+    if (pan !== 0) {
+      const panner = this.context.createStereoPanner();
+      panner.pan.value = Math.max(-1, Math.min(1, pan));
+      panner.connect(tail);
+      tail = panner;
+    }
+    if (gain !== 1) {
       const trim = this.context.createGain();
       trim.gain.value = gain;
-      trim.connect(this.gain);
-      source.connect(trim);
+      trim.connect(tail);
+      tail = trim;
     }
+    source.connect(tail);
     source.start();
+  }
+
+  /**
+   * Play a sound where it happens. `offset` is from the camera to the sound
+   * in game units, and `yaw` is the camera's facing as a sine and cosine.
+   *
+   * The engine works out a level for each ear and hands DirectSound a pan
+   * from their difference over 128 and a volume of
+   * `curve[(slider * max(L, R)) >> 8]`, the same hundredth-of-a-decibel curve
+   * the music slider uses.
+   *
+   * Two things differ. The volume: the engine's slider is a byte in its
+   * options screen and ours is this bank's own master gain, so the curve is
+   * indexed by the ear level itself — silent at nothing, unattenuated when a
+   * sound is at an ear — and the master multiplies what comes out. And the
+   * pan's sign, which is negative-is-left here because that is what Web Audio
+   * means by it; see `earLevels` for why the engine's own sign could not be
+   * established.
+   */
+  playAt(
+    name: string,
+    offset: { x: number; y: number; z: number },
+    yaw: { sin: number; cos: number },
+    sustained = false,
+  ): void {
+    const { left, right } = earLevels(offset, yaw);
+    const loudest = Math.max(left, right);
+    if (loudest <= 0) return;
+    const dB = MUSIC_VOLUME_CURVE[Math.min(MUSIC_VOLUME_CURVE.length - 1, Math.round(loudest))] ?? 0;
+    if (dB <= -10000) return;
+    this.play(name, 10 ** (dB / 2000), (right - left) / 128, sustained);
   }
 
   /** Warm the cache so the first jump is not silent while its file loads. */

@@ -540,6 +540,17 @@
                 Older note: DECODED (docs/LEVELS.md - slot 0 Hamm's 50
                 coins, 1 find-five, 2 challenge, 3 puzzle token revealed at
                 init, 4 boss; per-level table with ids). Not implemented.
+                SOUND EVENTS WORK 2026-09-06 (src/audio/events.ts): the
+                table that turns an event number into an effect, a volume
+                and a priority, read from the user's toy2.exe with the
+                per-level name list, and played with the engine's own
+                per-ear attenuation and pan. Creature scripts, which raised
+                event numbers that were being thrown away, now make their
+                noise - the Zurg toys boing and wind, the sheep baa, the
+                hover bot's rotor hums. Two flags on the effect word were
+                found while porting and are written up in docs/LEVELS.md:
+                a per-level redirect and a sustained-sound path. Checked on
+                all seventeen tables by tools/sound-events.ts.
                 HUD WORKS 2026-09-06 (docs/HUD.md, src/sim/hud.ts and
                 src/render/hud-draw.ts): all ten elements, drawn as the
                 game's own sprites over the canvas in the two virtual

@@ -183,8 +183,36 @@ Level 1's race: entering the garage zone with the R.C. car flag `0x200`
 opens the challenge dialogue; state `DAT_0052f2f8` steps 1 → 2 → 3 through a
 four-quadrant lap counter (`DAT_0052f584`, bits for the garage's x/z
 halves), `DAT_0052ad64` counts laps, and at three `FUN_004a0db0(2, 0)`
-reveals slot 2 with the camera cut. The car itself is a creature driven by
-the shared creature code, so the race is not portable until creatures are.
+reveals slot 2 with the camera cut.
+
+**How the car drives** (decoded 2026-09-07; not yet ported — the car sits
+still while you race). The car's handler (`FUN_00406a60` → level 1
+`FUN_00416f30`, level 2 `FUN_00418720`) only picks its animation from
+speed and steering, spins the wheel bones and spawns exhaust; it does not
+move it. The LEVEL TICK does, through the car's own creature entity — slot
+0x1d on both levels, at `0x52c840 + 0x1d * 0x9c` = `0x52d9ec` — using the
+fields every creature has (docs/CREATURES.md): +0x40 flags, +0x50 HOME,
++0x5c TARGET, +0x7e health.
+
+At the challenge (state 1): `flags |= 4` (script velocity, which is what
+lets the mover steer) and `health = 0xca` (always awake), node = 0, car
+laps = 0. Every tick while the race is 1 or 2:
+
+    node   = path[tag].points[n]                    level units
+    if (car.x/32 - node.x)^2 + (car.z/32 - node.z)^2 < 360000   (600 units)
+        home = node                                 +0x50/+0x58, game units
+        if carLaps < 3:  n += 1; past the last node: carLaps += 1, n = 0
+        else if car.z > finish:  the car has WON — race 2 becomes 3 (lost)
+                                 unless Buzz already has three laps; health = 1
+    target = path[tag].points[n]                    +0x5c/+0x64, game units
+
+The creature mover then drives it toward `target` at its own accel table.
+Level 1: path tag 0x1e, 45 nodes (`n > 0x2c` wraps), finish `z > -0x1a000`.
+Level 2: path tag 1, 65 nodes (`n > 0x40` wraps), finish `z > -0x24269`,
+and the car is held at `y <= 0x2000` with a dust puff (effect 0x35 in
+spawn mode 4, ±0x1000 in x/z) whenever it is pushed back up. Both node
+counts match the paths in the two `level.dat`s exactly, which is the
+check that this is the right path and the right wrap.
 
 **Timed runs, and the clock they share** (2026-09-05, `src/sim/tasks.ts`).
 Several levels' slot 2 is a run against a clock, and they all use the same

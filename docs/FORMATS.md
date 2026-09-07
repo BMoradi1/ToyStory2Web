@@ -712,8 +712,42 @@ Then, per frame (`FUN_004cddd0` → `FUN_004bc460`):
 
 So it is an ordinary portal renderer, with the frustum narrowing at each
 doorway, and a recursion limit. `to == 15` means outside; the loader rewrites
-it to -1. Objects are drawn in two passes with different distance limits,
-which is what the two instance lists in the `.ngn` scene are for.
+it to -1.
+
+**The two passes are two levels of detail, and they are kept apart by the
+clip planes** (decoded 2026-09-07, `FUN_004cddd0` and the walk). Every
+object carries a list number (`.ngn` instance `list`; the `level.dat` object
+table's first section is list 0 and its quarter-scale second section is
+list 1). On level 1, 207 of the 290 second-section objects sit exactly on a
+first-section object (box overlap 0.97–0.99) with FEWER faces: they are the
+same scenery at lower detail. Draw both at once and they z-fight, which is
+what the port did.
+
+The engine draws the FAR list first with the near clip plane pushed out,
+then the NEAR list with the far clip plane pulled in, and inside each walk
+only objects whose list matches the pass are considered, each also gated on
+its distance from the camera:
+
+    pass 1 (list 1): near clip = D0, far clip = none;  draw if d^2 > B^2
+    pass 0 (list 0): near clip = 0,  far clip = D1;    draw if d^2 < A^2
+
+`d` is the object's distance from the camera in level units (the D3D
+camera is game units / 32). The numbers come from a three-row quality
+table at 0x508d28, six floats a row, picked by the "detail" option
+`DAT_00508d74` (default 1) and forced to row 2 where a level's tick asks
+for the far view:
+
+    row   D0      D1      fog     fog     A       B
+    0     3000    3500    50      55      10000   0
+    1     5000    6500    40      60      10000   0
+    2     10000   12000   40      60      12000   1000
+
+So at the default the near detail is cut off by the clip plane at 6,500
+level units and the far detail cannot start before 5,000; the 1,500 in
+between shows both, under the fog the same rows set, and that band is the
+only place the original ever overdraws. Objects also carry a hide bit
+(+0x8c & 1) and are frustum-tested per object (`FUN_004ba270`, the
+0x55555555 outcode mask).
 
 **Where each object's zone lives.** In the `.ngn` scene's instance record: the
 low byte of the flags word at `+0x28` (`zone = flags & 0xff`, and

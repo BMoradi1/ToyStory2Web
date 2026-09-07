@@ -202,6 +202,29 @@
           view, narrowing the frustum to each outline, instead of taking a
           fixed one-step neighbourhood. Needs the portal corners projected
           per frame; level.zones already carries them.
+ [READY]  Z-FIGHTING between the two detail levels. Decoded 2026-09-07
+          (docs/FORMATS.md, "The two passes are two levels of detail").
+          The level.dat's second object section is a low-detail copy of
+          the first, and the port draws both. The engine draws the far
+          list with the near clip plane at D0 and the near list with the
+          far clip plane at D1 (5000 / 6500 level units at the default
+          quality; 10000 / 12000 at the top), and gates each object on
+          its camera distance besides. Port: keep `unitScale` (1 = near
+          list, 4 = far list) through to the draw groups, and either
+          render the two lists as two passes with those clip planes, or
+          hide near-list objects beyond D1 and far-list objects inside D0
+          by object distance each frame — the second is simpler and
+          leaves only the engine's own 1,500-unit crossfade band.
+ [READY]  THE RACE CAR does not move. Decoded 2026-09-07 (docs/LEVELS.md,
+          "How the car drives"): the level tick sets the car entity's
+          TARGET to the next node of a path and steps the node within 600
+          level units, with the car on script velocity and always awake.
+          Level 1: path 0x1e, 45 nodes, finish z > -0x1a000. Level 2:
+          path 1, 65 nodes, finish z > -0x24269. Port in stepTasks's race
+          branch against the car creature's targetX/Z, homeX/Z, flags and
+          health; add a car lap counter and the "car wins → race lost"
+          rule. The handler's wheel spin and exhaust are cosmetic and
+          separate.
  [DONE]   The follow camera. Decoded and ported 2026-09-06
           (docs/CAMERA.md, src/sim/camera.ts). Worst single-tick move on
           level 1 is now 81 level units, none over 100; it was 1,224 when

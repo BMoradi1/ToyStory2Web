@@ -7,8 +7,12 @@
  the follow camera were decoded AND PORTED, and 2026-09-07 when the last two loose ends
  (three level-specific effect modes, and the camera's three dropped
  float expressions - read off the machine code with objdump, all square
- roots) were closed. NOTHING IS WAITING ON FABLE and nothing is queued
- for it. Everything left is Opus work in TODOPLAN.txt.
+ roots) were closed, and two user-reported bugs were decoded the same
+ day: the z-fighting is the level's two detail levels drawn together
+ (the engine separates them with the clip planes - docs/FORMATS.md), and
+ the race car stands still because the level tick that drives it along
+ its path is unported (docs/LEVELS.md). Both are Opus jobs now, specified
+ in TODOPLAN.txt. NOTHING IS WAITING ON FABLE.
 ================================================================================
 
  Read TODOPLAN.txt for WHAT to do. This file is about WHO should do it and what

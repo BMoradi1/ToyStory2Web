@@ -1900,6 +1900,10 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     );
   }
   for (const effect of player.sounds) sound?.play(effect);
+  // Events carry their own volume and sustained flag out of the level's sound
+  // table, which is what lets the spin's whine and whirl hold rather than
+  // restart every tick.
+  for (const event of player.events) playEvent(event, player);
 
   if (pushBlocks && currentCollisionWorld) {
     const busy = player.spin !== 0 || player.laser !== 0 || player.hitStun > 0

@@ -169,6 +169,12 @@ export interface PlayerState {
 
   /** Set for one tick when the controller fires a sound event. Named as in the effect table. */
   sounds: string[];
+  /**
+   * Sound EVENTS raised this tick, by the engine's own number. The caller
+   * resolves them through the level's sound table, which is what carries the
+   * volume and the sustained flag; `sounds` above is the older by-name list.
+   */
+  events: number[];
 }
 
 export function createPlayer(x = 0, y = 0, z = 0, yaw = 0): PlayerState {
@@ -198,6 +204,7 @@ export function createPlayer(x = 0, y = 0, z = 0, yaw = 0): PlayerState {
     safeYaw: yaw,
     fellOut: false,
     sounds: [],
+    events: [],
   };
 }
 
@@ -359,6 +366,24 @@ function vertical(p: PlayerState, input: PlayerInput, t: MoveTable, k = 2): void
   if (p.vy > VERTICAL.terminalVelocity) p.vy = VERTICAL.terminalVelocity;
 }
 
+/**
+ * The sound events the spin raises (`FUN_00434eb0`), by the number the engine
+ * uses. Resolved through the level's own table, they are BUZTSPIN, BUZPWRUP,
+ * BUZWHIRL and BUZDIZZY. Two of them are sustained, which is why they are
+ * events and not names: raising a sustained event every tick keeps one sound
+ * running, where playing it by name would restart it 60 times a second.
+ */
+export const SPIN_EVENT = {
+  /** The spin goes off. */
+  start: 0x11,
+  /** Held down, winding up. Sustained. */
+  charging: 0x27,
+  /** The charged spin, whirling. Sustained. */
+  whirl: 0x26,
+  /** Once, when the whirl gives out and he staggers. */
+  dizzy: 0x18,
+} as const;
+
 /** Spin attack and its charge. `FUN_00434eb0`, trimmed to the parts that move the player. */
 function spinAttack(p: PlayerState, input: PlayerInput, prev: PlayerInput): void {
   if (p.spin > 0) p.spin = Math.max(0, p.spin - 1);
@@ -368,27 +393,39 @@ function spinAttack(p: PlayerState, input: PlayerInput, prev: PlayerInput): void
     p.spin = ATTACK.spinTicks;
     p.spinCharge = 1;
     p.laser = 0;
-    p.sounds.push('BUZSPIN');
+    p.events.push(SPIN_EVENT.start);
     return;
   }
 
   if (input.spin && p.spinCharge > 0) {
-    // Charging. The original starts reporting the charge whine after 12 ticks.
+    // Charging, and whining about it every tick. The event is sustained, so
+    // raising it repeatedly keeps one sound going rather than restarting it.
     p.spinCharge = Math.min(ATTACK.spinChargeTicks, p.spinCharge + 1);
+    p.events.push(SPIN_EVENT.charging);
     return;
   }
 
   if (p.spinCharge < 0) {
-    // Charged spin running: 181 ticks spinning then 119 dizzy, counting up to 0.
+    // The charged spin: 181 ticks whirling, then 119 dizzy, counting up to 0.
+    // The dizzy sound fires ONCE, on the tick the whirl gives out — the
+    // original tests the value from BEFORE the step against the same
+    // threshold it tests after it.
+    const wasWhirling = p.spinCharge < -0x77;
     p.spinCharge += 1;
-    if (p.spinCharge >= -0x77) p.sounds.push('BUZDIZZY');
+    if (p.spinCharge < -0x77) p.events.push(SPIN_EVENT.whirl);
+    else if (wasWhirling) p.events.push(SPIN_EVENT.dizzy);
     if (p.spinCharge >= 0) p.spinCharge = 0;
     return;
   }
 
-  if (p.spinCharge >= ATTACK.spinChargeTicks && isPlain(p)) {
+  // Released with a full charge: the spin goes off. The original gates this
+  // on its state word carrying nothing but "grounded", NOT on the same
+  // `isPlain` the press uses — `isPlain` insists the charge is zero, and the
+  // charge is 60 here by construction, so asking for both meant the charged
+  // spin could never launch at all.
+  const busy = p.spin !== 0 || p.laser !== 0 || p.hitStun > 0 || p.fallTimer < 0;
+  if (p.spinCharge >= ATTACK.spinChargeTicks && !busy) {
     p.spinCharge = -ATTACK.chargedSpinTicks + ATTACK.spinChargeTicks;
-    p.sounds.push('BUZTSPIN');
     return;
   }
   p.spinCharge = 0;
@@ -430,6 +467,7 @@ export function stepPlayer(
   cameraYaw: number,
 ): void {
   p.sounds.length = 0;
+  p.events.length = 0;
   const prev = runtime.previous;
 
   // --- stick to target yaw and magnitude -----------------------------------

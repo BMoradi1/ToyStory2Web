@@ -42,8 +42,26 @@ export enum AnimState {
   Dying = 7,
   DoubleJump = 8,
   HardFall = 0xc,
-  Spin = 9,
+  /** The charged spin, whirling. */
+  ChargedSpin = 0x13,
+  /** ...and the dizziness after it, the last 0x78 ticks. */
+  Dizzy = 0x14,
 }
+
+/**
+ * The plain spin's animation SLOT — not a state.
+ *
+ * `FUN_004011d0` runs its state machine first and then, if the spin timer is
+ * up, replaces the resolved primary slot with 9 and drives the cursor
+ * straight off the timer, bypassing the state's script. There IS a state 9,
+ * and it is the grapple: selecting it for a spin plays a climb, which is what
+ * this module used to do.
+ *
+ * A state whose two slots are equal cannot carry the override — it is one of
+ * the special moves — and the original cancels the spin rather than play it
+ * wrong.
+ */
+export const SPIN_SLOT = 9;
 
 /**
  * How much of the hit timer plays the knocked-back animation.
@@ -57,6 +75,9 @@ export const HIT_ANIMATION_ABOVE = 0x44;
 
 /** One entry of the cursor: 0x10000 is a whole script step. */
 const CURSOR_ONE = 0x10000;
+
+/** What the spin timer starts at, which the override counts down from. */
+const ATTACK_SPIN_TICKS = 0x30;
 
 export interface AnimationPlayback {
   /** Which entry of ANIMATION_STATES is running. */
@@ -121,7 +142,11 @@ export function selectState(p: PlayerState, hasInput: boolean): number {
   // they beat everything below.
   if (p.dying) return AnimState.Dying;
   if (p.hitStun > HIT_ANIMATION_ABOVE) return AnimState.Hit;
-  if (p.spin > 0) return AnimState.Spin;
+  // The charged spin IS a state, and a different one once he is dizzy. The
+  // plain spin is not; it is the slot override at the bottom of stepAnimation.
+  if (p.spinCharge < 0) {
+    return p.spinCharge > -0x78 ? AnimState.Dizzy : AnimState.ChargedSpin;
+  }
   if (p.fallTimer === 0x50) return AnimState.HardFall;
 
   if (p.coyote === 0) {
@@ -168,6 +193,16 @@ export function stepAnimation(
     play.frame = readScript(play, ANIMATION_STATES[AnimState.Idle]!) ?? 0;
   } else {
     play.frame = frame;
+  }
+  // The spin, over the top of whatever the state machine chose.
+  if (p.spin > 0) {
+    if (entry.slotA === entry.slotB) {
+      p.spin = 0;
+    } else {
+      // `(0x30 - spin) * 0x8000` is a 16.16 cursor, so the frame is half the
+      // ticks elapsed: 24 frames over the spin's 48.
+      return { slotA: SPIN_SLOT, slotB: SPIN_SLOT, frame: (ATTACK_SPIN_TICKS - p.spin) >> 1 };
+    }
   }
   return { slotA: entry.slotA, slotB: entry.slotB, frame: play.frame };
 }

@@ -227,8 +227,25 @@ direction, so control is camera-relative.
 
 Spin (`FUN_00434eb0`): spin button, grounded and idle. Spins for **48 ticks**.
 Holding the button charges `DAT_0053c83c` up to **60 ticks**; releasing at
-full charge starts a charged spin of **300 ticks**: 181 spinning, then 119
-dizzy (flag 0x04, `BUZDIZZY`) during which the player is uncontrollable.
+full charge starts a charged spin of **300 ticks**: 181 whirling, then 119
+dizzy (flag 0x04) during which the player is uncontrollable. The release is
+gated on the state word carrying nothing but "grounded", NOT on the same
+"nothing else running" test the press uses — that test insists the charge is
+zero, and at the release it is 60.
+
+Its four sounds, by event, resolved through the level's table:
+
+| event | name | when |
+|---|---|---|
+| 0x11 | `BUZTSPIN` | the plain spin goes off |
+| 0x27 | `BUZPWRUP` | every tick while charging. Sustained |
+| 0x26 | `BUZWHIRL` | every tick of the 181 whirling. Sustained |
+| 0x18 | `BUZDIZZY` | **once**, on the tick the whirl gives out |
+
+Two are sustained, so raising them every tick keeps one sound running rather
+than restarting it. `BUZDIZZY` is the odd one out: the original tests the
+charge from BEFORE the step against the same threshold it tests after, so it
+fires on the crossing and only then.
 
 Laser (`FUN_00434990`): fire button. A tap fires after a **12-tick** wind-up.
 Holding charges `DAT_0053c840` up to **64 ticks** and a release at full charge
@@ -310,8 +327,18 @@ The states the controller can currently reach:
 | 3 | 4 + 5 | falling, a later stretch of the same script |
 | 4 | 4 + 5 | landing, four frames then end |
 | 8 | 22 + 27 | double jump |
-| 9 | 9 | spin, forced by the spin timer |
 | 0xc | 15 | hard fall |
+| 0x13 | 11 | the charged spin, whirling |
+| 0x14 | 7 | ...and dizzy, the last 0x78 ticks of it |
+
+**The plain spin is not a state.** `FUN_004011d0` runs the state machine
+first and then, if the spin timer is up, replaces the resolved primary slot
+with **9** and drives the cursor straight off the timer,
+`(0x30 - spin) * 0x8000`, bypassing the state's script. A state whose two
+slots are equal cannot carry the override, and the original cancels the spin
+rather than play it wrong. There IS a state 9 — it is the grapple, slots
+10 + 10 — and selecting it for a spin plays a climb. The laser is the same
+shape with slot 0x1a, and is not ported.
 
 The other 20 belong to moves that are not implemented yet — poles, zip lines,
 the grapple, cutscenes. They are in the generated table and simply never

@@ -197,11 +197,13 @@ export interface CreatureSim {
   /** Hit sparks a damaging blow asked for, for the caller to draw. */
   sparks: { x: number; y: number; z: number }[];
   /**
-   * Where a creature just died for the first time. `FUN_00405d20` spills one
-   * coin there, gated on the same "has died before" bit, and the caller
-   * spawns it (docs/EFFECTS.md).
+   * Where a creature just died for the first time, and what its type asks
+   * for. `FUN_00405d20` spills one coin (gated on the same "has died before"
+   * bit) and then a burst whose shape comes from the type: a positive `burst`
+   * is that many of effect 0x23, a negative one is that many PAIRS of 99 and
+   * 0x11 and a bang. The caller spawns them (docs/EFFECTS.md).
    */
-  deaths: { x: number; y: number; z: number }[];
+  deaths: { x: number; y: number; z: number; burst: number }[];
   /** Bolts a handler fired this tick. The projectile itself is not ported. */
   shots: { x: number; y: number; z: number; heading: number }[];
   /**
@@ -1068,13 +1070,32 @@ export function stepCreatures(
  * The particle bursts and per-type death animations are not ported; the state
  * changes are.
  */
+/**
+ * How long a type takes to die, in ticks, and how big a burst it leaves.
+ *
+ * `FUN_00405d20` switches on the creature's type. Most get -1, which is one
+ * tick: they are gone by the next frame, which is what the original does too.
+ * A handful play a real death, and those are the ones you notice — Zurg's
+ * robots (type 3) take 94 ticks of flying up and spinning down, and a port
+ * that gives them one tick makes them blink out of existence instead.
+ */
+const DEATH_TICKS: Record<number, number> = {
+  3: 94, 0xe: 94, 0x18: 94, 0x14: 70, 4: 62, 0x15: 8,
+};
+/** Positive: that many of effect 0x23. Negative: that many 99 + 0x11 pairs. */
+const DEATH_BURST: Record<number, number> = {
+  3: 3, 0xe: 3, 4: 3, 0x14: 3, 0x18: 3,
+  0x10: 6, 0x19: 6, 0x36: 6, 0x1b: 4,
+  0x21: -5, 0x2e: -5, 0x29: -5,
+};
+
 export function killCreature(c: Creature, what: number, sim?: CreatureSim): void {
   if ((what & 1) !== 0) {
     // The coin a creature spills, once ever. The original spawns it here,
     // 0x1000 above the body and thrown upward, and asks for the ground under
     // it at once so it lands rather than falling through.
     if (sim && (c.flags & CREATURE_FLAGS.diedOnce) === 0) {
-      sim.deaths.push({ x: c.x, y: c.y, z: c.z });
+      sim.deaths.push({ x: c.x, y: c.y, z: c.z, burst: DEATH_BURST[c.type] ?? 0 });
     }
     if ((c.flags & CREATURE_FLAGS.diedOnce) === 0) {
       c.flags |= CREATURE_FLAGS.diedOnce;
@@ -1082,8 +1103,9 @@ export function killCreature(c: Creature, what: number, sim?: CreatureSim): void
       c.animRateAir = 0xe0;
       c.vx = 0; c.vy = -0x400; c.vz = 0;
     }
-    // Most types are removed on the next tick; a few play a death animation.
-    c.deathTimer = -1;
+    // Most types are removed on the next tick; a few play a death animation
+    // first, and for those the timer is what keeps the body on screen.
+    c.deathTimer = -(DEATH_TICKS[c.type] ?? 1);
   }
   if ((what & 2) !== 0) {
     if (c.respawn === 0) c.type = 0;

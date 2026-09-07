@@ -29,7 +29,7 @@ import { cos as cosOf, sin as sinOf, toRadians, yawOf } from './sim/trig.ts';
 import { createCamera, stepCamera, cameraTarget, type CameraState } from './sim/camera.ts';
 import { createZones, stepZones, type ZoneState } from './sim/zones.ts';
 import {
-  createEffects, liveEffects, spawnEffect, stepEffects, touchPlayer,
+  createEffects, liveEffects, spawnChild, spawnEffect, stepEffects, touchPlayer,
   type EffectSim, type EffectWorld,
 } from './sim/effects.ts';
 import { EFFECT_FLAGS, EFFECT_KIND, readEffectTable } from './formats/effect-table.ts';
@@ -637,6 +637,19 @@ async function open(dir: GameDir): Promise<void> {
        * Take a creature out of the world the way its own death does, so a
        * test can reach the state a task waits on without playing the fight.
        */
+      /**
+       * Hurt a creature the way an attack does, so a test can watch a real
+       * death rather than the shortcut below, which skips straight to
+       * removal.
+       */
+      hurtCreature(slot: number, kind = 1) {
+        if (!creatureSim || !player) return null;
+        const c = creatureSim.creatures.find((q) => q.slot === slot);
+        if (!c) return null;
+        c.stun = 0;
+        damageCreature(creatureSim, c, 0, kind);
+        return { slot, health: c.health, deathTimer: c.deathTimer };
+      },
       killCreature(slot: number) {
         if (!creatureSim) return null;
         const c = creatureSim.creatures.find((q) => q.slot === slot);
@@ -1137,6 +1150,29 @@ function spawnCreatureEffects(): void {
     const coin = spawnEffect(effects, world,
       at.x, at.y - 0x1000, at.z, 0, -0x800, 0, 0x80, 0, 0, EFFECT_KIND.coin);
     if (coin) coin.floor = world.groundAt(coin.x, coin.y, coin.z) ?? coin.y;
+    // ...and the burst its type asks for, so a kill reads as a kill rather
+    // than the body blinking out.
+    if (at.burst > 0) {
+      for (let i = 0; i < at.burst; i++) {
+        const bit = spawnChild(effects, world, at.x, at.y, at.z, 0x23, 0xe);
+        if (bit) bit.spin = effects.rand.byte() - 0x80;
+      }
+      effects.lights.push({ x: at.x, y: at.y, z: at.z, r: 0xf0, g: 0x80, b: 0, glow: false });
+    } else if (at.burst < 0) {
+      for (let i = 0; i < -at.burst; i++) {
+        const spark = spawnChild(effects, world, at.x, at.y, at.z, 99, (i & 1) * 10 + 4);
+        if (spark) {
+          spark.vy -= 0x100;
+          spark.life = (effects.rand.byte() & 0xff1f) + 0x78;
+          const grey = (effects.rand.byte() & 0x7f) + 0x40;
+          spark.r = grey; spark.g = grey; spark.b = grey;
+          const sign = (effects.rand.byte() & 1) === 0 ? -1 : 1;
+          spark.spin = sign * ((effects.rand.byte() & 0xff3f) + 0x40);
+        }
+        spawnChild(effects, world, at.x, at.y, at.z, 0x11, 4);
+      }
+    }
+    if (at.burst !== 0) playEvent(10, at);
   }
   creatureSim.deaths.length = 0;
 }

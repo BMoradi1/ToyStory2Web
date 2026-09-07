@@ -23,6 +23,7 @@
  * was read out of the executable.
  */
 import type { GameDir } from '../loader/gamedir.ts';
+import { selectIndexOf } from '../formats/save-file.ts';
 
 /**
  * The 22 track names, in the order of the table at 0x4eccd8. Indices 0..14 are
@@ -52,9 +53,19 @@ export const MUSIC = {
   levelComplete: 21,
 } as const;
 
-/** Which track a level plays. Levels are 1..15; anything else has none. */
+/**
+ * Which track a level plays. Levels are 1..15; anything else has none.
+ *
+ * The engine indexes the table by `DAT_0052ad8a`, which is the LEVEL-SELECT
+ * index rather than the internal level number (decoded 2026-09-07 with the
+ * save file, docs/FORMATS.md). The two only differ for the first two
+ * worlds' bosses, whose internal numbers are swapped in the select order:
+ * internal level 6 is the third level offered and plays `buzvred`, and
+ * internal level 3 is the sixth and plays `slime`.
+ */
 export function trackForLevel(level: number): number | null {
-  return level >= 1 && level <= 15 ? level - 1 : null;
+  const index = selectIndexOf(level);
+  return index >= 0 ? index : null;
 }
 
 /**

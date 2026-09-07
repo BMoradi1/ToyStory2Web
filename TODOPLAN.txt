@@ -202,6 +202,15 @@
           view, narrowing the frustum to each outline, instead of taking a
           fixed one-step neighbourhood. Needs the portal corners projected
           per frame; level.zones already carries them.
+ [READY]  THE SAVE FILE - wiring. The format is DECODED and parsed
+          2026-09-07 (docs/FORMATS.md "The save file",
+          src/formats/save-file.ts, tools/save-file.ts on all three files
+          in the install). Opus: read Toy200.sav through GameDir at start
+          into lives, health, the two sliders, the camera flag and the
+          per-level tokens (by internal level) and completed flags (by
+          select index); write it back on a token, a boss, and from the
+          pause menu's options. Writing means a file the user owns:
+          offer a download or the File System Access API, never a server.
  [DONE]   Z-FIGHTING between the two detail levels. Decoded and fixed
           2026-09-07: GeometryGroup.list, and per-material clip planes in
           the viewer at the engine's own limits (row 1 of the detail table

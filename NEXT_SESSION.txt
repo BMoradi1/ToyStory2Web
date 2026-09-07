@@ -12,7 +12,10 @@
  (the engine separates them with the clip planes - docs/FORMATS.md), and
  the race car stands still because the level tick that drives it along
  its path is unported (docs/LEVELS.md). Both are Opus jobs now, specified
- in TODOPLAN.txt. NOTHING IS WAITING ON FABLE.
+ in TODOPLAN.txt, and both were then fixed on Fable at the user's
+ request; the save file was decoded the same day (parser and validator
+ in the repo; wiring it into play is Opus work). NOTHING IS WAITING ON
+ FABLE.
 ================================================================================
 
  Read TODOPLAN.txt for WHAT to do. This file is about WHO should do it and what

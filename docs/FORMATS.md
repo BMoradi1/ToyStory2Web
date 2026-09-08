@@ -1116,3 +1116,60 @@ change and leaving play write back. The "save file" button downloads a
 the completed bytes, the power-up bits, and the two unread words. Whether
 a token already held reappears in its level is not established, so the
 level's tokens are placed as its data says regardless of the record.
+
+### level.dat, from the loader — DECODED 2026-09-07
+
+The section layout above was recovered by heuristics; this is the walk the
+engine itself does (`FUN_0043e6e0`, called from `FUN_00452fc0` once the
+file is in memory at `DAT_0054de98`), and `tools/dat-walk-validate.ts`
+runs it over every scene in the install.
+
+    u32 n                        how many tagged records follow
+    n x { i16 count; i16 tag; payload }
+        tag 0x3f     count x (i32 x, y, z, kind)          the markers
+        tag 0..0x3e  count x (i32 x, y, z)                a path, filed in slot `tag`
+        tag 0x40     count x (i32 x, y, z)                a box, filed apart (none shipped)
+        tag > 0x40   count x (i32 x, y, z); i32 from; i32 to   a portal quad, filed in
+                     the slots after the paths (0x41 up) and its corners shifted >> 2
+                     in place; (from, to) pairs go into the per-zone adjacency table
+        tag < 0      count x 3 i16 plus a 4-dword header  (none shipped)
+    u32 m; m x 0x80 bytes        a block table the loader steps over (m is 0 in every file)
+    objects, 20 bytes each, until the byte at +0xe is 0     list 0, the near detail
+    u32 c; (c + 1) dwords        an index list
+    objects, 20 bytes each, until the byte at +0xe is 0     list 1, the far detail
+    the mesh pool, reached only through each object's pointer
+
+An object is `i32 x, y, z; i16 at +0xc (made positive on load); u8 flags at
++0xe, 0 ending the list; u8; u32 mesh`, the last a file offset to the mesh
+header, whose +0xc holds the three rotation angles, whose +0x14/+0x18 (or
++0x1c/+0x20 when flag 8 is set) are further offsets the loader relocates,
+and whose +0x12/+0x14/+0x16 under flag 8 are per-axis scales the loader
+folds into the rotation matrix. Flag 0x80 is rewritten to 0x40. Records are
+always 20 bytes: the "20, 24 or 32" the heuristic tiler allows for were
+never the object records.
+
+So the file has no header at all beyond the record count. The old reading
+— markers at +4 — held because the marker record is the first record in
+every scene that has one, so its count sat at +4; a scene with no markers
+puts a path there instead, which is what `level02/level1` (two paths) and
+`level05/level1` do, and the four 1998 `level1.dat` files in level07-10
+are one record of 62 markers and 146 objects. The last dword of the file is
+a trailer offset, -1 in every shipped file.
+
+Checked over all 20 scenes: every walk lands, every mesh pointer points
+into the pool, and the object count equals the heuristic parser's on the
+15 scenes it reads except `level10/level`, where the walk finds 529 to its
+530 — one to look at when the parser is moved onto this walk. It also
+reads `level02/level1`, which the parser cannot, to the 65 objects its
+`.ngn` scene carries: that scene is INTERNAL LEVEL 12.
+
+**Which file a level loads** (`FUN_00452fc0(dir)`, with `FUN_00414720`
+passing the internal level): the directory is `level<NN>` for the level
+number, except that levels over 10 subtract 10 and set bit 8 of the mode
+word `DAT_0055a114`, and that word's bits 8-9 pick the file — 0
+`level.dat`, 1 `level1.dat`, 2 `level2.dat`, 3 `level3.dat`. So levels 1-10
+are `levelNN/level.dat`, 11-15 are `level0N/level1.dat`, exactly the
+mapping `sceneForLevel` had guessed; sets 2 and 3 are the `levelt*` /
+`level1t*` test scenes the build script converts, and directories 0 and
+16 are the front end. The empty `level11`-`level19` directories in the
+install are the build tree's, not the game's.

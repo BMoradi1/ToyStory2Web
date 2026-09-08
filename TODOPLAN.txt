@@ -756,7 +756,16 @@
  level11-19 hold only Pconv configs, so the shipped 15 live in level01-10
  plus the level1.* second file sets.
 
- [OPEN]    Map the 20 directories + two file sets per directory to levels.
+ [DONE]    Map the 20 directories + two file sets per directory to levels:
+           answered from FUN_00452fc0 2026-09-07 (docs/FORMATS.md
+           "Which file a level loads") - sceneForLevel had it right.
+ [READY]   Move parseDat onto the loader's own walk (docs/FORMATS.md
+           "level.dat, from the loader", tools/dat-walk-validate.ts):
+           a record count, tagged records, a block table, two lists of
+           20-byte objects. Drops every heuristic in dat.ts, reads
+           level02/level1 - which is INTERNAL LEVEL 12 and today fails
+           and silently shows level 1 instead - and settles the one
+           object level10/level disagrees by.
  [BLOCKED] Per-level logic ports, one at a time, boss levels last.
  [OPEN]    Stale artefacts to skip: level07-10's level1.dat and TERR1.ALL are
            one byte-identical 1998 file each.

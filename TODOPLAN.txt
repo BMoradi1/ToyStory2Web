@@ -697,8 +697,10 @@
                 the theme, and the save's token bit. Note the plan's old
                 "level 3" was the third level PLAYED, which the select
                 order makes internal level 6 - that is the one done.
-                Left: internal levels 3, 9, 12 and 15, each its own
-                fight; and the camera cuts, which every boss uses.
+                The camera cuts every boss uses are ported 2026-09-07
+                (docs/CAMERA.md "Cuts", src/sim/camera-cut.ts), and the
+                talk box now eases back through the same blend. Left:
+                internal levels 3, 9, 12 and 15, each its own fight.
  P3.8 [PART]    The talk box: DONE for hint signs 2026-09-05
                 (src/sim/talk.ts). Touching a signpost freezes Buzz, flies
                 the camera along the sign's path with the engine's own

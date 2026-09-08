@@ -191,10 +191,19 @@ function chatter(rand: RandomStream): number {
  * What the boss fight needs from the rest of the world. A superset of the
  * errand levels' needs, kept apart because a boss level uses nothing else.
  */
+/** What a level tick can do with the camera cut. */
+export interface CutHandle {
+  start: (look: { x: number; y: number; z: number }, ticks: number, distance: number) => void;
+  ticks: number;
+  eye: { x: number; y: number; z: number };
+  look: { x: number; y: number; z: number };
+}
+
 interface BossWorld {
   x: number; y: number; z: number;
   rand: RandomStream;
   cameraYaw?: number;
+  cut?: CutHandle;
   /** Raise a sound event, at a place or flat. */
   sound?: (event: number, at: { x: number; y: number; z: number } | null) => void;
   /** Raise a sequence rather than an event. */
@@ -239,14 +248,17 @@ function stepBossFight(
       tasks.bossClock = fight.clock - 1;
       if (boss.health < fight.deathAt) {
         tasks.bossHurt = fight.deathStun;
-        tasks.bossCut = fight.deathStun;
+        // The death is watched from right over the boss, sinking with it.
+        world.cut?.start(boss, fight.deathStun, fight.cutDistance);
+        if (world.cut) world.cut.eye = { x: boss.x, y: boss.y - fight.deathEyeUp, z: boss.z };
         tasks.bossPhase = 3;
         // This is what writes bit 7 of the level's token byte in the save.
         tasks.bossBeaten = true;
       } else {
         tasks.bossHurt = fight.stun;
-        tasks.bossCut = fight.stun;
+        world.cut?.start(boss, fight.stun, fight.cutDistance);
       }
+      tasks.bossCut = world.cut?.ticks ?? tasks.bossCut;
     }
   }
 
@@ -264,12 +276,17 @@ function stepBossFight(
     && boss.z > fight.arena.zMin && boss.z < fight.arena.zMax;
   tasks.bossRamp = Math.max(0, Math.min(0x800, tasks.bossRamp + (inside ? -1 : 1) * dt * 0x80));
 
-  // --- Buzz walking in is what starts it.
+  // --- Buzz walking in is what starts it: a cut to the boss, then the eye
+  //     pulled well back along x and up, ready to pan through the entrance.
   if (world.x < fight.triggerX && tasks.bossPhase === 0) {
     tasks.bossPhase = 1;
-    tasks.bossCut = fight.clock;
     tasks.bossClock = fight.clock;
     tasks.bossSwing = fight.swing;
+    world.cut?.start(boss, fight.clock, fight.cutDistance);
+    if (world.cut) {
+      world.cut.eye = { x: boss.x - fight.entranceEye.back, y: boss.y - fight.entranceEye.up, z: boss.z };
+    }
+    tasks.bossCut = world.cut?.ticks ?? fight.clock;
   }
 
   // --- it notices you turning away from it, and taunts.
@@ -292,12 +309,21 @@ function stepBossFight(
   //     out of a sine sweep, and 30 ticks before the end it is handed to the
   //     creature mover (the script-velocity flag) so the fight can steer it.
   if (tasks.bossPhase === 1) {
-    if (tasks.bossCut < fight.handOver) boss.flags |= CREATURE_FLAGS.scriptVelocity;
-    const sweep = Math.max(0, tasks.bossCut - fight.handOver);
+    const left = world.cut ? world.cut.ticks : Math.max(0, tasks.bossCut - dt);
+    if (left < fight.handOver) boss.flags |= CREATURE_FLAGS.scriptVelocity;
+    const sweep = Math.max(0, left - fight.handOver);
     boss.hover = ((cos(sweep * 0x14) >> 3) - 0x800) & 0xfff;
     boss.x -= dt * fight.flyIn;
-    tasks.bossCut = Math.max(0, tasks.bossCut - dt);
-    if (tasks.bossCut === 0) tasks.bossPhase = 2;
+    // The cut pans: the look follows the boss in, the eye rises through the
+    // whole entrance, tracks along x for its first part and along z after.
+    if (world.cut) {
+      world.cut.look.x = boss.x;
+      world.cut.eye.y += dt * fight.entrancePan.rise;
+      if (left < fight.entrancePan.turnAt) world.cut.eye.x -= dt * fight.entrancePan.alongX;
+      else world.cut.eye.z -= dt * fight.entrancePan.alongZ;
+    }
+    tasks.bossCut = left;
+    if (left === 0) tasks.bossPhase = 2;
   }
 
   // --- the fight.
@@ -356,7 +382,8 @@ function stepBossFight(
   if (tasks.bossPhase === 3) {
     boss.targetY -= dt * 0x280;
     boss.y -= dt * 0x280;
-    tasks.bossCut = Math.max(0, tasks.bossCut - dt);
+    if (world.cut) world.cut.eye.y -= dt * fight.deathPanUp;
+    tasks.bossCut = world.cut ? world.cut.ticks : Math.max(0, tasks.bossCut - dt);
     if (tasks.bossCut === 0) {
       tasks.levelWon = true;
       tasks.bossPhase = 4;
@@ -459,6 +486,11 @@ export function stepTasks(
     effect?: (x: number, y: number, z: number, kind: number, mode: number, spin?: number) => void;
     /** The ground under a point, game units, or null where there is none. */
     groundAt?: (x: number, z: number, y: number) => number | null;
+    /**
+     * The camera cut (src/sim/camera-cut.ts): start one, read how long is
+     * left, and move its eye and look while it runs, as the boss ticks do.
+     */
+    cut?: CutHandle;
   },
   dt = 1,
 ): DialogueRequest | null {

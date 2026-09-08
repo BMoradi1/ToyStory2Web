@@ -856,11 +856,15 @@ set on every level of a played file and could not account for. The health
 bar is `(health - 10) * 0x36 / 10`, its own formula and not the tin
 robot's.
 
-**Not ported.** The camera cuts (`FUN_004020f0`), which in the original
-frame the entrance and the death; the port keeps their countdown, because
-the phases hang off it and the fight would otherwise lose its timing, but
-the camera does not move. The hurt flicker, which scales the model through
-two fields the port does not carry, and the roll it takes while dying
+**The camera cuts** are ported too (docs/CAMERA.md "Cuts"): the fight
+opens with a 300-tick cut whose eye starts 0x48000 back along x and
+0x8000 up from the boss and pans up through the entrance, along x for its
+first 180 ticks and along z after, looking at the boss as it flies in;
+every hit is a 120-tick cut to the boss; and the death is a 300-tick cut
+from right over it, rising as it sinks.
+
+**Not ported.** The hurt flicker, which scales the model through two
+fields the port does not carry, and the roll it takes while dying
 (+0x0c). Sequences, so the shout is silent.
 
 **Walked end to end on level 6.** Buzz crossing the trigger starts the

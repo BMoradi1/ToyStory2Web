@@ -29,6 +29,7 @@ import { cos as cosOf, sin as sinOf, toRadians, yawOf } from './sim/trig.ts';
 import { createCamera, stepCamera, cameraTarget, type CameraState } from './sim/camera.ts';
 import { createZones, resetZones, stepZones, type ZoneState, detailRowFor } from './sim/zones.ts';
 import { basisFromCamera, walkPortals, type Rect } from './sim/portal-walk.ts';
+import { createCut, releaseToFollow, startCut, stepCutCamera, stepCutClock, type CutState } from './sim/camera-cut.ts';
 import {
   MENU, MENU_TEXT, MenuPage, createMenu, highlight, menuRows, openMenu, openTokenScreen, stepMenu,
   type MenuInput, type MenuState,
@@ -743,6 +744,11 @@ async function open(dir: GameDir): Promise<void> {
         if (!on) viewer?.setVisibleZones(null);
         return zoneCulling;
       },
+      /** The camera cut: ticks left, its eye, and what the renderer was given. */
+      get cut() {
+        return { ticks: cut.ticks, noControl: cut.noControl, blend: cut.blend, zoneBlend: cut.zoneBlend,
+          eye: cut.eye, look: cut.look, out: cut.out };
+      },
       /** The level's doorways, as from/to pairs. */
       zoneGraph() {
         return currentLevel ? currentLevel.level.zones.map((z) => [z.from, z.to]) : null;
@@ -1151,6 +1157,7 @@ async function spawnPlayer(): Promise<void> {
 
   // He has been put somewhere rather than having walked there.
   resetZones(zones);
+  Object.assign(cut, createCut());
   tasks = createTasks();
   startLevelTasks(tasks, level, progress?.p.powerUps ?? 0);
   startBossFight(level);
@@ -1961,6 +1968,19 @@ let walkKey = '';
  * for good waits on the object-to-room matching (docs/FORMATS.md).
  */
 let zoneCulling = false;
+/** The camera cut and the scripted camera it drives (docs/CAMERA.md "Cuts"). */
+const cut: CutState = createCut();
+/** What a level tick may do with the cut; the objects are the live ones. */
+const cutHandle = {
+  start(look: { x: number; y: number; z: number }, ticks: number, distance: number) {
+    if (player) startCut(cut, look, ticks, distance, player);
+  },
+  get ticks() { return cut.ticks; },
+  get eye() { return cut.eye; },
+  set eye(v: { x: number; y: number; z: number }) { cut.eye = v; },
+  get look() { return cut.look; },
+  set look(v: { x: number; y: number; z: number }) { cut.look = v; },
+};
 /** The pause menu (docs/HUD.md, src/sim/menu.ts). */
 const menu: MenuState = createMenu();
 /**
@@ -2180,6 +2200,10 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   const cameraYaw = bearing ?? (camera ? yawOf(player.x - camera.x, player.z - camera.z) : 0);
   let held = override ? { ...input.read(), ...override } : input.read();
   if (player.dying) held = { ...held, moveX: 0, moveY: 0, jump: false, spin: false, fire: false };
+  // The script tick feeds a running cut before anything moves, and a cut is
+  // the engine's "no player control" bit as much as a talk is.
+  stepCutClock(cut);
+  if (cut.noControl) held = { ...held, moveX: 0, moveY: 0, jump: false, spin: false, fire: false };
 
   // A talk freezes Buzz and takes the camera: the engine sets its "no player
   // control" bit and drives the camera from the talk script rather than the
@@ -2222,11 +2246,20 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       player.x * GAME_TO_RENDER, -player.y * GAME_TO_RENDER, -player.z * GAME_TO_RENDER,
       Math.PI - toRadians(player.yaw),
     );
-    viewer.placeCamera(
-      talk.eye.x * GAME_TO_RENDER, -talk.eye.y * GAME_TO_RENDER, -talk.eye.z * GAME_TO_RENDER,
-      talk.look.x * GAME_TO_RENDER, -talk.look.y * GAME_TO_RENDER, -talk.look.z * GAME_TO_RENDER,
-    );
+    {
+      // The follow camera is not stepped under a box here (the engine does,
+      // so it has somewhere fresh to blend back to; ours blends back to
+      // where it was left, which is close by).
+      const followLook = camera ? cameraTarget(player, camera) : talk.look;
+      const shown = stepCutCamera(cut, { eye: camera ?? talk.eye, look: followLook }, { eye: talk.eye, look: talk.look });
+      viewer.placeCamera(
+        shown.eye.x * GAME_TO_RENDER, -shown.eye.y * GAME_TO_RENDER, -shown.eye.z * GAME_TO_RENDER,
+        shown.look.x * GAME_TO_RENDER, -shown.look.y * GAME_TO_RENDER, -shown.look.z * GAME_TO_RENDER,
+      );
+    }
     if (talk.finished) {
+      // The box has shut: the camera eases back over 64 ticks.
+      releaseToFollow(cut);
       // A dialogue's last argument is the slot it earns: mark it done and
       // put its token in the world (`FUN_004a0db0`).
       if (talkSlot >= 0 && tasks && pickups) {
@@ -2279,7 +2312,9 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     // engine runs them in: the render pass sets both from the camera, and
     // the level ticks read them afterwards.
     if (currentCollision && currentLevel) {
-      stepZones(zones, currentCollision, currentLevel.level.zones, camera, player, { level: levelNow });
+      stepZones(zones, currentCollision, currentLevel.level.zones, camera, player, {
+        level: levelNow, blending: cut.zoneBlend > 0,
+      });
     }
     // The far detail row where the level's render pass asks for it.
     if (detailOption !== null) {
@@ -2289,7 +2324,10 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     // Which rooms are on screen (docs/LEVELS.md "The portal walk"). The
     // engine runs this in the render pass right after the zones, from the
     // camera's zone outward, and only draws what comes back.
-    const look = cameraTarget(player, camera);
+    const followLook = cameraTarget(player, camera);
+    // A running cut, or the ease back after one, is what the renderer sees.
+    const shown = stepCutCamera(cut, { eye: camera, look: followLook }, null);
+    const look = shown.look;
     if (currentLevel && zoneCulling && zones.camera < 0 && walkKey !== 'all') {
       // Over no floor at all: the engine has no room to start from, so draw
       // the level whole rather than guess.
@@ -2299,7 +2337,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     } else if (currentLevel && zones.camera >= 0 && zoneCulling) {
       const seen = walkPortals(
         currentLevel.level.zones, zones.camera,
-        basisFromCamera(camera, look),
+        basisFromCamera(shown.eye, look),
         { backdropZone: BACKDROP_ZONE[levelNow] ?? null, alsoFrom: zones.floor },
       );
       walkRects = seen;
@@ -2310,7 +2348,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       }
     }
     viewer.placeCamera(
-      camera.x * GAME_TO_RENDER, -camera.y * GAME_TO_RENDER, -camera.z * GAME_TO_RENDER,
+      shown.eye.x * GAME_TO_RENDER, -shown.eye.y * GAME_TO_RENDER, -shown.eye.z * GAME_TO_RENDER,
       look.x * GAME_TO_RENDER, -look.y * GAME_TO_RENDER, -look.z * GAME_TO_RENDER,
     );
   }
@@ -2366,6 +2404,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
           onGround: player.onGround,
           pathPoints: (tag) => currentLevel?.level.paths.find((p) => p.id === tag)?.points ?? null,
           cameraYaw: camera?.yaw ?? 0,
+          cut: cutHandle,
           sound: (event: number, at: { x: number; y: number; z: number } | null) =>
             playEvent(event, at ?? undefined),
           // The boss throws dust off its feet; the effect pool does the rest.

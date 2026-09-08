@@ -22,7 +22,11 @@
  ported (src/sim/portal-walk.ts) but is not drawing yet: it is blocked on
  the object-to-room matching, measured by tools/zone-assign-validate.ts at
  94.3% right on level 1 and 71.9% on level 2. That matching is the single
- most valuable thing left for the renderer - fixing it turns the walk on. NOTHING IS WAITING ON
+ most valuable thing left for the renderer - fixing it turns the walk on.
+ Later the same day: level 6's boss fight (the first world boss; the plan's
+ "level 3" meant the third level PLAYED) and the camera cuts, which the boss
+ fights and the talk box share (docs/CAMERA.md "Cuts"). Bosses 3, 9, 12
+ and 15 are each their own fight and are the obvious next Fable decode. NOTHING IS WAITING ON
  FABLE.
 ================================================================================
 

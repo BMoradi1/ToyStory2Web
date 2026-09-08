@@ -180,3 +180,58 @@ Measured after the port, walking, strafing, turning and jumping around
 level 1 for 480 ticks: the camera's worst single-tick move is **81 level
 units** and no tick exceeds 100. Before the position lag it was 310, and
 before the distance fix in the previous session it was 1,224.
+
+## Cuts
+
+Decoded and ported 2026-09-07 (`src/sim/camera-cut.ts`). The scripted
+camera the boss fights and the talk box share, in three pieces:
+
+**Starting one.** `FUN_004020f0(look, ticks, distance)` cuts to a thing:
+it sets the "no player control" bit (`DAT_0052b816 & 1`, the same one a
+talk box sets), camera flag bit 4, the cut's look point to the thing
+(`DAT_0050a500..08`) and its eye (`DAT_0050a520..28`) on the line from
+Buzz to it, `distance` sixteenths of a sine unit short of it at its
+height — every boss passes 0x10, which is 0x4000 game units — and the
+countdown `DAT_0050a1f4` to `ticks`. `FUN_00402290(ticks)` is the variant
+that cuts to Buzz himself, 0x3000 above his feet from 0x4000 short of him
+along the line from the camera's last position. Both then copy eye and
+look into the scripted camera record at 0x52b7e8 (`FUN_00402030`) with
+no ease, and set the blend counter `DAT_0050a140` to 64. A level tick may
+go on moving the cut's eye and look every tick it runs, and level 6 does,
+panning up and along through its boss's entrance.
+
+**Feeding it.** The script tick (`FUN_00402a10`, run before the player
+moves) copies the cut's look and eye into the record each tick and counts
+`DAT_0050a1f4` down; at zero it clears the no-control bit and flag 4 and
+sets the blend counter to 64 again. The record itself (`FUN_00403640`)
+eases its eye an eighth of the way toward the cut's eye each tick, and its
+yaw and pitch a quarter of the way toward the direction from that eye to
+the look point. The talk box's own end (the other exit of the same
+function) sets the blend counter to 64 too, but a talk starts with a hard
+cut: nothing sets the counter on its way in.
+
+**Blending.** The tail of the camera update (`FUN_00405860`) picks a
+source — the follow camera when control is on, the record when it is not
+— and the rendered camera (`DAT_0052adc0` and its angles) is that source
+outright when the counter is under 1, else `source + (rendered - source)
+* counter / 64`, the counter falling one a tick. The follow camera is
+stepped either way, so it is always somewhere sensible to come back to. A
+second counter, `DAT_0050a148`, climbs to 0x18 while control is off and
+decays after; the zone code reads it to let the camera's room lead
+Buzz's.
+
+**In the port.** The one approximation is that the engine eases two
+angles and the renderer takes a look-at point, so the record's look point
+is eased at the angle's quarter-a-tick rate instead. The follow camera is
+not stepped under a talk box, so a box blends back to where it left the
+camera rather than where it would have drifted to; a cut does step it.
+The special camera modes `FUN_004020f0` cancels on the way in
+(`DAT_0050a13c`, rails and fixed views) do not exist in the port.
+
+Walked on level 6: Buzz crossing the trigger sets a 300-tick cut, the
+rendered eye leaves the follow camera over the first 64 ticks as the
+counter runs 64 to 0, pans about 100 to 170 level units a sample through
+the entrance with Buzz held still, and when the countdown ends the
+counter restarts at 64 and the eye eases back to the follow camera. On
+level 1 a hint sign's box, once shut, sets the counter and the eye eases
+back the same way instead of snapping.

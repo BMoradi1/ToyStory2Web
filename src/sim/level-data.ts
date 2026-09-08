@@ -304,6 +304,15 @@ export interface BossFight {
   deathStun: number;
   /** With this much of the entrance left, the mover takes the boss over. */
   handOver: number;
+  /** Every cut here is `FUN_004020f0(boss, ticks, this)`. */
+  cutDistance: number;
+  /** The entrance's eye starts this far back along x and up from the boss... */
+  entranceEye: { back: number; up: number };
+  /** ...and pans: rising every tick, along x until this many ticks are left, then along z. */
+  entrancePan: { rise: number; turnAt: number; alongX: number; alongZ: number };
+  /** The death's eye starts this far above the boss and rises this much a tick. */
+  deathEyeUp: number;
+  deathPanUp: number;
   /** How far along x it flies in per tick during the entrance. */
   flyIn: number;
   /** Health below this is the last hit. */
@@ -651,6 +660,10 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
       chaseY: -0x10b13, chargeY: 0x4000,
       stun: 0x78, deathStun: 300,
       handOver: 0x1e, flyIn: 0x800,
+      cutDistance: 0x10,
+      entranceEye: { back: 0x48000, up: 0x8000 },
+      entrancePan: { rise: -0x130, turnAt: 0xb4, alongX: 0x200, alongZ: 0x80 },
+      deathEyeUp: 0x5000, deathPanUp: 0x80,
       deathAt: 11,
       bar: { from: 10, over: 10 },
       noticeRange: 400, tauntGap: 100, shoutGap: 400,

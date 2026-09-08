@@ -777,12 +777,24 @@ neighbour. Level 2, whose raw disagreement looks worst at 71.9%, has zero
 objects in that column once the always-drawn room 0 and the
 joined-by-a-doorway boundary cases are separated out.
 
-So the rooms and the zone floors are two partitions that do not line up at
-the edges, and the walk feels that. What has NOT been ruled out is a fault
-in the walk itself, or the port's field of view, or the follow camera
-reaching places the original's would not. The measurement to make next is
-which objects account for the differing pixels and which room each is
-labelled, rather than any more counting of labels against floors.
+The rooms and the zone floors are simply two different partitions: a
+room's geometry runs out to its walls while its floor slab only has to
+cover where the camera and Buzz can stand, and on level 1 five rooms'
+geometry reaches 1,800 to 4,300 level units beyond their slab.
+
+**Where the losses do come from.** Drawing every room the doorway graph
+connects, with no rectangle narrowing at all, is pixel for pixel
+identical at 24 of 24 placements on level 2 and 21 of 24 on level 1 — and
+the three that differ there are the case the paragraph below describes,
+the camera's room and Buzz's disagreeing, which the walk itself handles
+and a bare graph walk does not. So connectivity covers everything that is
+on screen, and what the walk loses it loses in the NARROWING: a doorway
+rejected as facing away, or as missing the rectangle it was given, or
+with every corner behind the eye. Averaged over a frame that is 700
+pixels on level 1 and 2,160 on level 2, under a quarter of one per cent.
+The likeliest cause is that the narrowing was tuned against the original's
+camera and field of view, and the port has neither exactly; the two
+quirks above make the walk sensitive to both.
 
 One more thing the walk needs that the engine does not. The engine seeds
 Buzz's room and the camera's from the same lookup, so the room he stands

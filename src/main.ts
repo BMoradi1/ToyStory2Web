@@ -740,6 +740,10 @@ async function open(dir: GameDir): Promise<void> {
         if (!on) viewer?.setVisibleZones(null);
         return zoneCulling;
       },
+      /** The level's doorways, as from/to pairs. */
+      zoneGraph() {
+        return currentLevel ? currentLevel.level.zones.map((z) => [z.from, z.to]) : null;
+      },
       /** Re-run the walk from where the camera is now, reporting every doorway. */
       walkTrace() {
         if (!currentLevel || !camera || !player) return null;

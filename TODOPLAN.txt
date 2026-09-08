@@ -202,19 +202,20 @@
           tools/portal-walk-validate.ts over all 9 scenes with doorways:
           204 doorways all fire the crossing test once, 2,584 camera
           placements all kept to the doorway graph).
- [READY]  Turn the portal walk on for drawing. With culling on, 17 of 24
-          camera placements on level 1, 14 of 24 on level 2 and 21 of 24
-          on level 13 are pixel for pixel identical to drawing every
-          room; the rest lose from a few dozen pixels to 2.8% of the
-          frame. The object-to-room labels were the first suspect and are
-          NOT the cause - see docs/LEVELS.md "The portal walk", and
-          tools/zone-assign-validate.ts, which shows the labels at every
-          problem object on level 1 are unambiguous in the .ngn. Next
-          measurement: at a camera that differs, find WHICH objects the
-          differing pixels belong to and what room each is labelled.
-          Suspects left: a fault in the walk, the port's 60-degree
-          vertical field of view against the engine's 74, and the follow
-          camera reaching places the original's would not.
+ [READY]  Turn the portal walk on for drawing. It costs, on average over
+          a frame, 700 pixels of 876,000 on level 1 and 2,160 on level 2
+          against drawing every room, and draws 3.6 rooms of 10 and 2.8
+          of 5 instead. Two suspects are ruled out (docs/LEVELS.md "The
+          portal walk"): the object-to-room labels, which are the .ngn's
+          own and unambiguous at every problem object, and connectivity,
+          since drawing every room the doorways connect is identical at
+          24 of 24 placements on level 2. What is left is the NARROWING
+          itself, tuned in the original against a camera and a field of
+          view the port does not have exactly - the port renders 60
+          degrees vertical where the engine's projection implies 74. So
+          the honest next step is the parity harness (P1.6): put the same
+          camera in the real game and settle the field of view first.
+          ts2.zoneCulling(true) turns the walk on meanwhile.
  [DONE]   THE SAVE FILE. Format decoded and parsed 2026-09-07
           (docs/FORMATS.md "The save file", src/formats/save-file.ts,
           tools/save-file.ts), and wired the same day: the record lives

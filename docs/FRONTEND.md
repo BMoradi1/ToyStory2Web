@@ -1,4 +1,4 @@
-# The front end — DECODED and PORTED 2026-09-07
+# The front end — DECODED and PORTED 2026-09-07/08
 
 Where the title, the menus and the level select live in `toy2.exe`, how
 the game flow runs them, what each draws, and what the port shows. The
@@ -153,10 +153,23 @@ ticks, takes the row: the first four fade out and return `row + 2`, and
 
 ## The level select, `FUN_00438a50` (3,598 bytes)
 
-`FUN_00453cf0` loads directory 16 (`FUN_00452fc0(0x10)`), sets the width
-to 512, the tick step `DAT_0052f2d4` to 2, the backdrop flag off and the
+`FUN_00453cf0` loads "level 16" (`FUN_00452fc0(0x10)`), sets the width to
+512, the tick step `DAT_0052f2d4` to 2, the backdrop flag off and the
 ambient to 0x8c, and runs it; on return the cursor `DAT_0052ad8a` is the
 position picked less one and `DAT_0055a0e4` the camera's node.
+
+**"Level 16" is `data/level06/level1`** (found 2026-09-08 after a wrong
+note here that the install lacked it): `FUN_00452fc0` takes ten off any
+level number above ten, sets bit 8 of `DAT_0055a114` — the directory's
+`level1` scene — and, with no texture set asked for, set 1. So the file
+names are `level06\level1.dat`, `level06\level1.raw` and
+`level06\level1t1.ngn`, which is just what `data/level16/levelt1.cfg`
+says it was built from (`INPUT_FILE ..\level06\level1.dat`). The same
+scene serves the load-game screen with set 3 (`FUN_00453f20`, 0xf8) and
+the movie viewer with set 2 (`FUN_00453fa0`, 0xb8). Its `.dat` opens with
+paths 1, 2, 3, 4, 6, 7, 8 and 9 and no markers, which the port's old
+shape-scan read as one 504-point path; it walks the records by tag now
+(docs/FORMATS.md).
 
 **What is open** (`FUN_0049eb50`): walk the select order counting levels
 whose token byte is non-zero, stopping at the first zero, and count the
@@ -198,21 +211,46 @@ length of `jump to select` for both, which is -293: **the PC build draws
 them off the left of the screen and never shows them.** The names are
 fifteen pointers at `0x4f6be4`, by position.
 
-**The diorama.** Everything else the routine does is 3D: the first hundred
-scene objects shown and 100..0x16e hidden (`FUN_004ccb20`), per open level
-a pair of -1-terminated object lists at `0x4f6dc8` hidden and shown, a
-camera riding two paths from the picked level's node toward the next with
-a wobble off the sine table, objects 0x57..0x63 animated through
-`FUN_00438910`, and a sound event per level (`position + 6`) at its node.
-**This install has no level 16 data**: `data/level16` holds only the build
-configs, which name what it was — `etch_lh.bmp` and `etch_rh.bmp` on slots
-32, 33 and 14, an Etch A Sketch — and level 16's sprite table says the
-rest: the token spinner on its slot 0, the "tokens" sign on its slot 4,
-and on slot 17 the arrows and digits, which turn out to be the SAME sheet
-as `level00/level.ngn`'s slot 17 (checked frame by frame against the
-headers). Whether the retail CD carries `level16/level.ngn` and `.dat` is
-not established; without them the PC game would have nothing to load here
-either.
+**The diorama** (src/front/diorama.ts, PORTED 2026-09-08): a model
+neighbourhood with each level's setting along it, the paths of the scene
+reached by tag.
+
+- *Objects.* Ids 0..99 are shown and 100..0x16e hidden (`FUN_004ccb20` at
+  scale 0x1000 or 0), then for every open position a pair of
+  -1-terminated i16 lists at `0x4f6dc8` (the hide pointer four bytes
+  before, the show pointer at it, eight bytes a level) hides that level's
+  closed dressing and shows its open one — with fifteen open, 80 of the
+  scene's 167 objects are hidden. Ids are the loader's object-id space,
+  not list indices.
+- *Vehicles.* Ids 0x57..0x58 ride path 7, 0x59..0x5f path 8 and
+  0x60..0x63 path 9 (`FUN_00438910`), from the phases `0x3200, 0x6400,
+  0x9000, 0x5d00, 0x4d00, 0x4400, 0x2c00, 0x1000, 0xa00, 0x8b00, 0x6e00,
+  0x3800, 0x1000` in 256ths of a node, 0x40 a tick, wrapping when the
+  node passes `count - 5`; each sits at the lerp between two nodes and
+  turns a quarter of the remaining angle toward its heading a tick.
+- *Camera.* Path 2 holds three nodes per position and path 1 the three
+  points they look at; `DAT_0055a0e4` is the node the last visit left.
+  Each tick the target is the node (plus `push / 1024` of the eased look
+  direction) less the camera; once within 0x2000 of it the camera settles
+  — picking one of the three at random from `rand.dat` every 256 ticks,
+  wobbling on `sin(t * 0x13) >> 5, sin(t * 0x17) >> 4, sin(t * 0x1d) >>
+  5`, its velocity a sixteenth of the offset — else the offset is
+  normalised to 0x1000 and the velocity eased toward half of it (`>> 5`
+  on x and z, `>> 4` on y). `FUN_00438790` then pushes the velocity out of
+  any box of path 3 (pairs of points: a centre and a corner; inside when
+  between the two heights and within the corner's radius, by up to 0x180
+  a tick). `push` climbs 0x60 a tick to 14000 while settled and falls
+  0x100 otherwise. `FUN_00438650` turns the yaw toward the node's look
+  direction and the pitch toward an atan2 of its SQUARED rise over its
+  squared reach, an eighth of the gap a tick capped at `0x2000 /
+  (distance / 128 + 0x100)`; the eye the renderer gets eases halfway to
+  the camera each tick.
+- *Sound.* A 3D event `position + 6` every tick at the level's look
+  point (`FUN_004a3b90`) — not ported.
+
+The level select's sprite table (level 16's) names its art on this
+bundle: the token spinner on slot 0, the "tokens" sign on 4, the arrows
+and digits on 17 (the same sheet as `level00`'s 17) and the font on 31.
 
 ## The summary, `FUN_004398b0` (decoded, not ported)
 
@@ -245,19 +283,26 @@ out. 0x168 ticks in all.
   and Buzz) and the select again when the pause menu's "exit level" or
   the boss movie ends it. `HudPainter.paintFront` draws a frame with the
   HUD's own blitter over the picture.
-- What the install does not carry is skipped rather than stood in for:
-  the select runs on black with its name, its arrows and digits (slot 17)
-  and its text, and without the token spinner and the sign (level 16's
-  slots 0 and 4). Options, load game and the movie viewer close at once.
-  The attract demo replays the boot chain. `exit` closes the front end.
+- `diorama.ts` — the select's scene: `main.ts` loads `level06/level1`
+  with the `t1` textures into the viewer, every used object kept
+  separate, and the runner lays the sprite layer over the viewer's own
+  picture (the page's chrome steps aside); the objects are shown, hidden
+  and moved by id and the camera placed each tick. Options, load game and
+  the movie viewer close at once. The attract demo replays the boot
+  chain. `exit` closes the front end.
 - Checked headlessly with `tools/browser-shot.ts`: title -> menu -> select
-  -> level 2 -> pause menu "exit level" -> select, with the cursor, the
-  repeat and the flash's timing under `tools/front-validate.ts`.
+  -> level 2 -> pause menu "exit level" -> select, the diorama drawn with
+  its 80 hidden objects, the token, the arrows and the name over it; the
+  cursor, the repeat and the flash's timing under
+  `tools/front-validate.ts`.
 
 ## What is left
 
 1. **The summary screen** (above): `levelt1.ngn` has every sheet it
    needs; it goes between a level and the select on the way back.
 2. **Game over, options, load game, the movie viewer, the credits** —
-   options and load are unread; game over and the credits are small.
-3. **The diorama** — needs level 16's scene, which the install lacks.
+   options and load are unread; game over and the credits are small. Load
+   game and the movie viewer run over this same scene with texture sets 3
+   and 2.
+3. **The diorama's ambience** — the per-level sound event, and a check of
+   the camera's flight against the real game once the parity harness runs.

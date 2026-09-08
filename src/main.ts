@@ -45,6 +45,7 @@ import { BOOT_MOVIES, MOVIES, MOVIE_FLAG, playCutscene } from './video/cutscene.
 import { PICTURE, loadFrontArt, pictureFor, showCard, type TitleCards } from './front/title.ts';
 import { FrontEnd } from './front/run.ts';
 import { PAD, readFrontStrings } from './front/screens.ts';
+import { readDioramaLists, type DioramaLists } from './front/diorama.ts';
 import { LEVEL_SELECT_ORDER, selectIndexOf, tokenCount } from './formats/save-file.ts';
 import { MUSIC, MUSIC_SLIDER_MAX, MUSIC_TRACKS, MUSIC_VOLUME_CURVE, MusicPlayer, trackForLevel } from './audio/music.ts';
 import {
@@ -54,6 +55,7 @@ import {
   COIN_DRAW, SPRITE, SPRITE_SHEET, readSpriteTable, type SpriteHeader,
 } from './formats/sprite-table.ts';
 import { HudPainter, type HudReadout, type MenuDraw, type Sheet, type TalkDraw } from './render/hud-draw.ts';
+import type { ObjectTransform } from './render/viewer.ts';
 import { readSoundTable, type SoundTable } from './audio/events.ts';
 import {
   HUD, HudElement, createHud, offsetOf, showHud, startHud, stepCoinSpin, stepHud,
@@ -792,6 +794,10 @@ async function open(dir: GameDir): Promise<void> {
           screen: screen?.kind ?? null,
           state: screen ? { ...screen.state } : null,
           frame: frontEnd?.lastFrame ?? null,
+          diorama: frontEnd?.lastDiorama ?? null,
+          hiddenObjects: dioramaHidden,
+          scene: viewer?.describeScene() ?? null,
+          camNode: selectCamNode,
           inLevel: frontLevelDone !== null,
         };
       },
@@ -2074,6 +2080,14 @@ let frontLevelDone: ((how: 'exit' | 'won') => void) | null = null;
 let frontEnteredWith = 0;
 /** Enter and Escape, which the pad reader does not own, for the front end. */
 const frontKeys = { enter: false, escape: false };
+/** `DAT_0055a0e4`: the level select's camera node between visits. */
+let selectCamNode = 0;
+/** The random table's cursor while the select is up (`DAT_0052adac`). */
+let selectRand = 0;
+/** The diorama scene while it is loaded: its objects by id, for the viewer. */
+let diorama: { level: DatLevel; placedIndex: (id: number) => number } | null = null;
+let dioramaLists: DioramaLists[] = [];
+let dioramaHidden = 0;
 /** A movie is over the page: the game does not tick under it. */
 let cutsceneUp = false;
 /** The most recent movie's handle, for a test to watch it decode. */
@@ -2137,6 +2151,7 @@ async function runFrontEnd(): Promise<void> {
   const strings = readFrontStrings(exeBytes, exeString);
   const menuTable = readSpriteTable(exeBytes, 0);
   const selectTable = readSpriteTable(exeBytes, 16);
+  dioramaLists = readDioramaLists(exeBytes);
   input.attach();
   void sound?.start();
   frontEnd = new FrontEnd({
@@ -2169,9 +2184,110 @@ async function runFrontEnd(): Promise<void> {
     playLevel: playLevelFromFront,
     attract: bootChain,
     quit() { infoEl.textContent = 'front end closed — the dropdown picks a scene'; },
+    loadDiorama: loadDioramaScene,
+    unloadDiorama() {
+      diorama = null;
+      document.body.classList.remove('front-scene');
+      if (viewer) viewer.playMode = false;
+    },
+    dioramaLists: () => dioramaLists,
+    camNode: () => selectCamNode,
+    setCamNode(node) { selectCamNode = node; },
+    rand() {
+      // `DAT_0052adac` walks rand.dat and is pulled back 0x5dc once past it.
+      const table = randomBytes;
+      if (!table || table.length === 0) return 0;
+      const byte = table[selectRand % table.length]!;
+      selectRand++;
+      if (selectRand > 0x5dc) selectRand -= 0x5dc;
+      return byte;
+    },
+    applyDiorama(frame, hidden) {
+      if (!viewer || !diorama) return;
+      const indices = new Set<number>();
+      for (const id of hidden) {
+        const index = diorama.placedIndex(id);
+        if (index >= 0) indices.add(index);
+      }
+      viewer.setHiddenObjects(indices);
+      dioramaHidden = indices.size;
+      const transforms = new Map<number, ObjectTransform>();
+      for (const v of frame.vehicles) {
+        const index = diorama.placedIndex(v.id);
+        const object = diorama.level.objects[index];
+        if (!object) continue;
+        const u = object.unitScale;
+        transforms.set(index, {
+          angles: [0, v.yaw, 0],
+          offset: [
+            (v.position.x - object.position.x * u) / WORLD_SCALE,
+            -(v.position.y - object.position.y * u) / WORLD_SCALE,
+            -(v.position.z - object.position.z * u) / WORLD_SCALE,
+          ],
+        });
+      }
+      viewer.setObjectTransforms(transforms);
+      viewer.placeCamera(
+        frame.eye.x * GAME_TO_RENDER, -frame.eye.y * GAME_TO_RENDER, -frame.eye.z * GAME_TO_RENDER,
+        frame.look.x * GAME_TO_RENDER, -frame.look.y * GAME_TO_RENDER, -frame.look.z * GAME_TO_RENDER,
+      );
+    },
+    selectSheets: () => (diorama ? sceneSheets : null),
+    sceneRect() {
+      if (!viewer) return null;
+      const view = viewer.view.getBoundingClientRect();
+      const rect = viewer.pictureRect;
+      return { x: view.left + rect.x, y: view.top + rect.y, width: rect.width, height: rect.height };
+    },
   }, document.body);
   await frontEnd.run();
   frontEnd = null;
+}
+
+/**
+ * The level select's scene, the engine's "level 16": `level06/level1.dat`
+ * with the `level1t1.ngn` textures (`FUN_00452fc0` takes ten off the level
+ * number and forces texture set 1; docs/FRONTEND.md). Every used object is
+ * kept separate so the select can show, hide and move them by id.
+ */
+async function loadDioramaScene(): Promise<{ paths: DatLevel['paths']; placedOf: (id: number) => { position: { x: number; y: number; z: number }; yaw: number } | null } | null> {
+  if (!viewer) return null;
+  const scene = levels.find((l) => l.id === 'level06/level1');
+  // The texture set is a bundle on its own, not a scene, so it is not in
+  // the scene list; it is read straight from the install.
+  const set = gameFiles?.get('data/level06/level1t1.ngn') ?? null;
+  if (!scene?.dat || !set) return null;
+  setStatus('level select: decoding textures…');
+  const textures = parseNgn(await set.read());
+  const gpuTextures = await loadTextures(textures);
+  sceneTextures = gpuTextures;
+  const level = parseDat(await scene.dat.read());
+  const separate = new Set<number>(level.objectIds.filter((i) => i >= 0));
+  const geometry = buildLevelGeometry(level, { zones: level.objects.map(() => null), separate });
+  const reflectionSlot = textures.find((t) => t.tag === 'tex14')?.slot ?? null;
+  viewer.setLevel(geometry, gpuTextures, reflectionSlot === null ? undefined : gpuTextures.get(reflectionSlot));
+  viewer.setFog(null);
+  viewer.setPlayer(null);
+  viewer.clearCreatureMeshes();
+  viewer.setCreatures([]);
+  viewer.playMode = true;
+  document.body.classList.add('front-scene');
+  const placedIndex = (id: number): number => level.objectIds[id] ?? -1;
+  diorama = { level, placedIndex };
+  currentLevel = null;
+  setStatus('level select');
+  return {
+    paths: level.paths,
+    placedOf(id) {
+      const object = level.objects[placedIndex(id)];
+      if (!object) return null;
+      const u = object.unitScale;
+      return {
+        position: { x: object.position.x * u, y: object.position.y * u, z: object.position.z * u },
+        yaw: object.rotation.y,
+      };
+    },
+  };
 }
 
 /**

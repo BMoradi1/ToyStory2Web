@@ -250,8 +250,6 @@ export interface DatLevel {
 }
 
 const ZONE_SIZE = 64;
-const ZONE_MAGIC = 0x0005;
-const ZONE_TAG = 0x0041;
 const MESH_TERMINATOR = 0xffffffff;
 /** `flags & 0x6f` values the loader's classifier treats as a sprite record. */
 const SPRITE_FLAG_KINDS = new Set([0x02, 0x03, 0x42, 0x43, 0x0a, 0x0b, 0x4a, 0x4b]);
@@ -396,54 +394,53 @@ export function parseDat(buffer: ArrayBuffer | Uint8Array): DatLevel {
   const r = new Reader(bytes);
   if (bytes.length < 8) throw new Error('level.dat: too short');
 
-  const markerCount = r.u16(4);
-
-  // --- markers: pickup points, evenly spread over walkable floor
-  //
-  // The count at +4 is not always the marker count. Three of the game's twenty
-  // scenes (level02/level1, level05/level1, level06/level1) have something
-  // else there, and reading it as markers yields positions scattered outside
-  // the level. They are caught by their `kind`: a real marker always carries
-  // 16, so a scene that produces anything else has been misread and is treated
-  // as having none. That matters beyond tidiness — the viewer picks a spawn
-  // point from this list, and a garbage marker puts Buzz outside the world.
+  // --- the tagged records, read as the loader reads them (`FUN_0043e6e0`):
+  //     `u32 n`, then n records of `u16 count, i16 tag`. Tag 0x3f is the
+  //     markers (16 bytes each); 1..0x3e a path and 0x40 a floor list
+  //     (12-byte points, which the level code reaches BY TAG — the level
+  //     select's camera rides paths 1 and 2 of its scene); 0x41 and above a
+  //     portal (count 5: four corners and the two rooms); a negative tag a
+  //     path of i16 points behind a 16-byte header. An earlier reading here
+  //     took the first record for the markers and scanned for the rest by
+  //     shape, which read the level select's scene — whose first record is
+  //     path 1 — as one 504-point path and cost the three scenes that open
+  //     with something other than markers theirs.
+  const recordCount = r.i32(0);
   const markers: Marker[] = [];
-  let pos = 8;
-  const sections: DatSections = { markers: 8, paths: 0, zones: 0, section4: 0, objectTable: 0, meshPool: 0 };
-  for (let i = 0; i < markerCount && pos + 16 <= r.length; i++) {
-    markers.push({ position: r.vec3(pos), kind: r.i32(pos + 12) });
-    pos += 16;
-  }
-  const markersValid = markers.every((m) => m.kind === MARKER_KIND);
-  if (!markersValid) {
-    markers.length = 0;
-    pos = 8;
-  }
-
-  // --- paths: polylines, read until the zone signature appears
-  sections.paths = pos;
   const paths: Path[] = [];
-  while (pos + 4 <= r.length) {
-    if (r.u16(pos) === ZONE_MAGIC && r.u16(pos + 2) === ZONE_TAG) break;
-    const count = r.u16(pos);
-    const id = r.u16(pos + 2);
-    if (count === 0 || count > 512 || pos + 4 + count * 12 > r.length) break;
-    const points: Vec3[] = [];
-    for (let i = 0; i < count; i++) points.push(r.vec3(pos + 4 + i * 12));
-    paths.push({ id, points });
+  const zones: Zone[] = [];
+  const sections: DatSections = { markers: 4, paths: 4, zones: 4, section4: 0, objectTable: 0, meshPool: 0 };
+  let pos = 4;
+  let seenPath = false, seenZone = false;
+  for (let i = 0; i < recordCount && pos + 4 <= r.length; i++) {
+    const count = r.u16(pos), tag = r.i16(pos + 2);
+    if (tag < 0) { pos += (Math.trunc((count * 3 + 1) / 2) + 4) * 4; continue; }
+    if (tag === 0x3f) {
+      sections.markers = pos;
+      for (let m = 0; m < count && pos + 4 + m * 16 + 16 <= r.length; m++) {
+        markers.push({ position: r.vec3(pos + 4 + m * 16), kind: r.i32(pos + 16 + m * 16) });
+      }
+      pos += 4 + count * 16;
+      continue;
+    }
+    if (tag >= 0x41) {
+      if (!seenZone) { sections.zones = pos; seenZone = true; }
+      if (count === 5 && pos + ZONE_SIZE <= r.length) {
+        zones.push({
+          corners: [r.vec3(pos + 4), r.vec3(pos + 16), r.vec3(pos + 28), r.vec3(pos + 40)],
+          from: r.i32(pos + 52), to: r.i32(pos + 56),
+        });
+      }
+    } else {
+      if (!seenPath) { sections.paths = pos; seenPath = true; }
+      const points: Vec3[] = [];
+      for (let k = 0; k < count && pos + 4 + k * 12 + 12 <= r.length; k++) points.push(r.vec3(pos + 4 + k * 12));
+      paths.push({ id: tag, points });
+    }
     pos += 4 + count * 12;
   }
-
-  // --- portals: planar quads standing in doorways, listed from both sides
-  sections.zones = pos;
-  const zones: Zone[] = [];
-  while (pos + ZONE_SIZE <= r.length && r.u16(pos) === ZONE_MAGIC && r.u16(pos + 2) === ZONE_TAG) {
-    zones.push({
-      corners: [r.vec3(pos + 4), r.vec3(pos + 16), r.vec3(pos + 28), r.vec3(pos + 40)],
-      from: r.i32(pos + 52), to: r.i32(pos + 56),
-    });
-    pos += ZONE_SIZE;
-  }
+  // A real marker always carries kind 16; anything else is a misread.
+  if (!markers.every((m) => m.kind === MARKER_KIND)) markers.length = 0;
 
   // --- the object lists and the mesh pool, walked the way the LOADER does
   //     (`FUN_0043e6e0`; docs/FORMATS.md "level.dat, from the loader").

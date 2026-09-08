@@ -172,6 +172,8 @@ export interface FrontFrame {
   items: FrontItem[];
   /** The screen's grey, 0..0x80. */
   fade: number;
+  /** Drawn over the 3D scene rather than on black: the level select. */
+  transparent?: boolean;
 }
 
 export interface StepResult<T extends string> {
@@ -532,7 +534,7 @@ export function stepSelect(s: SelectState, pad: PadWord, strings: FrontStrings, 
   items.push(bigText(strings.jumpToSelect, promptX, 0xbe, 512));
   items.push(bigText(strings.cancelToGoBack, promptX, 0xd0, 512));
 
-  const frame: FrontFrame = { picture: null, items, fade: s.fade.level };
+  const frame: FrontFrame = { picture: null, items, fade: s.fade.level, transparent: true };
   if (Math.abs(s.phase) > SELECT.leaveTicks) {
     return { frame, sounds, done: s.cancelled ? 'cancel' : 'pick' };
   }

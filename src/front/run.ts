@@ -18,6 +18,10 @@ import {
 } from './screens.ts';
 import type { Picture, TitleCards } from './title.ts';
 import { pictureFor } from './title.ts';
+import {
+  createDiorama, dioramaScene, hiddenObjects, stepDiorama,
+  type DioramaFrame, type DioramaLists, type DioramaScene, type DioramaState, type Placing,
+} from './diorama.ts';
 
 /** The engine's tick, 16949 microseconds (CLAUDE.md). */
 const TICK_SECONDS = 16949 / 1e6;
@@ -50,6 +54,24 @@ export interface FrontHost {
   attract(): Promise<void>;
   /** "exit" on the list menu. */
   quit(): void;
+  /**
+   * The level select's diorama (src/front/diorama.ts): load its scene and
+   * give back its paths and a vehicle's placing, or null when the install
+   * has none; the executable's show/hide lists; the camera node the last
+   * visit left (`DAT_0055a0e4`); a byte of the random table; and, each
+   * tick, the camera and the objects to apply. `sceneRect` is where the
+   * scene's picture sits on the page, for the sprite layer to lie over.
+   */
+  loadDiorama(): Promise<{ paths: { id: number; points: { x: number; y: number; z: number }[] }[]; placedOf: (id: number) => Placing | null } | null>;
+  unloadDiorama(): void;
+  dioramaLists(): DioramaLists[];
+  camNode(): number;
+  setCamNode(node: number): void;
+  rand(): number;
+  applyDiorama(frame: DioramaFrame, hidden: ReadonlySet<number>): void;
+  /** The diorama bundle's sheets while it is loaded: the select's sprites live there. */
+  selectSheets(): ReadonlyMap<number, Sheet> | null;
+  sceneRect(): { x: number; y: number; width: number; height: number } | null;
 }
 
 type Screen =
@@ -72,6 +94,9 @@ export class FrontEnd {
   /** The last frame drawn, for the harness. */
   lastFrame: FrontFrame | null = null;
   running = false;
+  /** The diorama while the select is up, or null without its scene. */
+  private diorama: { scene: DioramaScene; state: DioramaState; hidden: Set<number> } | null = null;
+  lastDiorama: DioramaFrame | null = null;
 
   constructor(private readonly host: FrontHost, private readonly parent: HTMLElement) {}
 
@@ -107,16 +132,19 @@ export class FrontEnd {
         }
         this.inGame = true;
         this.host.music(SELECT.music);
-        const done = await this.play({
-          kind: 'select',
-          state: createSelect(this.host.tokens(), this.host.strings, this.host.cursor(), this.host.enteredWith()),
-        });
+        const select = createSelect(this.host.tokens(), this.host.strings, this.host.cursor(), this.host.enteredWith());
+        // `FUN_00453cf0` loads the scene before the routine runs; the
+        // cursor past the open levels also puts the camera back at node 0.
+        if (this.host.cursor() + 1 > select.open) this.host.setCamNode(0);
+        await this.openDiorama(select);
+        const done = await this.play({ kind: 'select', state: select });
+        this.closeDiorama();
         if (done === 'cancel') { next = 'menu'; continue; }
-        const state = this.screen!.state as ReturnType<typeof createSelect>;
-        this.host.setCursor(state.pos - 1);
+        this.host.setCursor(select.pos - 1);
+        this.host.setCamNode(select.pos);
         this.hide();
         this.host.music(null);
-        await this.host.playLevel(state.pos);
+        await this.host.playLevel(select.pos);
         this.show();
       }
     } finally {
@@ -124,6 +152,28 @@ export class FrontEnd {
       this.hide();
       this.host.quit();
     }
+  }
+
+  private async openDiorama(select: ReturnType<typeof createSelect>): Promise<void> {
+    this.hide();
+    const loaded = await this.host.loadDiorama();
+    const scene = loaded ? dioramaScene(loaded.paths) : null;
+    if (loaded && scene) {
+      this.diorama = {
+        scene,
+        state: createDiorama(scene, this.host.camNode(), select.pos, loaded.placedOf),
+        hidden: hiddenObjects(this.host.dioramaLists(), select.open),
+      };
+    } else {
+      this.diorama = null;
+    }
+    this.show();
+  }
+
+  private closeDiorama(): void {
+    if (this.diorama) this.host.unloadDiorama();
+    this.diorama = null;
+    this.lastDiorama = null;
   }
 
   private play(screen: Screen): Promise<string> {
@@ -140,7 +190,17 @@ export class FrontEnd {
     let result;
     if (screen.kind === 'title') result = stepTitle(screen.state, this.pad, this.host.strings);
     else if (screen.kind === 'menu') result = stepListMenu(screen.state, this.pad, this.host.strings, this.inGame);
-    else result = stepSelect(screen.state, this.pad, this.host.strings);
+    else {
+      result = stepSelect(screen.state, this.pad, this.host.strings);
+      if (this.diorama) {
+        const frame = stepDiorama(this.diorama.state, this.diorama.scene, screen.state.pos, screen.state.ticks, this.host.rand);
+        this.lastDiorama = frame;
+        this.host.applyDiorama(frame, this.diorama.hidden);
+      } else {
+        // No scene to draw over: the select's layer stays on black.
+        result.frame.transparent = false;
+      }
+    }
     for (const effect of result.sounds) this.host.playSound(effect);
     this.lastFrame = result.frame;
     this.paint(result.frame, screen.kind === 'select' ? this.host.selectTable : this.host.menuTable);
@@ -169,7 +229,8 @@ export class FrontEnd {
   private paint(frame: FrontFrame, table: readonly (SpriteHeader | null)[]): void {
     if (!this.painter || !this.canvas) return;
     const card: Picture | null = frame.picture === null ? null : pictureFor(this.host.cards, frame.picture);
-    this.painter.paintFront(frame, table, this.host.sheets, card?.canvas ?? null);
+    const sheets = (this.diorama ? this.host.selectSheets() : null) ?? this.host.sheets;
+    this.painter.paintFront(frame, table, sheets, card?.canvas ?? null);
   }
 
   private show(): void {
@@ -194,9 +255,31 @@ export class FrontEnd {
     this.screen = null;
   }
 
-  /** Fit the engine's 4:3 screen inside the window, as the viewer does. */
+  /**
+   * Fit the engine's 4:3 screen inside the window, as the viewer does — or,
+   * with the diorama up, lie exactly over the scene's picture and let it
+   * show through.
+   */
   private fit(): void {
-    if (!this.canvas || !this.painter) return;
+    if (!this.canvas || !this.painter || !this.layer) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const over = this.diorama ? this.host.sceneRect() : null;
+    if (over) {
+      this.layer.style.background = 'transparent';
+      this.layer.style.pointerEvents = 'none';
+      this.canvas.style.position = 'fixed';
+      this.canvas.style.left = `${over.x}px`;
+      this.canvas.style.top = `${over.y}px`;
+      this.canvas.style.width = `${Math.round(over.width)}px`;
+      this.canvas.style.height = `${Math.round(over.height)}px`;
+      this.painter.resize(Math.round(over.width * dpr), Math.round(over.height * dpr));
+      return;
+    }
+    this.layer.style.background = '#000';
+    this.layer.style.pointerEvents = '';
+    this.canvas.style.position = '';
+    this.canvas.style.left = '';
+    this.canvas.style.top = '';
     const W = window.innerWidth;
     const H = window.innerHeight;
     let width = W;
@@ -204,7 +287,6 @@ export class FrontEnd {
     if (height > H) { height = H; width = (H * 4) / 3; }
     this.canvas.style.width = `${Math.round(width)}px`;
     this.canvas.style.height = `${Math.round(height)}px`;
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
     this.painter.resize(Math.round(width * dpr), Math.round(height * dpr));
   }
 

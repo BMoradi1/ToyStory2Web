@@ -60,9 +60,9 @@ the title with its "press jump", the list menu and the level select, all
 from your install, with the text read out of its executable. Arrows or
 WASD move, Space or Enter is jump, Escape is cancel; the level plays from
 the select, and the pause menu's "exit level" brings the select back.
-The select's Etch A Sketch diorama needs a `data/level16` scene this
-install does not have, so it runs on black with its name, arrows, count
-and text.
+The select flies over its diorama — the neighbourhood model in
+`data/level06/level1`, which is what the game's "level 16" turns out to
+be — with the level's name, the tokens you hold and the arrows over it.
 
 The cutscenes play from your install too: the three logos when the
 folder opens, a level's intro the first time you play it, and a boss's

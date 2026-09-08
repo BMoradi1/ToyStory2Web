@@ -486,7 +486,7 @@ with no offset table:
 
     header(8) | markers | paths | zone quads | ref list | objects | mesh pool
 
-    header    u32 nextPathSlot, u16 markerCount, u16 pathSlotCount (63)
+    header    u32 recordCount (see "from the loader" below), then the records
     marker    i32 x, y, z; i32 kind        always 0x10 in 1999-dated files
     path      u16 count, u16 id; count x { i32 x, y, z }     ids are sparse
     zone      u16 0x0005, u16 0x0041; 4 x { i32 x,y,z }; i32 a, b, c
@@ -1152,6 +1152,10 @@ runs it over every scene in the install.
                      the slots after the paths (0x41 up) and its corners shifted >> 2
                      in place; (from, to) pairs go into the per-zone adjacency table
         tag < 0      count x 3 i16 plus a 4-dword header  (none shipped)
+    (PORTED 2026-09-08: `parseDat` walks these records by tag. Paths are
+    reached BY TAG — the level select's scene, `level06/level1.dat`, opens
+    with paths 1, 2, 3, 4, 6, 7, 8 and 9 and has no markers, which the old
+    shape-scan read as one 504-point path; docs/FRONTEND.md.)
     u32 m; m x 0x80 bytes        a block table the loader steps over (m is 0 in every file)
     objects, 20 bytes each, until the byte at +0xe is 0     list 0, the near detail
     u32 c; (c + 1) dwords        an index list

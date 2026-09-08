@@ -804,11 +804,14 @@
            drawn from the install's own loadfont sheet and pictures, the
            text read from toy2.exe; the level plays from the select and
            the pause menu's "exit level" or the boss movie returns to it.
-           Left, in order: the SUMMARY screen FUN_004398b0 (decoded in
-           the doc; levelt1.ngn has all its art) between a level and the
-           select; game over and the credits (small); options and load
-           game (unread); the select's 3D diorama, which needs level 16's
-           scene - this install has only its build configs.
+           2026-09-08: the select's DIORAMA is in (src/front/diorama.ts)
+           - "level 16" is level06/level1 with the t1 textures, and the
+           camera, the show/hide lists and the vehicles follow the
+           routine. Left, in order: the SUMMARY screen FUN_004398b0
+           (decoded in the doc; levelt1.ngn has all its art) between a
+           level and the select; game over and the credits (small);
+           options and load game (unread; load game and the movie viewer
+           use the diorama scene with texture sets 3 and 2).
  [was]     Cutscenes: MPEG-1 in the browser (jsmpeg-style decoder or
            WebCodecs), fed from the user's rtlibs files.
  [OPEN]    First-run flow explaining that users supply their own copy.

@@ -47,6 +47,12 @@ export const DETAIL_ROWS: readonly { nearLimit: number; farLimit: number }[] = [
   { nearLimit: 10000, farLimit: 12000 },
 ];
 
+/** A kept-separate object's pose: the engine's angles, and a move in renderer units. */
+export interface ObjectTransform {
+  angles: readonly [number, number, number];
+  offset?: readonly [number, number, number];
+}
+
 export class Viewer {
   readonly scene = new THREE.Scene();
   readonly camera: THREE.PerspectiveCamera;
@@ -128,7 +134,7 @@ export class Viewer {
    */
   private objectVertices = new Map<number, { start: number; count: number; base: Float32Array }[]>();
   /** The angles each of those objects has been turned to. */
-  private objectAngles = new Map<number, readonly [number, number, number]>();
+  private objectTransforms = new Map<number, string>();
   /**
    * The 4:3 rectangle inside the canvas that the game is drawn into, in CSS
    * pixels from the canvas's top left. The engine has one screen shape and
@@ -279,7 +285,7 @@ export class Viewer {
 
     // Keep the untouched vertices of anything that can be turned.
     this.objectVertices = new Map();
-    this.objectAngles = new Map();
+    this.objectTransforms = new Map();
     for (const group of geometry.groups) {
       if (group.object === null) continue;
       let ranges = this.objectVertices.get(group.object);
@@ -356,6 +362,18 @@ export class Viewer {
    * rather than adding to the mesh.
    */
   setObjectAngles(angles: ReadonlyMap<number, readonly [number, number, number]>): void {
+    const transforms = new Map<number, ObjectTransform>();
+    for (const [object, a] of angles) transforms.set(object, { angles: a });
+    this.setObjectTransforms(transforms);
+  }
+
+  /**
+   * Turn and move the level's kept-separate objects: the angles as above,
+   * and an offset in renderer units from where the object was placed. The
+   * level select's diorama moves its little vehicles along their paths
+   * this way (src/front/diorama.ts).
+   */
+  setObjectTransforms(transforms: ReadonlyMap<number, ObjectTransform>): void {
     const mesh = this.current;
     const groups = this.lastLevel?.geometry.groups;
     if (!mesh || !groups) return;
@@ -364,13 +382,15 @@ export class Viewer {
     let touched = false;
 
     for (const [object, ranges] of this.objectVertices) {
-      const want = angles.get(object);
-      const have = this.objectAngles.get(object);
-      if (!want) continue;
-      if (have && have[0] === want[0] && have[1] === want[1] && have[2] === want[2]) continue;
+      const transform = transforms.get(object);
+      if (!transform) continue;
+      const want = transform.angles;
+      const [dx, dy, dz] = transform.offset ?? [0, 0, 0];
+      const key = `${want[0]},${want[1]},${want[2]}|${dx},${dy},${dz}`;
+      if (this.objectTransforms.get(object) === key) continue;
       const group = groups.find((g) => g.object === object);
       if (!group || !group.origin || !group.rotation) continue;
-      this.objectAngles.set(object, want);
+      this.objectTransforms.set(object, key);
       touched = true;
 
       // `M = R(new) * R(baked)^T` in game space, wrapped by the axis flip the
@@ -401,9 +421,9 @@ export class Viewer {
           const o = v * 3;
           const x = range.base[o]! - ox, y = range.base[o + 1]! - oy, z = range.base[o + 2]! - oz;
           const w = (range.start + v) * 3;
-          array[w] = m[0]! * x + m[1]! * y + m[2]! * z + ox;
-          array[w + 1] = m[3]! * x + m[4]! * y + m[5]! * z + oy;
-          array[w + 2] = m[6]! * x + m[7]! * y + m[8]! * z + oz;
+          array[w] = m[0]! * x + m[1]! * y + m[2]! * z + ox + dx;
+          array[w + 1] = m[3]! * x + m[4]! * y + m[5]! * z + oy + dy;
+          array[w + 2] = m[6]! * x + m[7]! * y + m[8]! * z + oz + dz;
         }
       }
     }

@@ -253,8 +253,10 @@ export class HudPainter {
     const px512 = W / 512;
     const px320 = W / 320;
     const py = H / 256;
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, W, H);
+    if (!frame.transparent) {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, W, H);
+    }
     if (picture) ctx.drawImage(picture, 0, 0, W, H);
 
     const bigFont = sheets.get(BIG_TEXT.sheet) ?? null;

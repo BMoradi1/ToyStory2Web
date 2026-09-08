@@ -41,9 +41,10 @@
  routine turned out to be the LOADING font on slot 31; the picture
  screens run in a 320-wide sprite space (DAT_004f7414 is a variable); a
  level is unlocked by bit 7 of its token byte, which is "visited", not
- unread. The install has no level16 scene, so the select's diorama and
- two of its sprites are absent and skipped. Next on Opus: the summary
- screen (FUN_004398b0, decoded in the doc, art present in levelt1.ngn).
+ unread. "Level 16" is level06/level1 with texture set 1 (the loader
+ takes ten off the number), and the select's diorama - camera, show/hide
+ lists, vehicles - is ported over it. Next on Opus: the summary screen
+ (FUN_004398b0, decoded in the doc, art present in levelt1.ngn).
 ================================================================================
 
  Read TODOPLAN.txt for WHAT to do. This file is about WHO should do it and what

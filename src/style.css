@@ -102,3 +102,10 @@ select {
   image-rendering: pixelated;
 }
 
+
+/* The level select runs over the viewer's own picture: the page's chrome
+   steps aside while it is up (src/front/run.ts). */
+body.front-scene #app header,
+body.front-scene #textures {
+  visibility: hidden;
+}

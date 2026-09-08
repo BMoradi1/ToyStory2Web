@@ -17,7 +17,12 @@
  record seeded from the install, a "save file" download button), then the
  boss and race music, the two zone overrides and the far-detail forcing,
  the race car's handler (wheels, skid dust, sounds; level 2 walked) and
- level 14's fog. The detail rows' middle columns are near planes, not fog. NOTHING IS WAITING ON
+ level 14's fog. The detail rows' middle columns are near planes, not fog.
+ The power-ups now carry through the save. The PORTAL WALK is decoded and
+ ported (src/sim/portal-walk.ts) but is not drawing yet: it is blocked on
+ the object-to-room matching, measured by tools/zone-assign-validate.ts at
+ 94.3% right on level 1 and 71.9% on level 2. That matching is the single
+ most valuable thing left for the renderer - fixing it turns the walk on. NOTHING IS WAITING ON
  FABLE.
 ================================================================================
 

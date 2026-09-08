@@ -74,10 +74,30 @@ export interface ZoneState {
   player: number;
   /** Last tick's raised player position, quarter level units. */
   prev: { x: number; y: number; z: number } | null;
+  /**
+   * The zone floor Buzz is actually standing over, which is NOT one of the
+   * engine's two globals — nothing in the game reads it. The portal walk
+   * uses it so the room he is in is never culled.
+   */
+  floor: number;
 }
 
 export function createZones(): ZoneState {
-  return { camera: -1, player: -1, prev: null };
+  return { camera: -1, player: -1, prev: null, floor: -1 };
+}
+
+/**
+ * Forget where Buzz was. The doorway test compares this tick's position with
+ * last tick's, so anything that MOVES him without walking — a level load, a
+ * respawn, a talk script putting him on a path node — would look like a walk
+ * across half the level and could register a crossing he never made. The
+ * engine has no such call; this is the port's own safeguard.
+ */
+export function resetZones(state: ZoneState): void {
+  state.camera = -1;
+  state.player = -1;
+  state.prev = null;
+  state.floor = -1;
 }
 
 type Vec = { x: number; y: number; z: number };
@@ -174,14 +194,18 @@ export function stepZones(
   const raised = { x: player.x, y: player.y - ZONES.raise, z: player.z };
   const fromCamera = zoneAt(groups, camera, S);
 
-  // --- Buzz's own zone.
-  if (fromCamera < 0 || state.player < 0) {
-    state.player = fromCamera < 0 ? zoneAt(groups, raised, S) : fromCamera;
+  // --- Buzz's own zone. The render pass seeds it from the CAMERA's floor
+  //     every frame (`FUN_00440f70` writes all three globals from one
+  //     lookup) and `FUN_004402b0` then either re-derives it from his own
+  //     raised position — only when the camera was over nothing, or always
+  //     on level 2 — or lets `FUN_0043fef0` nudge it by one doorway he
+  //     crossed this tick. So it follows the camera, not his feet. Every
+  //     write to `DAT_005d2a8c` in the executable was checked for this.
+  const now = { x: raised.x / QUARTER, y: raised.y / QUARTER, z: raised.z / QUARTER };
+  if (fromCamera < 0 || options.level === 2) {
+    state.player = zoneAt(groups, raised, S);
   } else {
-    // The correction: the camera's floor says the room, and walking through
-    // a doorway this tick overrides it.
     state.player = fromCamera;
-    const now = { x: raised.x / QUARTER, y: raised.y / QUARTER, z: raised.z / QUARTER };
     const before = state.prev ?? now;
     for (const portal of portals) {
       if (portal.from !== state.player) continue;
@@ -189,7 +213,11 @@ export function stepZones(
       if (crossedPortal(portal, before, now)) { state.player = portal.to; break; }
     }
   }
-  state.prev = { x: raised.x / QUARTER, y: raised.y / QUARTER, z: raised.z / QUARTER };
+  state.prev = now;
+  // The room his feet are actually over. NOT an engine global: the renderer
+  // uses it to keep the room he is standing in on screen when the camera
+  // has drifted over a neighbour's floor (src/sim/portal-walk.ts).
+  state.floor = zoneAt(groups, raised, S);
 
   // --- the camera's zone: the floor under it, but never further from Buzz
   //     than one doorway.

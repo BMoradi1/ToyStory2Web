@@ -27,7 +27,8 @@ import {
 } from './sim/player.ts';
 import { cos as cosOf, sin as sinOf, toRadians, yawOf } from './sim/trig.ts';
 import { createCamera, stepCamera, cameraTarget, type CameraState } from './sim/camera.ts';
-import { createZones, stepZones, type ZoneState, detailRowFor } from './sim/zones.ts';
+import { createZones, resetZones, stepZones, type ZoneState, detailRowFor } from './sim/zones.ts';
+import { basisFromCamera, walkPortals, type Rect } from './sim/portal-walk.ts';
 import {
   MENU, MENU_TEXT, MenuPage, createMenu, highlight, menuRows, openMenu, openTokenScreen, stepMenu,
   type MenuInput, type MenuState,
@@ -499,6 +500,7 @@ async function open(dir: GameDir): Promise<void> {
         const it = pickups.items[best]!;
         player.x = it.x * GAME_UNITS_PER_LEVEL_UNIT; player.z = it.z * GAME_UNITS_PER_LEVEL_UNIT;
         player.y = it.y * GAME_UNITS_PER_LEVEL_UNIT;
+        resetZones(zones);
         return { index: best, kind: PickupKind[it.kind], wasAway: Math.round(bestD / 32) };
       },
       get modelInfo() {
@@ -586,6 +588,7 @@ async function open(dir: GameDir): Promise<void> {
           ? groundBelow(currentCollisionWorld, player.x / S2, (b.y - 4000) / S2, player.z / S2)
           : null;
         player.y = floor ? floor.y * S2 : b.y;
+        resetZones(zones);
         player.vx = 0; player.vy = 0; player.vz = 0;
         player.yaw = b.segYaw;
         return { index: which, yaw: b.segYaw, block: { x: b.x, y: b.y, z: b.z }, player: { x: player.x, y: player.y, z: player.z } };
@@ -607,6 +610,7 @@ async function open(dir: GameDir): Promise<void> {
         if (!item) return null;
         const S = GAME_UNITS_PER_LEVEL_UNIT;
         player.x = item.x * S; player.y = item.y * S; player.z = item.z * S;
+        resetZones(zones);
         player.vx = 0; player.vy = 0; player.vz = 0;
         return { kind, id: item.id, x: player.x, y: player.y, z: player.z };
       },
@@ -618,6 +622,7 @@ async function open(dir: GameDir): Promise<void> {
         if (!item) return null;
         const S = GAME_UNITS_PER_LEVEL_UNIT;
         player.x = item.x * S; player.y = item.y * S; player.z = item.z * S;
+        resetZones(zones);
         return { id: item.id, of: signs.length, x: player.x, y: player.y, z: player.z };
       },
       /** Move the player straight to a spot, for tests that need a route. */
@@ -625,6 +630,7 @@ async function open(dir: GameDir): Promise<void> {
         if (!player) return null;
         player.x = x; player.z = z;
         if (y !== undefined) player.y = y;
+        resetZones(zones);
         player.vx = 0; player.vz = 0;
         return { x: player.x, y: player.y, z: player.z };
       },
@@ -654,6 +660,7 @@ async function open(dir: GameDir): Promise<void> {
         const c = creatureSim.creatures.find((q) => q.slot === slot);
         if (!c) return null;
         player.x = c.x + 400; player.y = c.y; player.z = c.z + 400;
+        resetZones(zones);
         return { slot, x: player.x, y: player.y, z: player.z };
       },
       /**
@@ -724,7 +731,32 @@ async function open(dir: GameDir): Promise<void> {
       },
       /** Which room the level scripts think Buzz is in (docs/LEVELS.md). */
       get zones() {
-        return { camera: zones.camera, player: zones.player };
+        return { camera: zones.camera, player: zones.player, floor: zones.floor };
+      },
+      /** Turn the portal walk's culling off, to compare what it removes. */
+      zoneCulling(on = true) {
+        zoneCulling = on;
+        walkKey = '';
+        if (!on) viewer?.setVisibleZones(null);
+        return zoneCulling;
+      },
+      /** Re-run the walk from where the camera is now, reporting every doorway. */
+      walkTrace() {
+        if (!currentLevel || !camera || !player) return null;
+        const log: unknown[] = [];
+        const seen = walkPortals(
+          currentLevel.level.zones, zones.camera,
+          basisFromCamera(camera, cameraTarget(player, camera)),
+          { backdropZone: BACKDROP_ZONE[levelNumber(levels[levelEl.selectedIndex]?.id ?? '') ?? 0] ?? null,
+            alsoFrom: zones.floor, trace: (t) => log.push(t) },
+        );
+        return { cameraZone: zones.camera, playerZone: zones.player, seen: [...seen.keys()], log };
+      },
+      /** What the portal walk saw this frame: each room and its screen rectangle. */
+      get walk() {
+        return [...walkRects.entries()]
+          .sort((a, b) => a[0] - b[0])
+          .map(([zone, r]) => ({ zone, ...r }));
       },
       /** The effect pool, for a test that wants to see what is alive. */
       get effects() {
@@ -1110,6 +1142,8 @@ async function spawnPlayer(): Promise<void> {
   startHud(hud);
   hudWas = { lives: -1, health: -1, coins: -1, found: -1 };
 
+  // He has been put somewhere rather than having walked there.
+  resetZones(zones);
   tasks = createTasks();
   startLevelTasks(tasks, level, progress?.p.powerUps ?? 0);
   revealedSlots = new Set();
@@ -1883,10 +1917,30 @@ const effectFlat: WorldSprite[] = [];
  * (docs/LEVELS.md "Zones").
  */
 const zones: ZoneState = createZones();
+/**
+ * The room the render pass records but never walks into, whose rectangles
+ * the backdrop is drawn through instead (`FUN_0043f3d0`'s zone 0xf test).
+ * Level 7 is the one that holds a room out this way.
+ */
+const BACKDROP_ZONE: Record<number, number | undefined> = { 7: 0xf };
 /** `FUN_00440f70`'s `case 0xe`: level 14's fog band, level units. */
 const FOG_BY_LEVEL: Record<number, readonly [number, number] | undefined> = { 14: [24000, 46000] };
 /** The clear colour `DAT_00559e84` (0x20 a channel) halved, as the pass builds it. */
 const FOG_COLOUR = 0x101010;
+/** What the portal walk saw last frame, and the set it produced. */
+let walkRects: Map<number, Rect> = new Map();
+let walkKey = '';
+/**
+ * Whether play draws only the rooms the portal walk can see. OFF by default,
+ * and not because the walk is wrong: every object's room comes from matching
+ * `.ngn` scene instances to `level.dat` objects by position, and on the
+ * objects that can be checked against the zone floor beneath them that
+ * matching disagrees on 5.7% of level 1's and 28% of level 2's. A room label
+ * that is wrong is a piece of scenery that vanishes, measured at up to 2.8%
+ * of the frame. `ts2.zoneCulling(true)` turns it on to look; turning it on
+ * for good waits on the object-to-room matching (docs/FORMATS.md).
+ */
+let zoneCulling = false;
 /** The pause menu (docs/HUD.md, src/sim/menu.ts). */
 const menu: MenuState = createMenu();
 /**
@@ -2038,6 +2092,10 @@ function setPlaying(on: boolean): void {
     sound?.stop();
     music?.disable();
     saveProgress();
+    // Give the whole level back to the inspection view.
+    walkKey = '';
+    walkRects = new Map();
+    viewer.setVisibleZones(null);
     // Nothing drives the HUD outside play, so take it off the screen.
     hudPainter?.clear();
     viewer.setWorldCards([], []);
@@ -2084,6 +2142,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       const floor = groundBelow(currentCollisionWorld, player.x / S, request.moveTo.y / S, player.z / S);
       player.y = floor ? floor.y * S : request.moveTo.y;
       player.vx = 0; player.vy = 0; player.vz = 0;
+      resetZones(zones);
     }
     if (request.faceYaw !== null) player.yaw = request.faceYaw;
     if (request.creature && creatureSim) {
@@ -2171,7 +2230,29 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       const row = detailRowFor(detailOption, levelNow, zones, player);
       if (row !== detailNow) { detailNow = row; viewer.setDetail(row); }
     }
+    // Which rooms are on screen (docs/LEVELS.md "The portal walk"). The
+    // engine runs this in the render pass right after the zones, from the
+    // camera's zone outward, and only draws what comes back.
     const look = cameraTarget(player, camera);
+    if (currentLevel && zoneCulling && zones.camera < 0 && walkKey !== 'all') {
+      // Over no floor at all: the engine has no room to start from, so draw
+      // the level whole rather than guess.
+      walkKey = 'all';
+      walkRects = new Map();
+      viewer.setVisibleZones(null);
+    } else if (currentLevel && zones.camera >= 0 && zoneCulling) {
+      const seen = walkPortals(
+        currentLevel.level.zones, zones.camera,
+        basisFromCamera(camera, look),
+        { backdropZone: BACKDROP_ZONE[levelNow] ?? null, alsoFrom: zones.floor },
+      );
+      walkRects = seen;
+      const key = [...seen.keys()].sort((a, b) => a - b).join(',');
+      if (key !== walkKey) {
+        walkKey = key;
+        viewer.setVisibleZones(new Set(seen.keys()));
+      }
+    }
     viewer.placeCamera(
       camera.x * GAME_TO_RENDER, -camera.y * GAME_TO_RENDER, -camera.z * GAME_TO_RENDER,
       look.x * GAME_TO_RENDER, -look.y * GAME_TO_RENDER, -look.z * GAME_TO_RENDER,

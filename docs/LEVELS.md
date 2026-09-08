@@ -704,3 +704,76 @@ Walked in the browser: the taunt fires on levels 2, 4, 5, 7, 11, 13 and 14
 by standing in each trigger, and level 1's already did. Level 10's band
 was not walked — its arena is up a shaft Buzz falls past when placed by
 hand — but the band brackets that boss's own height.
+
+## The portal walk
+
+Decoded and ported 2026-09-07 (`FUN_0043f3d0`, called once a frame from
+`FUN_004402b0`; `src/sim/portal-walk.ts`). This is how the engine decides
+which rooms to draw, and it is a real portal walk rather than the fixed
+one-step neighbourhood `reachableZones` takes.
+
+Start in the camera's room with the whole screen available. For each
+doorway out of it, project the doorway's four corners; if the projected
+quad still overlaps the rectangle you hold, the room beyond is visible,
+and you recurse into it with the rectangle narrowed to that quad's
+bounding box. A room nothing projects into is never drawn. The recursion
+carries a budget that starts at 254 and falls by one a step, and a room
+is re-entered only when reached with a HIGHER budget, that is by a
+shorter path.
+
+Everything happens in a 512 x 256 rectangle space with the eye at
+(256, 128) and a focal length of 160, so `x * 160 / z + 256` and
+`y * 160 / z + 128`, +Y down. The picture itself is only the middle of
+that space, x 96..416 and y 8..248; the margins exist so a corner behind
+the camera can be pinned outside the picture without overflowing a signed
+short. A corner nearer than z = 11 is clipped along its quad edge to
+whichever neighbour is further away, the crossing taken at the eye plane,
+and then pinned to the side of the space it went off. Two counters ride
+along: eight per corner behind the eye, so 32 means all four and the room
+is dropped, and one per pinned corner whose crossing landed within 512
+units of the view axis. `FUN_00451f80`, a signed area over the projected
+quad's two triangles, rejects the doorways facing away unless a corner
+was pinned.
+
+Three quirks of the original, all reproduced:
+
+- A room reached twice keeps the rectangle of the shorter path, not the
+  union of the two. Portal engines usually union; this one does not.
+- A later doorway in a room's list that misses the rectangle CLEARS a room
+  an earlier doorway had already made visible, so the outcome depends on
+  the order the doorways sit in the file.
+- The pinned-corner counter is tested as `count & 3`, and four pinned
+  corners come to 4, whose low two bits are clear. So the widest case
+  narrows where three pinned corners would have fallen back to the parent
+  rectangle.
+
+Level 7 holds its zone 15 out of the walk: it is recorded as visible and
+the backdrop is drawn through its rectangles instead of the room being
+entered.
+
+**Validation** (`tools/portal-walk-validate.ts`, every scene with
+doorways): all 204 doorways that lead to a real room fire the crossing
+test exactly once when walked through a tick at a time, and 2,584 camera
+placements over the zone floors all returned the camera's own room and
+room 0 and never named a room the doorway graph cannot reach.
+
+**What it is not yet used for.** Drawing. Comparing the frame with and
+without the culling at 24 camera placements a level, most come out pixel
+for pixel identical, but a few lose up to 2.8% of the frame. The cause is
+not the walk: an object's room comes from matching `.ngn` instances to
+`level.dat` objects by position, and `tools/zone-assign-validate.ts`
+measures that matching against the zone floor under each object — 94.3%
+agree on level 1, 71.9% on level 2. A wrongly labelled object is one that
+disappears. So play draws every room for now and `ts2.zoneCulling(true)`
+turns the walk on to look at it; turning it on for good waits on a better
+object-to-room mapping (docs/FORMATS.md, "This is the one thing not yet
+usable").
+
+One more thing the walk needs that the engine does not. The engine seeds
+Buzz's room and the camera's from the same lookup, so the room he stands
+in is always the room the walk starts from. The port's follow camera is
+its own reconstruction, and where it drifts over a neighbouring room's
+floor slab the walk would start next door and cull the room Buzz is
+actually in — 80% of the frame, in the worst case measured. The walk
+therefore also takes the floor under his feet (`ZoneState.floor`, not an
+engine global) and keeps that room on screen.

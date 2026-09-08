@@ -1079,6 +1079,17 @@ it misaligned. Offsets are from the block's start:
     +0x158  u8[16] one byte per select index: 1 once that boss is beaten
     +0x168  u8   all fifty tokens held
     +0x169  u8   level 15's boss beaten
+
+All three of those are written in one place, the level-exit flow
+`FUN_0049d910`, and only on the way out of a level. A level whose number
+divides by three (the boss levels 3, 6, 9, 12, 15) sets its own completed
+byte, and level 15 also sets the game-beaten flag. Any other level
+instead tests for the fiftieth token: the current level's token byte must
+have changed since the level began and the total must read 50, and then
+the all-tokens flag goes up. The port has no level-exit flow and no boss
+level ported, so it sets neither completed byte, and it raises the
+all-tokens flag when the fiftieth token is picked up rather than when the
+level ends.
     +0x16a..+0x187 zero in every file
 
 **The level-select order is not the internal order.** `DAT_0052ad8a` is

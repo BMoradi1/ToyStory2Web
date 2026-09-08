@@ -197,11 +197,21 @@
                 landing, each a coherent room rather than a scatter. Level 1
                 is 83 draw groups over 9 zones and 22 portals; standing in
                 zone 5 draws 6,023 of 33,103 triangles.
- [READY]  Frustum-clipped portal walk. What remains of the engine's real
-          algorithm: recurse through portals whose outline is inside the
-          view, narrowing the frustum to each outline, instead of taking a
-          fixed one-step neighbourhood. Needs the portal corners projected
-          per frame; level.zones already carries them.
+ [DONE]   Frustum-clipped portal walk. Decoded and ported 2026-09-07
+          (docs/LEVELS.md "The portal walk", src/sim/portal-walk.ts,
+          tools/portal-walk-validate.ts over all 9 scenes with doorways).
+          It is NOT used for drawing yet, and the blocker is the one
+          below: an object's room comes from matching .ngn instances to
+          level.dat objects, which tools/zone-assign-validate.ts measures
+          at 94.3% right on level 1 and 71.9% on level 2 against the zone
+          floor under each object. Wrong label = vanishing scenery, up to
+          2.8% of the frame. ts2.zoneCulling(true) turns it on to look.
+ [READY]  Object-to-room matching, which now BLOCKS the portal walk above
+          (docs/FORMATS.md "This is the one thing not yet usable").
+          Three routes: match by mesh identity rather than position;
+          render from the .ngn scene, which carries the room outright;
+          or take the room from the zone floor under each object, which
+          tools/zone-assign-validate.ts already computes.
  [DONE]   THE SAVE FILE. Format decoded and parsed 2026-09-07
           (docs/FORMATS.md "The save file", src/formats/save-file.ts,
           tools/save-file.ts), and wired the same day: the record lives

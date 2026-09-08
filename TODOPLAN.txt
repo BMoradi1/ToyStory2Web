@@ -681,10 +681,24 @@
                 LEFT: the power-ups do nothing yet - none of the five moves
                 is implemented - and levels 7 and 10 pass his path in a
                 variable, so only 1, 4 and 13 are tabled.
- P3.6 [READY]   Save format: Toy200.sav / Toy299.sav are samples in the
-                install; decode, then write.
- P3.7 [BLOCKED] Level 3 boss              <- P3.3. Forces the scripting model
-                before it is generalised.
+ P3.6 [DONE]    Save format decoded and wired 2026-09-07
+                (docs/FORMATS.md "The save file",
+                src/formats/save-file.ts, src/loader/save.ts,
+                tools/save-file.ts). The record lives in the browser,
+                seeded from the install's own Toy200.sav; lives, health,
+                the camera flag, both sliders, the tokens and the
+                power-ups all carry, and a button downloads a Toy200.sav.
+                Left: the completed bytes, which only a boss level's exit
+                writes (P3.7).
+ P3.7 [PART]    World bosses. LEVEL 6 IS PORTED 2026-09-07 (docs/LEVELS.md
+                "The world boss", the bossFight entry in level-data.ts and
+                stepBossFight in tasks.ts): the entrance, the chase and
+                charge laps, the stun and the shell, the death, the bar,
+                the theme, and the save's token bit. Note the plan's old
+                "level 3" was the third level PLAYED, which the select
+                order makes internal level 6 - that is the one done.
+                Left: internal levels 3, 9, 12 and 15, each its own
+                fight; and the camera cuts, which every boss uses.
  P3.8 [PART]    The talk box: DONE for hint signs 2026-09-05
                 (src/sim/talk.ts). Touching a signpost freezes Buzz, flies
                 the camera along the sign's path with the engine's own

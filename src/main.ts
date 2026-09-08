@@ -467,8 +467,8 @@ async function open(dir: GameDir): Promise<void> {
             flags: c.flags, near: (c.flags & CREATURE_FLAGS.near) !== 0,
             vulnerable: c.record.vulnerable,
             pc: c.pc, wait: c.wait, animState: c.animState, frame: c.frame >>> 16,
-            homeX: c.homeX, homeZ: c.homeZ,
-            targetX: c.targetX, targetZ: c.targetZ,
+            homeX: c.homeX, homeY: c.homeY, homeZ: c.homeZ,
+            targetX: c.targetX, targetY: c.targetY, targetZ: c.targetZ,
             bodyRadius: c.bodyRadius, hitRadius: c.hitRadius,
             offsetX: c.offsetX, offsetY: c.offsetY, offsetZ: c.offsetZ,
             stun: c.stun, respawn: c.respawn, deathTimer: c.deathTimer, partSpin: c.partSpin,
@@ -638,6 +638,9 @@ async function open(dir: GameDir): Promise<void> {
         return tasks ? {
           done: tasks.done, hintIndex: tasks.hintIndex,
           boss: tasks.boss, potatoPart: tasks.potatoPart, powerUps: tasks.powerUps,
+          bossPhase: tasks.bossPhase, bossClock: tasks.bossClock, bossHurt: tasks.bossHurt,
+          bossCut: tasks.bossCut, bossRamp: tasks.bossRamp, bossSwing: tasks.bossSwing,
+          bossBeaten: tasks.bossBeaten, levelWon: tasks.levelWon,
           fetch: tasks.fetch, fetchDone: tasks.fetchDone, fetchClock: tasks.fetchClock,
           slowTick: tasks.slowTick,
           race: tasks.race, laps: tasks.laps, quadrant: tasks.raceQuadrant,
@@ -1150,6 +1153,7 @@ async function spawnPlayer(): Promise<void> {
   resetZones(zones);
   tasks = createTasks();
   startLevelTasks(tasks, level, progress?.p.powerUps ?? 0);
+  startBossFight(level);
   revealedSlots = new Set();
   pickups = createPickups(currentLevel.level, level);
   // Lives and health carry over from the record, as `FUN_004a2cc0` copies
@@ -1517,6 +1521,16 @@ function hudReadout(level: number): HudReadout {
       bossBar = Math.max(0, Math.min(0x36, Math.round(((c.health - 9) * 0x36) / 11)));
     }
   }
+  // A world boss has its own bar, on for as long as the fight is (the level
+  // 6 tick's `(health - 10) * 0x36 / 10`).
+  const fight = LEVEL_TASKS[level]?.bossFight;
+  if (fight && creatureSim && tasks && tasks.bossPhase >= 2) {
+    const c = creatureSim.creatures.find((q) => q.slot === fight.creature);
+    if (c) {
+      bossBar = Math.max(0, Math.min(0x36,
+        Math.round(((c.health - fight.bar.from) * 0x36) / fight.bar.over)));
+    }
+  }
   // The shared task counter: under 100 the flag counts laps down, at 100 or
   // more it is a countdown in tenths of a minute.
   let clock: number | null = null;
@@ -1571,6 +1585,8 @@ function drawHud(level: number): void {
   if (r.found > 0) showHud(hud, HudElement.FindFive, HUD.liveTicks);
   if (r.clock !== null) showHud(hud, HudElement.TimedRun, HUD.liveTicks);
   if (r.boss >= 0) showHud(hud, HudElement.Boss, HUD.bossTicks);
+  // The world boss sets the same timer, which is what puts its theme on.
+  if (tasks && tasks.bossPhase === 2) showHud(hud, HudElement.Boss, HUD.bossTicks);
   if (tasks && tasks.potatoPart < 0) showHud(hud, HudElement.PotatoHead, HUD.liveTicks);
   if (tasks && r.coins >= 50 && (tasks.done & 1) === 0) showHud(hud, HudElement.Hamm, HUD.liveTicks);
 
@@ -1989,6 +2005,42 @@ function saveProgress(): void {
   commitProgress(progress);
 }
 
+/**
+ * A boss level's own init (level 6's `FUN_0041ffb0`): the boss is turned to
+ * face the arena, pushed along x, given a home box big enough to roam, and
+ * marked with the flag bit the level sets. Only the levels with a
+ * `bossFight` have one.
+ */
+function startBossFight(level: number): void {
+  const fight = LEVEL_TASKS[level]?.bossFight;
+  if (!fight || !creatureSim || !tasks) return;
+  const boss = creatureSim.creatures.find((c) => c.slot === fight.creature);
+  if (!boss) return;
+  boss.heading = fight.start.heading;
+  boss.wantYaw = fight.start.heading;
+  boss.flags |= fight.start.flags;
+  boss.x += fight.start.pushX;
+  boss.homeX = boss.x;
+  boss.record.rangeX = fight.start.range;
+  boss.record.rangeZ = fight.start.range;
+  tasks.bossHealthWas = boss.health;
+  tasks.bossSwing = fight.swing;
+  tasks.bossClock = fight.clock;
+}
+
+/**
+ * Beating a world boss writes bit 7 of that level's token byte, which is the
+ * bit the save decode found set on every level of a played file and could
+ * not account for (docs/FORMATS.md). The completed byte beside it is written
+ * by the level-exit flow, which the port does not have.
+ */
+function recordBossBeaten(level: number): void {
+  if (!progress || level < 1 || level > 15) return;
+  if ((progress.p.tokens[level] ?? 0) & 0x80) return;
+  progress.p.tokens[level] = (progress.p.tokens[level] ?? 0) | 0x80;
+  saveProgress();
+}
+
 /** A power-up earned from Mr Potato Head: its bit in the record. */
 function recordPowerUp(): void {
   if (!progress || !tasks) return;
@@ -2313,6 +2365,21 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
           playerZone: zones.player,
           onGround: player.onGround,
           pathPoints: (tag) => currentLevel?.level.paths.find((p) => p.id === tag)?.points ?? null,
+          cameraYaw: camera?.yaw ?? 0,
+          sound: (event: number, at: { x: number; y: number; z: number } | null) =>
+            playEvent(event, at ?? undefined),
+          // The boss throws dust off its feet; the effect pool does the rest.
+          effect: (x: number, y: number, z: number, kind: number, mode: number, spin?: number) => {
+            if (!effects || !camera) return;
+            const e = spawnChild(effects, effectWorld(), x, y, z, kind, mode);
+            if (e && spin !== undefined) e.spin = spin - 0x80;
+          },
+          groundAt: (x: number, z: number, y: number) => {
+            if (!currentCollisionWorld) return null;
+            const u = GAME_UNITS_PER_LEVEL_UNIT;
+            const hit = groundBelow(currentCollisionWorld, x / u, y / u, z / u);
+            return hit ? hit.y * u : null;
+          },
           dust: (x, y, z) => {
             if (!effects || !camera) return;
             const off = (effects.rand.byte() - 0x80) * 0x20;
@@ -2324,6 +2391,11 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       if (request) startDialogue(request);
       // Mr Potato Head hands the power-up back inside that step.
       recordPowerUp();
+      if (tasks.bossBeaten) { recordBossBeaten(level); tasks.bossBeaten = false; }
+      if (tasks.levelWon) {
+        tasks.levelWon = false;
+        infoEl.textContent = 'the boss is beaten';
+      }
       // The boss token is awarded by the creature handler partway through
       // its death, so pick that up here too.
       if (creatureSim.bossSlotEarned && !slotDoneNow(4)) markSlotDone(tasks, 4);

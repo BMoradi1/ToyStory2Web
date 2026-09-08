@@ -804,3 +804,69 @@ floor slab the walk would start next door and cull the room Buzz is
 actually in — 80% of the frame, in the worst case measured. The walk
 therefore also takes the floor under his feet (`ZoneState.floor`, not an
 engine global) and keeps that room on screen.
+
+## The world boss
+
+Decoded and ported 2026-09-07 from level 6's `FUN_0041ffb0` (init) and
+`FUN_00420060` (tick), the first of the five boss levels. A boss level has
+no errands: its tick is the fight and nothing else, which is why
+`LEVEL_TASKS[6]` carries only a `bossFight` and `stepTasks` hands the
+whole level to `stepBossFight` and returns.
+
+**Which levels.** The engine's own test is `level % 3 == 0`, so internal
+levels 3, 6, 9, 12 and 15. Note that internal 6 is the THIRD level played
+and internal 3 the sixth, because the level-select order swaps the first
+two worlds' bosses (docs/FORMATS.md, "The save file"). So level 6 is the
+first boss a player meets.
+
+**The init** turns the boss to heading 0xc00, sets flag 0x800, pushes it
+0x80000 along x so it starts off-stage, and opens its home box to
+0x1000 either way so the fight can range over the whole garden.
+
+**Five phases** (`DAT_0052f9a4`):
+
+| phase | what happens |
+|---|---|
+| 0 | waiting. Buzz walking in past x 0x31f9e starts it |
+| 1 | the entrance: it flies in at 0x800 a tick along x, banking out of a sine sweep, and 30 ticks before the end gains the script-velocity flag so the creature mover takes it over |
+| 2 | the fight |
+| 3 | dying: it sinks 0x280 a tick until the cut runs out, and the level is won |
+| 4 | over |
+
+**The fight** runs on a lap clock, 300 ticks for the first lap and 600
+after. For the part of a lap above 0x12d it chases, putting its target on
+Buzz at height -0x10b13; below that it charges, driving its target to
+±0x40000 along x at its home height plus 0x4000, and the sign flips every
+lap. Above 0x226 on the clock it also roars, shouts every 400 ticks, and
+throws dust off both feet — points 0x80 either side of its heading, four
+sine units out, dropped to whatever ground is under them.
+
+Its flight height is bent by how far it has strayed: a counter runs 0 to
+0x800 at 0x80 a tick while the boss is outside the arena box (x -233135
+to 233647, z -139166 to 139166) and back down inside it, and the cosine
+of that counter, tripled, is added to whichever height it wants.
+
+**Being hit** is noticed by watching the health rather than by being told.
+Any change closes the shell (`vulnerable` 4, the trick the tin robot uses
+too), restarts the lap clock and stuns it for 0x78 ticks, and the stun
+ends by opening the shell again to 7. A hit that takes it under 11 health
+instead stuns it for 300, moves it to phase 3, and **writes bit 7 of that
+level's token byte in the save** — which is the bit the save decode found
+set on every level of a played file and could not account for. The health
+bar is `(health - 10) * 0x36 / 10`, its own formula and not the tin
+robot's.
+
+**Not ported.** The camera cuts (`FUN_004020f0`), which in the original
+frame the entrance and the death; the port keeps their countdown, because
+the phases hang off it and the fight would otherwise lose its timing, but
+the camera does not move. The hurt flicker, which scales the model through
+two fields the port does not carry, and the roll it takes while dying
+(+0x0c). Sequences, so the shout is silent.
+
+**Walked end to end on level 6.** Buzz crossing the trigger starts the
+entrance; the boss flies in from x 525,920 to -93,512 and the fight
+begins; a hit takes it from 20 health to 18, closes the shell to 4 and
+stuns it for about 107 ticks, after which the shell reopens; it then
+chases and charges across the garden; and taking it to 10 health starts
+the death, sinks it, wins the level and puts 0x80 in the save's level 6
+token byte. The boss bar and the boss theme both come up with the fight.

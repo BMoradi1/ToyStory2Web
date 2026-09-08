@@ -16,6 +16,7 @@
 import { CREATURE_FLAGS, CREATURE_HEALTH, type Creature } from './creatures.ts';
 import { HAMM_COINS, POTATO_PARTS, TASK_TEXT, type LevelTasks } from './level-data.ts';
 import type { RandomStream } from './creatures.ts';
+import { cos, sin } from './trig.ts';
 
 /** A dialogue the level wants opened, as `FUN_004027f0` takes it. */
 export interface DialogueRequest {
@@ -54,6 +55,38 @@ export interface TaskState {
   hintIndex: number;
   /** The boss: 0 not taunted, 1 taunt shown, 2 awake, 3 dead. */
   boss: number;
+  /**
+   * A WORLD boss (`bossFight`), which is a different thing from the
+   * mini-boss above. `phase` is `DAT_0052f9a4`: 0 waiting, 1 the entrance,
+   * 2 the fight, 3 dying, 4 over.
+   */
+  bossPhase: number;
+  /** `DAT_0052f9a0`, the lap clock; `DAT_0052f990`, ticks it stays stunned. */
+  bossClock: number;
+  bossHurt: number;
+  /** `DAT_0052f98c`, the health it had last tick. */
+  bossHealthWas: number;
+  /** `DAT_0052f994`, 0..0x800: how far outside its arena it has drifted. */
+  bossRamp: number;
+  /** `DAT_0052f9b8`, which way along x it charges; flips every lap. */
+  bossSwing: number;
+  /** `DAT_0052f9b0` taunt cooldown, `DAT_0052f998` shout cooldown. */
+  bossTaunt: number;
+  bossShout: number;
+  /** `DAT_0052f9b4`, the camera bearing last tick: it taunts when you turn away. */
+  bossYaw: number;
+  /** `DAT_0052f9a8`, alternating, which drives the flicker while it is hurt. */
+  bossFlip: number;
+  /**
+   * `DAT_0050a1f4`, the camera cut's countdown. The port has no camera cuts
+   * yet, so this only holds Buzz still and paces the phases, which is what
+   * the fight's own timing hangs off.
+   */
+  bossCut: number;
+  /** Set on the hit that kills it, which is what writes the level's token byte. */
+  bossBeaten: boolean;
+  /** Set when the fight is over and the level is won (`DAT_00830cc4`). */
+  levelWon: boolean;
   /** Counts up once the boss is gone, to the delay before its token. */
   bossGone: number;
   /** The reach-a-box challenge: 0 not offered, 1 accepted, 2 running. */
@@ -119,6 +152,9 @@ export function createTasks(): TaskState {
   return {
     done: 0, hammChatter: 0, hintChatter: 0, hintIndex: -1,
     boss: 0, bossGone: 0, reach: 0, fetch: 0, fetchDone: 0, fetchClock: 100, slowTick: 0, potatoPart: 0, powerUps: 0, potatoChatter: 0, challenge: 0, challengeFrom: 0,
+    bossPhase: 0, bossClock: 0, bossHurt: 0, bossHealthWas: -1, bossRamp: 0, bossSwing: 0,
+    bossTaunt: 0, bossShout: 0, bossYaw: 0, bossFlip: 0, bossCut: 0,
+    bossBeaten: false, levelWon: false,
     race: RaceState.Idle, laps: 0, raceQuadrant: 0, checkpoint: 0, raceBlocked: true,
     carNode: 0, carLaps: 0,
   };
@@ -149,6 +185,189 @@ function tookTalk(c: Creature): boolean {
 /** The chatter timer the helpers share: `rand * 2 + 0xf0` ticks. */
 function chatter(rand: RandomStream): number {
   return rand.byte() * 2 + 0xf0;
+}
+
+/**
+ * What the boss fight needs from the rest of the world. A superset of the
+ * errand levels' needs, kept apart because a boss level uses nothing else.
+ */
+interface BossWorld {
+  x: number; y: number; z: number;
+  rand: RandomStream;
+  cameraYaw?: number;
+  /** Raise a sound event, at a place or flat. */
+  sound?: (event: number, at: { x: number; y: number; z: number } | null) => void;
+  /** Raise a sequence rather than an event. */
+  shout?: (event: number) => void;
+  effect?: (x: number, y: number, z: number, kind: number, mode: number, spin?: number) => void;
+  groundAt?: (x: number, z: number, y: number) => number | null;
+}
+
+/**
+ * The world boss (level 6's `FUN_00420060`; docs/LEVELS.md "The world
+ * boss"). A boss level's tick is nothing but this.
+ *
+ * Five phases. It waits until Buzz walks in past `triggerX`, plays an
+ * entrance, then flies laps of the arena: for most of each lap it chases him
+ * at one height, and for the last third it charges straight along x at
+ * another, flipping sides every lap. A hit stuns it and closes its shell
+ * (`vulnerable` 4, the trick the tin robot uses too); the hit that takes it
+ * under `deathAt` starts the long death and wins the level.
+ *
+ * `bossCut` stands in for the engine's camera cuts, which are not ported. It
+ * still counts down and still holds the phases apart, so the fight keeps its
+ * timing; only the camera move is missing.
+ */
+function stepBossFight(
+  tasks: TaskState,
+  fight: NonNullable<LevelTasks['bossFight']>,
+  creatureAt: (index: number) => Creature | undefined,
+  world: BossWorld,
+  dt: number,
+): void {
+  const boss = creatureAt(fight.creature);
+  if (!boss) return;
+  world.sound?.(fight.sounds.hum, null);
+  tasks.bossFlip = (tasks.bossFlip - 1) & 1;
+
+  // --- a hit. The engine watches the health rather than being told about it.
+  if (boss.health !== 0 && boss.health !== tasks.bossHealthWas) {
+    const first = tasks.bossHealthWas < 0;
+    tasks.bossHealthWas = boss.health;
+    if (!first) {
+      boss.record.vulnerable = 4;
+      tasks.bossClock = fight.clock - 1;
+      if (boss.health < fight.deathAt) {
+        tasks.bossHurt = fight.deathStun;
+        tasks.bossCut = fight.deathStun;
+        tasks.bossPhase = 3;
+        // This is what writes bit 7 of the level's token byte in the save.
+        tasks.bossBeaten = true;
+      } else {
+        tasks.bossHurt = fight.stun;
+        tasks.bossCut = fight.stun;
+      }
+    }
+  }
+
+  // --- the stun, and the shell opening again when it ends.
+  tasks.bossHurt -= dt;
+  if (tasks.bossHurt < 0) {
+    tasks.bossHurt = 0;
+    boss.record.vulnerable = 7;
+  } else if (tasks.bossHurt < 0x5a) {
+    world.sound?.(fight.sounds.hit, boss);
+  }
+
+  // --- how far outside its arena it has drifted, which swings its height.
+  const inside = boss.x > fight.arena.xMin && boss.x < fight.arena.xMax
+    && boss.z > fight.arena.zMin && boss.z < fight.arena.zMax;
+  tasks.bossRamp = Math.max(0, Math.min(0x800, tasks.bossRamp + (inside ? -1 : 1) * dt * 0x80));
+
+  // --- Buzz walking in is what starts it.
+  if (world.x < fight.triggerX && tasks.bossPhase === 0) {
+    tasks.bossPhase = 1;
+    tasks.bossCut = fight.clock;
+    tasks.bossClock = fight.clock;
+    tasks.bossSwing = fight.swing;
+  }
+
+  // --- it notices you turning away from it, and taunts.
+  if (tasks.bossPhase > 0 && tasks.bossPhase < 3) {
+    if (tasks.bossHurt === 0) world.sound?.(fight.sounds.fly, boss);
+    if (tasks.bossTaunt === 0 && dist256(world, boss) < fight.noticeRange) {
+      let turned = ((world.cameraYaw ?? 0) - tasks.bossYaw) & 0xfff;
+      if (turned > 0x800) turned -= 0x1000;
+      if (Math.abs(turned) > 0x40) {
+        world.sound?.(fight.sounds.taunt + (world.rand.byte() & 1), boss);
+        tasks.bossTaunt = fight.tauntGap;
+      }
+    } else {
+      tasks.bossTaunt = Math.max(0, tasks.bossTaunt - dt);
+    }
+    tasks.bossYaw = world.cameraYaw ?? tasks.bossYaw;
+  }
+
+  // --- the entrance. It flies in along x under the level's own hand, banking
+  //     out of a sine sweep, and 30 ticks before the end it is handed to the
+  //     creature mover (the script-velocity flag) so the fight can steer it.
+  if (tasks.bossPhase === 1) {
+    if (tasks.bossCut < fight.handOver) boss.flags |= CREATURE_FLAGS.scriptVelocity;
+    const sweep = Math.max(0, tasks.bossCut - fight.handOver);
+    boss.hover = ((cos(sweep * 0x14) >> 3) - 0x800) & 0xfff;
+    boss.x -= dt * fight.flyIn;
+    tasks.bossCut = Math.max(0, tasks.bossCut - dt);
+    if (tasks.bossCut === 0) tasks.bossPhase = 2;
+  }
+
+  // --- the fight.
+  if (tasks.bossPhase === 2) {
+    tasks.bossClock -= dt;
+    if (tasks.bossClock < 1) {
+      tasks.bossClock = fight.lap;
+      tasks.bossSwing = -tasks.bossSwing;
+    }
+    // The height it wants swings with how far out of the arena it has got.
+    const lift = cos(tasks.bossRamp) * 3;
+    if (tasks.bossClock < fight.chargeUnder) {
+      // The charge: straight along x, taking no notice of where Buzz is.
+      boss.targetX = tasks.bossSwing;
+      boss.targetZ = 0;
+      boss.targetY = lift + fight.chargeY + boss.homeY;
+    } else {
+      boss.targetX = world.x;
+      boss.targetZ = world.z;
+      boss.targetY = lift + fight.chaseY;
+      if (tasks.bossClock < fight.roarOver) {
+        world.sound?.(fight.sounds.roar, boss);
+        tasks.bossShout -= dt;
+        if (tasks.bossShout < 0) {
+          tasks.bossShout = fight.shoutGap;
+          world.shout?.(fight.sounds.shout);
+        }
+        // Dust off both feet, thrown where each one meets the ground.
+        for (const side of [-fight.foot.angle, fight.foot.angle]) {
+          const a = (boss.heading + side) & 0xfff;
+          const fx = boss.x + sin(a) * fight.foot.reach;
+          const fz = boss.z + cos(a) * fight.foot.reach;
+          const fy = world.groundAt?.(fx, fz, boss.y);
+          if (fy === null || fy === undefined) continue;
+          world.effect?.(fx, fy, fz, 0x7b, 2);
+          world.effect?.(fx, fy, fz, 0x7c, 1, world.rand.byte());
+        }
+      }
+    }
+  }
+
+  // --- it banks into its turns, and spins while it is stunned. `hover` is
+  //     the spare angle the draw code reads (+0x10); the second one the
+  //     original rolls while dying (+0x0c) is not modelled here.
+  if ((boss.flags & CREATURE_FLAGS.scriptVelocity) !== 0) {
+    if (tasks.bossHurt === 0) {
+      let turned = (boss.heading - boss.wantYaw) & 0xfff;
+      if (turned > 0x800) turned -= 0x1000;
+      boss.hover -= (boss.hover - ((turned / 2) | 0)) >> 5;
+    } else {
+      boss.hover = (boss.hover + dt * 0x40) & 0xfff;
+    }
+  }
+
+  // --- dying: it sinks, and the level is won when the cut runs out.
+  if (tasks.bossPhase === 3) {
+    boss.targetY -= dt * 0x280;
+    boss.y -= dt * 0x280;
+    tasks.bossCut = Math.max(0, tasks.bossCut - dt);
+    if (tasks.bossCut === 0) {
+      tasks.levelWon = true;
+      tasks.bossPhase = 4;
+    }
+  }
+}
+
+/** Steps of 256 game units, the engine's own coarse distance (`FUN_0049f400`). */
+function dist256(a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }): number {
+  const dx = (a.x - b.x) >> 8, dy = (a.y - b.y) >> 8, dz = (a.z - b.z) >> 8;
+  return Math.sqrt(dx * dx + dy * dy + dz * dz);
 }
 
 /**
@@ -229,6 +448,17 @@ export function stepTasks(
      */
     cameraZone: number;
     playerZone: number;
+    /** Which way the camera faces, 12-bit. The boss taunts when you turn away. */
+    cameraYaw?: number;
+    /** Raise a sound event, at a place or flat. The boss fight is noisy. */
+    sound?: (event: number, at: { x: number; y: number; z: number } | null) => void;
+    /**
+     * Spawn one effect record, game units. The boss throws dust off its feet;
+     * src/sim/effects.ts does the work.
+     */
+    effect?: (x: number, y: number, z: number, kind: number, mode: number, spin?: number) => void;
+    /** The ground under a point, game units, or null where there is none. */
+    groundAt?: (x: number, z: number, y: number) => number | null;
   },
   dt = 1,
 ): DialogueRequest | null {
@@ -389,6 +619,12 @@ export function stepTasks(
         };
       }
     }
+  }
+
+  // --- a world boss owns the whole level.
+  if (level.bossFight) {
+    stepBossFight(tasks, level.bossFight, creatureAt, world, dt);
+    return null;
   }
 
   // --- the mini-boss.

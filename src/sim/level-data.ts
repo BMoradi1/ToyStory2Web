@@ -274,7 +274,57 @@ export const TASK_TEXT = {
 } as const;
 
 /** Who runs which task on a level, from its tick's calls to the helpers. */
+/**
+ * A world boss and its arena. The five levels whose number divides by three
+ * are boss levels, and their tick is the fight rather than a set of errands
+ * (docs/LEVELS.md "The world boss"). Level 6 is the first one ported.
+ */
+export interface BossFight {
+  /** The placement slot the boss lives in. */
+  creature: number;
+  /** What the level's init does to it before anything moves. */
+  start: { heading: number; flags: number; pushX: number; range: number };
+  /** Buzz walking in past this x is what starts the fight. */
+  triggerX: number;
+  /** Outside this box the boss's flight height swings away. */
+  arena: { xMin: number; xMax: number; zMin: number; zMax: number };
+  /** How far along x it charges, flipping sides each lap. */
+  swing: number;
+  /** The phase clock: this to begin with, then this much every lap. */
+  clock: number;
+  lap: number;
+  /** Under this on the clock it charges; over that one it also roars. */
+  chargeUnder: number;
+  roarOver: number;
+  /** The height it flies at while chasing, and while charging. */
+  chaseY: number;
+  chargeY: number;
+  /** Ticks it is stunned by a hit, and by the one that kills it. */
+  stun: number;
+  deathStun: number;
+  /** With this much of the entrance left, the mover takes the boss over. */
+  handOver: number;
+  /** How far along x it flies in per tick during the entrance. */
+  flyIn: number;
+  /** Health below this is the last hit. */
+  deathAt: number;
+  /** The bar reads `(health - from) * 0x36 / over`. */
+  bar: { from: number; over: number };
+  /** How far from the boss Buzz has to be for it to notice him. */
+  noticeRange: number;
+  /** Ticks between one taunt and the next. */
+  tauntGap: number;
+  /** Ticks between the shouts it makes while chasing. */
+  shoutGap: number;
+  /** The two feet, at this angle either side of the heading and this far out. */
+  foot: { angle: number; reach: number };
+  /** Sound events: the arena hum, the hit, the flying loop, the two taunts, the roar. */
+  sounds: { hum: number; hit: number; fly: number; taunt: number; roar: number; shout: number };
+}
+
 export interface LevelTasks {
+  /** The level's boss, on a level whose number divides by three. */
+  bossFight?: BossFight;
   /** `FUN_004a1ce0(creature, pathTag, x, y, slot)`: talk to him holding fifty coins. */
   hamm?: { creature: number; pathTag: number; playerYaw: number; creatureYaw: number; slot: number };
   /** `FUN_004a1e60(creature, pathTag, hints)`: says what is still to do. */
@@ -582,6 +632,30 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
     findFive: {
       creature: 0x13, pathTag: 0x10,
       askText: 0x4f1d5c, doneText: 0x4f1dec, slot: 1, needed: 5, countedBy: 'creature',
+    },
+  },
+  /**
+   * The first world's boss (`FUN_0041ffb0` init, `FUN_00420060` tick). No
+   * errands on a boss level: the whole tick is the fight, and the numbers
+   * are its own. docs/LEVELS.md "The world boss".
+   */
+  6: {
+    bossFight: {
+      creature: 0,
+      start: { heading: 0xc00, flags: 0x800, pushX: 0x80000, range: 0x1000 },
+      triggerX: 0x31f9e,
+      arena: { xMin: -233135, xMax: 233647, zMin: -139166, zMax: 139166 },
+      swing: 0x40000,
+      clock: 300, lap: 600,
+      chargeUnder: 0x12d, roarOver: 0x226,
+      chaseY: -0x10b13, chargeY: 0x4000,
+      stun: 0x78, deathStun: 300,
+      handOver: 0x1e, flyIn: 0x800,
+      deathAt: 11,
+      bar: { from: 10, over: 10 },
+      noticeRange: 400, tauntGap: 100, shoutGap: 400,
+      foot: { angle: 0x80, reach: 4 },
+      sounds: { hum: 0x67, hit: 0x66, fly: 0x61, taunt: 0x62, roar: 0x65, shout: 0xd0 },
     },
   },
   7: {

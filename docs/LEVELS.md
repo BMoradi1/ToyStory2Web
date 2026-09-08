@@ -874,3 +874,121 @@ stuns it for about 107 ticks, after which the shell reopens; it then
 chases and charges across the garden; and taking it to 10 health starts
 the death, sinks it, wins the level and puts 0x80 in the save's level 6
 token byte. The boss bar and the boss theme both come up with the fight.
+
+## The Slime, internal level 3 — DECODED, not ported
+
+Decoded 2026-09-07 from `FUN_0041a8a0` (init) and `FUN_0041aa10` (tick),
+the sixth level played and world 2's boss. Scene `level03/level`, one
+creature, type 16 SLIME on AI script 14, placed with 99 health and speed
+64. This is a different kind of fight from level 6's and needs four
+things the port does not have yet, listed at the end; the numbers here
+are the whole of it.
+
+**The idea.** The slime is a blob whose SIZE is its health. Two numbers
+carry it: the size it is trying to be, `DAT_0052f75c`, and the size it
+grows back to, `DAT_0052f6f0`, both 0x1000 at the start; a third,
+`DAT_0052f704`, is the eased actual size (an eighth of the gap a tick,
+a thirty-second during the entrance). The health bar reads
+`((0x3800 - goal) >> 11) * 0x36 / 5`, so it has five stages, and the
+creature's own health word is never allowed to fall: every hit is noticed
+by comparing it with the value saved at init (`DAT_0052f730`) and
+putting it straight back.
+
+**Init.** The boss faces 0x800 (heading and `wantYaw`), is moved
+0x10000 along z, gets flag 0x800, hit radius 1000 (+0x2a), the draw
+triple +0x24/26/28 at 0x2000, and its `+0x8a` timer cleared. The level's
+packet word at `DAT_00559d6c + 8` is saved and replaced with 0x80000000
+(a plane the level draws, put out of reach until the fourth stage).
+Light 0 is placed at the boss, 11,000 under it (`FUN_004cce30`, level
+units), light 0x32 is dimmed to nothing and light 0 set to (5000, 5000,
+5000) (`FUN_004ccb20`).
+
+**Every tick**, in order:
+
+1. Sounds 0x6f (with a "1", sustained) and 0x67 (the arena hum). A
+   150-tick timer from init (`DAT_0052f718`) plays voice sequence 0xd2
+   once when it expires. Three wobble phases advance: `DAT_0052f748` by
+   0x1f, `DAT_0052f74c` by 0x3f, `DAT_0052f750` not at all.
+2. **Trigger** (`DAT_0052f754` 0 -> 1): Buzz within 0x17c steps of 256
+   game units of the boss in x/z (`FUN_0049f3c0`). A 300-tick cut to the
+   boss with its y temporarily 11,000 higher (so the cut looks at its
+   top), and the level's music starts.
+3. **Entrance** (phase 1): with under 0xf0 of the cut left, sound 0x46 at
+   the boss once; under 0x96, sequence -4 once and the actual size eases
+   toward the target a thirty-second a tick. At zero the script is jumped
+   to word 9 (`+0x80 = script + 0x12`, `+0x78 = 0`), light 0's rotation
+   is zeroed (`FUN_004ccc70`), and the phase becomes 999.
+4. **The fight** (phase 999):
+   - A voice timer (`DAT_0052f71c`, 180 at init) counts down and reloads
+     to `rand + 0x708`, playing sequence 0xd1 at Buzz each time.
+   - Buzz within 0x32 steps of the boss is shoved away along the line
+     from it: `FUN_004071e0(yaw, 3)`, which sets his velocity from the
+     angle (bit 1) and knocks him down (bit 2).
+   - **A hit** (health changed): the flash timer `DAT_0052f710` = 4; the
+     target size falls by 0x300; health is put back. If the target size
+     is now under 0x200 it is pinned there and the GOAL grows by 0x800;
+     every live effect of kind 0x3f is given one tick to live (its blobs
+     burst); at a goal of 0x3000 or more the light comes back
+     (`FUN_004ccb20(0x32, 0x1000 x3)`) and the saved packet word is
+     restored, and at 0x3800 or more it is **dying**: script to word 0x5e
+     (`+0xbc`), Buzz shifted 10,000 on x and z for the cut and back after,
+     goal 0x3800, target and actual sizes 1, a 420-tick cut to the boss
+     (raised 11,000 for it), flags cleared of 0x180, light 0's y set to
+     1,000 under the boss, bit 7 of this level's token byte written, and
+     the phase becomes 1000. Otherwise (a stage lost but not dead): shell
+     closed (`vulnerable` 4), script to word 0x4f (`+0x9e`), a cut of
+     `DAT_0052f758` ticks (180 at init, +40 each time) to the boss raised
+     14,000, its velocity zeroed, anim state 1 on script 0x10.
+   - While the shell is closed, the cut's look point is held
+     `size * 2 + 10000` under the boss.
+   - **Regrowing** toward the goal while the target is under it: with the
+     shell closed and under 0x78 of the cut left, sequence -4 once and the
+     target eases up a thirty-second of the gap a tick; with the shell
+     closed and more of the cut left, the script's wait is set to 5;
+     with the shell open, the target rises 32 a tick. Capped at the goal.
+   - The script talks back through `+0x8a`: 1 = spit, an effect of kind
+     0x3f from 10,000 above the boss with velocity y -2 and rotation
+     `heading * 4`, its homing pitch (+0x20) cleared, with sound 0xd;
+     3 = a 40-tick camera shake (`DAT_0050a510`). The timer is cleared.
+5. **Dying** (phase 1000): the cut looks 11,000 under the boss; with
+   under 180 of the cut left the boss is killed (`FUN_00405d20(e, 1)`)
+   9,000 higher than it stands, the light's fall speed `DAT_0052f6fc` is
+   set to -0xc00 and the phase becomes 1001. Light 0 then falls under
+   gravity 0x60 a tick and bounces off the point 2,000 above the boss at
+   half speed, with sound 0x45 while it is still fast. Phase 1001 waits
+   for the cut to end, 1002 counts on to 1030 and sets the level-won flag
+   (`DAT_00830cc4`).
+6. Every tick the fight is on: an effect of kind 0x41 from 10,000 above
+   the boss (mode 0x14, spin `(rand - 0x80) >> 3`); the boss's previous
+   state and frame fields (+0x16, +0x1c) copied from the current, +0x32
+   set to 0xfed3, the draw scale +0x2c/2e/30 set to the actual size, and
+   the hit table at +0x84 rewritten — +0x12 of every 0x20 bytes to
+   `-12000 - size` and +0x1e to `size / 16`, for four entries — so the
+   slime is hit where it is drawn. The boss theme timer is set while the
+   phase is over 0x3e6. A full-screen overlay is drawn (`FUN_0049b260(0x18,
+   0, 0x40, 0x40, 0x40, u, v, 0, 0x40)`, `v` scrolling one a tick), a
+   point light sits at (0x3889, -0x36099, -0x1fbc) at 0x80 grey, and the
+   draw triple +0x24/26/28 is either the three wobble sines `>> 4` under
+   mode `+0x34 = 0xf0000` or, while the flash timer runs, 0x2000 under
+   mode 1.
+7. Light 0 is turned to the boss's heading with a pitch and roll from
+   `DAT_0052f6f8`, which advances 0x80 a tick until the size drops under
+   0x400. Around the CAMERA, on a level with `DAT_0052f1c8` set, drips of
+   kind 0x1b fall from `rand` ahead of it. A slow ambient (`DAT_0052f700`,
+   20,000 ticks) sounds 0x70 from a point 200-ish ahead, and a rumble
+   (`DAT_0052f708`) shakes the screen brightness registers
+   (`DAT_0054dd6c/de9c/554038`) between 0x80 and `n * 3 + 0x80`.
+8. The **target marker**: the first live effect of kind 0x3f has its
+   position published to `DAT_00830d78/7c/80` with `DAT_00830d84 = 1`
+   (`DAT_00830d88 = -3`), which the laser homes on and the HUD marks;
+   with none, the marker is off.
+
+**What the port needs before this can move.** (1) A per-creature draw
+scale (+0x2c/2e/30, 0x2000 = 1) and the draw modifier triple +0x24/26/28
+with its mode word +0x34, which the port's `offsetX/Y/Z` currently
+holds from the model — the two uses want reconciling. (2) Rewriting the
+hit table per tick, which `hitShapes` is read-only for now. (3) Effect
+kinds 0x3f (the spat blob, with the laser target hook), 0x41 and 0x1b,
+none exercised yet. (4) The knockback `FUN_004071e0(yaw, bits)` on the
+player. Lights and the overlay are cosmetic; the camera cuts and the
+save bit are already there.

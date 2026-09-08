@@ -701,6 +701,12 @@
                 (docs/CAMERA.md "Cuts", src/sim/camera-cut.ts), and the
                 talk box now eases back through the same blend. Left:
                 internal levels 3, 9, 12 and 15, each its own fight.
+                LEVEL 3 (the Slime, sixth played) is DECODED 2026-09-07
+                (docs/LEVELS.md "The Slime"); it is a size-is-health
+                blob with five stages and needs four things first: a
+                per-creature draw scale, a rewritable hit table, effect
+                kinds 0x3f/0x41/0x1b, and the player knockback
+                FUN_004071e0. Levels 9, 12 and 15 not read yet.
  P3.8 [PART]    The talk box: DONE for hint signs 2026-09-05
                 (src/sim/talk.ts). Touching a signpost freezes Buzz, flies
                 the camera along the sign's path with the engine's own

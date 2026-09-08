@@ -902,9 +902,11 @@ putting it straight back.
 triple +0x24/26/28 at 0x2000, and its `+0x8a` timer cleared. The level's
 packet word at `DAT_00559d6c + 8` is saved and replaced with 0x80000000
 (a plane the level draws, put out of reach until the fourth stage).
-Light 0 is placed at the boss, 11,000 under it (`FUN_004cce30`, level
-units), light 0x32 is dimmed to nothing and light 0 set to (5000, 5000,
-5000) (`FUN_004ccb20`).
+Scene object 0 is placed at the boss, 11,000 under it (`FUN_004cce30`
+moves a `.ngn` scene object, level units), scene object 0x32 is scaled
+to nothing and object 0 to (5000, 5000, 5000) (`FUN_004ccb20` scales
+one; `FUN_004ccc70` / `FUN_004ccce0` turn one, `FUN_004ccef0` reads one's
+position). Where "light" appears below, read "scene object".
 
 **Every tick**, in order:
 
@@ -1095,3 +1097,118 @@ else the boss 0x4000 above. The boss theme timer is set in phases 2 and
 **What the port needs first.** The same four things as the Slime plus
 one: a creature reset from placement (`FUN_00406cd0`, which the sim's
 respawn nearly is), and the beam draw.
+
+## Zurg, internal level 12 — DECODED, not ported
+
+Decoded 2026-09-07 from `FUN_0042b300` (init) and `FUN_0042b3a0`
+(tick). Scene `level02/level1`, which the port cannot load until
+`parseDat` is retiled (docs/FORMATS.md); music `buzvzurg`; the boss is
+slot 0. A simple fight with a set-piece death.
+
+**Init.** Flag 0x800; the boss raised 0x28000 and moved 0x10000 along z,
+heading 0xc00, `targetY` its own height, record +0xe (its anim/speed
+byte) 0; a 300-tick clock, a 0x78 voice timer, a 0x104 attack clock.
+
+**Phases** (`DAT_0052fe24`):
+
+| phase | what happens |
+|---|---|
+| 0 | waiting. Buzz's x rising to -0x18b2a or above starts it: music, a 300-tick cut to the boss (eye 0x3000 short of it, 0x5000 up, look 0x4000 up), sound 0xd8 |
+| 1 | the entrance: the boss rises 0x200 a tick, the cut's eye 0x220 a tick and back along x (faster under 0xb4); voice 0xb9 once after 0x78; Buzz is pinned to (-0x1da7c, -0x12bd0, 0xf699) whenever he gets above -70,000; at the cut's end flags |= 0xc (script velocity and chase), record +0xe = 10, `vulnerable` 6, phase 2 |
+| 2 | the fight |
+| 3 | dying |
+| 4 | over |
+
+**The fight.** A voice line every `rand * 2 + 400` ticks (0xba..0xbd);
+the camera's look-at is the boss; the boss theme timer is set. **A hit**:
+a one-in-four voice 0xd9 at Buzz; stun 0x3c; shell closed (`vulnerable`
+4); flicker through the draw triple on alternate ticks while stunned.
+Under 10 health it **dies**: phase 3, a 300-tick cut from a sine unit off
+its heading and 0x4000 up, anim 2 / script 0x19, chase and script
+velocity cleared, its two animation-rate bytes 0xc0 and the record's
++0x1c/+0x1d 0x20, the save's token bit, voice 0xc0. Otherwise a voice
+(0xbe/0xbf), anim 1 / script 2, rate bytes 0xe0, attack clock 0.
+
+**The attack clock** `DAT_0052fe30` runs 0x12e down to 0. Passing 200:
+anim 0 / script 0x18, rates 0xc0 (winding up). Passing 0x92, 0x8a, and
+each tick from 0x7e to 0x7f: a shot from (-0xfa, -0xfa, 0) in the
+boss's frame — kind 0x6c with velocity from its heading (a cosine from
+the table at 0x4fee88 and a sine 0x80 round, both a quarter) and gravity
+0x400 when its health is above 0x13 or `DAT_0052fe34` is 0, else kind
+0x6d thrown straight up with rotation `heading * 4` — and sound 0x9d.
+Passing 0x68: anim 1 / script 2, rates 0xe0. At 0 the clock reloads and
+the boss strafes: velocity a sixteenth of a sine unit at heading ±0x200,
+the sign random.
+
+**Dying** (phase 3). Buzz pinned as before. The boss turns toward
+(-0xbd7c, 0x99); inside the box x (-0x256d6, 0xe0aa) z (-0x1b3e9,
+0x1b297) it drives outward at a sixteenth of a sine unit; outside it,
+record +0xe = 0, it spins 0x10 a tick and RISES with an accelerating
+`DAT_0052fe2c` (+0x40 a tick) to 170,000, sound 0x9f on arrival, sound
+0x9e above 70,000, and throws effects of kind 0x70 from 80,000 up with
+velocity -0x2400 while detail is on. The cut looks at it from
+-0x188e0 up, a sine unit over its acceleration away; the level is won
+when the cut ends. Whatever the phase, the boss is held within 0x500
+steps of that same point, and the bar is `(health - 9) * 0x36 / 20`.
+The target marker (`DAT_00830d84`) is put on the path-0 node nearest
+Buzz that lies within 1,000 steps of the camera, and every such node
+gets a grey glow.
+
+**What the port needs first.** The draw triple and mode word, effect
+kinds 0x6c / 0x6d / 0x70, the target marker, and Buzz pinned by the
+level. No knockback and no hit-table rewriting, so it is the easiest of
+the four after level 6.
+
+## The finale, internal level 15 — the stage is DECODED, the fighters not yet
+
+Decoded 2026-09-07 from `FUN_0042faa0` (init) and `FUN_0042fc50`
+(tick). Scene `level05/level1`, music `buzvpros`. Five creatures: slots
+0-2 the three bosses SMITH, GUNSL and PROSP (29 health each, scripts 39,
+33, 41), slot 3 JESSIE and slot 4 WOODY (1 health, never respawn). The
+tick is the stage — the entrance, the chain, the camera, the win; each
+boss's own behaviour is in a routine of its own: `FUN_0042f310` (SMITH,
+529 bytes), `FUN_0042f530` (GUNSL, 632) and `FUN_0042f7b0` (PROSP, 752),
+which are what advance the win counter, and which are the next read.
+
+**Init.** All five turned to 0x400; the three bosses' health zeroed and
+placed at (-0x32c6d, -0x92d6, -0x14f5), (-0x327cc, -0x92da, -0x45cd)
+and (-0x32bbf, -0x92db, -0x8251); everyone's respawn 10000; the arena
+point read from scene object 0 (`FUN_004ccef0`) and its y kept.
+
+**The entrance** runs off a counter `DAT_0052fff8` started at 0x50 by
+Buzz's x falling under -0x16bd9, together with a 480-tick cut of
+distance 0x38 to scene object 0 (eye 0x4000 up, look 0x2000 up; between
+0x168 and 0xf0 of it the eye tracks 0x180 a tick along x). The counter
+runs to 1000 and fires as it passes: 0x96 voice 0xcd at Jessie; 0x118
+Jessie thrown up (vy -0x300) and Woody (-0x400); 0x14f the same swapped;
+0x168 both again with a spin and their z velocity zeroed; 0x1ae the three
+bosses thrown up (-0x700, -0x600, -0x800) and given 29 health, Jessie's
+and Woody's health cleared, sound 10 — each step with sound 0x2f, a
+bounce of scene objects 0, 1, 3 and 4 (a velocity from -0xc00 rising
+0x200 a tick, capped at the kept y) and a 0x800-tick wobble applied to
+objects 0-3 as a rotation from a sine, its axis by which step. Under 0x1e
+of the cut, once: music, the three bosses' phase words set to 2 and each
+jumped to word 0xe of its script with its record's +0xf cleared, ground
+velocities and a 0x400 x velocity, sound 0xe, voice 199 at PROSP.
+
+**The chain.** While the fight is on, GUNSL keeps a sine unit (0x4000
+game units) from SMITH, PROSP the same from GUNSL, and PROSP from SMITH,
+each pulled back along the bearing when closer than 512 level units.
+None of them may cross x = -0x2bdd6 while moving toward it.
+
+**The camera roll.** 0xf0 ticks into the fight a counter `DAT_00530068`
+starts climbing 8 a tick to 0x3000 and the follow camera's ROLL
+(`DAT_0052f3c4`) is set from a cosine of it, shaped so it swings for
+0x800, holds, swings back and rests; sound 0xa8 plays throughout with
+its pitch from the same cosine. The bar is the three healths less 27,
+times 0x36, over 60; the boss theme timer is set.
+
+**The win.** The three routines count `DAT_00530064`; at 3 a 0x78-tick
+cut of distance 0x20 to the last boss beaten (`DAT_0052fff4`), and when
+it ends: Jessie and Woody turned to 0x400, placed at (-0x4e4e0, -0xbc80,
+0x14e0) and (-0x46944, -0xb680, -0x1bea) with 1 health, the save's token
+bit, a 300-tick cut to Woody at distance 0x40 (eye 0x3000 along, 0x3000
+up, 0x1000 back; its z drifting 0x20 a tick), the level-complete flow
+(`DAT_0052b7dc = 1`, `DAT_0052f2dc = 0xf0`). Path-0 nodes within 1,024
+steps of the camera glow (node 2 red, the rest grey) and the nearest to
+Buzz is the target marker.

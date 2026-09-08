@@ -709,9 +709,11 @@
                 FUN_004071e0. LEVEL 9 (the pod, ninth played) is
                 DECODED 2026-09-07 (docs/LEVELS.md "The pod"): a
                 stage-clamped boss that releases helpers you must kill,
-                six orbiting BUBs, a wrist laser. Levels 12 and 15 not
-                read yet; 12 cannot even be loaded until parseDat is
-                retiled.
+                six orbiting BUBs, a wrist laser. LEVEL 12 (Zurg) is
+                DECODED ("Zurg"): the easiest port after 6, but its
+                scene cannot load until parseDat is retiled. LEVEL 15's
+                stage is decoded ("The finale"); its three bosses'
+                routines FUN_0042f310/f530/f7b0 are the last read.
  P3.8 [PART]    The talk box: DONE for hint signs 2026-09-05
                 (src/sim/talk.ts). Touching a signpost freezes Buzz, flies
                 the camera along the sign's path with the engine's own

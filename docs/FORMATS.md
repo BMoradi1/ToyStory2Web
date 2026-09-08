@@ -781,17 +781,19 @@ low byte of the flags word at `+0x28` (`zone = flags & 0xff`, and
 unread). Level 1 uses zones 0-8; level 2 uses 0-4, and in both, zone 0's
 objects are spread over the whole level, matching its always-drawn role.
 
-**This is the one thing not yet usable, and here is why.** Our geometry comes
-from `level.dat`, whose object records carry no zone — the low nibble of
-`Object.flags` was tested and does not match. The two files hold the same
-number of objects (1,126 in level 1, 588 in level 2) but are ordered
-differently, and matching them by position resolves only 65-72%: about a
-quarter of `level.dat`'s objects sit thousands of units from any scene
-instance, so the scene is not simply a permutation of it. Two ways forward,
-neither attempted: find the correlation some other way (mesh identity rather
-than position), or build the render geometry from the `.ngn` scene instead of
-`level.dat`, which is after all what the PC executable does and would bring
-zones, materials and per-vertex alpha with it.
+**The zone is in `level.dat` after all** (found 2026-09-07; "level.dat,
+from the loader" below). The records this parser tiles as objects are the
+24- or 32-byte TRANSFORM records; the loader's own object list, which the
+parser had never read, is a separate list of 20-byte entries each holding
+a flags byte at +0xe, the ZONE at +0xf and a pointer at +0x10 to the
+transform record. An earlier note here tested the low nibble of the
+transform's flags and, finding no zone, matched `.ngn` instances to
+objects by position instead. `applyObjectZones` now walks that list and
+keys the byte by the pointer, so every object carries `zone` from the
+file, and `assignZones` is only the fallback. Where both exist they agree
+on every object of most scenes and on all but a handful elsewhere
+(`tools/dat-walk-validate.ts` prints the count), the byte being the one
+the engine draws by.
 
 ### Texture mapping — SOLVED
 
@@ -1140,13 +1142,16 @@ runs it over every scene in the install.
     the mesh pool, reached only through each object's pointer
 
 An object is `i32 x, y, z; i16 at +0xc (made positive on load); u8 flags at
-+0xe, 0 ending the list; u8; u32 mesh`, the last a file offset to the mesh
-header, whose +0xc holds the three rotation angles, whose +0x14/+0x18 (or
-+0x1c/+0x20 when flag 8 is set) are further offsets the loader relocates,
-and whose +0x12/+0x14/+0x16 under flag 8 are per-axis scales the loader
-folds into the rotation matrix. Flag 0x80 is rewritten to 0x40. Records are
-always 20 bytes: the "20, 24 or 32" the heuristic tiler allows for were
-never the object records.
++0xe, 0 ending the list; u8 ZONE at +0xf; u32 record`, the last a file
+offset to the object's transform record — which is exactly the 24- or
+32-byte record this parser tiles as `DatObject`: `x, y, z` again, three
+rotation angles at +0xc, and under flag 8 (the 32-byte shape) three scales
+at +0x12 and its mesh pointers at +0x1c/+0x20, else at +0x14/+0x18. The
+loader relocates those pointers, folds the scales into the rotation
+matrix, caps the detail byte (+0x13 or +0x19, top five bits) at 0x12, and
+replaces the object's +0x10 with a 32-byte runtime record it appends after
+the file: the 3x3 matrix, a pointer back to the transform, and a size
+from `FUN_0043e430`. Flag 0x80 is rewritten to 0x40.
 
 So the file has no header at all beyond the record count. The old reading
 — markers at +4 — held because the marker record is the first record in

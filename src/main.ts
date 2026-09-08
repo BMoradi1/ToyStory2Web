@@ -322,10 +322,16 @@ async function showLevel(index: number): Promise<void> {
       let zones: (number | null)[] = parsed.objects.map(() => null);
       if (sceneBytes) {
         try {
-          zones = assignZones(
-            parsed.objects.map((o) => ({ ...o, faceCount: objectFaceCount(parsed, o) })),
-            parseNgnScene(sceneBytes),
-          );
+          // The room is in level.dat itself (the loader's object list); the
+          // scene-file matching stays as the fallback for a file the walk
+          // could not reach, and agrees with the byte wherever both exist.
+          const native = parsed.objects.map((o) => o.zone);
+          zones = native.every((z) => z !== null)
+            ? native
+            : assignZones(
+              parsed.objects.map((o) => ({ ...o, faceCount: objectFaceCount(parsed, o) })),
+              parseNgnScene(sceneBytes),
+            );
         } catch { /* no zones: the level still draws, just all at once */ }
       }
       currentLevel = { level: parsed, zones };

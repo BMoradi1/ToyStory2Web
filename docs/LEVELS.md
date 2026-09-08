@@ -765,9 +765,12 @@ frame. Play therefore draws every room and `ts2.zoneCulling(true)` turns
 the walk on to look at it.
 
 **Why that is, is not settled.** The first guess was the object-to-room
-labels, since they come from matching `.ngn` instances to `level.dat`
-objects by position. That guess is wrong, and the check that killed it is
-worth keeping: `tools/zone-assign-validate.ts` compares each object's
+labels, since they came from matching `.ngn` instances to `level.dat`
+objects by position. That guess is wrong — and since 2026-09-07 the room
+comes straight out of `level.dat`'s own object list (docs/FORMATS.md
+"level.dat, from the loader"), which changes the measurement not at all:
+20 of 24 placements clean on level 1 and 14 of 24 on level 10. The check
+that killed the guess is still worth keeping: `tools/zone-assign-validate.ts` compares each object's
 label with the zone floor beneath it, and on level 1 the 22 objects whose
 label names a room the floor's room does not even join all sit at
 positions where every `.ngn` instance agrees on the room. There was no

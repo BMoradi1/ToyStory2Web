@@ -89,6 +89,15 @@ export interface DatObject {
   /** Byte offset of this object's mesh, stored as the record's final field. */
   meshOffset: number;
   position: Vec3;
+  /**
+   * The visibility zone, straight from the file: the loader's object list
+   * (`FUN_0043e6e0`, "level.dat, from the loader" in docs/FORMATS.md) is
+   * 20-byte entries whose byte at +0xf is the room and whose pointer at
+   * +0x10 is this record. Null only if the walk could not reach this record.
+   */
+  zone: number | null;
+  /** Which of the loader's two object lists named it: 0 near, 1 far. */
+  datList: 0 | 1 | null;
   /** Rotation in PSX angle units (4096 == 360 degrees). */
   rotation: Vec3;
   /** Scale in 4.12 fixed point (4096 == 1.0). */
@@ -539,6 +548,7 @@ export function parseDat(buffer: ArrayBuffer | Uint8Array): DatLevel {
   const objects: DatObject[] = table.records.map(({ offset, size }) => ({
     offset: offset + 4, size, unitScale: 1,
     meshOffset: r.u32(offset + size),
+    zone: null, datList: null,
     position: r.vec3(offset + 4),
     rotation: size >= 24
       ? { x: r.u16(offset + 16), y: r.u16(offset + 18), z: r.u16(offset + 20) }
@@ -604,7 +614,50 @@ export function parseDat(buffer: ArrayBuffer | Uint8Array): DatLevel {
     o = mesh.end;
   }
 
+  applyObjectZones(r, sections.section4, objects);
   return { sections, placements, objectIds, markers, paths, zones, objects, meshes, sprites };
+}
+
+/**
+ * The loader's two object lists, which begin where the record stream ends:
+ *
+ *     u32 m; m x 0x80 bytes            a block table (m is 0 in every file)
+ *     20-byte entries until +0xe is 0  list 0
+ *     u32 c; (c + 1) x u32             the object-id index
+ *     20-byte entries until +0xe is 0  list 1
+ *
+ * An entry is `i32 x, y, z; i16; u8 flags; u8 zone; u32 record`, the record
+ * being the 24- or 32-byte transform this parser tiles as an object. So the
+ * zone the engine draws each object under is here, keyed by the record's
+ * offset — which is what `assignZones` had been recovering from the `.ngn`
+ * scene by position, and agrees with it on every object of every scene bar
+ * three on level 10 (tools/dat-walk-validate.ts).
+ */
+function applyObjectZones(r: Reader, at: number, objects: DatObject[]): void {
+  if (at <= 0 || at + 4 > r.length) return;
+  let pos = at;
+  const blocks = r.u32(pos);
+  pos += 4 + blocks * 0x80;
+  const found = new Map<number, { zone: number; list: 0 | 1 }>();
+  const walk = (list: 0 | 1): boolean => {
+    // +0xe is the flags byte, +0xf the zone: one little-endian u16.
+    while (pos + 20 <= r.length && (r.u16(pos + 0xe) & 0xff) !== 0) {
+      found.set(r.u32(pos + 0x10), { zone: r.u16(pos + 0xe) >> 8, list });
+      pos += 20;
+    }
+    if (pos + 20 > r.length) return false;
+    pos += 20;
+    return true;
+  };
+  if (!walk(0)) return;
+  if (pos + 4 > r.length) return;
+  const index = r.u32(pos);
+  pos += 4 + (index + 1) * 4;
+  walk(1);
+  for (const o of objects) {
+    const hit = found.get(o.offset);
+    if (hit) { o.zone = hit.zone; o.datList = hit.list; }
+  }
 }
 
 /**

@@ -759,13 +759,18 @@
  [DONE]    Map the 20 directories + two file sets per directory to levels:
            answered from FUN_00452fc0 2026-09-07 (docs/FORMATS.md
            "Which file a level loads") - sceneForLevel had it right.
- [READY]   Move parseDat onto the loader's own walk (docs/FORMATS.md
-           "level.dat, from the loader", tools/dat-walk-validate.ts):
-           a record count, tagged records, a block table, two lists of
-           20-byte objects. Drops every heuristic in dat.ts, reads
-           level02/level1 - which is INTERNAL LEVEL 12 and today fails
-           and silently shows level 1 instead - and settles the one
-           object level10/level disagrees by.
+ [DONE]    Each object's ROOM now comes from level.dat itself (the
+           loader's object list, byte +0xf; applyObjectZones in dat.ts,
+           2026-09-07). assignZones is the fallback only.
+ [READY]   Move parseDat's transform-record tiling and mesh-pool search
+           onto the loader's own walk (docs/FORMATS.md "level.dat, from
+           the loader", tools/dat-walk-validate.ts): follow each
+           object's +0x10 pointer to its 24/32-byte transform (flag 8
+           picks the size) instead of tiling, and reach the meshes
+           through the transform's pointers instead of scanning. That
+           reads level02/level1 - INTERNAL LEVEL 12, which today fails
+           and silently shows level 1 - and settles the one extra record
+           the tiler finds on level04/level and level10/level.
  [BLOCKED] Per-level logic ports, one at a time, boss levels last.
  [OPEN]    Stale artefacts to skip: level07-10's level1.dat and TERR1.ALL are
            one byte-identical 1998 file each.

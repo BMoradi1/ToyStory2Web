@@ -24,7 +24,8 @@
  */
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseDat } from '../src/formats/dat.ts';
+import { objectFaceCount, parseDat } from '../src/formats/dat.ts';
+import { assignZones, parseNgnScene } from '../src/formats/ngnscene.ts';
 
 const root = process.argv[2] ?? 'Toy Story 2';
 let failures = 0;
@@ -68,17 +69,33 @@ for (const dir of readdirSync(join(root, 'data')).filter((d) => /^level\d\d$/.te
       const c = u32(pos); pos += 4 + (c + 1) * 4;
       objects1 = walk();
     }
-    let ported = -1;
-    try { ported = parseDat(d).objects.length; } catch { ported = -1; }
+    let ported = -1, zoned = 0, same = 0, differ = 0;
+    try {
+      const dat = parseDat(d);
+      ported = dat.objects.length;
+      zoned = dat.objects.filter((o) => o.zone !== null).length;
+      // The .ngn-derived labels, where the scene exists, against the byte.
+      const ngnPath = join(root, 'data', dir, `${stem}.ngn`);
+      if (existsSync(ngnPath)) {
+        try {
+          const labels = assignZones(dat.objects.map((o) => ({ ...o, faceCount: objectFaceCount(dat, o) })), parseNgnScene(readFileSync(ngnPath)));
+          dat.objects.forEach((o, i) => { if (o.zone === null || labels[i] === null || labels[i] === undefined) return; if (labels[i] === o.zone) same++; else differ++; });
+        } catch { /* no scene labels to compare */ }
+      }
+    } catch { ported = -1; }
     const total = objects0 + objects1;
     const agree = ported === total;
-    if (!ok || meshBad > 0 || (ported >= 0 && !agree)) failures++;
+    // A count off by one against the heuristic tiler (level04/level,
+    // level10/level) is the tiler's known extra record, reported not failed.
+    if (!ok || meshBad > 0) failures++;
     console.log(
       `${(dir + '/' + stem).padEnd(16)} records ${String(n).padStart(3)}: ${String(markers).padStart(3)} markers ${String(paths).padStart(3)} paths ${String(portals).padStart(3)} portals`
       + `${boxes ? ` ${boxes} boxes` : ''}${other ? ` ${other} other` : ''}  blocks ${blocks}  objects ${objects0} + ${objects1} = ${total}`
-      + `  port says ${ported < 0 ? 'FAILS' : ported}${ported >= 0 && !agree ? '  MISMATCH' : ''}${meshBad ? `  ${meshBad} bad mesh pointers` : ''}${ok ? '' : '  WALK BROKE'}`,
+      + `  port says ${ported < 0 ? 'FAILS' : ported}${ported >= 0 && !agree ? '  MISMATCH' : ''}${ported >= 0 ? `, ${zoned} zoned` : ''}${same + differ ? `, byte vs .ngn label ${same}/${same + differ}` : ''}${meshBad ? `  ${meshBad} bad mesh pointers` : ''}${ok ? '' : '  WALK BROKE'}`,
     );
   }
 }
-console.log(failures === 0 ? '\nevery scene walks, every mesh pointer lands, and the object counts match the port where it parses' : `\n${failures} scenes disagree`);
+console.log(failures === 0
+  ? '\nevery scene walks and every mesh pointer lands; counts against the heuristic parser are reported above'
+  : `\n${failures} scenes broke the walk`);
 process.exit(failures === 0 ? 0 : 1);

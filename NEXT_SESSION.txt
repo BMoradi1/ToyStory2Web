@@ -26,7 +26,12 @@
  Later the same day: level 6's boss fight (the first world boss; the plan's
  "level 3" meant the third level PLAYED) and the camera cuts, which the boss
  fights and the talk box share (docs/CAMERA.md "Cuts"). Bosses 3, 9, 12
- and 15 are each their own fight and are the obvious next Fable decode. NOTHING IS WAITING ON
+ and 15 are each their own fight and are the obvious next Fable decode.
+ Also on Fable: the Slime (level 3) is decoded but not ported; the camera
+ cuts are ported; level.dat's real layout is decoded from the loader and
+ each object's room is now read from the file (the .ngn matching was
+ never the problem). Opus: retile parseDat on that walk - it unblocks
+ internal level 12, which the port cannot load today. NOTHING IS WAITING ON
  FABLE.
 ================================================================================
 

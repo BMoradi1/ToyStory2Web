@@ -758,16 +758,31 @@ placements over the zone floors all returned the camera's own room and
 room 0 and never named a room the doorway graph cannot reach.
 
 **What it is not yet used for.** Drawing. Comparing the frame with and
-without the culling at 24 camera placements a level, most come out pixel
-for pixel identical, but a few lose up to 2.8% of the frame. The cause is
-not the walk: an object's room comes from matching `.ngn` instances to
-`level.dat` objects by position, and `tools/zone-assign-validate.ts`
-measures that matching against the zone floor under each object — 94.3%
-agree on level 1, 71.9% on level 2. A wrongly labelled object is one that
-disappears. So play draws every room for now and `ts2.zoneCulling(true)`
-turns the walk on to look at it; turning it on for good waits on a better
-object-to-room mapping (docs/FORMATS.md, "This is the one thing not yet
-usable").
+without the culling at 24 camera placements a level, 17 of 24 on level 1,
+14 of 24 on level 2 and 21 of 24 on level 13 come out pixel for pixel
+identical, and the rest lose between a few dozen pixels and 2.8% of the
+frame. Play therefore draws every room and `ts2.zoneCulling(true)` turns
+the walk on to look at it.
+
+**Why that is, is not settled.** The first guess was the object-to-room
+labels, since they come from matching `.ngn` instances to `level.dat`
+objects by position. That guess is wrong, and the check that killed it is
+worth keeping: `tools/zone-assign-validate.ts` compares each object's
+label with the zone floor beneath it, and on level 1 the 22 objects whose
+label names a room the floor's room does not even join all sit at
+positions where every `.ngn` instance agrees on the room. There was no
+ambiguity for the matching to resolve, so those labels are certain — the
+engine's own — and it is the floor slab beneath that belongs to a
+neighbour. Level 2, whose raw disagreement looks worst at 71.9%, has zero
+objects in that column once the always-drawn room 0 and the
+joined-by-a-doorway boundary cases are separated out.
+
+So the rooms and the zone floors are two partitions that do not line up at
+the edges, and the walk feels that. What has NOT been ruled out is a fault
+in the walk itself, or the port's field of view, or the follow camera
+reaching places the original's would not. The measurement to make next is
+which objects account for the differing pixels and which room each is
+labelled, rather than any more counting of labels against floors.
 
 One more thing the walk needs that the engine does not. The engine seeds
 Buzz's room and the camera's from the same lookup, so the room he stands

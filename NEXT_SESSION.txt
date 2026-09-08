@@ -31,7 +31,10 @@
  cuts are ported; level.dat's real layout is decoded from the loader and
  each object's room is now read from the file (the .ngn matching was
  never the problem). Opus: retile parseDat on that walk - it unblocks
- internal level 12, which the port cannot load today. NOTHING IS WAITING ON
+ internal level 12, which the port cannot load today.
+ Every boss is now decoded (docs/LEVELS.md: the Slime, the pod, Zurg,
+ the finale). Nothing is waiting on Fable; the Opus queue is the parseDat
+ retile, then Zurg (level 12) as the easiest boss port. NOTHING IS WAITING ON
  FABLE.
 ================================================================================
 

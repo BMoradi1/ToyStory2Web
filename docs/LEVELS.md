@@ -1159,16 +1159,16 @@ kinds 0x6c / 0x6d / 0x70, the target marker, and Buzz pinned by the
 level. No knockback and no hit-table rewriting, so it is the easiest of
 the four after level 6.
 
-## The finale, internal level 15 — the stage is DECODED, the fighters not yet
+## The finale, internal level 15 — DECODED, not ported
 
 Decoded 2026-09-07 from `FUN_0042faa0` (init) and `FUN_0042fc50`
 (tick). Scene `level05/level1`, music `buzvpros`. Five creatures: slots
 0-2 the three bosses SMITH, GUNSL and PROSP (29 health each, scripts 39,
 33, 41), slot 3 JESSIE and slot 4 WOODY (1 health, never respawn). The
 tick is the stage — the entrance, the chain, the camera, the win; each
-boss's own behaviour is in a routine of its own: `FUN_0042f310` (SMITH,
-529 bytes), `FUN_0042f530` (GUNSL, 632) and `FUN_0042f7b0` (PROSP, 752),
-which are what advance the win counter, and which are the next read.
+boss's own behaviour is a per-type handler of its own, `FUN_0042f310`
+(SMITH), `FUN_0042f530` (GUNSL) and `FUN_0042f7b0` (PROSP), installed for
+this level and described after the stage.
 
 **Init.** All five turned to 0x400; the three bosses' health zeroed and
 placed at (-0x32c6d, -0x92d6, -0x14f5), (-0x327cc, -0x92da, -0x45cd)
@@ -1212,3 +1212,40 @@ up, 0x1000 back; its z drifting 0x20 a tick), the level-complete flow
 (`DAT_0052b7dc = 1`, `DAT_0052f2dc = 0xf0`). Path-0 nodes within 1,024
 steps of the camera glow (node 2 red, the rest grey) and the nearest to
 Buzz is the target marker.
+
+**The three fighters.** All three share a shape: a hit is noticed by the
+health changing and starts a 0x3c-tick stun with the shell closed
+(`vulnerable` 4) and a flicker on alternate ticks through the draw
+triple (0x2000, mode 1); the stun ending opens the shell (6 for SMITH
+and PROSP, 7 for GUNSL); and under 10 health, in phase 2, the boss is
+jumped to its script's defeat entry, its shell closed, its chase flags
+cleared, sequence -2 played, the win counter `DAT_00530064` advanced, its
+phase word set to 3 and itself recorded as the last beaten (0, 1, 2).
+Each also has its attack:
+
+- **SMITH.** With Buzz in his box and within 300 steps while in animState
+  1, he winds up: anim 3 / script 0x18, record speed 0, a 0x3f-tick fuse.
+  Past frame 0x2e of state 3 he returns to script word 0x10 with speed
+  0x10 and chase cleared. When the fuse ends, a thrown effect of kind 0x66
+  from (0xb4, -0x96, -0x32) in his frame with velocity (0, -2, 0), its
+  rotation `heading * 4`, no homing, and sound 0xa7. Defeat entry: word
+  0x2d of script 39.
+- **GUNSL.** Sound 0xc1 on every hit. His script sets `+0x8a`; above 0x14
+  it is reset to 10 and the muzzle taken from bone 0xf, then it counts
+  down, the muzzle from bone 0x10 as it expires, and every tick it runs he
+  fires: sound 0x56, a shot of kind 0x61 toward Buzz clamped to within
+  0x100 of his heading (straight ahead if further), velocity a quarter
+  sine and vy 0x200, plus five sparks of kind 100 (mode 0xf) while awake.
+  Defeat entry: word 0x34 of script 33.
+- **PROSP.** A voice line on every hit (three variants) and another every
+  `rand * 2 + 400` ticks (six variants). With Buzz in his box and within
+  300 steps while in animState 4: rates 0xd0, anim 3 / script 9, speed 0,
+  a 0x2c-tick fuse, and if `FUN_004a3e60` says no, sequence 0xc2. Past
+  frame 0x15 of state 3 he returns to word 0x10 with speed 0x10. When the
+  fuse ends, a pick of kind 0x68 thrown from an eighth of a sine unit
+  ahead and 0x800 up, its velocity a quarter of the sine and cosine of his
+  heading, rotation `0x7ff - heading`, sound 0xa6. Defeat entry: word
+  0x2d of script 41.
+
+With that, every boss in the game is decoded: 6 is ported, 3, 9, 12 and
+15 are written up above with what each needs.

@@ -796,13 +796,14 @@
            own rules and the save's movie flags. Left: B pictures are
            skipped by the decoder (10 distinct frames a second), and the
            trailer, secret ending and ending have no trigger yet.
- [READY]   The front end, DECODED 2026-09-07 (docs/FRONTEND.md): the
-           game flow, two title cards, the press-jump and list menus,
-           and the LEVEL SELECT, which is a 3D diorama (FUN_00438a50)
-           growing a level at a time over level00's scene with the
-           camera on two paths. Blocked on rendering geometry from the
-           .ngn, since level00 has no level.dat; the menus could go over
-           a plain colour first.
+ [PART]    The front end (docs/FRONTEND.md). The TITLE CARDS PLAY
+           2026-09-07 (src/front/title.ts): the boot shows the notices
+           and the "Buzz Lightyear to the Rescue" title from the user's
+           install. It was never blocked on .ngn geometry - level00's
+           bundles have none; the screens are full-screen 8-bit
+           pictures, which decodeBmp now reads. Left: the text routine
+           FUN_0049d750, which unblocks the list menu and the level
+           select, and what the select's diorama looks like on PC.
  [was]     Cutscenes: MPEG-1 in the browser (jsmpeg-style decoder or
            WebCodecs), fed from the user's rtlibs files.
  [OPEN]    First-run flow explaining that users supply their own copy.

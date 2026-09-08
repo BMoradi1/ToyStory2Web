@@ -138,23 +138,45 @@ export function decodeBmp(
   const width = view.getInt32(18, true);
   const rawHeight = view.getInt32(22, true);
   const bitsPerPixel = view.getUint16(28, true);
-  if (bitsPerPixel !== 24 || width <= 0 || rawHeight === 0) return null;
+  const compression = view.getUint32(30, true);
+  // 24-bit is what every level texture is; the front end's full-screen
+  // pictures are 8-bit with a palette (docs/FRONTEND.md). Neither is ever
+  // compressed in this game's files.
+  if ((bitsPerPixel !== 24 && bitsPerPixel !== 8) || compression !== 0) return null;
+  if (width <= 0 || rawHeight === 0) return null;
 
   const height = Math.abs(rawHeight);
   // A positive height means the rows are stored bottom-up.
   const bottomUp = rawHeight > 0;
-  const stride = (width * 3 + 3) & ~3;
+  const bytesPerPixel = bitsPerPixel >> 3;
+  const stride = (width * bytesPerPixel + 3) & ~3;
   if (pixelOffset + stride * height > bmp.length) return null;
+
+  // The palette follows the DIB header: `clrUsed` entries, or 256 when the
+  // field is 0, each stored blue, green, red, unused.
+  let palette: Uint8Array | null = null;
+  if (bitsPerPixel === 8) {
+    const paletteAt = 14 + view.getUint32(14, true);
+    const entries = view.getUint32(46, true) || 256;
+    if (paletteAt + entries * 4 > bmp.length) return null;
+    palette = bmp.subarray(paletteAt, paletteAt + entries * 4);
+  }
 
   const rgba = new Uint8Array(new ArrayBuffer(width * height * 4));
   for (let y = 0; y < height; y++) {
     let src = pixelOffset + (bottomUp ? height - 1 - y : y) * stride;
     let dst = y * width * 4;
     for (let x = 0; x < width; x++) {
-      const b = bmp[src]!, g = bmp[src + 1]!, r = bmp[src + 2]!;
+      let r: number, g: number, b: number;
+      if (palette) {
+        const at = bmp[src]! * 4;
+        b = palette[at] ?? 0; g = palette[at + 1] ?? 0; r = palette[at + 2] ?? 0;
+      } else {
+        b = bmp[src]!; g = bmp[src + 1]!; r = bmp[src + 2]!;
+      }
       rgba[dst] = r; rgba[dst + 1] = g; rgba[dst + 2] = b;
       rgba[dst + 3] = r === COLOUR_KEY.r && g === COLOUR_KEY.g && b === COLOUR_KEY.b ? 0 : 255;
-      src += 3; dst += 4;
+      src += bytesPerPixel; dst += 4;
     }
   }
 

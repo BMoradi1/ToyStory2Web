@@ -1,4 +1,4 @@
-# The front end — DECODED 2026-09-07, not ported
+# The front end — DECODED 2026-09-07; the title cards PLAY
 
 Where the title, the menus and the level select live in `toy2.exe`, what
 each needs, and why the port draws none of them yet.
@@ -61,19 +61,47 @@ picks a movie index and `FUN_0049ab90(index + 10)` plays it, -1 leaving.
 Directory 16 is empty in the install examined, so this screen may be
 unreachable in the shipped build.
 
-## Why none of this is ported
+## The screens are PICTURES, not a scene
 
-1. **The scenes exist only as `.ngn`.** `level00` holds `level.ngn` and
-   three `levelt*.ngn` (the diorama and the menu rooms) with no
-   `level.dat` — its `level.bin` is four bytes, a record count of 4 and
-   nothing after — so the port's geometry path, which reads `level.dat`,
-   has nothing to draw. Rendering from the `.ngn` scene is the open item
-   that unblocks all of this at once; the scene parser already reads its
-   instance and primitive tables. Where the diorama's camera paths come
-   from without a `.dat` is not settled.
-2. **Full-screen pictures.** `FUN_0048f1b0(n)` shows a picture by number;
-   which file it reads has not been traced (candidates: `data/BITS`,
-   `data/pcbits`, the `gfx/` sets).
-3. The menus themselves are the pause menu's kind of code and would port
-   in an afternoon once there is something to draw them over. A first cut
-   over a plain colour is possible today.
+An earlier note here said the front end was blocked on rendering geometry
+from the `.ngn`. That was wrong, and the correction is the useful part.
+`data/level00`'s four `.ngn` files hold **no geometry at all**: each one's
+chunk chain is a 0x104 texture chunk and a 0x106 creature chunk and then
+the file ends, with no gobj sets (0x100) and no instances (0x101), where a
+level's scene has both. They are texture bundles.
+
+What the screens are is full-screen 800 x 600 pictures shown as the
+BACKDROP. `FUN_0048f1b0(n)` adds one to `n`, takes that entry of the table
+at `0x500a58` (`36, 40, 41, 42, 43, 44, 45, 46, 47`), falls back to the
+one at `0x500a7c` when that slot is not loaded, and raises the backdrop
+flag `DAT_005d2a90`. In `level00/level.ngn` those slots are:
+
+| `FUN_00438520` argument | slot | what it is |
+|---|---|---|
+| 0 | bgr40 | the Disney/Pixar "Toy Story 2" card |
+| 1 | bgr41 | the ESRB rating card (320 x 256, and the only 24-bit one) |
+| 2 | bgr42 | the Hasbro / Slinky / Etch A Sketch / Little Tikes notices |
+| 3 | bgr43 | a second notices card |
+| 4 | bgr44 | "Buzz Lightyear to the Rescue" — the title, under the list menu |
+
+**Ported 2026-09-07** (`src/front/title.ts`): the boot plays its three
+logo movies and then shows cards 2 and 3 as `FUN_004381f0(10)` does,
+landing on the title. Each is up for 600 ticks at the engine's 59 a
+second, and Escape, Enter, Space or a click moves on. They are decoded
+from the user's own install; the pictures are 8-bit palettised BMPs,
+which the browser's own image decoder refuses and `decodeBmp` did not
+read either until this pass, since every level texture is 24-bit.
+
+## What is left
+
+1. **The menus' text.** The HUD font is sprite 20 on texture slot 32, and
+   `level00`'s bundle has slots 0, 17, 31, 37 and 40-44 — no 32 — so the
+   front end does not draw text with it. `FUN_0049d750(string, y, colour)`
+   is what the level select prints its names with, and reading that is the
+   next step. With it the list menu and the level select follow quickly:
+   both are the pause menu's kind of code over a picture that now works.
+2. **The level select's diorama.** The routine shows and hides scene
+   objects 0..0x16e, and `level00` has no instances for those calls to
+   touch, so what it looks like on the PC build is not established. It
+   loads through `FUN_00452fc0(0x10)`, directory 16, which this install
+   does not have.

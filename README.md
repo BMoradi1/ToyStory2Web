@@ -55,6 +55,10 @@ onto the page instead. Nothing is uploaded either way.
 | `c` | cycle back-face culling, to check the winding by eye |
 | `g` | collapse the level to a single material |
 
+The game boots the way it did: the three logo movies, the notice cards
+and the title screen, all from your install. Escape, Enter, Space or a
+click moves past each.
+
 The cutscenes play from your install too: the three logos when the
 folder opens, a level's intro the first time you play it, and a boss's
 movie when it falls. Escape, Enter, Space or a click skips one.

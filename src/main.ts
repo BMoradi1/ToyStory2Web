@@ -42,6 +42,7 @@ import { EFFECT_FLAGS, EFFECT_KIND, readEffectTable } from './formats/effect-tab
 import { SoundBank, PLAYER_EFFECTS } from './audio/sfx.ts';
 import { commitProgress, exportProgress, forgetProgress, loadProgress, type Progress } from './loader/save.ts';
 import { BOOT_MOVIES, MOVIES, MOVIE_FLAG, playCutscene } from './video/cutscene.ts';
+import { PICTURE, loadTitleCards, pictureFor, showCard, type TitleCards } from './front/title.ts';
 import { selectIndexOf, tokenCount } from './formats/save-file.ts';
 import { MUSIC, MUSIC_SLIDER_MAX, MUSIC_TRACKS, MUSIC_VOLUME_CURVE, MusicPlayer, trackForLevel } from './audio/music.ts';
 import {
@@ -417,6 +418,7 @@ async function open(dir: GameDir): Promise<void> {
   sound = new SoundBank(dir);
   music = new MusicPlayer(dir);
   gameFiles = dir;
+  titleCards = await loadTitleCards(dir);
   // The player's progress: the browser's copy, else the install's own
   // Toy200.sav, else a fresh record (src/loader/save.ts). The camera choice
   // and the two sliders come from it, as the original's options do.
@@ -762,6 +764,22 @@ async function open(dir: GameDir): Promise<void> {
         return Object.entries(MOVIES).map(([k, name]) => ({ index: Number(k), name, present: movieFile(Number(k)) !== null }));
       },
       get cutsceneUp() { return cutsceneUp; },
+      /** The front end's pictures: which slots decoded, and what is up. */
+      get title() {
+        return {
+          cards: [...titleCards.keys()].sort((a, b) => a - b),
+          showing: frontCard !== null,
+          sizes: Object.fromEntries([...titleCards.entries()].map(([s, b]) => [s, `${b.width}x${b.height}`])),
+        };
+      },
+      showTitleCard(n: number) {
+        const picture = pictureFor(titleCards, n);
+        if (!picture) return null;
+        frontCard?.close();
+        frontCard = showCard(picture, document.body, { hold: true });
+        return { width: picture.width, height: picture.height };
+      },
+      closeTitleCard() { frontCard?.close(); frontCard = null; return true; },
       get cutsceneProgress() { return lastCutscene ? lastCutscene.progress() : null; },
       /** The camera cut: ticks left, its eye, and what the renderer was given. */
       get cut() {
@@ -882,8 +900,8 @@ async function open(dir: GameDir): Promise<void> {
 
   try {
     await showLevel(0);
-  // The original boots through its three logos, tt, dlogo and acti, each
-  // skippable, and a skip drops the rest (the game flow's own chain).
+  // The original boots through its three logos, tt, dlogo and acti, then
+  // two picture cards, each skippable (the game flow's own chain).
   void playBoot();
   } catch (err) {
     // Don't strand the user on the loading panel — the UI is usable and they
@@ -2018,6 +2036,10 @@ let cameraPassive = false;
 let progress: Progress | null = null;
 /** The install, kept for the cutscenes, which are read only when played. */
 let gameFiles: GameDir | null = null;
+/** The front end's pictures (docs/FRONTEND.md), decoded when the folder opens. */
+let titleCards: TitleCards = new Map();
+/** The card on screen, if any. */
+let frontCard: ReturnType<typeof showCard> | null = null;
 /** A movie is over the page: the game does not tick under it. */
 let cutsceneUp = false;
 /** The most recent movie's handle, for a test to watch it decode. */
@@ -2046,11 +2068,30 @@ async function playMovie(index: number, options: { audio?: boolean; decodeFirstF
   }
 }
 
-/** The boot: tt, dlogo, acti in the game flow's order; a skip ends the chain. */
+/**
+ * The boot, as the game flow runs it: the three logo movies tt, dlogo and
+ * acti, then the two picture cards `FUN_00438520(2)` and `(3)`. A skip drops
+ * the rest of the movies; the cards are skipped one at a time.
+ */
 async function playBoot(): Promise<void> {
   for (const index of BOOT_MOVIES) {
     const how = await playMovie(index);
     if (how === 'skipped') break;
+  }
+  for (const card of [PICTURE.trademarks, PICTURE.notices]) {
+    const picture = pictureFor(titleCards, card);
+    if (!picture) continue;
+    frontCard = showCard(picture, document.body);
+    await frontCard.done;
+    frontCard = null;
+  }
+  // The title sits under the list menu, which is not ported: hold it up
+  // until the first key, so the last thing the boot shows is the title.
+  const title = pictureFor(titleCards, PICTURE.title);
+  if (title) {
+    frontCard = showCard(title, document.body, { hold: true });
+    await frontCard.done;
+    frontCard = null;
   }
 }
 

@@ -54,8 +54,12 @@ the HUD uses):
 
 Every screen sprite ends in `FUN_004b8cc0(x, y, w, h, uv0, uv1, texture,
 colour, blend)`, a quad in **normalised screen coordinates**: the helpers
-divide x by 512 or by 320 and y by 256 (the constants at 0x4f7414/8 are
-512.0 and 256.0, `_DAT_004dc0f4` is 1/320 and `_DAT_004dc020` is 1.0).
+divide x by 512 or by 320 and y by 256 (`_DAT_004f7414/8` hold 512.0 and
+256.0 in play, `_DAT_004dc0f4` is 1/320 and `_DAT_004dc020` is 1.0). The
+first pair is a VARIABLE, not a constant: the front end sets it to 320.0
+before its picture screens and back to 512.0 for the level select
+(docs/FRONTEND.md "Two widths"), so the "512 space" below is the width
+of the moment.
 Both spaces stretch to the whole screen, so a 512-space x of 0x1dc and a
 320-space x of 0x128 land on the same column (0.93). Sizes are the frame's
 texels times a 12-bit scale (0x1000 = one texel per virtual pixel) over the

@@ -47,21 +47,36 @@ export interface Picture { width: number; height: number; canvas: HTMLCanvasElem
 export type TitleCards = Map<number, Picture>;
 
 /**
- * Decode the front end's pictures. Only the slots the tables name are
- * decoded, so the other bundles' art costs nothing. Returns an empty map if
- * the install has no `level00`.
+ * The bundle's sheets the menus draw from: 31 is `loadfont.bmp`, the font
+ * both front-end text routines use (src/front/text.ts), and 17 carries the
+ * level select's arrows and digits — the same sheet its own table (level
+ * 16's) names, checked frame by frame against the headers.
  */
-export async function loadTitleCards(dir: GameDir): Promise<TitleCards> {
+export const FRONT_SHEETS = [17, 31] as const;
+
+export interface FrontArt {
+  cards: TitleCards;
+  /** Texture slot to sheet, for the sprite painter. */
+  sheets: Map<number, HTMLCanvasElement>;
+}
+
+/**
+ * Decode the front end's pictures and sheets. Only the slots the tables
+ * name are decoded, so the other bundles' art costs nothing. Returns empty
+ * maps if the install has no `level00`.
+ */
+export async function loadFrontArt(dir: GameDir): Promise<FrontArt> {
   const out: TitleCards = new Map();
+  const sheets = new Map<number, HTMLCanvasElement>();
   const file = dir.get('data/level00/level.ngn');
-  if (!file) return out;
-  const wanted = new Set<number>([...PICTURE_SLOTS, ...PICTURE_SLOTS_ALT]);
+  if (!file) return { cards: out, sheets };
+  const wanted = new Set<number>([...PICTURE_SLOTS, ...PICTURE_SLOTS_ALT, ...FRONT_SHEETS]);
   let textures;
   try {
     textures = parseNgn(await file.read());
   } catch (err) {
     console.warn('the front end pictures did not decode:', (err as Error).message);
-    return out;
+    return { cards: out, sheets };
   }
   for (const texture of textures) {
     if (texture.slot === null || !wanted.has(texture.slot)) continue;
@@ -76,9 +91,14 @@ export async function loadTitleCards(dir: GameDir): Promise<TitleCards> {
     const ctx = canvas.getContext('2d');
     if (!ctx) continue;
     ctx.putImageData(new ImageData(new Uint8ClampedArray(image.rgba), image.width, image.height), 0, 0);
-    out.set(texture.slot, { width: image.width, height: image.height, canvas });
+    // `decodeBmp` has already punched the sheets' green key out to alpha 0.
+    if ((FRONT_SHEETS as readonly number[]).includes(texture.slot)) {
+      sheets.set(texture.slot, canvas);
+    } else {
+      out.set(texture.slot, { width: image.width, height: image.height, canvas });
+    }
   }
-  return out;
+  return { cards: out, sheets };
 }
 
 /** The picture for a `FUN_00438520` argument, or null when neither slot loaded. */

@@ -42,8 +42,10 @@ import { EFFECT_FLAGS, EFFECT_KIND, readEffectTable } from './formats/effect-tab
 import { SoundBank, PLAYER_EFFECTS } from './audio/sfx.ts';
 import { commitProgress, exportProgress, forgetProgress, loadProgress, type Progress } from './loader/save.ts';
 import { BOOT_MOVIES, MOVIES, MOVIE_FLAG, playCutscene } from './video/cutscene.ts';
-import { PICTURE, loadTitleCards, pictureFor, showCard, type TitleCards } from './front/title.ts';
-import { selectIndexOf, tokenCount } from './formats/save-file.ts';
+import { PICTURE, loadFrontArt, pictureFor, showCard, type TitleCards } from './front/title.ts';
+import { FrontEnd } from './front/run.ts';
+import { PAD, readFrontStrings } from './front/screens.ts';
+import { LEVEL_SELECT_ORDER, selectIndexOf, tokenCount } from './formats/save-file.ts';
 import { MUSIC, MUSIC_SLIDER_MAX, MUSIC_TRACKS, MUSIC_VOLUME_CURVE, MusicPlayer, trackForLevel } from './audio/music.ts';
 import {
   PICKUP, createPickups, pickupObjects, PickupKind, revealToken, stepPickups, type PickupState,
@@ -418,7 +420,9 @@ async function open(dir: GameDir): Promise<void> {
   sound = new SoundBank(dir);
   music = new MusicPlayer(dir);
   gameFiles = dir;
-  titleCards = await loadTitleCards(dir);
+  const art = await loadFrontArt(dir);
+  titleCards = art.cards;
+  frontSheets = art.sheets;
   // The player's progress: the browser's copy, else the install's own
   // Toy200.sav, else a fresh record (src/loader/save.ts). The camera choice
   // and the two sliders come from it, as the original's options do.
@@ -780,6 +784,21 @@ async function open(dir: GameDir): Promise<void> {
         return { width: picture.width, height: picture.height };
       },
       closeTitleCard() { frontCard?.close(); frontCard = null; return true; },
+      /** The front end: which screen is up and its state, and the last frame's items. */
+      get front() {
+        const screen = frontEnd?.current ?? null;
+        return {
+          running: frontEnd?.running ?? false,
+          screen: screen?.kind ?? null,
+          state: screen ? { ...screen.state } : null,
+          frame: frontEnd?.lastFrame ?? null,
+          inLevel: frontLevelDone !== null,
+        };
+      },
+      /** Step the front end `n` ticks with a pad word (screens.ts `PAD`). */
+      frontDrive(word: number, n = 1) { return frontEnd ? frontEnd.drive(word, n) : null; },
+      /** Start the front end now, past the boot. */
+      frontStart() { void runFrontEnd(); return true; },
       get cutsceneProgress() { return lastCutscene ? lastCutscene.progress() : null; },
       /** The camera cut: ticks left, its eye, and what the renderer was given. */
       get cut() {
@@ -1843,7 +1862,13 @@ function startDialogue(request: import('./sim/tasks.ts').DialogueRequest): void 
 function applyMenu(action: ReturnType<typeof stepMenu>): void {
   if (!action) return;
   if (action.kind === 'resume' || action.kind === 'token') return;
-  if (action.kind === 'exit') { void togglePlay(); return; }
+  if (action.kind === 'exit') {
+    // Under the front end the level hands back to the select
+    // (`DAT_0052b7dc = 5`); on its own, play just stops.
+    if (frontLevelDone) { frontLevelDone('exit'); return; }
+    void togglePlay();
+    return;
+  }
   if (action.kind === 'camera') {
     cameraPassive = action.passive;
     infoEl.textContent = action.passive ? 'passive camera' : 'active camera';
@@ -2040,6 +2065,15 @@ let gameFiles: GameDir | null = null;
 let titleCards: TitleCards = new Map();
 /** The card on screen, if any. */
 let frontCard: ReturnType<typeof showCard> | null = null;
+/** `level00/level.ngn`'s sheets 17 and 31, for the menus' sprites and text. */
+let frontSheets = new Map<number, Sheet>();
+let frontEnd: FrontEnd | null = null;
+/** Resolves the level the front end is waiting on (src/front/run.ts). */
+let frontLevelDone: ((how: 'exit' | 'won') => void) | null = null;
+/** `DAT_00830ca8`: the token byte the last level was entered with. */
+let frontEnteredWith = 0;
+/** Enter and Escape, which the pad reader does not own, for the front end. */
+const frontKeys = { enter: false, escape: false };
 /** A movie is over the page: the game does not tick under it. */
 let cutsceneUp = false;
 /** The most recent movie's handle, for a test to watch it decode. */
@@ -2074,6 +2108,12 @@ async function playMovie(index: number, options: { audio?: boolean; decodeFirstF
  * the rest of the movies; the cards are skipped one at a time.
  */
 async function playBoot(): Promise<void> {
+  await bootChain();
+  await runFrontEnd();
+}
+
+/** The logos and the two cards, `FUN_0049d910`'s `LAB_0049d996`. */
+async function bootChain(): Promise<void> {
   for (const index of BOOT_MOVIES) {
     const how = await playMovie(index);
     if (how === 'skipped') break;
@@ -2085,14 +2125,83 @@ async function playBoot(): Promise<void> {
     await frontCard.done;
     frontCard = null;
   }
-  // The title sits under the list menu, which is not ported: hold it up
-  // until the first key, so the last thing the boot shows is the title.
-  const title = pictureFor(titleCards, PICTURE.title);
-  if (title) {
-    frontCard = showCard(title, document.body, { hold: true });
-    await frontCard.done;
-    frontCard = null;
+}
+
+/**
+ * The title, the list menu and the level select, then the level, and the
+ * select again when it is over (src/front/run.ts). Everything drawn is the
+ * install's own; the text is read out of its executable.
+ */
+async function runFrontEnd(): Promise<void> {
+  if (!exeBytes || frontEnd) return;
+  const strings = readFrontStrings(exeBytes, exeString);
+  const menuTable = readSpriteTable(exeBytes, 0);
+  const selectTable = readSpriteTable(exeBytes, 16);
+  input.attach();
+  void sound?.start();
+  frontEnd = new FrontEnd({
+    strings, menuTable, selectTable, sheets: frontSheets, cards: titleCards,
+    pad() {
+      const p = input.read();
+      let word = 0;
+      if (p.moveY > 0.5) word |= PAD.up;
+      if (p.moveY < -0.5) word |= PAD.down;
+      if (p.moveX < -0.5) word |= PAD.left;
+      if (p.moveX > 0.5) word |= PAD.right;
+      if (p.jump || frontKeys.enter) word |= PAD.jump;
+      if (frontKeys.escape) word |= PAD.cancel;
+      return word;
+    },
+    playSound(effect) { playEvent(effect); },
+    music(track) {
+      if (!music) return;
+      music.start();
+      music.want(track);
+    },
+    tokens: () => progress?.p.tokens ?? [],
+    cursor: () => progress?.p.level ?? 0,
+    setCursor(cursor) {
+      if (!progress) return;
+      progress.p.level = cursor;
+      saveProgress();
+    },
+    enteredWith: () => frontEnteredWith,
+    playLevel: playLevelFromFront,
+    attract: bootChain,
+    quit() { infoEl.textContent = 'front end closed — the dropdown picks a scene'; },
+  }, document.body);
+  await frontEnd.run();
+  frontEnd = null;
+}
+
+/**
+ * `LAB_0049dedd` on: a level by play position. Its intro first, unless
+ * seen — a boss level has none, except level 12's own (`FUN_0049eb20(0x10)`)
+ * — then the scene, Buzz, and play until the pause menu's "exit level" or
+ * the boss falls.
+ */
+async function playLevelFromFront(position: number): Promise<'exit' | 'won'> {
+  const level = LEVEL_SELECT_ORDER[position - 1];
+  if (level === undefined) return 'exit';
+  const index = levels.findIndex((l) => l.id === `level${String(level).padStart(2, '0')}/level`);
+  if (index < 0) {
+    infoEl.textContent = `level ${level} is not in this install`;
+    return 'exit';
   }
+  if (position % 3 !== 0) await playLevelMovie(position, false);
+  else if (position === 12) await playLevelMovie(0x10, false);
+  levelEl.selectedIndex = index;
+  await showLevel(index);
+  if (!player) await spawnPlayer();
+  if (!player) return 'exit';
+  frontEnteredWith = progress?.p.tokens[level] ?? 0;
+  setPlaying(true);
+  infoEl.textContent = 'playing — WASD or stick to move, space to jump, J spin, K fire, Escape for the menu';
+  const how = await new Promise<'exit' | 'won'>((resolve) => { frontLevelDone = resolve; });
+  frontLevelDone = null;
+  if (viewer?.playMode) setPlaying(false);
+  input.attach();
+  return how;
 }
 
 /**
@@ -2129,9 +2238,13 @@ function saveProgress(): void {
   if (!progress) return;
   const p = progress.p;
   if (pickups) { p.lives = pickups.lives; p.health = pickups.health; }
-  const level = levelNumber(levels[levelEl.selectedIndex]?.id ?? '') ?? 0;
-  const cursor = selectIndexOf(level);
-  if (cursor >= 0) p.level = cursor;
+  // The select cursor is the level select's to set (`DAT_0052ad8a`); with
+  // no front end running, the dropdown's scene stands in for it.
+  if (!frontEnd) {
+    const level = levelNumber(levels[levelEl.selectedIndex]?.id ?? '') ?? 0;
+    const cursor = selectIndexOf(level);
+    if (cursor >= 0) p.level = cursor;
+  }
   p.sfx = menu.sfx;
   p.bgm = menu.bgm;
   p.activeCamera = !cameraPassive;
@@ -2548,8 +2661,9 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       if (tasks.levelWon) {
         tasks.levelWon = false;
         infoEl.textContent = 'the boss is beaten';
-        // Forced: the boss movie plays every time the boss falls.
-        void playLevelMovie(selectIndexOf(level) + 1, true);
+        // Forced: the boss movie plays every time the boss falls, and under
+        // the front end the level is over once it has (`LAB_0049dd87`).
+        void playLevelMovie(selectIndexOf(level) + 1, true).then(() => frontLevelDone?.('won'));
       }
       // The boss token is awarded by the creature handler partway through
       // its death, so pick that up here too.
@@ -2712,8 +2826,21 @@ async function toggleCollision(): Promise<void> {
 
 // `0`-`9` show one zone as the engine would from inside it: the zone itself,
 // zone 0, and whatever its portals lead to. `a` goes back to the whole level.
+window.addEventListener('keyup', (ev) => {
+  if (ev.key === 'Enter') frontKeys.enter = false;
+  else if (ev.key === 'Escape') frontKeys.escape = false;
+});
 window.addEventListener('keydown', (ev) => {
   if (!viewer) return;
+  // While a front-end screen is up it owns the keyboard: the pad reader
+  // has the arrows and space, and these two are the rest of its word.
+  if (frontEnd?.current) {
+    if (ev.key === 'Enter') frontKeys.enter = true;
+    else if (ev.key === 'Escape') frontKeys.escape = true;
+    else return;
+    ev.preventDefault();
+    return;
+  }
   // Enter toggles play; while playing, the movement keys belong to the game
   // and the inspection shortcuts would collide with them.
   // While the pause menu is up it owns the keyboard, and the game under it

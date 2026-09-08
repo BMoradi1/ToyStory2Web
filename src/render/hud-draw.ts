@@ -28,6 +28,8 @@
  */
 import { HUD, HudElement, blinkOn, offsetOf, pulse, stackShift, type HudState } from '../sim/hud.ts';
 import { FONT_DIGIT_BASE, LEVEL_SPRITE_BASE, SPRITE, type SpriteHeader } from '../formats/sprite-table.ts';
+import type { FrontFrame } from '../front/screens.ts';
+import { BIG_TEXT, MENU_TEXT_DRAW } from '../front/text.ts';
 
 /**
  * The talk box, from `FUN_00401c30` and `FUN_00401b60`. The box is five
@@ -202,6 +204,92 @@ export class HudPainter {
     return out;
   }
 
+  /**
+   * Queue a frame of a sprite. `sx` and `py` are the pixels per virtual
+   * unit across and down; a sprite whose header or sheet is missing is
+   * skipped rather than drawn wrong.
+   */
+  private blitSprite(
+    table: readonly (SpriteHeader | null)[], sheets: ReadonlyMap<number, Sheet>,
+    index: number, frame: number, x: number, y: number,
+    colour: Modulate, sx: number, py: number, scaleX = 0x1000, scaleY = 0x1000, alpha = 1,
+  ): void {
+    const h = table[index];
+    if (!h) return;
+    const raw = sheets.get(h.texture);
+    if (!raw) return;
+    const f = h.frames[frame] ?? h.frames[0];
+    if (!f) return;
+    const w = (h.width * scaleX) >> 12;
+    const ht = (h.height * scaleY) >> 12;
+    if (w <= 0 || ht <= 0) return;
+    const sheet = this.tinted(raw, colour);
+    const ctx = this.ctx;
+    this.queue.push(() => {
+      if (alpha !== 1) ctx.globalAlpha = alpha;
+      ctx.drawImage(sheet, f.u, f.v, h.width, h.height, x * sx, y * py, w * sx, ht * py);
+      if (alpha !== 1) ctx.globalAlpha = 1;
+    });
+  }
+
+  /**
+   * Paint one frame of the front end (src/front/screens.ts): the picture
+   * under everything, then the sprite layer in the engine's order, flushed
+   * backward like the HUD's, then the fade. `pictures` maps a picture slot
+   * to its decoded card and `bigFont` is the loading font's sheet, slot 31,
+   * whose cells the big text samples directly rather than through a sprite.
+   */
+  paintFront(
+    frame: FrontFrame,
+    table: readonly (SpriteHeader | null)[],
+    sheets: ReadonlyMap<number, Sheet>,
+    picture: Sheet | null,
+  ): void {
+    this.clear();
+    const ctx = this.ctx;
+    ctx.imageSmoothingEnabled = false;
+    const W = this.canvas.width;
+    const H = this.canvas.height;
+    const px512 = W / 512;
+    const px320 = W / 320;
+    const py = H / 256;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, W, H);
+    if (picture) ctx.drawImage(picture, 0, 0, W, H);
+
+    const bigFont = sheets.get(BIG_TEXT.sheet) ?? null;
+    for (const item of frame.items) {
+      if (item.kind === 'sprite') {
+        this.blitSprite(table, sheets, item.index, item.frame, item.x, item.y, item.colour,
+          item.space === 512 ? px512 : px320, py, item.scaleX, item.scaleY, item.alpha);
+      } else if (item.kind === 'menu') {
+        const colour = item.grey;
+        for (const g of item.glyphs) {
+          this.blitSprite(table, sheets, MENU_TEXT_DRAW.sprite, g.frame, g.x, item.y, colour,
+            px320, py, MENU_TEXT_DRAW.scale, MENU_TEXT_DRAW.scale, item.alpha);
+        }
+      } else if (bigFont) {
+        const sheet = this.tinted(bigFont, item.colour);
+        const size = BIG_TEXT.size;
+        const sx = item.space === 512 ? px512 : px320;
+        for (const g of item.glyphs) {
+          this.queue.push(() => {
+            ctx.drawImage(sheet, g.u, g.v, BIG_TEXT.sample, BIG_TEXT.sample,
+              g.x * sx, g.y * py, size * sx, size * py);
+          });
+        }
+      }
+    }
+    for (let i = this.queue.length - 1; i >= 0; i--) this.queue[i]!();
+    this.queue.length = 0;
+
+    // The fade is a modulate of the whole screen by its grey over 0x80.
+    if (frame.fade < NEUTRAL) {
+      ctx.fillStyle = `rgba(0,0,0,${1 - frame.fade / NEUTRAL})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+  }
+
   constructor(private readonly canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('no 2d context for the HUD');
@@ -246,21 +334,7 @@ export class HudPainter {
     const blit = (
       index: number, frame: number, x: number, y: number,
       colour: Modulate, sx: number, scaleX = 0x1000, scaleY = 0x1000,
-    ) => {
-      const h = table[index];
-      if (!h) return;
-      const raw = sheets.get(h.texture);
-      if (!raw) return;
-      const f = h.frames[frame] ?? h.frames[0];
-      if (!f) return;
-      const w = (h.width * scaleX) >> 12;
-      const ht = (h.height * scaleY) >> 12;
-      if (w <= 0 || ht <= 0) return;
-      const sheet = this.tinted(raw, colour);
-      this.queue.push(() => {
-        ctx.drawImage(sheet, f.u, f.v, h.width, h.height, x * sx, y * py, w * sx, ht * py);
-      });
-    };
+    ) => this.blitSprite(table, sheets, index, frame, x, y, colour, sx, py, scaleX, scaleY);
     /** A bar: sprite 6's solid texel stretched to `w` x `ht` virtual pixels. */
     const bar = (
       x: number, y: number, w: number, ht: number,

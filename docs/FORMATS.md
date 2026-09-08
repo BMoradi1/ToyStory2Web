@@ -1086,9 +1086,15 @@ it misaligned. Offsets are from the block's start:
     +0x144  u16  health                      fresh 14     -> DAT_0052f396
     +0x147  u8[16] one byte per INTERNAL level number 1..15: bits 0..4 the
                    five tokens (the level select unpacks exactly those); bit
-                   7 is set on every level in the played file and is unread
-    +0x158  u8[15] one byte per level by PLAY position 1..15: that level's
-                   movie has been shown (`DAT_0052f0e7[n]`, +0x157 + n)
+                   7 is VISITED — the levels' own init writes 0x80 into it,
+                   and `FUN_0049eb50` counts a level as open while its byte
+                   is non-zero, which is what unlocks the next one
+                   (docs/FRONTEND.md "The level select"; corrected
+                   2026-09-07 from "unread")
+    +0x158  u8[16] one byte per level by PLAY position 1..15: that level's
+                   movie has been shown (`DAT_0052f0e7[n]`, +0x157 + n);
+                   +0x167 (n = 0x10) is level 12's own intro, played before
+                   that boss
     +0x168  u8   all fifty tokens held, and the secret ending shown (n = 0x11)
     +0x169  u8   level 15 beaten, and the ending shown (n = 0x12)
 
@@ -1099,10 +1105,10 @@ a level's on first playing its intro, and the level-exit flow
 three) when its boss falls, level 15's also setting +0x169. Any other level
 instead tests for the fiftieth token: the current level's token byte must
 have changed since the level began and the total must read 50, and then
-the all-tokens flag goes up. The port has no level-exit flow and no boss
-level ported, so it sets neither completed byte, and it raises the
-all-tokens flag when the fiftieth token is picked up rather than when the
-level ends.
+the all-tokens flag goes up. The port's level-exit flow is the front
+end's (docs/FRONTEND.md "The flow"): a boss's byte is set when it falls,
+and the all-tokens flag goes up when the fiftieth token is picked up
+rather than when the level ends.
     +0x16a..+0x187 zero in every file
 
 **The level-select order is not the internal order.** `DAT_0052ad8a` is

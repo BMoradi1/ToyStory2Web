@@ -55,9 +55,14 @@ onto the page instead. Nothing is uploaded either way.
 | `c` | cycle back-face culling, to check the winding by eye |
 | `g` | collapse the level to a single material |
 
-The game boots the way it did: the three logo movies, the notice cards
-and the title screen, all from your install. Escape, Enter, Space or a
-click moves past each.
+The game boots the way it did: the three logo movies, the notice cards,
+the title with its "press jump", the list menu and the level select, all
+from your install, with the text read out of its executable. Arrows or
+WASD move, Space or Enter is jump, Escape is cancel; the level plays from
+the select, and the pause menu's "exit level" brings the select back.
+The select's Etch A Sketch diorama needs a `data/level16` scene this
+install does not have, so it runs on black with its name, arrows, count
+and text.
 
 The cutscenes play from your install too: the three logos when the
 folder opens, a level's intro the first time you play it, and a boss's

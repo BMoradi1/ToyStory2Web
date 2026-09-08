@@ -104,7 +104,11 @@ export interface SaveProgress {
   health: number;
   /** Indexed by INTERNAL level 1..15; index 0 unused. Bits 0..4 are the tokens. */
   tokens: number[];
-  /** Indexed by PLAY position 1..15 (index 0 unused): that level's movie has been shown. */
+  /**
+   * Indexed by PLAY position 1..15 (index 0 unused): that level's movie has
+   * been shown. Index 16 is level 12's own intro, which the flow plays as
+   * `FUN_0049eb20(0x10)` before that boss.
+   */
   shown: boolean[];
   /** +0x168: all fifty tokens, which is also the secret ending having played. */
   allTokens: boolean;
@@ -133,7 +137,7 @@ export function parseSaveFile(buffer: ArrayBuffer | Uint8Array, slot: number): S
     const tokens: number[] = [0];
     for (let n = 1; n <= 15; n++) tokens.push(b[SAVE.tokens + n]!);
     const shown: boolean[] = [false];
-    for (let n = 1; n <= 15; n++) shown.push(b[SAVE.shown + n] !== 0);
+    for (let n = 1; n <= 16; n++) shown.push(b[SAVE.shown + n] !== 0);
     progress = {
       lives: b[SAVE.lives]!,
       level: b[SAVE.level]!,
@@ -191,7 +195,7 @@ export function writeProgress(block: Uint8Array, p: SaveProgress): void {
   block[SAVE.health] = p.health & 0xff;
   block[SAVE.health + 1] = (p.health >> 8) & 0xff;
   for (let n = 1; n <= 15; n++) block[SAVE.tokens + n] = (p.tokens[n] ?? 0) & 0xff;
-  for (let n = 1; n <= 15; n++) block[SAVE.shown + n] = p.shown[n] ? 1 : 0;
+  for (let n = 1; n <= 16; n++) block[SAVE.shown + n] = p.shown[n] ? 1 : 0;
   block[SAVE.allTokens] = p.allTokens ? 1 : 0;
   block[SAVE.gameBeaten] = p.gameBeaten ? 1 : 0;
 }

@@ -995,3 +995,103 @@ kinds 0x3f (the spat blob, with the laser target hook), 0x41 and 0x1b,
 none exercised yet. (4) The knockback `FUN_004071e0(yaw, bits)` on the
 player. Lights and the overlay are cosmetic; the camera cuts and the
 save bit are already there.
+
+## The pod, internal level 9 — DECODED, not ported
+
+Decoded 2026-09-07 from `FUN_00424390` (init) and `FUN_00424490` (tick,
+the largest level tick in the game). Scene `level09/level`, music
+`buzvbuz`. Twelve creatures: slot 0 the boss, a big ZPOD (type 54, 26
+health); slots 1-6 six BUBs (type 55, 1 health, script 6) that orbit it;
+and slots 7-11 the helpers it releases, a small ZPOD (20), ZURG1, ZURG3,
+ZGCAR and SHINY. Level 6's shape with two twists: the boss's health is
+CLAMPED to its stage, and each hit releases helpers you have to kill
+before it opens again.
+
+**Init.** Stage `DAT_0052fbd4` = 1, base height `DAT_0052fbcc` =
+-0x58000, the released pair both "slot 7" (none), a spin cooldown of 200
+and a voice timer of 0x78; the boss's record speed set to 0; every BUB
+(slots 1-6, 0x9c apart) given respawn 10000 and its record's home box
+copied from the boss's.
+
+**Every tick, first.** The boss is held inside a ring of radius 0x1068
+level units about the arena's origin (0x1068 + 800 from phase 3), pulled
+back onto it along its own bearing when it strays; the two released
+helpers are held inside 0x15e0 the same way, and stopped dead while a
+box or cut is up. The six BUBs are placed ON the boss, each facing
+`DAT_0052fc0c + n * 0x2ab` (an even spread of six, the whole ring turning
+4 a tick), their frames staggered by 0xc0000 out of a shared 0..0x180000
+phase; a point 0x5aa ahead and 0x96 above each is dropped to the ground,
+and a BUB whose health is 1 shoves Buzz away from that point when he is
+within 0x4b steps (`FUN_004071e0(yaw, 1)`, velocity only). Every one of
+the seven flies at `base + sin(DAT_0052fc08) / 8`, the sine phase
+advancing 0x20 a tick.
+
+**Phases** (`DAT_0052fc04`):
+
+| phase | what happens |
+|---|---|
+| 0 | waiting. Buzz's z rising past -0x1bb58 starts it: the level's music, base height -0x38000, a 360-tick cut to the boss from 0x8000 above Buzz |
+| 1 | the entrance: the cut's eye sinks 0x80 a tick and its look tracks the boss; the base height rises 0x280 a tick to -0x8000; voice sequence 0xd5 once after 0x78 ticks; at the cut's end phase 2 and the boss's record speed 0x10 |
+| 2 | the fight |
+| 3 | stage 7 reached: the boss's animState 2, record speed 0x14 — it comes down for you |
+| 4 | dying: the cut eye rises; under 0x78 of the cut the boss is killed (`FUN_00405d20`) |
+| 5 | the level is won when the cut ends |
+
+**A hit** (health changed, phase under 4): sound 0x83; health is put
+back to `0x1a - stage` while the stage is under 6, so it only ever falls
+one point a stage; the next pair of helper slots is read from the table
+at 0x4f2f58 — twelve dwords `8 8 7 7 8 9 10 7 11 8 11 7` read two at a
+time, so the stages release ZURG1, then the small ZPOD, then ZURG1 with
+ZURG3, ZGCAR with the small ZPOD, SHINY with ZURG1 — the shell closes
+(`vulnerable` 4), and in phase 2 the stun `DAT_0052fbc0` is 600 with a
+360-tick cut, else 0x78. Under 11 health it is instead **dying**: a
+240-tick cut whose eye is set 0x100 round from Buzz's heading and 0x8000
+up, speed 0, spin cooldown 10000, phase 4, and bit 7 of this level's
+token byte.
+
+**The stun** counts down; at 0 the shell opens (`vulnerable` 7) and, at
+stage 7 in phase 2, phase 3 begins. While it runs in phase 2 the boss
+flickers between 0x1000 and a pulse off the frame counter through the
+draw triple +0x24/26/28 under mode `+0x34 = 1`; in other phases it
+alternates 0x2000 and off.
+
+**Releasing the helpers** (phase 2, stun running; the stun is capped at
+600). Once the cut ends: the first time the stun is above 0x1a4, the
+pair's respawn is set to 10000 and the release is armed; then, when BOTH
+released helpers' health reads 0 — Buzz has killed them — the stun drops
+to 0x78, the boss's record speed goes back to 0x10 and the STAGE
+advances. While the cut still runs: the spin cooldown is 200, the cut
+looks at BUB `stage` (its ground point, the eye three sine units round
+from that BUB's heading), and under 300 ticks of cut with that BUB in
+animState 0 it is put on animState 1 / script 0x17, the pair are reset
+from their placements (`FUN_00406cd0`), given flags 0xaf0, their draw
+scale zeroed with `+0x32 = 0x8000` as a "grow" marker, and sound 0x86
+plays at the first. Between 0xb9 and 300 ticks of cut, an effect (0x11
+mode 2, or kind 4 mode 4 without detail) is thrown from (0, 400, 0x4b0)
+ahead of that BUB. Once the BUB's health is 1 the pair are parked at its
+ground point 0x1000 up with velocity zero and `+0x8a = 0x1cc` unless in
+animState 0xe; and under 0x3c ticks of cut with the BUB in animState 1,
+four explosions (kind 0x23, mode 0xe), sound 0x85, voice 0xd6, a glow
+(`FUN_0049ee50`, 0xf08000, 0x20) and the BUB is killed. A released
+helper whose `+0x32` reads 0x8000 grows its draw scale 0xc a tick to
+0x1000, which clears the marker.
+
+**The laser.** With the spin cooldown at 0 and Buzz within 400 steps:
+from a point 400 behind the boss, the bearing to Buzz is clamped to
+±0x200 of the boss's heading; a ray of 0x8000 is cast that way
+(`FUN_0048c860`) and a beam drawn along it (`FUN_0044e100`, type 9),
+with sound 0x87 at its end, `DAT_0052f1c2` sparks of kind 4, an effect
+0x46, a glow and a green point light there; Buzz within 0x1e steps of
+the end takes sound 0x84, voice 0xd7 (on a 0x4b0-tick timer) and
+`FUN_004071e0(yaw, 3)`, the full knock-down.
+
+**Also.** The base height eases toward Buzz's own height at 0x80 a tick
+while he is within 200 steps in phase 3, else back to -0x8000. The
+camera's look-at (`DAT_0050a118`) is switched every 0x1e ticks to
+whichever living released helper is nearer the camera, 0x2000 above it,
+else the boss 0x4000 above. The boss theme timer is set in phases 2 and
+3. The bar is `(health - 10) * 0x36 / 16`.
+
+**What the port needs first.** The same four things as the Slime plus
+one: a creature reset from placement (`FUN_00406cd0`, which the sim's
+respawn nearly is), and the beam draw.

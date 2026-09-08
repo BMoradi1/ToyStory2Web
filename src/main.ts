@@ -16,7 +16,7 @@ import {
 } from './formats/collision.ts';
 import {
   findLevels, findModels, gameDirFromDrop, gameDirFromFileList, pickGameDir,
-  supportsDirectoryPicker, validateGameDir, type GameDir,
+  supportsDirectoryPicker, validateGameDir, type GameDir, type GameFile,
 } from './loader/gamedir.ts';
 import { Viewer } from './render/viewer.ts';
 import { InputSource } from './sim/input.ts';
@@ -41,6 +41,7 @@ import {
 import { EFFECT_FLAGS, EFFECT_KIND, readEffectTable } from './formats/effect-table.ts';
 import { SoundBank, PLAYER_EFFECTS } from './audio/sfx.ts';
 import { commitProgress, exportProgress, forgetProgress, loadProgress, type Progress } from './loader/save.ts';
+import { BOOT_MOVIES, MOVIES, MOVIE_FLAG, playCutscene } from './video/cutscene.ts';
 import { selectIndexOf, tokenCount } from './formats/save-file.ts';
 import { MUSIC, MUSIC_SLIDER_MAX, MUSIC_TRACKS, MUSIC_VOLUME_CURVE, MusicPlayer, trackForLevel } from './audio/music.ts';
 import {
@@ -415,6 +416,7 @@ async function open(dir: GameDir): Promise<void> {
   creatureModels.clear();
   sound = new SoundBank(dir);
   music = new MusicPlayer(dir);
+  gameFiles = dir;
   // The player's progress: the browser's copy, else the install's own
   // Toy200.sav, else a fresh record (src/loader/save.ts). The camera choice
   // and the two sliders come from it, as the original's options do.
@@ -750,6 +752,17 @@ async function open(dir: GameDir): Promise<void> {
         if (!on) viewer?.setVisibleZones(null);
         return zoneCulling;
       },
+      /** Play a cutscene by index or name and wait for it; `movies` lists what the install has. */
+      cutscene(which: number | string, options: { audio?: boolean; decodeFirstFrame?: boolean } = {}) {
+        const index = typeof which === 'number' ? which
+          : Number(Object.keys(MOVIES).find((k) => MOVIES[Number(k)] === which) ?? -1);
+        return playMovie(index, options);
+      },
+      movies() {
+        return Object.entries(MOVIES).map(([k, name]) => ({ index: Number(k), name, present: movieFile(Number(k)) !== null }));
+      },
+      get cutsceneUp() { return cutsceneUp; },
+      get cutsceneProgress() { return lastCutscene ? lastCutscene.progress() : null; },
       /** The camera cut: ticks left, its eye, and what the renderer was given. */
       get cut() {
         return { ticks: cut.ticks, noControl: cut.noControl, blend: cut.blend, zoneBlend: cut.zoneBlend,
@@ -869,6 +882,9 @@ async function open(dir: GameDir): Promise<void> {
 
   try {
     await showLevel(0);
+  // The original boots through its three logos, tt, dlogo and acti, each
+  // skippable, and a skip drops the rest (the game flow's own chain).
+  void playBoot();
   } catch (err) {
     // Don't strand the user on the loading panel — the UI is usable and they
     // can pick a different scene from the dropdown.
@@ -2000,6 +2016,56 @@ let detailNow: number | null = 1;
 let cameraPassive = false;
 /** The save record (docs/FORMATS.md "The save file"), once a directory is open. */
 let progress: Progress | null = null;
+/** The install, kept for the cutscenes, which are read only when played. */
+let gameFiles: GameDir | null = null;
+/** A movie is over the page: the game does not tick under it. */
+let cutsceneUp = false;
+/** The most recent movie's handle, for a test to watch it decode. */
+let lastCutscene: ReturnType<typeof playCutscene> | null = null;
+
+/** The install's file for a movie index, or null when the install lacks it. */
+function movieFile(index: number): GameFile | null {
+  const name = MOVIES[index];
+  if (!name || !gameFiles) return null;
+  return gameFiles.get(`rtlibs/${name.toLowerCase()}.dll`) ?? null;
+}
+
+/** Play a movie over the page and wait for it. Resolves 'missing' without one. */
+async function playMovie(index: number, options: { audio?: boolean; decodeFirstFrame?: boolean } = {}): Promise<'ended' | 'skipped' | 'failed' | 'missing'> {
+  const file = movieFile(index);
+  if (!file) return 'missing';
+  cutsceneUp = true;
+  music?.disable();
+  try {
+    const handle = playCutscene(file, document.body, options);
+    lastCutscene = handle;
+    return await handle.done;
+  } finally {
+    cutsceneUp = false;
+    if (viewer?.playMode) music?.start();
+  }
+}
+
+/** The boot: tt, dlogo, acti in the game flow's order; a skip ends the chain. */
+async function playBoot(): Promise<void> {
+  for (const index of BOOT_MOVIES) {
+    const how = await playMovie(index);
+    if (how === 'skipped') break;
+  }
+}
+
+/**
+ * `FUN_0049eb20(n, mode, force)`: a level's movie by play position, shown
+ * once unless forced, and the save remembers. The intro plays the first time
+ * a level is entered; the boss movie plays on the boss's fall, forced.
+ */
+async function playLevelMovie(playPosition: number, force: boolean): Promise<void> {
+  if (!progress) return;
+  if (progress.p.shown[playPosition] && !force) return;
+  progress.p.shown[playPosition] = true;
+  saveProgress();
+  await playMovie(playPosition + MOVIE_FLAG.base);
+}
 
 /** Push the record's option bytes into the menu, the camera and the mixers. */
 function applyProgressOptions(): void {
@@ -2192,6 +2258,7 @@ function setPlaying(on: boolean): void {
 function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   if (!viewer || !player || !playerRuntime || !currentCollisionWorld) return;
 
+  if (cutsceneUp) return;
   if (player.fellOut) { void respawn(); return; }
   const levelNow = levelNumber(levels[levelEl.selectedIndex]?.id ?? '') ?? 0;
   if (player.dying) {
@@ -2440,6 +2507,8 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       if (tasks.levelWon) {
         tasks.levelWon = false;
         infoEl.textContent = 'the boss is beaten';
+        // Forced: the boss movie plays every time the boss falls.
+        void playLevelMovie(selectIndexOf(level) + 1, true);
       }
       // The boss token is awarded by the creature handler partway through
       // its death, so pick that up here too.
@@ -2577,6 +2646,10 @@ async function togglePlay(): Promise<void> {
     await spawnPlayer();
     if (!player) return;
   }
+  // The level's intro, the first time it is played (docs/FORMATS.md "The
+  // cutscenes"): movies go by PLAY position, which the select order gives.
+  const position = selectIndexOf(levelNumber(levels[levelEl.selectedIndex]?.id ?? '') ?? 0) + 1;
+  if (position > 0) await playLevelMovie(position, false);
   setPlaying(true);
   infoEl.textContent =
     'playing — WASD or stick to move, space to jump, J spin, K fire, M mutes';

@@ -47,12 +47,19 @@ export const SAVE = {
    * one played file examined and is unread.
    */
   tokens: 0x147,
-  /** One byte per level-select index 0..14: 1 once its boss is beaten. */
-  completed: 0x158,
+  /**
+   * `FUN_0049eb20(n)`: one byte per MOVIE, at `shown + n`, set when movie
+   * `n + 10` has been played: n = 1..15 a level's own movie by PLAY
+   * position (its intro, or its boss movie on the boss levels), 0x11 the
+   * secret ending, 0x12 the ending. Bytes +0x159..+0x167 are the levels.
+   */
+  shown: 0x158,
   /** Set once all fifty tokens are held. */
   allTokens: 0x168,
-  /** Set once level 15's boss is beaten. */
+  /** `shown + 0x11`: the secret ending, also set when level 15 is beaten. */
   gameBeaten: 0x169,
+  /** `shown + 0x12`: the ending has been played. */
+  endingShown: 0x16a,
   /** The record is padded out to this. */
   end: 0x188,
   activeCamera: 0x40,
@@ -97,10 +104,11 @@ export interface SaveProgress {
   health: number;
   /** Indexed by INTERNAL level 1..15; index 0 unused. Bits 0..4 are the tokens. */
   tokens: number[];
-  /** Indexed by select index 0..14. */
-  completed: boolean[];
+  /** Indexed by PLAY position 1..15 (index 0 unused): that level's movie has been shown. */
+  shown: boolean[];
   allTokens: boolean;
   gameBeaten: boolean;
+  endingShown: boolean;
 }
 
 /**
@@ -123,8 +131,8 @@ export function parseSaveFile(buffer: ArrayBuffer | Uint8Array, slot: number): S
     const bv = new DataView(b.buffer, b.byteOffset, b.byteLength);
     const tokens: number[] = [0];
     for (let n = 1; n <= 15; n++) tokens.push(b[SAVE.tokens + n]!);
-    const completed: boolean[] = [];
-    for (let i = 0; i < 15; i++) completed.push(b[SAVE.completed + i] !== 0);
+    const shown: boolean[] = [false];
+    for (let n = 1; n <= 15; n++) shown.push(b[SAVE.shown + n] !== 0);
     progress = {
       lives: b[SAVE.lives]!,
       level: b[SAVE.level]!,
@@ -134,9 +142,10 @@ export function parseSaveFile(buffer: ArrayBuffer | Uint8Array, slot: number): S
       bgm: b[SAVE.bgm]!,
       health: bv.getUint16(SAVE.health, true),
       tokens,
-      completed,
+      shown,
       allTokens: b[SAVE.allTokens] !== 0,
       gameBeaten: b[SAVE.gameBeaten] !== 0,
+      endingShown: b[SAVE.endingShown] !== 0,
     };
   }
   return { name, progress, block, release };
@@ -182,9 +191,10 @@ export function writeProgress(block: Uint8Array, p: SaveProgress): void {
   block[SAVE.health] = p.health & 0xff;
   block[SAVE.health + 1] = (p.health >> 8) & 0xff;
   for (let n = 1; n <= 15; n++) block[SAVE.tokens + n] = (p.tokens[n] ?? 0) & 0xff;
-  for (let i = 0; i < 15; i++) block[SAVE.completed + i] = p.completed[i] ? 1 : 0;
+  for (let n = 1; n <= 15; n++) block[SAVE.shown + n] = p.shown[n] ? 1 : 0;
   block[SAVE.allTokens] = p.allTokens ? 1 : 0;
   block[SAVE.gameBeaten] = p.gameBeaten ? 1 : 0;
+  block[SAVE.endingShown] = p.endingShown ? 1 : 0;
 }
 
 /** The whole file: the length-prefixed name and then the block. */

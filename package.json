@@ -19,6 +19,7 @@
     "vite": "^5.4.0"
   },
   "dependencies": {
+    "@cycjimmy/jsmpeg-player": "^6.1.2",
     "three": "^0.169.0"
   }
 }

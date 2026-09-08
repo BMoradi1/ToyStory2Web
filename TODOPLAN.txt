@@ -789,7 +789,20 @@
 ================================================================================
  [READY]   Publish the repo (code only - assets never ship)
  [OPEN]    Audio: .wav playback, positional where the original was.
- [OPEN]    Cutscenes: MPEG-1 in the browser (jsmpeg-style decoder or
+ [DONE]    Cutscenes, 2026-09-07: the rtlibs "DLLs" are MPEG-1 program
+           streams; remuxed to transport in memory and played by jsmpeg
+           (docs/FORMATS.md "The cutscenes", src/video/). Boot logos,
+           first-play intros and boss movies are wired to the engine's
+           own rules and the save's movie flags. Left: B pictures are
+           skipped by the decoder (10 distinct frames a second), and the
+           trailer, secret ending and ending have no trigger yet.
+ [READY]   The front end: title, main menu (FUN_00437c40 draws it, 871
+           bytes; strings in the exe), the press-jump screen and level
+           picker (FUN_0049b9e0 / FUN_0043a600, 1461 bytes, returns the
+           play position and plays its intro), the game flow FUN_0049d910
+           (1681 bytes), over the level00 .ngn scenes (no .dat: needs
+           .ngn geometry, or a plain colour to begin with).
+ [was]     Cutscenes: MPEG-1 in the browser (jsmpeg-style decoder or
            WebCodecs), fed from the user's rtlibs files.
  [OPEN]    First-run flow explaining that users supply their own copy.
  [OPEN]    Graceful failure when files are missing or a copy is incomplete.

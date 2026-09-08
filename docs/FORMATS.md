@@ -1082,10 +1082,11 @@ it misaligned. Offsets are from the block's start:
     +0x168  u8   all fifty tokens held
     +0x169  u8   level 15's boss beaten
 
-All three of those are written in one place, the level-exit flow
-`FUN_0049d910`, and only on the way out of a level. A level whose number
-divides by three (the boss levels 3, 6, 9, 12, 15) sets its own completed
-byte, and level 15 also sets the game-beaten flag. Any other level
+The bytes from +0x159 are MOVIE-SHOWN flags rather than completion, one
+per level by play position ("The cutscenes" below): the level select sets
+a level's on first playing its intro, and the level-exit flow
+`FUN_0049d910` forces a boss level's (a level whose number divides by
+three) when its boss falls, level 15's also setting +0x169. Any other level
 instead tests for the fiftieth token: the current level's token byte must
 have changed since the level began and the total must read 50, and then
 the all-tokens flag goes up. The port has no level-exit flow and no boss
@@ -1178,3 +1179,45 @@ mapping `sceneForLevel` had guessed; sets 2 and 3 are the `levelt*` /
 `level1t*` test scenes the build script converts, and directories 0 and
 16 are the front end. The empty `level11`-`level19` directories in the
 install are the build tree's, not the game's.
+
+### The cutscenes — DECODED and playing (2026-09-07)
+
+`rtlibs/*.dll` are not libraries. Each is an MPEG-1 PROGRAM stream: pack
+headers `00 00 01 BA` with the MPEG-1 marker, a system header, video on
+stream 0xE0 (320 x 208 at 30 frames a second for the levels, 320 x 192
+at 25 for the logos, about 1.6 Mbit/s, I-P-B pictures in twelve-picture
+groups) and MPEG-1 layer II audio on stream 0xC0 at 44.1 kHz mono,
+64 kbit/s. The executable plays them through DirectShow (it asks for
+`amstream.dll`), and the extension only keeps them out of the way. The
+`data/FMV/fmv.bin` beside them is a 24-entry list of PlayStation `.str`
+names the PC never shipped.
+
+**Which plays when** (`FUN_0049a930` names them by index, `FUN_0049ab90`
+plays one): 0 dlogo, 1 acti, 2 tt, 10 the trailer, 11..25 one per level
+in PLAY order — `l NN in` for the twelve ordinary levels, `l NN bo` for
+the boss levels 3, 6, 9, 12 and 15 — then 26 `l 12 in`, 27 `l 15 bo 2`
+and 28 `end 01`. The boot plays tt, dlogo and acti in that order, each
+skippable and a skip ending the chain. `FUN_0049eb20(n, mode, force)`
+plays movie `n + 10` and sets byte `+0x158 + n` of the SAVE, which is
+what the save decode above had read as a "completed" flag: it is "this
+movie has been shown" — the level select plays a level's intro through
+it unforced, so once only, and the game flow forces the boss movie when
+a boss falls (`n` = the level's play position), the secret ending for
+all fifty tokens (`n` = 0x11, movie 27) and the ending after level 15
+(`n` = 0x12, movie 28). The trailer is movie 10, which the level select
+reaches as position 0.
+
+**In the port** (`src/video/`): the program stream is rewrapped in memory
+as a transport stream — the same elementary data in 188-byte packets with
+MPEG-2 packet headers carrying the same timestamps — and handed to
+jsmpeg's JavaScript decoders through a source that feeds it in pieces.
+Three things about that library had to be worked around and are noted in
+the code: its WebAssembly decoders fault on these streams, its packaged
+start-code search stops at the first code that is not the one asked for
+(so the first B picture ended playback at frame five), and decoding a
+frame inside the first write hung the page on every second movie of a
+session. B pictures are skipped by the decoder, so a level movie shows
+its I and P frames each held for three; the timing and the sound are
+whole. Verified: all 22 files remux to whole packets in node, and in the
+browser the logo movie decodes at full rate from half a second after the
+call and the smallest boss movie plays its 304 pictures to the end.

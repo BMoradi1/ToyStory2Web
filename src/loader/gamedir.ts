@@ -26,7 +26,7 @@ export type GameDir = Map<string, GameFile>;
 
 /** Directories we care about. Skipping the rest keeps the scan quick — the
  *  cutscene folder alone is 214 MB and we don't need it to enumerate levels. */
-const WANTED = /^(data|audio|scripts)(\/|$)/;
+const WANTED = /^(data|audio|scripts|rtlibs)(\/|$)/;
 
 function fileEntry(path: string, file: File): GameFile {
   return {
@@ -98,8 +98,8 @@ export function gameDirFromFileList(files: ArrayLike<File>): GameDir {
     const parts = relative.split('/');
     const path = (parts.length > 1 ? parts.slice(1) : parts).join('/').toLowerCase();
     if (!path) continue;
-    // Skip the cutscene folder: 214 MB of video we don't need enumerated.
-    if (path.startsWith('rtlibs/')) continue;
+    // The cutscene folder is 214 MB, but an entry is only a handle: nothing
+    // is read until a movie is played.
     out.set(path, fileEntry(path, file));
   }
   return out;

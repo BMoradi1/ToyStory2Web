@@ -55,6 +55,10 @@ onto the page instead. Nothing is uploaded either way.
 | `c` | cycle back-face culling, to check the winding by eye |
 | `g` | collapse the level to a single material |
 
+The cutscenes play from your install too: the three logos when the
+folder opens, a level's intro the first time you play it, and a boss's
+movie when it falls. Escape, Enter, Space or a click skips one.
+
 Progress is the game's own save record: lives, health, the camera choice,
 the volume sliders and the tokens per level, kept in the browser and seeded
 from the `Toy200.sav` in your install the first time. The **save file**

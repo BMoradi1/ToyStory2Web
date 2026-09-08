@@ -796,12 +796,13 @@
            own rules and the save's movie flags. Left: B pictures are
            skipped by the decoder (10 distinct frames a second), and the
            trailer, secret ending and ending have no trigger yet.
- [READY]   The front end: title, main menu (FUN_00437c40 draws it, 871
-           bytes; strings in the exe), the press-jump screen and level
-           picker (FUN_0049b9e0 / FUN_0043a600, 1461 bytes, returns the
-           play position and plays its intro), the game flow FUN_0049d910
-           (1681 bytes), over the level00 .ngn scenes (no .dat: needs
-           .ngn geometry, or a plain colour to begin with).
+ [READY]   The front end, DECODED 2026-09-07 (docs/FRONTEND.md): the
+           game flow, two title cards, the press-jump and list menus,
+           and the LEVEL SELECT, which is a 3D diorama (FUN_00438a50)
+           growing a level at a time over level00's scene with the
+           camera on two paths. Blocked on rendering geometry from the
+           .ngn, since level00 has no level.dat; the menus could go over
+           a plain colour first.
  [was]     Cutscenes: MPEG-1 in the browser (jsmpeg-style decoder or
            WebCodecs), fed from the user's rtlibs files.
  [OPEN]    First-run flow explaining that users supply their own copy.

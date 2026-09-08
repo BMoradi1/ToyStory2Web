@@ -770,15 +770,15 @@
  [DONE]    Each object's ROOM now comes from level.dat itself (the
            loader's object list, byte +0xf; applyObjectZones in dat.ts,
            2026-09-07). assignZones is the fallback only.
- [READY]   Move parseDat's transform-record tiling and mesh-pool search
-           onto the loader's own walk (docs/FORMATS.md "level.dat, from
-           the loader", tools/dat-walk-validate.ts): follow each
-           object's +0x10 pointer to its 24/32-byte transform (flag 8
-           picks the size) instead of tiling, and reach the meshes
-           through the transform's pointers instead of scanning. That
-           reads level02/level1 - INTERNAL LEVEL 12, which today fails
-           and silently shows level 1 - and settles the one extra record
-           the tiler finds on level04/level and level10/level.
+ [DONE]    parseDat reads the file the LOADER's way 2026-09-07: the
+           object lists give every object's address, size, unit scale
+           and room, replacing the mesh-pool scan, the record tiler and
+           the first-section guess. INTERNAL LEVEL 12 now loads (it
+           silently showed level 1 before); level 4's two mis-sized
+           records, level 10's invented one and 19 wrong unit scales are
+           fixed; levels 1-3 render to the same triangle counts. Only
+           the four dead 1998 level1.dat copies in level07-10 are
+           still refused.
  [BLOCKED] Per-level logic ports, one at a time, boss levels last.
  [OPEN]    Stale artefacts to skip: level07-10's level1.dat and TERR1.ALL are
            one byte-identical 1998 file each.

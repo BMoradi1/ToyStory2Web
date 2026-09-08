@@ -7,13 +7,23 @@
  * is the other half of a level — geometry here, collision there.
  *
  * It is a **pointer-linked memory image**: 32-bit "address" fields are byte
- * offsets from the start of the file, and the sections are contiguous with no
- * offset table. Layout:
+ * offsets from the start of the file. There is no header beyond a record
+ * count, and the file is read the way the LOADER reads it (`FUN_0043e6e0`;
+ * docs/FORMATS.md "level.dat, from the loader"):
  *
- *     header(8) | markers | paths | zone quads | ref list | objects | mesh pool
+ *     u32 n; n tagged records     the markers, paths and portal quads
+ *     u32 m; m x 0x80 bytes       a block table (m is 0 in every shipped file)
+ *     20-byte entries, 0 ends     object list 0, drawn at unit scale
+ *     u32 c; (c + 1) x u32        the object-id index
+ *     20-byte entries, 0 ends     object list 1, the quarter-scale copy
+ *     the mesh pool               reached only through each object's pointer
  *
- * Section boundaries have to be recovered rather than read, and object records
- * do not store their own size — see `findObjectTable`.
+ * Each list entry points at a 24- or 32-byte TRANSFORM record, which is what
+ * `DatObject` is. An earlier pass here recovered all of that by heuristics —
+ * a scan for the mesh pool, a tiler over the transform records and a guess at
+ * where the first list ended — which mis-sized two records on level 4,
+ * invented one on level 10, put 19 at the wrong scale, and could not read
+ * `level02/level1` at all. `walkObjectLists` replaced it 2026-09-07.
  *
  * Note this is NOT the PlayStation `.dat` that published prior art describes;
  * the PC conversion rewrote it, and these files fail that spec's checks. No
@@ -73,8 +83,9 @@ export interface Zone {
 export const OUTSIDE = 15;
 
 export interface DatObject {
-  /** Byte offset of this record (its position field) and the size the tiler chose. */
+  /** Byte offset of this record's position field, which its list entry points at. */
   offset: number;
+  /** 24, or 32 when the entry's flag 8 says the record carries scales. */
   size: number;
   /**
    * Model units per stored unit: 1 for the first section of the object table,
@@ -377,95 +388,8 @@ function readMesh(r: Reader, offset: number): DatMesh | null {
   return { offset, end: pos, vertices, faces };
 }
 
-/** Could the bytes at `offset` be an object record? */
-function objectPlausible(r: Reader, offset: number, meshStart: number | null): boolean {
-  if (offset < 0 || offset + 24 > r.length) return false;
-  const ptr = r.u32(offset);
-  if (ptr !== 0) {
-    if (ptr >= r.length) return false;
-    if (meshStart !== null && ptr < meshStart) return false;
-    if (meshStart === null && readMesh(r, ptr) === null) return false;
-  }
-  // Rotations are angle units, so all three must be below a full turn.
-  for (let k = 0; k < 3; k++) if (r.u16(offset + 16 + k * 2) >= ANGLE_UNITS) return false;
-  // Positions well outside any level's extent mean this isn't an object.
-  const p = r.vec3(offset + 4);
-  return Math.max(Math.abs(p.x), Math.abs(p.y), Math.abs(p.z)) <= 1 << 22;
-}
 
-/**
- * The mesh pool starts at the lowest mesh pointer held by any object record.
- * Section 4's entries point at object records (at `+4`), which gives us a way
- * in without knowing where the object table begins.
- */
-function findMeshStart(r: Reader, searchFrom: number): number | null {
-  const seen = new Set<number>();
-  let best: number | null = null;
-  for (let p = searchFrom; p < r.length - 20; p += 4) {
-    const v = r.u32(p + 16);
-    if (v <= 0x100 || v >= r.length || seen.has(v)) continue;
-    seen.add(v);
-    if (!objectPlausible(r, v - 4, null)) continue;
-    const meshPtr = r.u32(v - 4);
-    if (meshPtr && (best === null || meshPtr < best)) best = meshPtr;
-  }
-  return best;
-}
 
-/**
- * Recover the object table by tiling it exactly.
- *
- * Records are 20, 24 or 32 bytes and **do not store their own size**. We work
- * backwards from the end of the table marking every offset from which some
- * sequence of valid records reaches the end, then walk forwards choosing sizes.
- * In practice this resolves uniquely — the identity-scale signature at +22
- * disambiguates 24 from 32 whenever both would tile.
- */
-function findObjectTable(
-  r: Reader, searchFrom: number, meshStart: number,
-): { start: number; end: number; records: { offset: number; size: number }[] } | null {
-  const ok = (o: number): boolean => {
-    const v = r.u32(o);
-    if (!(v === 0 || (v % 4 === 0 && v >= meshStart && v < r.length))) return false;
-    for (let k = 0; k < 3; k++) if (r.u16(o + 16 + k * 2) >= ANGLE_UNITS) return false;
-    return true;
-  };
-
-  // The table ends at or just before the mesh pool.
-  for (let end = meshStart; end > meshStart - 68; end -= 4) {
-    if (end <= searchFrom) continue;
-
-    const can = new Map<number, boolean>([[end, true]]);
-    for (let o = end - 4; o >= searchFrom; o -= 4) {
-      can.set(o, ok(o) && (can.get(o + 24) === true || can.get(o + 32) === true ||
-                           can.get(o + 20) === true));
-    }
-
-    let start: number | null = null;
-    for (let o = searchFrom; o < end; o += 4) {
-      if (can.get(o) === true) { start = o; break; }
-    }
-    if (start === null) continue;
-
-    const records: { offset: number; size: number }[] = [];
-    for (let o = start; o < end;) {
-      const c24 = can.get(o + 24) === true;
-      const c32 = can.get(o + 32) === true;
-      let size: number;
-      if (c24 && c32) {
-        // Identity scale (0x1000 on all three axes) marks the 32-byte form.
-        size = r.u16(o + 22) === 0x1000 && r.u16(o + 24) === 0x1000 &&
-               r.u16(o + 26) === 0x1000 ? 32 : 24;
-      } else if (c32) size = 32;
-      else if (c24) size = 24;
-      else size = 20;
-      records.push({ offset: o, size });
-      o += size;
-    }
-    return { start, end, records };
-  }
-  return null;
-}
 
 export function parseDat(buffer: ArrayBuffer | Uint8Array): DatLevel {
   const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
@@ -521,63 +445,38 @@ export function parseDat(buffer: ArrayBuffer | Uint8Array): DatLevel {
     pos += ZONE_SIZE;
   }
 
-  // --- section 4: the placement tables and the object-id list. Not needed to
-  //     render, so a file this cannot be read from still parses; see
-  //     readPlacements for the layout.
+  // --- the object lists and the mesh pool, walked the way the LOADER does
+  //     (`FUN_0043e6e0`; docs/FORMATS.md "level.dat, from the loader").
+  //     Everything below used to be recovered by heuristics — a scan for the
+  //     mesh pool, a tiler over the object records, and a guess at where the
+  //     first section ended. The loader reads all three outright.
   sections.section4 = walkRecordStream(r) ?? pos;
+  const lists = walkObjectLists(r, sections.section4);
+  if (!lists) throw new Error('level.dat: could not walk the object lists');
+  sections.objectTable = lists.start;
+  sections.meshPool = lists.meshPool;
   const { placements, objectIds } = readPlacements(r, sections.section4);
-  const meshStart = findMeshStart(r, pos);
-  if (meshStart === null) throw new Error('level.dat: could not locate the mesh pool');
-  sections.meshPool = meshStart;
 
-  const table = findObjectTable(r, pos, meshStart);
-  if (!table) throw new Error('level.dat: could not tile the object table');
-  sections.objectTable = table.start;
-
-  // The mesh pointer is the LAST field of a record, not the first. The tiler
-  // frames records as [u32][x y z][rot][scale][flags] because that is how the
-  // pointer/rotation validity checks fall out, but the u32 at the head of a
-  // frame belongs to the PREVIOUS record. Reading it as this record's mesh
-  // pairs every mesh with the transform of the object before it — which is
-  // invisible when neighbours share a transform (most do: multi-part props
-  // are consecutive records) and shows up as a stray part wherever they do
-  // not. Level 1's garage car lost a quarter to the next object's transform
-  // that way. Under the head-pointer reading 8 of 15 clean scene files place
-  // the same mesh twice at an identical transform; under this one, none do,
-  // and the table ends exactly at the mesh pool instead of 4 bytes short.
-  const objects: DatObject[] = table.records.map(({ offset, size }) => ({
-    offset: offset + 4, size, unitScale: 1,
-    meshOffset: r.u32(offset + size),
-    zone: null, datList: null,
-    position: r.vec3(offset + 4),
-    rotation: size >= 24
-      ? { x: r.u16(offset + 16), y: r.u16(offset + 18), z: r.u16(offset + 20) }
-      : { x: 0, y: 0, z: 0 },
-    scale: size === 32
-      ? { x: r.u16(offset + 22), y: r.u16(offset + 24), z: r.u16(offset + 26) }
-      : { x: ANGLE_UNITS, y: ANGLE_UNITS, z: ANGLE_UNITS },
-    flags: r.u16(offset + (size === 32 ? 28 : Math.min(size - 2, 22))),
-  }));
-
-  // --- where the first section of the object table ends.
-  //
-  // Nothing in the record says which section it is in, and no count was found
-  // in the header. What does mark it is section 4, the 20-byte list between
-  // the portals and the objects: records of `x y z, u32, pointer` (pointer
-  // last, like the objects themselves), and its leading run points at
-  // exactly the first-section objects, one each — verified against the PC
-  // scene's own two instance lists in every scene file that has one. The
-  // list is preceded by up to a few words of lead-in — a u32 0 after a path
-  // or portal section, two after a marker section, none when nothing precedes
-  // it — so the start is found by trying each. A scene where no lead-in works
-  // keeps every object at unit scale, which is the old behaviour.
-  const byOffset = new Map(objects.map((o, i) => [o.offset, i]));
-  const resolves = (q: number) => q + 20 <= table.start && byOffset.has(r.u32(q + 16));
-  let q = pos;
-  for (let lead = 0; lead <= 16 && !resolves(q); lead += 4) q = pos + lead;
-  let firstSection = 0;
-  for (; resolves(q); q += 20) firstSection++;
-  if (firstSection > 0) for (let i = firstSection; i < objects.length; i++) objects[i]!.unitScale = 4;
+  // An entry names its object's TRANSFORM record, whose position field is
+  // what the pointer points at, so the record's frame starts four bytes
+  // earlier — the u32 there is the previous record's mesh pointer. Flag 8
+  // picks the record's shape: with it, three scales at +0x12 and the mesh
+  // pointer at +0x1c; without, no scales and the mesh pointer at +0x14.
+  const objects: DatObject[] = lists.entries.map((e) => {
+    const size = (e.flags & OBJECT_SCALED) !== 0 ? 32 : 24;
+    const offset = e.record - 4;
+    return {
+      offset: e.record, size, unitScale: e.list === 0 ? 1 : 4,
+      meshOffset: r.u32(offset + size),
+      zone: e.zone, datList: e.list,
+      position: r.vec3(offset + 4),
+      rotation: { x: r.u16(offset + 16), y: r.u16(offset + 18), z: r.u16(offset + 20) },
+      scale: size === 32
+        ? { x: r.u16(offset + 22), y: r.u16(offset + 24), z: r.u16(offset + 26) }
+        : { x: ANGLE_UNITS, y: ANGLE_UNITS, z: ANGLE_UNITS },
+      flags: r.u16(offset + (size === 32 ? 28 : 22)),
+    };
+  });
 
   // Placements point at object records by the offset of their position field,
   // which is exactly what `DatObject.offset` records.
@@ -604,7 +503,7 @@ export function parseDat(buffer: ArrayBuffer | Uint8Array): DatLevel {
     const mesh = readMesh(r, o);
     if (mesh) meshes.set(o, mesh);
   }
-  for (let o = meshStart; o < r.length - 8;) {
+  for (let o = sections.meshPool; o < r.length - 8;) {
     if (meshes.has(o)) { o = meshes.get(o)!.end; continue; }
     if (sprites.has(o)) { o = sprites.get(o)!.end; continue; }
     if (r.u32(o) === MESH_TERMINATOR) { o += 4; continue; }  // the lone word after a section's last sprite
@@ -614,51 +513,54 @@ export function parseDat(buffer: ArrayBuffer | Uint8Array): DatLevel {
     o = mesh.end;
   }
 
-  applyObjectZones(r, sections.section4, objects);
   return { sections, placements, objectIds, markers, paths, zones, objects, meshes, sprites };
 }
 
+/** An entry's flag bit 3: the record carries scales and is four bytes longer. */
+const OBJECT_SCALED = 0x08;
+
 /**
- * The loader's two object lists, which begin where the record stream ends:
+ * The loader's two object lists (`FUN_0043e6e0`), which begin where the
+ * tagged-record stream ends:
  *
  *     u32 m; m x 0x80 bytes            a block table (m is 0 in every file)
- *     20-byte entries until +0xe is 0  list 0
+ *     20-byte entries until +0xe is 0  list 0, drawn at unit scale
  *     u32 c; (c + 1) x u32             the object-id index
- *     20-byte entries until +0xe is 0  list 1
+ *     20-byte entries until +0xe is 0  list 1, the quarter-scale copy
+ *     the mesh pool
  *
- * An entry is `i32 x, y, z; i16; u8 flags; u8 zone; u32 record`, the record
- * being the 24- or 32-byte transform this parser tiles as an object. So the
- * zone the engine draws each object under is here, keyed by the record's
- * offset — which is what `assignZones` had been recovering from the `.ngn`
- * scene by position, and agrees with it on every object of every scene bar
- * three on level 10 (tools/dat-walk-validate.ts).
+ * An entry is `i32 x, y, z; i16; u8 flags; u8 zone; u32 record`. Its own
+ * position is a copy the loader keeps; the RECORD's is what everything here
+ * reads, since that is the transform the engine builds its matrix from.
  */
-function applyObjectZones(r: Reader, at: number, objects: DatObject[]): void {
-  if (at <= 0 || at + 4 > r.length) return;
-  let pos = at;
-  const blocks = r.u32(pos);
-  pos += 4 + blocks * 0x80;
-  const found = new Map<number, { zone: number; list: 0 | 1 }>();
+function walkObjectLists(r: Reader, at: number): {
+  start: number;
+  meshPool: number;
+  entries: { record: number; flags: number; zone: number; list: 0 | 1 }[];
+} | null {
+  if (at <= 0 || at + 4 > r.length) return null;
+  let pos = at + 4 + r.u32(at) * 0x80;
+  const start = pos;
+  const entries: { record: number; flags: number; zone: number; list: 0 | 1 }[] = [];
   const walk = (list: 0 | 1): boolean => {
-    // +0xe is the flags byte, +0xf the zone: one little-endian u16.
-    while (pos + 20 <= r.length && (r.u16(pos + 0xe) & 0xff) !== 0) {
-      found.set(r.u32(pos + 0x10), { zone: r.u16(pos + 0xe) >> 8, list });
+    while (pos + 20 <= r.length) {
+      // +0xe is the flags byte and +0xf the zone: one little-endian u16.
+      const both = r.u16(pos + 0xe);
+      if ((both & 0xff) === 0) { pos += 20; return true; }
+      const record = r.u32(pos + 0x10);
+      if (record < 20 || record + 4 > r.length) return false;
+      entries.push({ record, flags: both & 0xff, zone: both >> 8, list });
       pos += 20;
     }
-    if (pos + 20 > r.length) return false;
-    pos += 20;
-    return true;
+    return false;
   };
-  if (!walk(0)) return;
-  if (pos + 4 > r.length) return;
-  const index = r.u32(pos);
-  pos += 4 + (index + 1) * 4;
-  walk(1);
-  for (const o of objects) {
-    const hit = found.get(o.offset);
-    if (hit) { o.zone = hit.zone; o.datList = hit.list; }
-  }
+  if (!walk(0)) return null;
+  if (pos + 4 > r.length) return null;
+  pos += 4 + (r.u32(pos) + 1) * 4;
+  if (!walk(1)) return null;
+  return { start, meshPool: pos, entries };
 }
+
 
 /**
  * Where the record stream ends, the way the loader finds it.

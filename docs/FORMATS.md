@@ -782,18 +782,27 @@ unread). Level 1 uses zones 0-8; level 2 uses 0-4, and in both, zone 0's
 objects are spread over the whole level, matching its always-drawn role.
 
 **The zone is in `level.dat` after all** (found 2026-09-07; "level.dat,
-from the loader" below). The records this parser tiles as objects are the
-24- or 32-byte TRANSFORM records; the loader's own object list, which the
-parser had never read, is a separate list of 20-byte entries each holding
-a flags byte at +0xe, the ZONE at +0xf and a pointer at +0x10 to the
-transform record. An earlier note here tested the low nibble of the
-transform's flags and, finding no zone, matched `.ngn` instances to
-objects by position instead. `applyObjectZones` now walks that list and
-keys the byte by the pointer, so every object carries `zone` from the
-file, and `assignZones` is only the fallback. Where both exist they agree
-on every object of most scenes and on all but a handful elsewhere
-(`tools/dat-walk-validate.ts` prints the count), the byte being the one
-the engine draws by.
+from the loader" below). The records this parser used to tile as objects
+are the 24- or 32-byte TRANSFORM records; the loader's own object list,
+which the parser had never read, is a separate list of 20-byte entries
+each holding a flags byte at +0xe, the ZONE at +0xf and a pointer at
++0x10 to the transform record. An earlier note here tested the low nibble
+of the transform's flags and, finding no zone, matched `.ngn` instances
+to objects by position instead. `parseDat` now walks the lists, so every
+object carries `zone` from the file and `assignZones` is only a fallback.
+
+Walking them also fixed the objects themselves. The list gives each
+record's address, its size (flag 8 means it carries scales and is four
+bytes longer) and which list it is in, where the old tiler guessed all
+three: it mis-sized two records on level 4, invented one on level 10 from
+a run of bytes that tiled, put 19 objects at the wrong unit scale on
+level05/level1 and level06/level1, and could not read `level02/level1` —
+INTERNAL LEVEL 12 — at all, so the port showed level 1 in its place.
+Object sets are otherwise identical, and levels 1, 2 and 3 render to the
+same triangle counts as before. The list order is also the `.ngn` scene's
+own: matching instances to objects by index now agrees with the zone byte
+on 100% of every scene, where before it was 891 of 899 on level01/level1
+and 469 of 478 on level08/level.
 
 ### Texture mapping — SOLVED
 
@@ -1163,12 +1172,13 @@ puts a path there instead, which is what `level02/level1` (two paths) and
 are one record of 62 markers and 146 objects. The last dword of the file is
 a trailer offset, -1 in every shipped file.
 
-Checked over all 20 scenes: every walk lands, every mesh pointer points
-into the pool, and the object count equals the heuristic parser's on the
-15 scenes it reads except `level10/level`, where the walk finds 529 to its
-530 — one to look at when the parser is moved onto this walk. It also
-reads `level02/level1`, which the parser cannot, to the 65 objects its
-`.ngn` scene carries: that scene is INTERNAL LEVEL 12.
+Checked over all 20 scenes: every walk lands and every mesh pointer points
+into the pool. `parseDat` has read the file this way since 2026-09-07 and
+now reads 16 of the 20, including `level02/level1` (internal level 12) at
+the 65 objects its `.ngn` scene carries. The four it still refuses are
+`level07`-`level10`'s `level1.dat`, the four identical copies of one 1998
+file that no level ever loads (levels 11-15 are `level01`-`level05`), and
+which have one record of 62 markers where the release format has none.
 
 **Which file a level loads** (`FUN_00452fc0(dir)`, with `FUN_00414720`
 passing the internal level): the directory is `level<NN>` for the level

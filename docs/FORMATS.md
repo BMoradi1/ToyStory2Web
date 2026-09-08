@@ -1078,11 +1078,12 @@ it misaligned. Offsets are from the block's start:
     +0x147  u8[16] one byte per INTERNAL level number 1..15: bits 0..4 the
                    five tokens (the level select unpacks exactly those); bit
                    7 is set on every level in the played file and is unread
-    +0x158  u8[16] one byte per select index: 1 once that boss is beaten
-    +0x168  u8   all fifty tokens held
-    +0x169  u8   level 15's boss beaten
+    +0x158  u8[15] one byte per level by PLAY position 1..15: that level's
+                   movie has been shown (`DAT_0052f0e7[n]`, +0x157 + n)
+    +0x168  u8   all fifty tokens held, and the secret ending shown (n = 0x11)
+    +0x169  u8   level 15 beaten, and the ending shown (n = 0x12)
 
-The bytes from +0x159 are MOVIE-SHOWN flags rather than completion, one
+The bytes from +0x158 are MOVIE-SHOWN flags rather than completion, one
 per level by play position ("The cutscenes" below): the level select sets
 a level's on first playing its intro, and the level-exit flow
 `FUN_0049d910` forces a boss level's (a level whose number divides by
@@ -1198,7 +1199,7 @@ in PLAY order — `l NN in` for the twelve ordinary levels, `l NN bo` for
 the boss levels 3, 6, 9, 12 and 15 — then 26 `l 12 in`, 27 `l 15 bo 2`
 and 28 `end 01`. The boot plays tt, dlogo and acti in that order, each
 skippable and a skip ending the chain. `FUN_0049eb20(n, mode, force)`
-plays movie `n + 10` and sets byte `+0x158 + n` of the SAVE, which is
+plays movie `n + 10` and sets byte `+0x157 + n` of the SAVE, which is
 what the save decode above had read as a "completed" flag: it is "this
 movie has been shown" — the level select plays a level's intro through
 it unforced, so once only, and the game flow forces the boss movie when

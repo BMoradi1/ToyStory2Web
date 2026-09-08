@@ -49,7 +49,7 @@ for (const f of files) {
   console.log(`  lives ${p.lives}, select cursor ${p.level} (internal level ${LEVEL_SELECT_ORDER[p.level]}), health ${p.health}, power-ups ${p.powerUps.toString(2)}`);
   console.log(`  camera ${p.activeCamera ? 'active' : 'passive'}, sfx ${p.sfx}/10, bgm ${p.bgm}/10`);
   console.log(`  tokens ${tokenCount(p)}/50 ${held}`);
-  console.log(`  movies shown (play positions) ${p.shown.map((c, n) => c ? n : -1).filter((n) => n > 0).join(',') || 'none'}; all tokens ${p.allTokens}; game beaten ${p.gameBeaten}; ending shown ${p.endingShown}${ok ? '' : '  FAIL: a field is out of range'}`);
+  console.log(`  movies shown (play positions) ${p.shown.map((c, n) => c ? n : -1).filter((n) => n > 0).join(',') || 'none'}; all tokens ${p.allTokens}; game beaten ${p.gameBeaten}${ok ? '' : '  FAIL: a field is out of range'}`);
 }
 console.log(fail === 0 ? `\n${files.length} files parse and every field is in range; each encodes back byte for byte` : `\nFAIL ${fail}`);
 process.exit(fail === 0 ? 0 : 1);

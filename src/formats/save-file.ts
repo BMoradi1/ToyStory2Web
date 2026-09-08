@@ -48,18 +48,18 @@ export const SAVE = {
    */
   tokens: 0x147,
   /**
-   * `FUN_0049eb20(n)`: one byte per MOVIE, at `shown + n`, set when movie
-   * `n + 10` has been played: n = 1..15 a level's own movie by PLAY
-   * position (its intro, or its boss movie on the boss levels), 0x11 the
-   * secret ending, 0x12 the ending. Bytes +0x159..+0x167 are the levels.
+   * `FUN_0049eb20(n)`: one byte per MOVIE, at `shown + n` (the engine's
+   * `DAT_0052f0e7[n]`, +0x157 from the block), set when movie `n + 10` has
+   * been played: n = 1..15 a level's own movie by PLAY position (its
+   * intro, or its boss movie on the boss levels), so bytes +0x158..+0x166;
+   * 0x11 the secret ending at +0x168, which is also the all-tokens flag;
+   * 0x12 the ending at +0x169, also set when level 15 is beaten.
    */
-  shown: 0x158,
-  /** Set once all fifty tokens are held. */
+  shown: 0x157,
+  /** `shown + 0x11`: all fifty tokens held / the secret ending shown. */
   allTokens: 0x168,
-  /** `shown + 0x11`: the secret ending, also set when level 15 is beaten. */
+  /** `shown + 0x12`: level 15 beaten / the ending shown. */
   gameBeaten: 0x169,
-  /** `shown + 0x12`: the ending has been played. */
-  endingShown: 0x16a,
   /** The record is padded out to this. */
   end: 0x188,
   activeCamera: 0x40,
@@ -106,9 +106,10 @@ export interface SaveProgress {
   tokens: number[];
   /** Indexed by PLAY position 1..15 (index 0 unused): that level's movie has been shown. */
   shown: boolean[];
+  /** +0x168: all fifty tokens, which is also the secret ending having played. */
   allTokens: boolean;
+  /** +0x169: level 15 beaten, which is also the ending having played. */
   gameBeaten: boolean;
-  endingShown: boolean;
 }
 
 /**
@@ -145,7 +146,6 @@ export function parseSaveFile(buffer: ArrayBuffer | Uint8Array, slot: number): S
       shown,
       allTokens: b[SAVE.allTokens] !== 0,
       gameBeaten: b[SAVE.gameBeaten] !== 0,
-      endingShown: b[SAVE.endingShown] !== 0,
     };
   }
   return { name, progress, block, release };
@@ -194,7 +194,6 @@ export function writeProgress(block: Uint8Array, p: SaveProgress): void {
   for (let n = 1; n <= 15; n++) block[SAVE.shown + n] = p.shown[n] ? 1 : 0;
   block[SAVE.allTokens] = p.allTokens ? 1 : 0;
   block[SAVE.gameBeaten] = p.gameBeaten ? 1 : 0;
-  block[SAVE.endingShown] = p.endingShown ? 1 : 0;
 }
 
 /** The whole file: the length-prefixed name and then the block. */

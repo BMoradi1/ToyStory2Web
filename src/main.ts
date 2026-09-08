@@ -1111,7 +1111,7 @@ async function spawnPlayer(): Promise<void> {
   hudWas = { lives: -1, health: -1, coins: -1, found: -1 };
 
   tasks = createTasks();
-  startLevelTasks(tasks, level);
+  startLevelTasks(tasks, level, progress?.p.powerUps ?? 0);
   revealedSlots = new Set();
   pickups = createPickups(currentLevel.level, level);
   // Lives and health carry over from the record, as `FUN_004a2cc0` copies
@@ -1931,6 +1931,14 @@ function saveProgress(): void {
   commitProgress(progress);
 }
 
+/** A power-up earned from Mr Potato Head: its bit in the record. */
+function recordPowerUp(): void {
+  if (!progress || !tasks) return;
+  if ((progress.p.powerUps & tasks.powerUps) === tasks.powerUps) return;
+  progress.p.powerUps |= tasks.powerUps;
+  saveProgress();
+}
+
 /** A token taken on this level: its bit in the level's byte, and the fiftieth sets the flag. */
 function recordToken(slot: number): void {
   if (!progress || slot < 0) return;
@@ -2229,6 +2237,8 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
         },
       );
       if (request) startDialogue(request);
+      // Mr Potato Head hands the power-up back inside that step.
+      recordPowerUp();
       // The boss token is awarded by the creature handler partway through
       // its death, so pick that up here too.
       if (creatureSim.bossSlotEarned && !slotDoneNow(4)) markSlotDone(tasks, 4);

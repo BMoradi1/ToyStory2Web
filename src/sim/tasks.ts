@@ -101,9 +101,18 @@ export interface TaskState {
   raceBlocked: boolean;
 }
 
-/** Set the level's starting state: which part Mr Potato Head is missing. */
-export function startLevelTasks(tasks: TaskState, level: number): void {
-  tasks.potatoPart = POTATO_PARTS[level]?.part ?? 0;
+/**
+ * Set the level's starting state: which part Mr Potato Head is missing.
+ *
+ * `held` is the power-ups the save already carries. The engine tests the
+ * level's bit in the table at 0x503a22 before it puts the part in the
+ * world, so a power-up already earned means there is no part to find and
+ * Mr Potato Head only explains what it does.
+ */
+export function startLevelTasks(tasks: TaskState, level: number, held = 0): void {
+  tasks.powerUps = held;
+  const part = POTATO_PARTS[level];
+  tasks.potatoPart = part && (held & part.power) === 0 ? part.part : 0;
 }
 
 export function createTasks(): TaskState {

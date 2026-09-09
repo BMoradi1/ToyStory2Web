@@ -78,11 +78,14 @@ the viewer never writes there.
 
 While playing: **WASD** or a gamepad stick to move, **space** to jump (again at
 the top for a double jump), **J** to spin, **K** for the laser, **Q**/**E** or
-the shoulder buttons to swing the camera, **M** to mute. Movement is
+the shoulder buttons to swing the camera, **M** to mute. The normal laser is a
+red beam; holding K to full charge and releasing fires a wider yellow beam.
+Disk ammunition switches firing to homing disks, consuming one round per shot;
+when it runs out, firing returns to the laser. Movement is
 camera-relative, as the original's is, and Buzz is animated from the game's own
-animation state machine. Walls do not stop you yet — collision response is the
-next piece of work — so it is possible to walk into scenery or out of the
-level.
+animation state machine. Walls stop Buzz, and reachable ledges can be caught
+while descending from a jump. Falling out of the level returns him to his
+last safe position.
 
 ## What works today
 
@@ -133,6 +136,10 @@ level.
   touching something flatter than 60 degrees rather than finding a floor
   underfoot. Fall out of the level and you are put back where you last stood
   safely, as the original does.
+- **Edge climb.** Jump toward a reachable ledge: Buzz automatically catches
+  it while descending and pulls himself up. The original reach, flatness and
+  clearance checks reject high shelves and obstructed climbs; animation state
+  9 plays the 82-tick pull-up before movement resumes.
 - **Creatures move.** Every scene's enemies and cast are read from the
   level's packet file (an RNC-compressed container the game's own unpacker
   was transcribed for) and then *run*: the game's own script interpreter,

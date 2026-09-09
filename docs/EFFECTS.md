@@ -1,7 +1,7 @@
 # The effect system
 
 Decoded 2026-09-06 from `toy2.exe`. Everything that is not a model or a
-level mesh and moves — Buzz's laser bolt, the hover bot's shots, the coins
+level mesh and moves — Buzz's disk, the hover bot's shots, the coins
 a dying creature spills, hit sparks, smoke, dust, the stomp's shockwave,
 the sparkles over secrets, the boss missiles — is an **effect**: one of 64
 records driven by a template and a behaviour byte. `src/formats/
@@ -88,15 +88,18 @@ after.
 
 ## The tick
 
-### Laser launch correction (2026-09-08)
+### Disk launch corrections (2026-09-08)
+
+These effects were initially mislabeled as the normal laser. They are disks;
+the normal laser is a separate beam system described below.
 
 The browser's firing call passed Buzz's yaw into a parameter also used as
 pitch for untargeted shots. Facing +X therefore fired upward, facing -Z
-fired backward, and facing -X fired downward. `spawnStraightLaser` now takes
+fired backward, and facing -X fired downward. `spawnStraightDisk` now takes
 separate yaw and pitch; the current controller has no vertical aiming and
 uses pitch zero. Homing shots retain their existing initial yaw and
 target-derived pitch. Target selection also skips zero-health creatures.
-`tools/laser-probe.ts` reads the install's effect templates and checks eight
+`tools/disk-probe.ts` reads the install's effect templates and checks eight
 ticks of forward, level flight at all 4,096 headings, plus eight explicit
 elevation cases. This verifies the launch correction, not retail parity of
 the wrist origin, target selection, or charged-shot behavior.
@@ -189,8 +192,8 @@ mark at the record's floor. `sound N` is the sound event N at the record.
 | 0x1a | sound 0x44; while L > 4 spawn 0x40 in 2 at a random offset (±0x1000); light | 1 |
 | 0x1b | shrink `per`/tick in both axes, floor 1 | — |
 | 0x1c | unless `per` == 0xc6: floor with a 100-unit mark; land: bounce vy*3/4, die when |vy| < 0x400, sound 0x68. On 1-in-7 ticks while drawn and L > 5 spawn 0xf in 2, random spin | — |
-| 0x1d | **the laser bolt.** Sound 0x55 on 1-in-8 ticks. Within 0x4000 (level units squared, i.e. 128) of the target's hit-shape centre: if the placement's vulnerable byte is 4 the bolt **bounces** — flags lose `hurts` and `homing`, vy = -0x400, gravity 0x30, vx/vz = the angle from target to bolt, mode 0x1e, life 0x32, sound 7 — else `FUN_00408a60(creature, angle, 4)` damages it and the bolt dies with death code 8 | — |
-| 0x1e | the straight bolt: while L > 4 spawn `c3` x 0x2c in a random offset (±0x80) with a third of its velocity | — |
+| 0x1d | **the homing disk.** Sound 0x55 on 1-in-8 ticks. Within 0x4000 (level units squared, i.e. 128) of the target's hit-shape centre: if the placement's vulnerable byte is 4 the bolt **bounces** — flags lose `hurts` and `homing`, vy = -0x400, gravity 0x30, vx/vz = the angle from target to bolt, mode 0x1e, life 0x32, sound 7 — else `FUN_00408a60(creature, angle, 4)` damages it and the bolt dies with death code 8 | — |
+| 0x1e | the straight disk: while L > 4 spawn `c3` x 0x2c in a random offset (±0x80) with a third of its velocity | — |
 | 0x1f | shrink 4/tick, floor 0x10 | 1 |
 | 0x20 | `w,h = tri(DAT_0052ad61) * 8 + 100` (the 1-in-16 counter as a triangle wave); on `c2` ticks while drawn and L > 4 spawn 0x4d in 2 with random spin | — |
 | 0x21 | shrink `per/2`/tick, floor 1 | 1 |
@@ -274,10 +277,48 @@ vy = -0x400, gravity 0x30, life 0x32, vx/vz away from Buzz at 0x100 a
 tick, sound 7. The hurt itself uses the angle from the last touching record
 to Buzz.
 
-## The laser (`FUN_004a4960(aim)`, from `FUN_00434990`)
+## Normal wrist laser: beams, not disk effects
 
-Needs a charge (`DAT_00882968 > 0`; both counters `DAT_00882968` and
-`DAT_00882964` drop by one). Unless the camera is in modes 3+ (then the
+Corrected after the user identified the homing disks. `FUN_00434990` calls
+`FUN_004a5d30` for the ordinary wrist weapon; it calls `FUN_004a4960` only
+when the disk-ammo counter is nonzero. The earlier effects research and
+implementation had mistaken the disk branch for the default weapon.
+
+`src/sim/laser.ts` implements the separate four-record beam pool:
+
+- Maximum range 0x20000 game units (4096 level units), with a 32-tick fade.
+- Hits are resolved at firing time against scenery and animated creature
+  ellipsoids. The nearest hit clips the beam; it does not chase an enemy.
+- Aim assistance is limited to 0x80 angle units from the facing, with pitch
+  clamped to ±0x40. Only creatures whose vulnerability includes bit 4 qualify.
+- Normal shots are red, half-width 32 level units, damage kind 2; charged
+  shots are yellow, half-width 64, damage kind 3. The temporary powered
+  laser is green, half-width 32, and also uses damage kind 3.
+- The tail retracts 0x800 game units per tick while the endpoint stays fixed.
+- Drawing uses sprite 9 from the install, tiled over 400-level-unit segments,
+  with frame 2 at the tail and frame 1 after it. U follows the beam's length;
+  V runs across its glowing core. Mapping those axes the other way made bars.
+
+With disk ammo, the port instead launches one disk and consumes one round.
+At zero ammo the next shot is a beam again. Active disks are capped at six;
+rejected launches do not spend ammunition. `tools/beam-probe.ts` checks beam
+geometry, hit order, wall occlusion, aim limits, colours, fading and UV axes;
+`tools/disk-probe.ts` checks the separate particle trajectory and placement.
+
+Browser verification on level 4: collected a real category-7 pickup for ten
+rounds, fired ten disks with ammo 9, 8, …, 0, and confirmed the next shot
+created a red beam with no disk effect. A captured side view confirms the
+beam's texture runs along its length instead of producing transverse bars.
+
+Remaining differences: the muzzle uses an approximate body-relative origin,
+the beam/scenery query reuses the swept-sphere implementation, and the
+original's reflected beam and special first-person targeting are not ported.
+Floating-point segment/ellipsoid intersections replace the integer routine.
+
+## The disk launcher (`FUN_004a4960(aim)`, from `FUN_00434990`)
+
+Requires disk ammunition (`DAT_00882964`) and a free disk permit
+(`DAT_00882968`, initially 6); both counters drop by one when fired. Unless the camera is in modes 3+ (then the
 target comes from `DAT_0050a4fc`), the nearest live creature whose
 placement's vulnerable byte is nonzero, whose `+0x70` is not negative and
 whose flags have both bits 0x1 and 0x2, within 4096 level units, becomes
@@ -291,7 +332,7 @@ Sound 0x54 either way.
 
 | who | kinds |
 |---|---|
-| the laser | 0x47, 0x48 |
+| the disk launcher | 0x47, 0x48 |
 | the stomp (`FUN_00434d20`) | 0x12 in 0xb, 0x13 in 0xc, 0x400 above Buzz, sound 0xf |
 | the spin (`FUN_00434eb0`) | 0x16/0x17 in 2 (charge trails, rotation from the spin counter), 0x14/0x15 in 2 at 0x3000 up |
 | a creature dying (`FUN_00405d20`) | 0x3d (the coin, floor set at once), 99 in 4 or 14, 0x11 in 4, 0x23 in 0xe |
@@ -317,13 +358,14 @@ positions with a colour and a countdown that the character lighting reads
 
 `src/sim/effects.ts` is the pool, the spawner, the child spawner, the tick
 in the order above with every mode the switch names, the seven fades, the
-twelve death codes and the touch test. `src/main.ts` fires the laser, feeds
+twelve death codes and the touch test. `src/main.ts` fires beams or disks according to ammo, feeds
 the creature port's shots and sparks in, hands hits to `damageCreature`,
 turns a touched coin into a coin and a shot that landed into
 `hurtPlayer()`. The cards are drawn by two additive `SpriteBatch`es beside
 the coins' translucent one, with the template's spin.
 
-Checked in the browser on level 1: firing with nothing in range spawns kind
+Historical disk-path check in the browser on level 1 (before ammo gating):
+firing with nothing in range spawns kind
 0x48 and its mode-0x1e trail, one 0x2c spark per 3-tick gate; firing at a
 creature spawns kind 0x47, which homes in three axes and, against one whose
 `vulnerable` byte is 4, **bounces** — losing `hurts` and `homing`, taking
@@ -336,7 +378,7 @@ Two things are not as the original has them, and each is named at its
 site (modes 0x2f, 0x30 and 0x34 were read and ported on 2026-09-07): the
 bolt's starting pitch is aimed at its
 target because where `FUN_00434990` gets the aim it passes was not read,
-and level it passes over anything much above the wrist; and the laser
+and level it passes over anything much above the wrist; and the disk launcher
 targets the nearest creature that is in this tick's near list rather than
 the original's "near list AND explicitly awake", which would leave it with
 almost nothing to aim at.

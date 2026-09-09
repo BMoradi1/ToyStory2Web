@@ -4,7 +4,7 @@
  * `FUN_00410f40` (tick), `FUN_00410b80` (die) and `FUN_004100f0` (touch
  * Buzz). The decode is docs/EFFECTS.md, which carries every mode.
  *
- * Buzz's laser bolt is one of these, and so are the hover bot's shots, the
+ * Buzz's disk is one of these, and so are the hover bot's shots, the
  * coins a dying creature spills, hit sparks, smoke, dust, the stomp's
  * shockwave and the sparkles over an unspent secret. There are 64 records,
  * each a moving, spinning, fading sprite card driven by a template and a
@@ -25,7 +25,7 @@ import type { RandomStream } from './creatures.ts';
 export interface EffectTarget {
   x: number; y: number; z: number;
   alive: boolean;
-  /** The placement's vulnerable byte; 4 bounces the laser. */
+  /** The placement's vulnerable byte; 4 bounces the disk. */
   vulnerable: number;
   /** The creature itself, handed back with the hit. */
   creature: object;
@@ -52,7 +52,7 @@ export interface Effect {
   pitch: number;
   /**
    * The creature this is homing on, or null for Buzz / nothing. `vulnerable`
-   * is its placement's byte: 4 bounces the laser (docs/CREATURES.md).
+   * is its placement's byte: 4 bounces the disk (docs/CREATURES.md).
    */
   target: EffectTarget | null;
   /** +0x24: ticks left. 0 is dead. */
@@ -232,7 +232,7 @@ export function spawnEffect(
   return e;
 }
 
-/** Fire an untargeted wrist laser. Facing and elevation are independent:
+/** Fire an untargeted disk. Facing and elevation are independent:
  * the current player controller has no vertical aiming, so pitch is level.
  * The spawner halves these velocities, as it does for every plain effect.
  */
@@ -788,7 +788,7 @@ function bolt(sim: EffectSim, world: EffectWorld, e: Effect, dt: number): number
 }
 
 /**
- * Mode 0x1d: Buzz's laser bolt. Near its creature it either BOUNCES — off one
+ * Mode 0x1d: Buzz's disk. Near its creature it either BOUNCES — off one
  * whose placement's vulnerable byte is 4 — or lands damage kind 4 and dies
  * with death code 8.
  */
@@ -801,7 +801,7 @@ function diskHoming(sim: EffectSim, world: EffectWorld, e: Effect): number {
   if (dx * dx + dy * dy + dz * dz >= 0x4000) return 0;
 
   if (t.vulnerable === 4) {
-    // Laser-proof: the bolt comes off it, straight, and can no longer hurt.
+    // Disk-proof: the bolt comes off it, straight, and can no longer hurt.
     const away = yawOf(e.x - t.x, e.z - t.z);
     e.flags &= ~(EFFECT_FLAGS.hurts | EFFECT_FLAGS.homing);
     e.vy = -0x400;

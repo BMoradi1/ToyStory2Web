@@ -308,15 +308,20 @@ export class Viewer {
       overlay.setAttribute('position', buffer.getAttribute('position'));
       overlay.setAttribute('normal', buffer.getAttribute('normal'));
       overlay.setAttribute('uv', buffer.getAttribute('uv'));
-      for (const group of reflectGroups) overlay.addGroup(group.start, group.count, 0);
-      this.reflections = new THREE.Mesh(overlay, new THREE.MeshMatcapMaterial({
+      for (const [i, group] of reflectGroups.entries()) overlay.addGroup(group.start, group.count, i);
+      // Three.js honours geometry groups only with a material ARRAY. A single
+      // material draws every shared vertex, coating the whole level in a
+      // translucent reflection (even the far-detail doorframes near the eye).
+      this.reflections = new THREE.Mesh(overlay, reflectGroups.map(group => new THREE.MeshMatcapMaterial({
         matcap: reflection,
         transparent: true,
+        side: this.sideOverride ?? (group.doubleSided ? THREE.DoubleSide : THREE.FrontSide),
+        clippingPlanes: [group.list === 1 ? this.farListPlane : this.nearListPlane],
         // Half from the material the engine builds, and the 0x60 vertex alpha
         // its generated UVs carry.
         opacity: 0.5 * (0x60 / 0xff),
         depthWrite: false,
-      }));
+      })));
       this.scene.add(this.reflections);
     }
 
@@ -445,17 +450,16 @@ export class Viewer {
       if (material[i]) material[i]!.visible = visible;
       if (visible) shown += group.count / 3; else hidden += group.count / 3;
     });
-    // The reflection overlay shares one material across every reflective
-    // group, so it cannot be hidden a group at a time the way the level can.
-    // Its draw ranges are rebuilt instead, which is why a collected pickup
-    // does not leave its shine behind.
+    // Keep original material indices when filtering reflection ranges. An
+    // empty group list with a material array draws nothing, so a collected
+    // pickup cannot leave its shine behind.
     const overlay = this.reflections?.geometry;
     if (overlay) {
       overlay.clearGroups();
-      for (const group of this.reflectGroups) {
+      for (const [i, group] of this.reflectGroups.entries()) {
         const visible = (zones === null || group.zone === null || zones.has(group.zone))
           && (group.object === null || !this.hiddenObjects.has(group.object));
-        if (visible) overlay.addGroup(group.start, group.count, 0);
+        if (visible) overlay.addGroup(group.start, group.count, i);
       }
     }
     return { shown, hidden };
@@ -948,7 +952,9 @@ export class Viewer {
     if (this.reflections) {
       this.scene.remove(this.reflections);
       this.reflections.geometry.dispose();
-      (this.reflections.material as THREE.Material).dispose();
+      const materials = this.reflections.material;
+      if (Array.isArray(materials)) materials.forEach(m => m.dispose());
+      else materials.dispose();
       this.reflections = null;
     }
     if (!this.current) return;

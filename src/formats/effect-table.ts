@@ -9,7 +9,7 @@
  * (`FUN_0040fae0(x, y, z, vx, vy, vz, gravity, rotation, spin, kind)`) fills
  * a record from one of 128 sixteen-byte templates at 0x4ec160, and the
  * child spawner (`FUN_0040fdf0(x, y, z, kind, mode)`) draws the velocity out
- * of one of 29 spawn modes at 0x4ec948 first. Buzz's laser bolt, the hover
+ * of one of 29 spawn modes at 0x4ec948 first. Buzz's disk, the hover
  * bot's shots, a dead creature's coins, hit sparks, dust, smoke, the
  * sparkles over secrets and the stomp's shockwave are all effects.
  *
@@ -156,9 +156,9 @@ export function readEffectTable(exe: Uint8Array): { kinds: (EffectTemplate | nul
 
 /** Kinds the code names at its call sites. */
 export const EFFECT_KIND = {
-  /** Buzz's laser bolt, homing on the creature it was fired at (mode 0x1d). */
+  /** Buzz's disk, homing on the creature it was fired at (mode 0x1d). */
   diskHoming: 0x47,
-  /** The bolt when nothing was in range, or after bouncing off a laser-proof creature (mode 0x1e). */
+  /** The bolt when nothing was in range, or after bouncing off a disk-proof creature (mode 0x1e). */
   diskStraight: 0x48,
   /** A coin spilled by a dying creature; picked up by touch. */
   coin: 0x3d,

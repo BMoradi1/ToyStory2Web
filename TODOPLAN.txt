@@ -204,6 +204,17 @@
           placements all kept to the doorway graph).
  [BLOCKED] Turn the portal walk on for drawing. Waiting on P1.6's matched
           retail camera/FOV comparison to resolve visible geometry losses.
+          Separate doorway transparency bug fixed 2026-09-08: reflection
+          overlay used one material, so Three.js ignored its groups and
+          redrew the entire level translucently. It now uses a material
+          array and each group's detail clip plane/culling. Chromium checks:
+          340 reflection triangles, zero with reflective objects/zones hidden;
+          bedroom/landing doorway comparison and build pass. FORMATS.md.
+          Misplaced doorway trim also fixed 2026-09-08: object rotation
+          must be Rx*Ry*Rz, decoded from FUN_00450c70. Previous Ry*Rx*Rz
+          turned the bedroom trim away from the blue wall and misoriented
+          the door. Matched-camera screenshot and 7,245 matrix comparisons
+          against the original fixed-point equations pass (16 scenes).
           It costs, on average over
           a frame, 700 pixels of 876,000 on level 1 and 2,160 on level 2
           against drawing every room, and draws 3.6 rooms of 10 and 2.8
@@ -275,21 +286,27 @@
           exist: the mover height blend, and the states that pull the view
           behind Buzz.
  [DONE]   The effect system. Decoded and ported 2026-09-06
-          (docs/EFFECTS.md, src/sim/effects.ts). Buzz's laser homes,
-          bounces off laser-proof creatures and damages the rest; the
+          (docs/EFFECTS.md, src/sim/effects.ts). Buzz's disk launcher homes,
+          bounces off disk-proof creatures and damages the rest; the
           robots' shots, the death coins and the sparks are effects too.
           Open: modes 0x2f, 0x30 and 0x34 (level-specific, never decoded),
           the bolt's starting aim, and the near-list targeting test.
           Fixed 2026-09-08: untargeted lasers used player yaw as pitch,
           sending shots up/down/backwards as Buzz turned. Facing and
           elevation are now separate; the current controller fires level.
-          tools/laser-probe.ts checks all 4,096 headings through the effect
+          tools/disk-probe.ts checks all 4,096 headings through the effect
           tick with the install's template, plus independent pitch checks.
           Zero-health creatures are excluded from laser target selection.
           Also fixed the invisible effects: drawEffects placed game-unit
           centres as level units, 32x too far from the world origin. Card
           centres now use the same conversion as Buzz; sizes retain their
           level-unit conversion. Laser probe covers sprite-batch placement.
+          Weapon identity corrected: 0x47/0x48 are the disk power-up, not
+          the default laser. src/sim/laser.ts now handles red normal beams,
+          wider yellow charged beams, immediate hits and clipped endpoints.
+          Beam texture axes fixed. Browser-tested level 4's real ammo pickup:
+          ten disks consume ten rounds, then firing returns to the laser.
+          beam-probe, disk-probe, player-attack-probe and build pass.
  [READY]  Camera's own zone and the player's. DECODED 2026-09-06
           (docs/LEVELS.md "Zones"): both are `zoneAt` (src/formats/
           collision.ts) on the render camera over the ZONE FLOORS, with
@@ -346,9 +363,16 @@
                 in units 32x the level file's. Written up in docs/PLAYER.md
                 and typed in src/sim/player-constants.ts. Ghidra scripts
                 to rebuild both decompiles: tools/ghidra/.
-                Not extracted: projectile speeds, the mover's step height
-                and slope limit (P2.3), ledge-grab probe geometry.
+                Subsequent work decoded projectile speeds (EFFECTS.md),
+                the mover (P2.3), and ledge-grab geometry (PLAYER.md).
  P2.2 [DONE]    Character controller on the fixed 60 Hz tick.
+                Edge climb added 2026-09-08 from FUN_00435f30: automatic
+                descending hand crossing, clearance/flatness/reach gates,
+                82-tick animation state 9 / slot 10, input lock and recovery.
+                tools/ledge-probe.ts covers a running jump, rejected grabs,
+                landing/interruption and 371 real Level 1 edge samples.
+                Existing 24 movement checks pass. Moving-platform attachment
+                and original climb camera transition remain unported.
                 src/sim/player.ts is a transcription of FUN_00436220 and
                 what it calls: the jump state machine, gravity and the
                 release cut, the double jump both ways, friction and the

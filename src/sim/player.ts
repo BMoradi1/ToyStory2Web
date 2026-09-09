@@ -16,11 +16,9 @@
  * tick count and divided it back out after moving; at a fixed rate that factor
  * is 1, so it is gone from here. See docs/PLAYER.md, "Time base".
  *
- * Scope: this is P2.2, the controller. Collision *response* is P2.3, and the
- * `Ground` interface below is the seam. Behind it now sit a floor query, a
- * wall slide and a death plane — enough to walk around a level without
- * leaving it — but not the original's mover, so there is no step height and
- * no ledge handling. See docs/PLAYER.md.
+ * The `Ground` interface connects the controller to swept-sphere collision
+ * and the automatic ledge-climb probes. See docs/PLAYER.md for the remaining
+ * differences from the original mover.
  */
 import { sweepSphere, type CollisionWorld } from '../formats/collision.ts';
 import {
@@ -28,6 +26,7 @@ import {
   MOVE_OVERRIDES, TURN, VERTICAL, type MoveTable,
 } from './player-constants.ts';
 import { cos, idiv, sin, YAW_MASK, yawDelta, yawOf } from './trig.ts';
+import { CLIMB_TICKS, findLedge, type LedgeProbe, type LedgeTarget } from './ledge.ts';
 
 /** Jump state, the original's field at `+0x8c`. */
 export enum JumpState {
@@ -49,6 +48,8 @@ export enum JumpState {
  * degrees this tick", which is what makes ledges, steps and slopes behave.
  */
 export interface Ground {
+  /** Optional on test worlds; real collision checks reach and body clearance. */
+  ledge?(probe: LedgeProbe): LedgeTarget | null;
   move(
     from: { x: number; y: number; z: number },
     velocity: { x: number; y: number; z: number },
@@ -129,6 +130,8 @@ export interface PlayerState {
   dying: boolean;
   /** +0x90: animation phase the controller asks for. */
   animPhase: number;
+  /** DAT_0053c660: edge-climb ticks remaining; animation state 9. */
+  climb: number;
 
   /** `DAT_0053c838`: counts up while falling; 0x50 once the fall is long enough to hurt, negative while stunned on landing. */
   fallTimer: number;
@@ -146,9 +149,9 @@ export interface PlayerState {
   laser: number;
   laserCharge: number;
   /**
-   * The charge the laser went off at this tick, or null. `FUN_004a4960` is
-   * what the original calls here; the bolt itself is an effect
-   * (docs/EFFECTS.md), which the caller spawns.
+   * The charge the weapon went off at this tick, or null. The caller chooses
+   * the ordinary beam (`FUN_004a5d30`) or, with ammo, the disk launcher
+   * (`FUN_004a4960`); see docs/EFFECTS.md.
    */
   laserFired: number | null;
 
@@ -191,6 +194,7 @@ export function createPlayer(x = 0, y = 0, z = 0, yaw = 0): PlayerState {
     hitStun: 0,
     dying: false,
     animPhase: 0,
+    climb: 0,
     fallTimer: 0,
     jumpedFromGround: false,
     takeoffY: y,
@@ -208,18 +212,19 @@ export function createPlayer(x = 0, y = 0, z = 0, yaw = 0): PlayerState {
   };
 }
 
-/** Edge detection, standing in for the original's previous-buttons word at 0x52f2fe. */
+/** Previous input and pre-move height (+0x60), for button and ledge crossings. */
 export interface PlayerRuntime {
   previous: PlayerInput;
+  previousY: number | null;
 }
 
 export function createRuntime(): PlayerRuntime {
-  return { previous: { ...NO_INPUT } };
+  return { previous: { ...NO_INPUT }, previousY: null };
 }
 
 /** Is the player in a plain state — no attack, no stun, nothing special? */
 function isPlain(p: PlayerState): boolean {
-  return p.spin === 0 && p.spinCharge === 0 && p.laser === 0 && p.hitStun <= 0 && p.fallTimer >= 0;
+  return p.climb === 0 && p.spin === 0 && p.spinCharge === 0 && p.laser === 0 && p.hitStun <= 0 && p.fallTimer >= 0;
 }
 
 /**
@@ -486,6 +491,34 @@ export function stepPlayer(
   p.sounds.length = 0;
   p.events.length = 0;
   const prev = runtime.previous;
+  p.laserFired = null;
+  const previousY = runtime.previousY;
+  runtime.previousY = p.y;
+  if (p.dying || p.hitStun > 0) p.climb = 0;
+  else if (p.climb > 0) p.climb--;
+  else if (p.vy > 0 && !p.onGround && p.coyote === 0 && p.fallTimer !== 0x50
+      && p.spin === 0 && p.spinCharge === 0 && p.hitStun <= 0
+      && p.fallTimer >= 0 && previousY !== null) {
+    const edge = ground.ledge?.({ x: p.x, y: p.y, z: p.z, yaw: p.yaw, previousY });
+    if (edge) {
+      p.x = edge.x; p.y = edge.y; p.z = edge.z; p.targetYaw = edge.yaw;
+      p.climb = CLIMB_TICKS;
+      p.laser = 0; p.laserCharge = 0;
+      p.fallTimer = 0;
+      p.events.push(0x17);
+    }
+  }
+  if (p.climb > 0) {
+    // The animation contains the pull-up displacement relative to the new
+    // ledge anchor. Moving the controller as well would apply it twice.
+    p.yaw = (p.yaw + idiv(yawDelta(p.targetYaw, p.yaw), 16)) & YAW_MASK;
+    p.vx = p.vy = p.vz = p.forwardSpeed = p.lateralSpeed = 0;
+    p.onGround = false; p.coyote = 0; p.groundNormal = null; p.contacts = [];
+    p.animPhase = 9;
+    runtime.previousY = p.y;
+    runtime.previous = { ...input };
+    return;
+  }
 
   // --- stick to target yaw and magnitude -----------------------------------
   // The engine's dead zone is per axis on the raw pad value, and its magnitude
@@ -597,6 +630,7 @@ export function stepPlayer(
 export function groundFromCollision(world: CollisionWorld): Ground {
   const scale = GAME_UNITS_PER_LEVEL_UNIT;
   return {
+    ledge: probe => findLedge(world, probe),
     move(from, velocity) {
       return sweepSphere(world, from, velocity, COLLISION.radius, {
         scale,

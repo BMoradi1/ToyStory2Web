@@ -41,6 +41,7 @@ export enum AnimState {
   /** Out of health. Buzz's own animation slot, and it does not loop back. */
   Dying = 7,
   DoubleJump = 8,
+  Climb = 9,
   HardFall = 0xc,
   /** The charged spin, whirling. */
   ChargedSpin = 0x13,
@@ -54,7 +55,7 @@ export enum AnimState {
  * `FUN_004011d0` runs its state machine first and then, if the spin timer is
  * up, replaces the resolved primary slot with 9 and drives the cursor
  * straight off the timer, bypassing the state's script. There IS a state 9,
- * and it is the grapple: selecting it for a spin plays a climb, which is what
+ * and it is the ledge climb: selecting it for a spin plays a climb, which is what
  * this module used to do.
  *
  * A state whose two slots are equal cannot carry the override — it is one of
@@ -165,6 +166,7 @@ export function selectState(p: PlayerState, hasInput: boolean): number {
   // they beat everything below.
   if (p.dying) return AnimState.Dying;
   if (p.hitStun > HIT_ANIMATION_ABOVE) return AnimState.Hit;
+  if (p.climb > 0) return AnimState.Climb;
   // The charged spin IS a state, and a different one once he is dizzy. The
   // plain spin is not; it is the slot override at the bottom of stepAnimation.
   if (p.spinCharge < 0) {

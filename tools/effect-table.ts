@@ -11,7 +11,7 @@
  *  - every kind the updater or the death hook spawns as a child exists;
  *  - every spawn mode's randomisation nibbles are rules 0..6;
  *  - the kinds the code names look like what it uses them for: the coin
- *    is the coin sprite with twelve frames, the two laser bolts carry the
+ *    is the coin sprite with twelve frames, the two disk variants carry the
  *    two bolt modes, the hover shot and the missiles carry `hurts`.
  */
 import { readFileSync } from 'node:fs';
@@ -63,8 +63,8 @@ for (const m of modes) {
 
 const coin = kinds[EFFECT_KIND.coin]!;
 if (coin.sprite !== SPRITE.coin || coin.frames !== 12) bad(`coin kind: sprite ${coin.sprite} frames ${coin.frames}`);
-if (kinds[EFFECT_KIND.diskHoming]!.mode !== 0x1d || kinds[EFFECT_KIND.diskStraight]!.mode !== 0x1e) bad('laser bolt modes');
-if (!(kinds[EFFECT_KIND.diskHoming]!.flags & EFFECT_FLAGS.homing)) bad('laser bolt is not homing');
+if (kinds[EFFECT_KIND.diskHoming]!.mode !== 0x1d || kinds[EFFECT_KIND.diskStraight]!.mode !== 0x1e) bad('disk modes');
+if (!(kinds[EFFECT_KIND.diskHoming]!.flags & EFFECT_FLAGS.homing)) bad('disk is not homing');
 for (const k of [EFFECT_KIND.hoverShot, EFFECT_KIND.coin]) if (!(kinds[k]!.flags & EFFECT_FLAGS.hurts)) bad(`kind 0x${k.toString(16)} cannot touch Buzz`);
 if (kinds[EFFECT_KIND.stompRing]!.mode !== 0xb || kinds[EFFECT_KIND.stompWave]!.mode !== 0xb) bad('stomp kinds are not growers');
 

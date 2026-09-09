@@ -514,9 +514,20 @@ offset from which some sequence of valid records reaches the end, then forwards
 choosing sizes. This resolves uniquely in practice; where both 24 and 32 would
 tile, the identity-scale signature (`0x1000` on all three axes at `+22`) picks
 the 32-byte form. Rotations are PSX angle units (4096 = 360 degrees) and scale
-is 4.12 fixed point (4096 = 1.0). Composition order is assumed `Ry*Rx*Rz` and
-is **unverified** — though most objects rotate on one axis, where it can't
-matter.
+is 4.12 fixed point (4096 = 1.0). Composition order is **`Rx*Ry*Rz`**
+(column vectors, Z acts first), decoded 2026-09-08 from `FUN_00450c70`,
+called by the level loader `FUN_0043e6e0`. Its first row is
+`[cz*cy, -sz*cy, sy]`; it uses the sine table at `0x4fe788` and truncates
+fixed-point products toward zero. The former `Ry*Rx*Rz` assumption made
+level 1's bedroom doorway trim (object 100, angles 2049/3073/2049) face
+the same way as the opposing landing copy (382, angles 0/1024/0), leaving
+gaps between the trim and blue wall and misorienting the door itself.
+`tools/object-rotation.ts` compares 7,245 rotations across 16 supported
+scenes plus mixed-axis samples against the original scalar equations and
+sine table; maximum coefficient difference is 0.000818 (quantization).
+Four unsupported alternate `level1.dat` files in levels 7–10 are excluded.
+A matched-camera Chromium screenshot confirms the doorway trim now meets
+the wall. This is separate from the reflection-overlay bug below.
 
 **Meshes** sit back to back, each closed by `FFFFFFFF`. A negative vertex count
 means an extra `u32[n+1]` block follows the vertices (purpose unknown, size rule
@@ -957,6 +968,23 @@ that must blend are the alpha-0x80 group above. Material 0x02 also appears on
 a minority of otherwise opaque `0x60`/`0x61` faces — most likely faces whose
 texture region contains the colour key, so the cutout goes through alpha
 blending with vertex alpha 255 (inference, not read from code).
+
+**Doorway transparency regression (2026-09-08).** The reflection overlay
+shared the level's position buffer and selected reflective faces with draw
+groups, but used a single material. Three.js ignores geometry groups for a
+single-material mesh, so it drew all 33,103 level triangles again with the
+reflection's translucent material. Far-detail geometry appeared near the
+camera too, because the overlay had no detail clip planes. This caused the
+transparent-looking surfaces at Level 1's doorway transitions independently
+of portal culling.
+
+The overlay now uses a material array, with the corresponding detail clip
+plane and face-culling rule for each reflective group. Visibility filtering
+preserves those material indices, and disposal handles the array. Verified
+in Chromium at the bedroom/landing doorway with portal culling disabled:
+the reflection pass submits 340 triangles with all reflective pickups shown,
+and zero when their objects or zones are hidden. The before/after view removes
+the translucent duplicate surfaces. The build passes.
 
 **Rendering these rules.** `buildLevelGeometry` buckets faces by (page, blend,
 cull) and emits the opaque buckets first. Two deliberate divergences from the

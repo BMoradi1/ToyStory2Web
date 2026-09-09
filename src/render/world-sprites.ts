@@ -176,10 +176,19 @@ export class SpriteBatch {
       p[o + 9] = s.x - ax - bx; p[o + 10] = s.y - ay - by; p[o + 11] = s.z - az - bz;
 
       o = i * 8;
-      uv[o] = s.u0; uv[o + 1] = s.v0;
-      uv[o + 2] = s.u1; uv[o + 3] = s.v0;
-      uv[o + 4] = s.u1; uv[o + 5] = s.v1;
-      uv[o + 6] = s.u0; uv[o + 7] = s.v1;
+      if (s.axis) {
+        // Beam art is horizontal: U runs along its length and V across
+        // its narrow glowing core. Ordinary cards use U across the width.
+        uv[o] = s.u1; uv[o + 1] = s.v0;
+        uv[o + 2] = s.u1; uv[o + 3] = s.v1;
+        uv[o + 4] = s.u0; uv[o + 5] = s.v1;
+        uv[o + 6] = s.u0; uv[o + 7] = s.v0;
+      } else {
+        uv[o] = s.u0; uv[o + 1] = s.v0;
+        uv[o + 2] = s.u1; uv[o + 3] = s.v0;
+        uv[o + 4] = s.u1; uv[o + 5] = s.v1;
+        uv[o + 6] = s.u0; uv[o + 7] = s.v1;
+      }
 
       const cr = s.r ?? 1, cg = s.g ?? 1, cb = s.b ?? 1;
       o = i * 16;

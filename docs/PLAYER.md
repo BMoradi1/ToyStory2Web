@@ -9,8 +9,9 @@ names them (`FUN_xxxxxxxx`); the PSX twin is given where it was matched.
 Confidence: **high** for the time base, the unit scale, and every constant in
 the jump, gravity, run and turn sections (identical integer code in both
 builds). **Medium** for the attack timers and power-ups (read from one build,
-consistent with the in-game text). **Low** for the ledge-grab probe distances,
-which are noted but not validated.
+consistent with the in-game text). Edge-climb distances and state selection
+are decoded from the PC routine and validated against synthetic collision
+and real Level 1 ledges; its queries use the port's swept-sphere arithmetic.
 
 ## How it was found
 
@@ -279,6 +280,37 @@ per tick. Jump lets go with `vy = -0x400` and a run-clamped push along yaw,
 or -0x600 straight up from the very top. Type-2 poles are slides: gravity 16
 per tick to a cap of 0x800.
 
+## Edge climb — ported 2026-09-08
+
+`FUN_00435f30` automatically grabs while descending, with coyote time spent,
+no hard-fall/stun or other special move, and floor more than `0x2000` below
+the origin. Laser activity is allowed by its `0xfff7f` mask and is cancelled
+when the climb animation takes over. Reach is `sin(yaw)/3, cos(yaw)/3`
+in the `0x4000` sine-table scale (about 5,461 game units). The top normal
+must have Y below `-15000/16384`.
+
+The hands, `0x3600` ABOVE the origin (+Y is down), must cross the top minus
+200 between the previous and current positions. The original floor helper
+`FUN_00486280` can return a top above the current probe, so the port searches
+the whole crossing interval; a below-only query misses fast descents.
+Two radius-4000 sweeps check clearance: upward from one-quarter reach behind
+Buzz, then forward four-thirds reach at top Y minus `0x1838`. A lower sweep
+finds the wall normal to turn toward, closing the yaw difference by 1/16.
+
+On success the controller anchors one reach forward at top Y minus 200,
+fires sound event `0x17`, zeros velocity, and locks movement for `0x52` ticks.
+Animation **state 9, slot 10** contains the pull-up displacement relative to
+that anchor; the controller must not add another animated translation.
+Damage/death cancels the climb and respawn clears it. The existing mover
+settles Buzz onto the top when control resumes. Moving-platform attachment
+and the original camera's climb transition remain unported.
+
+`tools/ledge-probe.ts` checks ordinary running-jump acquisition, fast descent,
+reach/facing, low ceilings, steep tops, state gates, all 82 animation ticks,
+input lock, landing and damage interruption. It also finds 371 reachable
+edge samples in Level 1's actual collision hull. `tools/player-probe.ts`
+still passes all 24 movement checks.
+
 ## PSX differences
 
 Only two were found in the controller: forward friction (32 on PSX, 48 on PC)
@@ -336,7 +368,7 @@ first and then, if the spin timer is up, replaces the resolved primary slot
 with **9** and drives the cursor straight off the timer,
 `(0x30 - spin) * 0x8000`, bypassing the state's script. A state whose two
 slots are equal cannot carry the override, and the original cancels the spin
-rather than play it wrong. There IS a state 9 — it is the grapple, slots
+rather than play it wrong. There IS a state 9 — it is the ledge climb, slots
 10 + 10 — and selecting it for a spin plays a climb. The laser is the same
 shape with slot 0x1a. Both overrides keep the state's secondary slot and
 its original frame cursor; only the primary slot receives the attack frame.
@@ -598,9 +630,7 @@ later change.
 
 ## Not extracted
 
-Projectile speeds and lifetimes; the exact ledge-grab probe geometry
-(`FUN_00435f30` probes 0x3600 below the origin and one third of a unit
-forward, low confidence). The "line" collision the mover also runs
+The "line" collision the mover also runs
 (`FUN_00480660`, walking a linked list at `0x7290f4` of up to 32 vertical
 segments, tested like walls) is dead on PC: the machine code reads that
 head in three places (`FUN_00484380`, `FUN_0048c860`, `FUN_0048d530`),

@@ -840,8 +840,8 @@ function rotationMatrix(rot: Vec3): number[] {
   const [sx, cx] = [Math.sin(a(rot.x)), Math.cos(a(rot.x))];
   const [sy, cy] = [Math.sin(a(rot.y)), Math.cos(a(rot.y))];
   const [sz, cz] = [Math.sin(a(rot.z)), Math.cos(a(rot.z))];
-  // Multiply three axis matrices in a configurable order so the convention can
-  // be tested rather than assumed.
+  // FUN_00450c70, called by the original level loader FUN_0043e6e0,
+  // constructs Rx * Ry * Rz (column vectors; Z acts first).
   const RX = [1, 0, 0, 0, cx, -sx, 0, sx, cx];
   const RY = [cy, 0, sy, 0, 1, 0, -sy, 0, cy];
   const RZ = [cz, -sz, 0, sz, cz, 0, 0, 0, 1];
@@ -852,11 +852,7 @@ function rotationMatrix(rot: Vec3): number[] {
         for (let k = 0; k < 3; k++) out[i * 3 + j] += A[i * 3 + k]! * B[k * 3 + j]!;
     return out as number[];
   };
-  // Order barely matters in practice: all six permutations agree on level 1's
-  // bounding box to within 1.5 units out of 224, even though 281 objects
-  // rotate on more than one axis. Ry * Rx * Rz is kept as the documented
-  // assumption.
-  return mul(mul(RY, RX), RZ);
+  return mul(mul(RX, RY), RZ);
 }
 
 /**

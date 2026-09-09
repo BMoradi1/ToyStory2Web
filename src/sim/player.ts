@@ -431,7 +431,7 @@ function spinAttack(p: PlayerState, input: PlayerInput, prev: PlayerInput): void
   p.spinCharge = 0;
 }
 
-/** Laser charge. `FUN_00434990`, reduced to its timers. */
+/** Basic laser phase/charge from `FUN_00434990`, without power-up autofire. */
 function laser(p: PlayerState, input: PlayerInput, prev: PlayerInput): void {
   p.laserFired = null;
   const pressed = input.fire && !prev.fire;
@@ -441,15 +441,32 @@ function laser(p: PlayerState, input: PlayerInput, prev: PlayerInput): void {
     return;
   }
   if (p.laser === 0) return;
-  if (input.fire) {
-    if (p.laser < ATTACK.laserWindupTicks) p.laser += 1;
-    else p.laserCharge = Math.min(ATTACK.laserChargeTicks, p.laserCharge + 1);
-    return;
+  let fired: number | null = null;
+  if (p.laser < ATTACK.laserWindupTicks) {
+    // Releasing early does not cancel the arm raise or fire from idle.
+    p.laser += 1;
+    if (p.laser === ATTACK.laserWindupTicks) fired = 0;
+  } else {
+    p.laser += 1;
+    if (input.fire) {
+      p.laserCharge = Math.min(ATTACK.laserChargeTicks, p.laserCharge + 1);
+      if (pressed) {
+        if (p.laser < 0x35) fired = 0;
+        else p.laser = 0x40 - p.laser;
+      } else if (p.laser > 0x33) {
+        p.laser -= 0x28;
+      }
+    } else {
+      if (p.laserCharge > 0x24) p.laser = 0x34;
+      if (p.laserCharge === ATTACK.laserChargeTicks) fired = p.laserCharge;
+      p.laserCharge = 0;
+    }
+    if (p.laser > 0x3f) p.laser = 0;
   }
-  p.sounds.push(p.laserCharge >= ATTACK.laserChargeTicks ? 'BUZYLASR' : 'BUZLASER');
-  p.laserFired = p.laserCharge;
-  p.laser = 0;
-  p.laserCharge = 0;
+  if (fired === null) return;
+  p.sounds.push(fired >= ATTACK.laserChargeTicks ? 'BUZYLASR' : 'BUZLASER');
+  p.laserFired = fired;
+  p.laser = ATTACK.laserWindupTicks;
 }
 
 /**

@@ -157,9 +157,9 @@ export function readEffectTable(exe: Uint8Array): { kinds: (EffectTemplate | nul
 /** Kinds the code names at its call sites. */
 export const EFFECT_KIND = {
   /** Buzz's laser bolt, homing on the creature it was fired at (mode 0x1d). */
-  laserBolt: 0x47,
+  diskHoming: 0x47,
   /** The bolt when nothing was in range, or after bouncing off a laser-proof creature (mode 0x1e). */
-  laserStraight: 0x48,
+  diskStraight: 0x48,
   /** A coin spilled by a dying creature; picked up by touch. */
   coin: 0x3d,
   /** The hover bot's shot, from each gun in turn. */

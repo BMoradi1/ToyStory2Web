@@ -26,7 +26,8 @@ export const DEFAULT_KEYS: KeyBindings = {
   right: ['KeyD', 'ArrowRight'],
   jump: ['Space'],
   spin: ['KeyJ', 'ShiftLeft'],
-  fire: ['KeyK', 'ControlLeft'],
+  // Ctrl + forward (W) is the browser's close-tab shortcut.
+  fire: ['KeyK'],
   cameraLeft: ['KeyQ'],
   cameraRight: ['KeyE'],
 };

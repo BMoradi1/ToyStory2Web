@@ -11,7 +11,7 @@ import {
 import { decodeBmp, parseNgn, type NgnTexture } from './formats/ngn.ts';
 import { assignZones, parseNgnScene } from './formats/ngnscene.ts';
 import {
-  buildCollisionWorld, collisionGroupByObject, groundBelow, moveCollisionGroup, parseCollision,
+  buildCollisionWorld, collisionGroupByObject, groundBelow, moveCollisionGroup, parseCollision, sweepSphere,
   type CollisionGroup, type CollisionWorld,
 } from './formats/collision.ts';
 import {
@@ -20,6 +20,7 @@ import {
 } from './loader/gamedir.ts';
 import { Viewer } from './render/viewer.ts';
 import { InputSource } from './sim/input.ts';
+import { fireBeam, stepBeams, type LaserBeam, type LaserTarget } from './sim/laser.ts';
 import { GAME_UNITS_PER_LEVEL_UNIT } from './sim/player-constants.ts';
 import {
   createPlayer, createRuntime, groundFromCollision, stepPlayer,
@@ -35,7 +36,7 @@ import {
   type MenuInput, type MenuState,
 } from './sim/menu.ts';
 import {
-  createEffects, liveEffects, spawnChild, spawnEffect, stepEffects, touchPlayer,
+  createEffects, liveEffects, spawnChild, spawnEffect, spawnStraightDisk, stepEffects, touchPlayer,
   type EffectSim, type EffectWorld,
 } from './sim/effects.ts';
 import { EFFECT_FLAGS, EFFECT_KIND, readEffectTable } from './formats/effect-table.ts';
@@ -61,7 +62,7 @@ import {
   HUD, HudElement, createHud, offsetOf, showHud, startHud, stepCoinSpin, stepHud,
   type HudState,
 } from './sim/hud.ts';
-import type { WorldSprite } from './render/world-sprites.ts';
+import { effectCardPlacement, type WorldSprite } from './render/world-sprites.ts';
 import {
   exeString, HINT_SIGNS, levelNumber, PUSH_BLOCKS, SPAWN_TABLE, TALK_SCRIPTS, tokenSlotsAtStart,
 } from './sim/level-data.ts';
@@ -842,6 +843,8 @@ async function open(dir: GameDir): Promise<void> {
           cards: effectCards.length, flat: effectFlat.length,
           lastHitAngle: effects.hits[0]?.angle ?? null,
           live: live.length,
+          beams: laserBeams.map(b => ({ ...b })),
+          diskAmmo: pickups?.discs ?? 0,
           kinds: live.map((e) => e.kind),
           sprites: live.map((e) => e.sprite),
           first: live[0]
@@ -1216,6 +1219,7 @@ async function spawnPlayer(): Promise<void> {
     })()
     : null;
   viewer.setCardSheet(sceneTextures.get(SPRITE_SHEET) ?? null);
+  laserBeams.length = 0;
   hud = createHud();
   startHud(hud);
   hudWas = { lives: -1, health: -1, coins: -1, found: -1 };
@@ -1380,7 +1384,7 @@ function effectWorld(): EffectWorld {
 }
 
 /**
- * Buzz fires (`FUN_004a4960`). The bolt is an effect: kind 0x47 homes on the
+ * The disk launcher (`FUN_004a4960`). Kind 0x47 homes on the
  * nearest creature that can be hurt, and kind 0x48 flies straight when
  * nothing is in range. A creature whose `vulnerable` byte is 4 bounces the
  * homing one, which the effect tick handles.
@@ -1388,8 +1392,11 @@ function effectWorld(): EffectWorld {
  * The original fires from the wrist bone; this fires from Buzz's centre,
  * which is the same place to within his own width.
  */
-function fireLaser(aim: number): void {
+function fireDisk(): void {
   if (!effects || !player || !camera) return;
+  if (!pickups || pickups.discs <= 0) return;
+  // The original keeps six disk permits (DAT_00882968), distinct from ammo.
+  if (liveEffects(effects).filter(e => e.kind === EFFECT_KIND.diskHoming || e.kind === EFFECT_KIND.diskStraight).length >= 6) return;
   const world = effectWorld();
   const x = player.x, y = player.y - 0x1cc0, z = player.z;
 
@@ -1397,7 +1404,7 @@ function fireLaser(aim: number): void {
   let least = Infinity;
   if (creatureSim) {
     for (const c of creatureSim.creatures) {
-      if (c.record.vulnerable === 0 || c.deathTimer < 0) continue;
+      if (c.record.vulnerable === 0 || c.deathTimer < 0 || c.health <= 0) continue;
       // The original wants flags 0x1 and 0x2 together. 0x2 is "in this
       // tick's near list", which is the part that means "the game is
       // running this creature"; 0x1 is the always-awake bit a script or a
@@ -1410,7 +1417,8 @@ function fireLaser(aim: number): void {
     }
   }
   if (best && least < 0x1000000) {
-    const bolt = spawnEffect(effects, world, x, y, z, 0, -2, 0, aim << 2, 0, 0, EFFECT_KIND.laserBolt);
+    const bolt = spawnEffect(effects, world, x, y, z, 0, -2, 0, player.yaw << 2, 0, 0, EFFECT_KIND.diskHoming);
+    if (!bolt) return;
     if (bolt) {
       const at = best;
       const tx = at.x + at.offsetX, ty = at.y + at.offsetY, tz = at.z + at.offsetZ;
@@ -1434,14 +1442,40 @@ function fireLaser(aim: number): void {
       bolt.target = target;
     }
   } else {
-    const flat = cosOf(aim);
-    spawnEffect(effects, world, x, y, z,
-      Math.trunc(((sinOf(player.yaw) * flat) >> 14) / 3),
-      Math.trunc(-sinOf(aim) / 3),
-      Math.trunc(((cosOf(player.yaw) * flat) >> 14) / 3),
-      0, 0, 0, EFFECT_KIND.laserStraight);
+    if (!spawnStraightDisk(effects, world, { x, y, z }, player.yaw)) return;
   }
+  pickups.discs--;
+  showHud(hud, HudElement.Laser, HUD.laserTicks);
   playEvent(0x54, player);
+}
+
+/** Normal/charged beams are instant segment hits, not homing particles. */
+function fireLaser(): void {
+  if (!player || !camera) return;
+  if (pickups && pickups.discs > 0) { fireDisk(); return; }
+  const origin = { x: player.x, y: player.y - 0x2c00, z: player.z };
+  const targets: LaserTarget[] = [];
+  for (const c of creatureSim?.creatures ?? []) {
+    const shape = c.hitShapes?.[c.animState];
+    if (!shape || c.deathTimer < 0 || c.health <= 0 || c.stun < 0 || (c.flags & CREATURE_FLAGS.near) === 0) continue;
+    targets.push({ creature: c, position: c, heading: c.heading, shape, vulnerable: c.record.vulnerable });
+  }
+  const mode = pickups && pickups.powerTimer > 0 ? 2 : (player.laserFired ?? 0) >= 64 ? 1 : 0;
+  if (mode === 2 && pickups) pickups.powerTimer = Math.max(0, pickups.powerTimer - 10);
+  const shot = fireBeam(laserBeams, origin, player.yaw, mode, targets, (from, delta) => {
+    if (!currentCollisionWorld) return 1;
+    const swept = sweepSphere(currentCollisionWorld, from, delta, 0x100, { passes: 1, skin: 0 });
+    return swept.touched ? Math.min(1, Math.hypot(swept.x - from.x, swept.y - from.y, swept.z - from.z) / Math.hypot(delta.x, delta.y, delta.z)) : 1;
+  });
+  if (shot.hit && creatureSim) {
+    const c = creatureSim.creatures.find(c => c === shot.hit!.creature);
+    if (c) damageCreature(creatureSim, c, shot.yaw, shot.damageKind);
+  }
+  if (effects && (shot.hit || shot.wall)) {
+    const p = shot.beam.to, world = effectWorld();
+    spawnChild(effects, world, p.x, p.y, p.z, mode === 0 ? 1 : mode === 1 ? 10 : 0x49, mode === 1 ? 5 : 2);
+    for (let i = 0; i < 5; i++) spawnChild(effects, world, p.x, p.y, p.z, 4, 4);
+  }
 }
 
 /** The effects, as cards. Additive ones go in their own batch. */
@@ -1457,15 +1491,37 @@ function drawEffects(): void {
     const f = header.frames[e.frame] ?? header.frames[0];
     if (!f) continue;
     const card: WorldSprite = {
-      x: e.x / WORLD_SCALE, y: -e.y / WORLD_SCALE, z: -e.z / WORLD_SCALE,
+      ...effectCardPlacement(e),
       u0: f.u / sheet.width, v0: f.v / sheet.height,
       u1: (f.u + header.width) / sheet.width, v1: (f.v + header.height) / sheet.height,
-      width: e.width / WORLD_SCALE, height: e.height / WORLD_SCALE,
       alpha: 1,
       r: e.r / 128, g: e.g / 128, b: e.b / 128,
       rotation: toRadians(e.rotation),
     };
     ((e.flags & EFFECT_FLAGS.flat) !== 0 ? effectFlat : effectCards).push(card);
+  }
+  // Sprite 9 is the beam strip. The engine tiles it every 400 level units,
+  // with frame 2 at the tail and frame 1 along the remainder.
+  const strip = spriteTable[9];
+  if (strip) for (const beam of laserBeams) {
+    const dx = beam.to.x - beam.from.x, dy = beam.to.y - beam.from.y, dz = beam.to.z - beam.from.z;
+    const length = Math.hypot(dx, dy, dz);
+    for (let offset = 0; offset < length; offset += 400 * 32) {
+      const span = Math.min(400 * 32, length - offset), t = (offset + span / 2) / length;
+      const frame = strip.frames[offset === 0 ? 2 : 1] ?? strip.frames[0];
+      if (!frame) continue;
+      effectCards.push({
+        x: (beam.from.x + dx * t) * GAME_TO_RENDER,
+        y: -(beam.from.y + dy * t) * GAME_TO_RENDER,
+        z: -(beam.from.z + dz * t) * GAME_TO_RENDER,
+        width: beam.width * 2 / WORLD_SCALE, height: span * GAME_TO_RENDER,
+        axis: { x: dx, y: -dy, z: -dz },
+        u0: frame.u / sheet.width, v0: frame.v / sheet.height,
+        u1: (frame.u + strip.width) / sheet.width, v1: (frame.v + strip.height) / sheet.height,
+        alpha: 1, r: beam.colour[0] * beam.life / 32,
+        g: beam.colour[1] * beam.life / 32, b: beam.colour[2] * beam.life / 32,
+      });
+    }
   }
   viewer.setEffectCards(effectCards, effectFlat);
 }
@@ -2006,6 +2062,7 @@ let playerAnim: AnimationPlayback | null = null;
 let camera: CameraState | null = null;
 /** The effect pool, or null before a level is up. */
 let effects: EffectSim | null = null;
+const laserBeams: LaserBeam[] = [];
 /** This frame's effect cards, rebuilt each tick. */
 const effectCards: WorldSprite[] = [];
 const effectFlat: WorldSprite[] = [];
@@ -2810,8 +2867,9 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     drawCreatures();
   }
 
-  // Buzz's laser, and then the pool that carries it (docs/EFFECTS.md).
-  if (player.laserFired !== null) fireLaser(player.yaw);
+  stepBeams(laserBeams);
+  // Beams hit immediately; disks move in the effect pool.
+  if (player.laserFired !== null) fireLaser();
   stepEffectsNow();
 
   if (pickups) {
@@ -2867,7 +2925,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
 function poseAnimation(hasInput: boolean): void {
   if (!viewer || !player || !playerAnim || !playerModel?.anm) return;
   const speed = Math.hypot(player.vx, player.vz);
-  const { slotA, slotB, frame } = stepAnimation(playerAnim, player, hasInput, speed);
+  const { slotA, slotB, frame, frameB } = stepAnimation(playerAnim, player, hasInput, speed);
 
   const anm = playerModel.anm;
   const primary = anm.animations[slotA];
@@ -2876,7 +2934,7 @@ function poseAnimation(hasInput: boolean): void {
   viewer.setPlayerPose(
     buildPosedMeshData(
       playerModel.model, anm, primary, frame % Math.max(1, primary.frameCount),
-      secondary ? { animation: secondary, frame: frame % Math.max(1, secondary.frameCount) } : null,
+      secondary ? { animation: secondary, frame: frameB % Math.max(1, secondary.frameCount) } : null,
     ),
     sceneTextures,
   );

@@ -194,7 +194,7 @@ export function selectState(p: PlayerState, hasInput: boolean): number {
  */
 export function stepAnimation(
   play: AnimationPlayback, p: PlayerState, hasInput: boolean, speed: number,
-): { slotA: number; slotB: number; frame: number } {
+): { slotA: number; slotB: number; frame: number; frameB: number } {
   play.footfalls = 0;
   play.sounds.length = 0;
 
@@ -241,6 +241,8 @@ export function stepAnimation(
       posed = LASER_FRAMES[Math.min(LASER_FRAMES.length - 1, p.laser >> 1)] ?? 0;
     }
   }
-  if (slot >= 0) return { slotA: slot, slotB: slot, frame: posed };
-  return { slotA: entry.slotA, slotB: entry.slotB, frame: play.frame };
+  // The override replaces only the primary layer. The base layer keeps its
+  // own cursor; slot 26 (laser) and slot 9 (spin) omit its seven bones.
+  if (slot >= 0) return { slotA: slot, slotB: entry.slotB, frame: posed, frameB: play.frame };
+  return { slotA: entry.slotA, slotB: entry.slotB, frame: play.frame, frameB: play.frame };
 }

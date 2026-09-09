@@ -88,6 +88,33 @@ after.
 
 ## The tick
 
+### Laser launch correction (2026-09-08)
+
+The browser's firing call passed Buzz's yaw into a parameter also used as
+pitch for untargeted shots. Facing +X therefore fired upward, facing -Z
+fired backward, and facing -X fired downward. `spawnStraightLaser` now takes
+separate yaw and pitch; the current controller has no vertical aiming and
+uses pitch zero. Homing shots retain their existing initial yaw and
+target-derived pitch. Target selection also skips zero-health creatures.
+`tools/laser-probe.ts` reads the install's effect templates and checks eight
+ticks of forward, level flight at all 4,096 headings, plus eight explicit
+elevation cases. This verifies the launch correction, not retail parity of
+the wrist origin, target selection, or charged-shot behavior.
+
+The user's invisible-laser report exposed a second bug the flight-only
+checks missed: `drawEffects` divided game-unit positions by 256 rather than
+32 × 256. The resulting cards were 32 times too far from the world origin.
+`effectCardPlacement` now converts centres from game units and sizes from
+level units separately, preserving the renderer's Y/Z axis flips. The laser
+probe also checks actual sprite-batch vertex positions at a nonzero origin.
+Verified in headless Chromium with a real fired shot on level 2: a side
+camera shows the bolt and spark trail beside Buzz. The follow camera can
+hide the first part of flight behind his body. The wrist-bone origin is
+still a gap; the firing pose's missing layer and phase progression were
+subsequently fixed (docs/PLAYER.md, "Laser phases").
+
+### Update order
+
 For each live record, in this order:
 
 1. life -= dt, floored at 0.

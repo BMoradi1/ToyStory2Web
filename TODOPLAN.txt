@@ -202,7 +202,9 @@
           tools/portal-walk-validate.ts over all 9 scenes with doorways:
           204 doorways all fire the crossing test once, 2,584 camera
           placements all kept to the doorway graph).
- [READY]  Turn the portal walk on for drawing. It costs, on average over
+ [BLOCKED] Turn the portal walk on for drawing. Waiting on P1.6's matched
+          retail camera/FOV comparison to resolve visible geometry losses.
+          It costs, on average over
           a frame, 700 pixels of 876,000 on level 1 and 2,160 on level 2
           against drawing every room, and draws 3.6 rooms of 10 and 2.8
           of 5 instead. Two suspects are ruled out (docs/LEVELS.md "The
@@ -278,6 +280,16 @@
           robots' shots, the death coins and the sparks are effects too.
           Open: modes 0x2f, 0x30 and 0x34 (level-specific, never decoded),
           the bolt's starting aim, and the near-list targeting test.
+          Fixed 2026-09-08: untargeted lasers used player yaw as pitch,
+          sending shots up/down/backwards as Buzz turned. Facing and
+          elevation are now separate; the current controller fires level.
+          tools/laser-probe.ts checks all 4,096 headings through the effect
+          tick with the install's template, plus independent pitch checks.
+          Zero-health creatures are excluded from laser target selection.
+          Also fixed the invisible effects: drawEffects placed game-unit
+          centres as level units, 32x too far from the world origin. Card
+          centres now use the same conversion as Buzz; sizes retain their
+          level-unit conversion. Laser probe covers sprite-batch placement.
  [READY]  Camera's own zone and the player's. DECODED 2026-09-06
           (docs/LEVELS.md "Zones"): both are `zoneAt` (src/formats/
           collision.ts) on the render camera over the ZONE FLOORS, with
@@ -292,7 +304,13 @@
           src/sim/zones.ts keeps both zones, stepTasks takes them, level
           7's timed egg can fail, and all nine boss taunts are in with
           their triggers (docs/LEVELS.md "What starts a boss fight").
- P1.6 [ACTIVE]  Parity harness. Half done: tools/render-level.ts now takes
+ P1.6 [ACTIVE]  Parity harness. Half done.
+                Browser driver hardened 2026-09-08: rejects failed loads
+                and invalid level indices, bounds level switches and the
+                overall run, and reports browser launch/transport failures.
+                Verified build and missing-browser failure path; this does
+                not settle retail screenshot parity.
+                tools/render-level.ts takes
                 --eye/--target/--size/--fovy and matches three.js (vertical
                 FOV, the viewer's clear colour, the same two draw queues and
                 the same per-face culling), so browser and oracle can be
@@ -440,7 +458,13 @@
                 spin, hard fall. The remaining 20 states belong to moves
                 that do not exist yet (poles, zip lines, grapple, cutscenes)
                 and are in the table but never selected.
-                Left to do: the laser and charged-spin states. The
+                Fixed 2026-09-08: laser/spin overrides now preserve the
+                base animation layer and its independent frame cursor.
+                Laser phases now run wind-up, held aim and recovery rather
+                than freezing then snapping to idle. player-attack-probe
+                validates all 417 posed triangles and 100 repeated shots.
+                Left Ctrl fire binding removed: Ctrl+W closes browser tabs.
+                Older note: the laser and charged-spin states. The
                 footfall/sound opcodes are counted but still not played -
                 they fire EVENT numbers, and the event table is the part
                 of the sound system that is not ported (see below).

@@ -338,7 +338,23 @@ with **9** and drives the cursor straight off the timer,
 slots are equal cannot carry the override, and the original cancels the spin
 rather than play it wrong. There IS a state 9 — it is the grapple, slots
 10 + 10 — and selecting it for a spin plays a climb. The laser is the same
-shape with slot 0x1a, and is not ported.
+shape with slot 0x1a. Both overrides keep the state's secondary slot and
+its original frame cursor; only the primary slot receives the attack frame.
+The port incorrectly made both slots the attack slot, dropping the seven
+bones absent from slots 9 and 26. Fixed 2026-09-08, with full 417-triangle
+poses checked against the install by `tools/player-attack-probe.ts`.
+
+**Laser phases.** Rechecked against `FUN_00434990` on 2026-09-08: a tap
+raises the arm and fires at phase 12 even if released before then. The phase
+continues to 63 before returning to idle. While held, phases past 51 wrap
+back by 40 and charge saturates at 64. Releasing charge above 36 moves to
+phase 52; full charge fires again and restarts at phase 12. The old port
+froze at phase 12 and cleared the pose immediately on release. The basic
+sequence is now ported; power-up autofire remains outside this controller.
+The probe covers tapping, charging, recovery, and 100 repeated shots.
+
+Keyboard firing uses **K**. The Left Ctrl alternate was removed because
+combining it with forward movement on W forms the browser's close-tab shortcut.
 
 The other 20 belong to moves that are not implemented yet — poles, zip lines,
 the grapple, cutscenes. They are in the generated table and simply never

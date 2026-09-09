@@ -232,6 +232,23 @@ export function spawnEffect(
   return e;
 }
 
+/** Fire an untargeted wrist laser. Facing and elevation are independent:
+ * the current player controller has no vertical aiming, so pitch is level.
+ * The spawner halves these velocities, as it does for every plain effect.
+ */
+export function spawnStraightDisk(
+  sim: EffectSim, world: EffectWorld,
+  origin: { x: number; y: number; z: number },
+  yaw: number, pitch = 0,
+): Effect | null {
+  const flat = cos(pitch);
+  return spawnEffect(sim, world, origin.x, origin.y, origin.z,
+    idiv((sin(yaw) * flat) >> 14, 3),
+    idiv(-sin(pitch), 3),
+    idiv((cos(yaw) * flat) >> 14, 3),
+    0, 0, 0, EFFECT_KIND.diskStraight);
+}
+
 /**
  * `FUN_0040fdf0`: spawn `kind` with a velocity drawn from spawn mode `mode`,
  * whose four packed nibbles say how each component is randomised.
@@ -505,7 +522,7 @@ function behave(sim: EffectSim, world: EffectWorld, e: Effect, dt: number): numb
       return 0;
     }
     case 0x1c: return bolt(sim, world, e, dt);
-    case 0x1d: return laserBolt(sim, world, e);
+    case 0x1d: return diskHoming(sim, world, e);
     case 0x1e:
       if (e.life > 4) {
         for (let i = 0; i < sim.gate.three; i++) {
@@ -775,7 +792,7 @@ function bolt(sim: EffectSim, world: EffectWorld, e: Effect, dt: number): number
  * whose placement's vulnerable byte is 4 — or lands damage kind 4 and dies
  * with death code 8.
  */
-function laserBolt(sim: EffectSim, world: EffectWorld, e: Effect): number {
+function diskHoming(sim: EffectSim, world: EffectWorld, e: Effect): number {
   if (sim.gate.eight) sound(sim, 0x55, e);
   const t = e.target;
   if (!t) return 0;

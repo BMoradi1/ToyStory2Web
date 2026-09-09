@@ -32,6 +32,9 @@ if (!root) {
 }
 const gameDir = resolve(root);
 const levelIndex = Number(flag('--level') ?? 0);
+if (!Number.isInteger(levelIndex) || levelIndex < 0) {
+  throw new Error('--level must be a non-negative integer');
+}
 const evalJs = flag('--eval');
 const baseUrl = process.env.BASE_URL ?? 'http://localhost:5173/';
 const browser = process.env.CHROMIUM ?? 'chromium';
@@ -48,6 +51,18 @@ const fromChrome = chrome.stdio[4] as NodeJS.ReadableStream;
 
 let nextId = 1;
 const pending = new Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }>();
+let transportError: Error | undefined;
+function failTransport(error: Error) {
+  transportError = error;
+  for (const request of pending.values()) request.reject(error);
+  pending.clear();
+}
+chrome.on('error', (error) => failTransport(error));
+chrome.on('exit', (code, signal) => {
+  failTransport(new Error(`Chromium exited (code ${code}, signal ${signal})`));
+});
+toChrome.on('error', (error) => failTransport(error));
+fromChrome.on('error', (error) => failTransport(error));
 const listeners: ((msg: any) => void)[] = [];
 let buffer = '';
 fromChrome.on('data', (chunk) => {
@@ -64,9 +79,12 @@ fromChrome.on('data', (chunk) => {
 });
 
 function send(method: string, params: object = {}, sessionId?: string): Promise<any> {
+  if (transportError) return Promise.reject(transportError);
   const id = nextId++;
-  toChrome.write(JSON.stringify({ id, method, params, sessionId }) + '\0');
-  return new Promise((resolve, reject) => pending.set(id, { resolve, reject }));
+  return new Promise((resolve, reject) => {
+    pending.set(id, { resolve, reject });
+    toChrome.write(JSON.stringify({ id, method, params, sessionId }) + '\0');
+  });
 }
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -119,12 +137,15 @@ async function main() {
   let status = '';
   for (;;) {
     status = await evaluate(`document.getElementById('status').textContent`);
-    if (/ready$/.test(status) || /failed|Error/.test(status)) break;
+    if (/failed|Error/.test(status)) throw new Error(`level load failed: ${status}`);
+    if (/ready$/.test(status)) break;
     if (Date.now() - started > 180_000) throw new Error(`timed out; last status: ${status}`);
     await sleep(500);
   }
   console.log(`status: ${status}`);
   if (levelIndex > 0) {
+    const levelCount = await evaluate(`document.getElementById('level').options.length`);
+    if (levelIndex >= levelCount) throw new Error(`--level ${levelIndex} is out of range (0–${levelCount - 1})`);
     // Wait for THIS level to say ready, not whatever was ready before: the
     // status line still carries the previous level for a beat after the
     // change event, and matching /ready$/ alone lets the eval run against
@@ -132,10 +153,12 @@ async function main() {
     const wanted: string = await evaluate(
       `document.getElementById('level').options[${levelIndex}].textContent`);
     await evaluate(`(() => { const s = document.getElementById('level'); s.selectedIndex = ${levelIndex}; s.dispatchEvent(new Event('change')); })()`);
+    const levelStarted = Date.now();
     for (;;) {
       status = await evaluate(`document.getElementById('status').textContent`);
+      if (/failed|Error/.test(status)) throw new Error(`level load failed: ${status}`);
       if (status.startsWith(wanted) && /ready$/.test(status)) break;
-      if (/failed|Error/.test(status)) break;
+      if (Date.now() - levelStarted > 180_000) throw new Error(`timed out loading ${wanted}; last status: ${status}`);
       await sleep(500);
     }
     console.log(`status: ${status}`);
@@ -165,4 +188,12 @@ async function main() {
   console.log(`wrote ${outPath}`);
 }
 
-main().catch((err) => { console.error(err.message); process.exitCode = 1; }).finally(() => chrome.kill());
+// Bound navigation, protocol requests and user-supplied evaluation as well as
+// asset loading. A missing browser event must not strand a validation run.
+let deadline: ReturnType<typeof setTimeout>;
+const timeout = new Promise<never>((_, reject) => {
+  deadline = setTimeout(() => reject(new Error('browser screenshot timed out after 300 seconds')), 300_000);
+});
+Promise.race([main(), timeout])
+  .catch((err) => { console.error(err.message); process.exitCode = 1; })
+  .finally(() => { clearTimeout(deadline); chrome.kill(); });

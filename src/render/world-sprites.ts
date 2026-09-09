@@ -19,6 +19,19 @@
  * looking of the two and the one the art is drawn for.
  */
 import * as THREE from 'three';
+import { WORLD_SCALE } from '../formats/dat.ts';
+import { GAME_UNITS_PER_LEVEL_UNIT } from '../sim/player-constants.ts';
+
+/** Effect centres use game units; their card sizes use level units. */
+export function effectCardPlacement(effect: {
+  x: number; y: number; z: number; width: number; height: number;
+}): Pick<WorldSprite, 'x' | 'y' | 'z' | 'width' | 'height'> {
+  const scale = GAME_UNITS_PER_LEVEL_UNIT * WORLD_SCALE;
+  return {
+    x: effect.x / scale, y: -effect.y / scale, z: -effect.z / scale,
+    width: effect.width / WORLD_SCALE, height: effect.height / WORLD_SCALE,
+  };
+}
 
 export interface WorldSprite {
   /** Centre, renderer units. */
@@ -33,6 +46,8 @@ export interface WorldSprite {
   r?: number; g?: number; b?: number;
   /** Spin about the view axis, radians. Effects use it; coins do not. */
   rotation?: number;
+  /** A beam's longitudinal direction; its width stays camera-facing. */
+  axis?: { x: number; y: number; z: number };
 }
 
 const VERTEX = /* glsl */`
@@ -137,6 +152,15 @@ export class SpriteBatch {
       // A card that spins turns its two in-plane axes rather than the quad,
       // which keeps it facing the camera while it rolls.
       let arx = rx, ary = ry, arz = rz, aux = ux, auy = uy, auz = uz;
+      if (s.axis) {
+        const n = Math.hypot(s.axis.x, s.axis.y, s.axis.z) || 1;
+        aux = s.axis.x / n; auy = s.axis.y / n; auz = s.axis.z / n;
+        const m = camera.matrixWorld.elements;
+        const cx = m[12]! - s.x, cy = m[13]! - s.y, cz = m[14]! - s.z;
+        const x = cy * auz - cz * auy, y = cz * aux - cx * auz, z = cx * auy - cy * aux;
+        const cross = Math.hypot(x, y, z);
+        if (cross > 1e-9) { arx = x / cross; ary = y / cross; arz = z / cross; }
+      }
       if (s.rotation) {
         const c = Math.cos(s.rotation), n = Math.sin(s.rotation);
         arx = rx * c + ux * n; ary = ry * c + uy * n; arz = rz * c + uz * n;

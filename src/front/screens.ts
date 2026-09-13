@@ -79,6 +79,7 @@ export interface FrontStrings {
   cancelToGoBack: string;
   needMoreTokens: string;
   pressJumpToExit: string;
+  pressJumpToSelect: string;
   /** Indexed by play position 1..15; index 0 unused. */
   levelNames: string[];
   tokensWanted: number[];
@@ -109,6 +110,7 @@ export function readFrontStrings(exe: Uint8Array, exeString: (exe: Uint8Array, a
     cancelToGoBack: exeString(exe, FRONT_TEXT.cancelToGoBack),
     needMoreTokens: exeString(exe, FRONT_TEXT.needMoreTokens),
     pressJumpToExit: exeString(exe, FRONT_TEXT.pressJumpToExit),
+    pressJumpToSelect: exeString(exe, FRONT_TEXT.pressJumpToSelect),
     levelNames,
     tokensWanted,
   };
@@ -163,6 +165,7 @@ export type FrontItem =
     kind: 'sprite'; index: number; frame: number; x: number; y: number;
     /** Which virtual width the x is over, 512 or 320. */
     space: 512 | 320; scaleX: number; scaleY: number; colour: Grey; alpha: number;
+    clipX?: readonly [number, number];
   }
   | { kind: 'big'; glyphs: BigGlyph[]; space: 512 | 320; colour: readonly [number, number, number] }
   | { kind: 'menu'; glyphs: MenuGlyph[]; y: number; grey: number; alpha: number };

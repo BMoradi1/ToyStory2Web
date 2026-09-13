@@ -74,11 +74,15 @@ from the `Toy200.sav` in your install the first time. The **save file**
 button downloads a `Toy200.sav` you can copy into the install yourself;
 the viewer never writes there. **Load game** on the main menu lets you choose
 an exported save or the save in the selected install, preview it, and load it
-into the browser. **Options** previews music volume, sound effects volume and
-camera mode; Apply keeps changes and Cancel restores them. These browser
-panels use mouse and keyboard (Tab, arrow keys, Enter and Escape).
-**Movie viewer** replays the trailer and unlocked cutscenes from your install.
-Skipping or finishing a movie returns to the list without changing progress.
+into the browser. **Options** uses the original Etch A Sketch screen for volume controls,
+keyboard bindings, camera mode and detail level. Jump accepts volume changes;
+Escape cancels a subpage. **Load game** opens the original load/save pages
+with eight browser slots. **Import save file** opens the native picker and
+places the chosen save in slot eight for loading. Saves never modify the
+install. **Movie viewer** uses the original binocular artwork and replays
+unlocked local movies without changing progress. Arrows/stick navigate,
+Space/Enter selects, and Escape/gamepad Triangle goes back. Keyboard bindings
+use physical key capture; Enter accepts the controller page.
 | `s` | report what is actually in the scene |
 | `m` | mute or unmute |
 

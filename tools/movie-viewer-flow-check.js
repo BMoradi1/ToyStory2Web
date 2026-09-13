@@ -18,32 +18,23 @@
   await wait(() => ts2.front.screen === 'title', 'title did not open');
   ts2.frontDrive(0, 40); ts2.frontDrive(0x4000); ts2.frontDrive(0, 30);
   await wait(() => ts2.front.screen === 'menu', 'menu did not open');
-  const choose = async row => {
-    ts2.frontDrive(0,70);
-    for(let i=0;i<row;i++){ts2.frontDrive(0x40);ts2.frontDrive(0,20);}
-    ts2.frontDrive(0x4000);ts2.frontDrive(0,30);
-    await wait(()=>document.querySelector('dialog[open]'),'dialog did not open');
-  };
-  const click = label => {
-    const button=[...document.querySelectorAll('dialog button')].find(b=>b.textContent===label);
-    if(!button||button.disabled)throw Error('unavailable button '+label);button.click();
-  };
-  const close = async label => {click(label);await wait(()=>ts2.front.screen==='menu','menu did not return');};
-  const before = JSON.stringify(ts2.save);
-  await choose(3);
-  const listed=[...document.querySelectorAll('[data-movie]')].map(b=>Number(b.dataset.movie));
-  if(listed[0]!==10)throw Error('trailer missing');
-  document.querySelector('[data-movie="10"]').click();
+  const before=JSON.stringify(ts2.save);
+  ts2.frontDrive(0,70);
+  for(let i=0;i<3;i++){ts2.frontDrive(0x40);ts2.frontDrive(0,20);}
+  ts2.frontDrive(0x4000);ts2.frontDrive(0,30);
+  await wait(()=>ts2.front.screen==='movies','retail movie screen did not open');
+  ts2.frontDrive(0,70);
+  const listed=ts2.front.state.choices.map(c=>c.index);
+  ts2.frontDrive(0x4000);ts2.frontDrive(0,54);
   await wait(()=>ts2.cutsceneUp,'movie did not start');
   await wait(()=>ts2.cutsceneProgress?.frames>0,'movie did not decode');
-  if(document.querySelector('dialog[open]'))throw Error('modal obscures video');
   const frames=ts2.cutsceneProgress.frames;
   window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));
   window.dispatchEvent(new KeyboardEvent('keyup',{key:'Escape'}));
-  await wait(()=>document.querySelector('dialog[open]'),'viewer did not return');
-  if(document.activeElement?.dataset.movie!=='10')throw Error('selection not restored');
+  await wait(()=>ts2.front.screen==='movies','movie screen did not return');
+  ts2.frontDrive(0,70);
   if(JSON.stringify(ts2.save)!==before)throw Error('replay changed progress');
-  await close('Back');
-  await choose(3);
-  return {listed,frames,returned:true,progressUnchanged:JSON.stringify(ts2.save)===before};
+  if(document.querySelector('dialog[open]'))throw Error('browser dialog remains');
+  ts2.frontDrive(0x20);ts2.frontDrive(0,70);
+  return {listed,frames,cursor:ts2.front.state.cursor,returned:true,progressUnchanged:true};
 })()

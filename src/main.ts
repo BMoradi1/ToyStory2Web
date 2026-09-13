@@ -1,5 +1,5 @@
 import { CREDIT_SLOTS, CREDIT_TEXT } from './front/endings.ts';
-import { showOptions, showLoadGame, showMovieViewer, type BrowserOptions } from './front/browser-menu.ts';
+import { chooseSaveFile } from './front/browser-menu.ts';
 import { movieChoices } from './front/movies.ts';
 import { createSlimeBoss, slimeBossBar, slimeBlobTarget } from './sim/slime-boss.ts';
 import { GroupType, buildMeshData, parseAll, readHitShapes, type AllFile } from './formats/all.ts';
@@ -45,7 +45,7 @@ import {
 } from './sim/effects.ts';
 import { EFFECT_FLAGS, EFFECT_KIND, readEffectTable } from './formats/effect-table.ts';
 import { SoundBank, PLAYER_EFFECTS } from './audio/sfx.ts';
-import { commitProgress, exportProgress, forgetProgress, loadProgress, type Progress } from './loader/save.ts';
+import { commitProgress, importProgress, exportProgress, forgetProgress, loadProgress, type Progress } from './loader/save.ts';
 import { BOOT_MOVIES, MOVIES, MOVIE_FLAG, playCutscene } from './video/cutscene.ts';
 import { PICTURE, loadFrontArt, pictureFor, showCard, type TitleCards } from './front/title.ts';
 import { FrontEnd } from './front/run.ts';
@@ -435,6 +435,13 @@ async function open(dir: GameDir): Promise<void> {
   // Toy200.sav, else a fresh record (src/loader/save.ts). The camera choice
   // and the two sliders come from it, as the original's options do.
   progress = await loadProgress(dir);
+  try {
+    const keys=JSON.parse(localStorage.getItem('ts2.controls')??'null');
+    if(keys&&Object.keys(input.keys).every(k=>Array.isArray(keys[k])&&keys[k].length>0&&keys[k].every((c:unknown)=>typeof c==='string'&&/^(Key[A-Z]|Digit[0-9]|Arrow(Up|Down|Left|Right)|Space|Shift(Left|Right)|[A-Za-z]+)$/.test(c))))input.keys=keys;
+    const detail=localStorage.getItem('ts2.detail');
+    if(detail!==null&&/^[012]$/.test(detail))detailOption=Number(detail);
+  }catch{}
+
   applyProgressOptions();
   if (levels.length === 0) return setStatus('No levels found under data/.', true);
 
@@ -2241,7 +2248,7 @@ async function runFrontEnd(): Promise<void> {
       if (p.moveX < -0.5) word |= PAD.left;
       if (p.moveX > 0.5) word |= PAD.right;
       if (p.jump || frontKeys.enter) word |= PAD.jump;
-      if (frontKeys.escape) word |= PAD.cancel;
+      if (frontKeys.escape || [...(navigator.getGamepads?.() ?? [])].some(pad=>pad?.connected&&pad.buttons[3]?.pressed)) word |= PAD.cancel;
       return word;
     },
     playSound(effect) { playEvent(effect); },
@@ -2252,54 +2259,53 @@ async function runFrontEnd(): Promise<void> {
       music.want(track, loop);
     },
     musicEnded: () => music?.ended ?? false,
-    async movies() {
-      if (!progress || !exeBytes) return;
-      input.detach();
-      let selected = 10, message = '';
-      try {
-        for (;;) {
-          music?.start(); music?.want(MUSIC.menu);
-          const choices = movieChoices(exeBytes, progress.p, strings.levelNames, index => movieFile(index) !== null);
-          const index = await showMovieViewer(choices, selected, message);
-          if (index === null) break;
-          selected = index;
-          const result = await playMovie(index);
-          message = result === 'failed' || result === 'missing' ? 'This movie could not be played. Choose another movie.' : '';
-        }
-      } finally { frontKeys.enter = frontKeys.escape = false; input.attach(); }
+    movieChoices: () => exeBytes && progress ? movieChoices(exeBytes, progress.p, strings.levelNames, index => movieFile(index) !== null) : [],
+    moviePlay: index => playMovie(index),
+    loadMovieArt: () => currentDir ? loadFrontArt(currentDir, 'level1t2', [0,1,2,3,4,5,6,7,17,31], [], 'level06') : Promise.resolve(null),
+    optionsValues: () => ({sfx:menu.sfx,bgm:menu.bgm,activeCamera:!cameraPassive,detail:detailOption??1,keys:structuredClone(input.keys)}),
+    previewOptions(value) {
+      menu.sfx=value.sfx;menu.bgm=value.bgm;cameraPassive=!value.activeCamera;
+      input.keys=structuredClone(value.keys);
+      detailOption=value.detail;
+      if(sound)sound.volume=value.sfx/MENU.volumeSteps*0.6;
+      if(music)music.volume=Math.round(value.bgm/MENU.volumeSteps*MUSIC_SLIDER_MAX);
     },
-    async options() {
-      if (!progress) return;
-      input.detach();
-      const initial = { sfx: menu.sfx, bgm: menu.bgm, activeCamera: !cameraPassive };
-      const preview = (value: BrowserOptions) => {
-        menu.sfx = value.sfx; menu.bgm = value.bgm; cameraPassive = !value.activeCamera;
-        if (sound) sound.volume = (value.sfx / MENU.volumeSteps) * 0.6;
-        if (music) music.volume = Math.round((value.bgm / MENU.volumeSteps) * MUSIC_SLIDER_MAX);
-      };
-      try {
-        const accepted = await showOptions(initial, preview);
-        if (accepted) saveProgress();
-      } finally { frontKeys.enter = frontKeys.escape = false; input.attach(); }
+    commitOptions() {
+      saveProgress();
+      try{localStorage.setItem('ts2.controls',JSON.stringify(input.keys));localStorage.setItem('ts2.detail',String(detailOption));}catch{}
     },
-    async loadGame() {
-      if (!currentDir) return false;
-      input.detach();
-      try {
-        const loaded = await showLoadGame(currentDir, strings.levelNames);
-        if (!loaded) return false;
-        progress = loaded;
-        // A later menu save must not copy resources from the old level.
-        if (pickups) { pickups.lives = loaded.p.lives; pickups.health = loaded.p.health; }
-        lastLifeLost = false;
-        lastLevelSummary = null;
-        frontEnteredWith = 0;
-        selectCamNode = 0;
-        applyProgressOptions();
-        commitProgress(loaded);
-        return true;
-      } finally { frontKeys.enter = frontKeys.escape = false; input.attach(); }
+    optionText(address) {
+      if(!exeBytes)return '';
+      if(address<0){const o=-address-0x400000;address=new DataView(exeBytes.buffer,exeBytes.byteOffset).getUint32(o,true);}
+      return exeString(exeBytes,address);
     },
+    loadOptionsArt: () => currentDir ? loadFrontArt(currentDir,'levelt2',[0,1,2,4,5,6,7,8,9,10,31]) : Promise.resolve(null),
+    async loadSlots() {
+      const slots: import('./front/load-screen.ts').SaveSlot[]=Array.from({length:8},()=>({name:'',progress:null}));
+      for(let i=0;i<8;i++){
+        try{const stored=localStorage.getItem(`ts2.slot.${i}`);if(stored){slots[i]={name:'default.cfg',progress:importProgress(Uint8Array.from(JSON.parse(stored)))};}}catch{}
+      }
+      if(!slots[0]!.progress&&progress)slots[0]={name:'default.cfg',progress:importProgress(exportProgress(progress))};
+      const installed=currentDir?.get('toy200.sav');
+      if(installed&&!slots[1]!.progress){try{slots[1]={name:'install save',progress:importProgress(await installed.read())};}catch{}}
+      return slots;
+    },
+    loadSlot(slot) {
+      if(!slot.progress)return;
+      const loaded=slot.progress;
+      progress=loaded;
+      if(pickups){pickups.lives=loaded.p.lives;pickups.health=loaded.p.health;}
+      lastLifeLost=false;lastLevelSummary=null;frontEnteredWith=0;selectCamNode=0;
+      applyProgressOptions();commitProgress(loaded);
+    },
+    saveSlot(index) {
+      if(!progress)return{name:'',progress:null};
+      saveProgress();const bytes=exportProgress(progress);
+      try{localStorage.setItem(`ts2.slot.${index}`,JSON.stringify([...bytes]));}catch{}
+      return{name:'default.cfg',progress:importProgress(bytes)};
+    },
+    loadSaveArt: () => currentDir ? loadFrontArt(currentDir,'level1t3',[4,17,31],[],'level06') : Promise.resolve(null),
+    importSave: chooseSaveFile,
     resetLives() {
       lastLifeLost = false;
       if (pickups) { pickups.lives = SAVE.freshLives; pickups.health = SAVE.freshHealth; }
@@ -3164,6 +3170,7 @@ window.addEventListener('keyup', (ev) => {
 });
 window.addEventListener('keydown', (ev) => {
   if (!viewer) return;
+  if(frontEnd?.configureKey(ev.code)){ev.preventDefault();return;}
   // While a front-end screen is up it owns the keyboard: the pad reader
   // has the arrows and space, and these two are the rest of its word.
   if (frontEnd?.current) {

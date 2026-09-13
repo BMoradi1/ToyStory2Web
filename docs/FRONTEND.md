@@ -357,61 +357,75 @@ final-win/ending/credits/selector flow with an isolated host and real local
 art/text; it does not claim a complete final boss playthrough. Credits
 were also visually inspected in Chromium.
 
-## Browser options and load game (2026-09-12)
+## Retail options and load/save screens (2026-09-12)
 
-The list menu now opens `src/front/browser-menu.ts` for both choices.
-These are browser adaptations, not a port of the original sprite layouts.
-Options offers the supported music/SFX sliders (0..10) and active/passive
-camera, previewed immediately. Apply commits the existing save fields;
-Cancel or Escape restores the snapshot. Keyboard input is detached from
-gameplay while the modal owns focus. Native controls use Tab and arrow keys;
-these dialogs do not yet support gamepad navigation.
+The replacement HTML dialogs have been removed. `src/front/options.ts`
+uses the original Etch A Sketch background and sprite table from
+`level00/levelt2.ngn`: controller/music/SFX/GFX rows, moving alien cursors,
+animated music and SFX pictures, volume bars and arrows. Row y coordinates
+65/85/105/125 and the 32-tick cursor movement come from `FUN_004371b0`.
+Text uses sprite 67 from slot 10, at half scale for labels and 3/8 scale
+for prompts. Volume changes preview immediately; Cancel restores the
+subpage snapshot, Jump accepts, and leaving options commits the result.
 
-Load game accepts a local `.sav` or the selected install's `Toy200.sav`.
-It validates the release layout and progress ranges before offering Load,
-shows the level, token count and lives, and leaves progress untouched on
-cancel or a failed read. Selecting a different file invalidates the earlier
-candidate immediately; stale asynchronous reads cannot enable loading it.
-The loaded record is committed to browser storage and its options/resources
-are applied before returning to the menu. No install file is changed.
-`tools/save-import-probe.ts` checks malformed files and round trips;
-`tools/settings-flow-check.js` verifies preview/cancel/apply, invalid input,
-loading, persistence and a clean selector in Chromium.
+Controller and graphics subpages retain the original font/background but
+are adaptations to the current engine. Controller supports physical-key
+rebinding, duplicate-key swapping, active/passive camera and acceptance
+through Enter or the final row. Escape cancels capture or restores the
+subpage snapshot. The GFX page exposes the implemented three detail levels.
+Original lens flare, animated-texture and gamma controls are not exposed
+because those rendering features/settings remain unported. Bindings and
+detail use browser preference keys `ts2.controls` and `ts2.detail`;
+volume/camera remain in the game's save block. This is not a claim of
+complete parity for the controller/GFX helper routines.
 
-The original options routine has four rows: controller setup, music volume,
-SFX volume and graphics setup (text at `0x4f5b24`, `0x4f5b3c`, `0x4f5b4c`,
-`0x4f6804`). Its subpage Cancel restores the captured settings, while Jump
-accepts them. The controller/GFX helper routines and the original load-game
-diorama presentation remain to be ported; the browser panels do not emulate
-Windows device or display-mode configuration.
+`src/front/load-screen.ts` restores the PC load/save root and eight-slot
+pages from `FUN_0049b9e0`, using `level06/level1t3.ngn`'s Slinky picture
+and the original font in 512-wide space. Root rows are load game, save
+game, main menu; slot rows start at y33, spaced23, and selection blinks.
+Saves go to browser slots `ts2.slot.0` through `.7`, never to the install.
+An unused first slot offers current progress and an unused second slot
+can offer the install's save. Loading applies the selected record; saving
+snapshots current progress. The only DOM control is a small Import save
+file button, needed to open the native picker in a trusted click. Its
+validated result fills slot eight for explicit selection; it does not
+replace progress until Jump loads it. `browser-menu.ts` now contains only
+that file-picker bridge. Original slot transition timing is not fully ported.
 
-## Browser movie viewer (2026-09-12)
+All three front screens now use the normal keyboard/gamepad pad word.
+Triangle (standard gamepad button3) cancels; the existing directions and
+Jump navigate/select. File selection and physical-key capture still use
+browser/keyboard input.
 
-The movie menu now replays local cutscenes and returns to the same selection.
+## Retail movie viewer (2026-09-12)
+
 `src/front/movies.ts` reads the original order table at `0x4f6e8c`:
-flags 0..11, 16, 12..15, 17, 18, terminated by 255. `FUN_0043a600`
-forces flag zero on for the trailer and filters the remaining entries by
-`shown[flag]`; the wrapper `FUN_00453fa0` plays movie `flag + 10` and
-reopens the list. Thus the level-12 intro precedes its boss movie; the
-secret ending and normal ending use the existing save flags.
+flags 0..11, 16, 12..15, 17, 18, terminated by255. `FUN_0043a600`
+always offers flag zero (the trailer), filtering other entries by shown
+flags; the wrapper plays movie `flag + 10` and reopens the same selection.
 
-The browser dialog follows that ordering and unlock rule, disables entries
-whose files are absent, closes before video playback, restores selection
-when playback ends or is skipped, and resumes menu music. Replays call the
-video player directly, so they never mark new movies shown or alter progress.
-Errors return to the list with a message. Arrow keys/Tab move focus, Enter
-plays and Escape returns. Original sprites, the texture-set-2 diorama and
-gamepad navigation remain presentation work.
+The retail binocular screen uses sprite table16 and `level1t2.ngn`.
+The thumbnail sprite/frame pairs come from `0x4f6e3c`. Sprites60/61 form
+the binocular body, 62/63 the scrolling layer, 57 the arrows, and 64 the
+blank frame. `FUN_004949b0` takes horizontal clipping bounds, not scaled
+width/height: the two thumbnail windows clip to x56..112 and208..264.
+`HudPainter` now supports per-sprite clipping, preserving the engine's
+reverse draw order. Selection uses the original fixed-point scroll,
+velocity limit128, acceleration16 and damping8, with a53-tick exit fade.
+Replays leave progress unchanged; missing files cannot be selected.
+Earlier notes calling the movie/load artwork a 3D diorama were imprecise:
+the loader uses the level16 texture variants, but these screens draw
+pictures/sprites, not the selector's scene camera.
 
-`tools/movie-viewer-probe.ts` covers unlocks, order, missing files and
-unchanged progress. `tools/movie-viewer-flow-check.js` exercises the real
-menu, trailer decoding, skip, restored selection and return to the menu.
+Validation: `tools/retail-menu-probe.ts` checks every movie thumbnail and
+options sprite against the real texture bounds, volume clamping/rollback,
+navigation and exit timing. Chromium checks cover movie decoding/replay,
+options rollback/accept, physical-key rebinding and persistence, native
+save import without premature replacement, slot save/load and return to
+menus. Options, load/save and movie screens were visually inspected.
 
 ## What is left
 
-1. **Original options/load/movie presentation** — browser functions work,
-   but controller remapping, graphics settings, gamepad dialog navigation
-   and original sprite layouts remain. Load game
-   and the movie viewer use diorama texture sets 3 and 2.
-2. **The diorama's ambience** — the per-level sound event, and a check of
-   the camera's flight against the real game once the parity harness runs.
+1. Complete controller/GFX helper parity and load/save transition timing;
+   lens flare, texture animation and gamma need engine support first.
+2. The level selector's per-level ambience and camera-flight comparison.

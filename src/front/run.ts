@@ -1,3 +1,6 @@
+import { createLoadScreen, stepLoadScreen, type SaveSlot } from './load-screen.ts';
+import { createOptions, stepOptions, CONTROL_ACTIONS, type OptionsValues } from './options.ts';
+import { createMovieScreen, stepMovieScreen, type MovieChoice } from './movies.ts';
 /**
  * The game flow's front end, `FUN_0049d910` from the title on: title ->
  * list menu -> level select -> a level -> the select again, the way the
@@ -62,9 +65,19 @@ export interface FrontHost {
   creditsText(): string;
   ending(): Promise<void>;
   resetLives(): void;
-  options(): Promise<void>;
-  loadGame(): Promise<boolean>;
-  movies(): Promise<void>;
+  optionsValues(): OptionsValues;
+  previewOptions(value: OptionsValues): void;
+  commitOptions(): void;
+  optionText(address: number): string;
+  loadOptionsArt(): Promise<FrontArt | null>;
+  loadSlots(): Promise<SaveSlot[]>;
+  loadSlot(slot: SaveSlot): void;
+  saveSlot(index: number): SaveSlot;
+  loadSaveArt(): Promise<FrontArt | null>;
+  importSave(): Promise<SaveSlot | null>;
+  movieChoices(): MovieChoice[];
+  moviePlay(index: number): Promise<unknown>;
+  loadMovieArt(): Promise<FrontArt | null>;
   /** "exit" on the list menu. */
   quit(): void;
   /**
@@ -93,7 +106,10 @@ type Screen =
   | { kind: 'select'; state: ReturnType<typeof createSelect> }
   | { kind: 'summary'; state: SummaryState }
   | { kind: 'gameOver'; state: ReturnType<typeof createGameOver> }
-  | { kind: 'credits'; state: ReturnType<typeof createCredits> };
+  | { kind: 'credits'; state: ReturnType<typeof createCredits> }
+  | { kind: 'movies'; state: ReturnType<typeof createMovieScreen> }
+  | { kind: 'options'; state: ReturnType<typeof createOptions> }
+  | { kind: 'load'; state: ReturnType<typeof createLoadScreen> };
 
 export class FrontEnd {
   private layer: HTMLDivElement | null = null;
@@ -145,9 +161,9 @@ export class FrontEnd {
           if (done === 'exit') return;
           if (done === 'options' || done === 'load' || done === 'movies') {
             this.hide();
-            if (done === 'options') await this.host.options();
-            else if (done === 'movies') await this.host.movies();
-            else if (await this.host.loadGame()) this.inGame = true;
+            if (done === 'options') await this.runOptions();
+            else if (done === 'movies') await this.runMovies();
+            else if (await this.runLoad()) this.inGame = true;
             this.show();
           }
           continue;
@@ -210,6 +226,79 @@ export class FrontEnd {
     }
   }
 
+  /** Controller configuration receives physical key codes, not mapped actions. */
+  configureKey(code: string): boolean {
+    if(this.screen?.kind!=='options'||this.screen.state.page!==0)return false;
+    const s=this.screen.state;
+    if(s.capture){
+      if(code==='Escape'){s.capture=false;return true;}
+      if(code==='Enter'||code==='Tab'||code.startsWith('Meta')||code.startsWith('Control')||code.startsWith('Alt'))return true;
+      const action=CONTROL_ACTIONS[s.subrow];
+      if(action){
+        const old=s.value.keys[action][0]!;
+        for(const other of CONTROL_ACTIONS){
+          if(other===action||!s.value.keys[other].includes(code))continue;
+          s.value.keys[other]=s.value.keys[other].filter(key=>key!==code);
+          if(!s.value.keys[other].length)s.value.keys[other]=[old];
+        }
+        s.value.keys[action]=[code];this.host.previewOptions(s.value);
+      }
+      s.capture=false;return true;
+    }
+    if(code==='Enter'){s.page=-1;this.host.commitOptions();return true;}
+    return false;
+  }
+  private async runLoad(): Promise<boolean> {
+    this.summaryArt=await this.host.loadSaveArt();
+    const state=createLoadScreen(await this.host.loadSlots());
+    this.show();
+    // File selection requires a real click, so only this browser-specific
+    // action is DOM-backed; the game menu and its slots are the retail canvas.
+    let active=true;
+    const button=document.createElement('button');button.textContent='Import save file';
+    button.style.cssText='position:fixed;bottom:8px;right:8px;z-index:41';
+    button.onclick=async()=>{
+      button.disabled=true;
+      try{const slot=await this.host.importSave();if(slot&&active){state.slots[7]=slot;state.page='load';state.row=7;state.message='';}}
+      catch(error){state.message=(error as Error).message.slice(0,36);}
+      finally{button.disabled=false;}
+    };
+    document.body.append(button);
+    try{
+      for(;;){
+        const done=await this.play({kind:'load',state});
+        if(done==='exit')return false;
+        const [action,index]=done.split(':');
+        if(action==='load'){this.host.loadSlot(state.slots[Number(index)]!);return true;}
+        state.slots[Number(index)]=this.host.saveSlot(Number(index));state.message='game saved';
+      }
+    }finally{active=false;button.remove();this.hide();this.summaryArt=null;}
+  }
+
+  private async runOptions(): Promise<void> {
+    this.summaryArt=await this.host.loadOptionsArt();
+    this.show();
+    await this.play({kind:'options',state:createOptions(this.host.optionsValues())});
+    this.host.commitOptions();
+    this.hide();this.summaryArt=null;
+  }
+
+  private async runMovies(): Promise<void> {
+    this.summaryArt = await this.host.loadMovieArt();
+    let selected = 10, message = '';
+    for (;;) {
+      this.host.music(LIST_MENU.music);
+      this.show();
+      const done = await this.play({ kind: 'movies', state: createMovieScreen(this.host.movieChoices(), selected, message) });
+      this.hide();
+      if (done === 'cancel') break;
+      selected = Number(done);
+      const result=await this.host.moviePlay(selected);
+      message=result==='failed'||result==='missing'?'movie could not be played':'';
+    }
+    this.summaryArt = null;
+  }
+
   private async openDiorama(select: ReturnType<typeof createSelect>): Promise<void> {
     this.hide();
     const loaded = await this.host.loadDiorama();
@@ -246,6 +335,12 @@ export class FrontEnd {
     let result;
     if (screen.kind === 'title') result = stepTitle(screen.state, this.pad, this.host.strings);
     else if (screen.kind === 'menu') result = stepListMenu(screen.state, this.pad, this.host.strings, this.inGame);
+    else if (screen.kind === 'load') result=stepLoadScreen(screen.state,this.pad,this.host.optionText);
+    else if (screen.kind === 'options') {
+      result=stepOptions(screen.state,this.pad,this.host.optionText);
+      this.host.previewOptions(screen.state.value);
+    }
+    else if (screen.kind === 'movies') result = stepMovieScreen(screen.state, this.pad, this.host.strings.pressJumpToSelect);
     else if (screen.kind === 'gameOver') result = stepGameOver(screen.state, this.pad, this.host.musicEnded());
     else if (screen.kind === 'credits') result = stepCredits(screen.state, this.pad);
     else if (screen.kind === 'summary') {
@@ -263,7 +358,7 @@ export class FrontEnd {
     }
     for (const effect of result.sounds) this.host.playSound(effect);
     this.lastFrame = result.frame;
-    this.paint(result.frame, screen.kind === 'select' ? this.host.selectTable : this.host.menuTable);
+    this.paint(result.frame, screen.kind === 'select' || screen.kind === 'movies' ? this.host.selectTable : this.host.menuTable);
     if (result.done !== null) {
       const resolve = this.resolveScreen;
       this.resolveScreen = null;

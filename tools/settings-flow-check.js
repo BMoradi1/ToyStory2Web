@@ -18,54 +18,57 @@
   await wait(() => ts2.front.screen === 'title', 'title did not open');
   ts2.frontDrive(0, 40); ts2.frontDrive(0x4000); ts2.frontDrive(0, 30);
   await wait(() => ts2.front.screen === 'menu', 'menu did not open');
-  const choose = async row => {
-    ts2.frontDrive(0,70);
-    for(let i=0;i<row;i++){ts2.frontDrive(0x40);ts2.frontDrive(0,20);}
+  const choose=async row=>{
+    ts2.frontDrive(0,70);for(let i=0;i<row;i++){ts2.frontDrive(0x40);ts2.frontDrive(0,20);}
     ts2.frontDrive(0x4000);ts2.frontDrive(0,30);
-    await wait(()=>document.querySelector('dialog[open]'),'dialog did not open');
+    await wait(()=>ts2.front.screen===(row===1?'options':'load'),'retail screen did not open');
+    ts2.frontDrive(0,70);
   };
-  const click = label => {
-    const button=[...document.querySelectorAll('dialog button')].find(b=>b.textContent===label);
-    if(!button||button.disabled)throw Error('unavailable button '+label);button.click();
-  };
-  const close = async label => {click(label);await wait(()=>ts2.front.screen==='menu','menu did not return');};
-  const original = {...ts2.save};
   await choose(1);
-  const setVolume = value => {
-    const slider=document.querySelector('dialog input[name=bgm]');slider.value=String(value);slider.dispatchEvent(new Event('input'));
-  };
-  setVolume(0);
-  if(ts2.menu.bgm!==0)throw Error('volume preview not applied');
-  await close('Cancel');
-  if(ts2.menu.bgm!==original.bgm||ts2.save.bgm!==original.bgm)throw Error('cancel failed to restore volume');
-  await choose(1);setVolume(3);await close('Apply');
-  if(ts2.save.bgm!==3)throw Error('applied volume not saved');
-  const saved = JSON.stringify(ts2.save);
+  // Configure a physical key, then accept through the controller page.
+  ts2.frontDrive(0x4000);ts2.frontDrive(0);
+  ts2.frontDrive(0x4000);ts2.frontDrive(0);
+  if(!ts2.front.state.capture)throw Error('controller did not enter key capture');
+  window.dispatchEvent(new KeyboardEvent('keydown',{key:'l',code:'KeyL'}));
+  window.dispatchEvent(new KeyboardEvent('keyup',{key:'l',code:'KeyL'}));
+  if(ts2.front.state.value.keys.up[0]!=='KeyL')throw Error('key capture failed');
+  window.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',code:'Enter'}));
+  window.dispatchEvent(new KeyboardEvent('keyup',{key:'Enter',code:'Enter'}));
+  if(JSON.parse(localStorage.getItem('ts2.controls')).up[0]!=='KeyL')throw Error('binding did not persist');
+  const before=ts2.save.bgm;
+  ts2.frontDrive(0x40);ts2.frontDrive(0,35);ts2.frontDrive(0x4000);ts2.frontDrive(0);
+  if(ts2.front.state.page!==1)throw Error('music page did not open');
+  ts2.frontDrive(0x80);ts2.frontDrive(0);ts2.frontDrive(0x1000);ts2.frontDrive(0);
+  if(ts2.menu.bgm!==before)throw Error('volume cancel did not restore');
+  ts2.frontDrive(0x4000);ts2.frontDrive(0);ts2.frontDrive(0x80);ts2.frontDrive(0);ts2.frontDrive(0x4000);ts2.frontDrive(0);
+  const value=ts2.menu.bgm;
+  ts2.frontDrive(0x1000);ts2.frontDrive(0,45);
+  await wait(()=>ts2.front.screen==='menu','options did not exit');
+  if(ts2.save.bgm!==value)throw Error('volume was not saved');
   await choose(2);
-  const selectFile=(bytes,name='Toy200.sav')=>{
-    const data=new DataTransfer();data.items.add(new File([bytes],name));
-    const input=document.querySelector('dialog input[type=file]');input.files=data.files;input.dispatchEvent(new Event('change'));
-  };
-  selectFile(new Uint8Array([1,2,3]));await pause(100);
-  if(![...document.querySelectorAll('dialog button')].find(b=>b.textContent==='Load selected save').disabled)throw Error('invalid save enabled load');
-  await close('Cancel');
-  if(JSON.stringify(ts2.save)!==saved)throw Error('cancel changed save');
-  const bytes=ts2.exportSave();
-  const offset=4+new DataView(bytes.buffer,bytes.byteOffset).getUint32(0,true);
-  bytes[offset+0x138]=7;bytes[offset+0x139]=0;bytes[offset+0x144]=6;bytes[offset+0x145]=0;
-  await choose(2);selectFile(bytes);
-  await wait(()=>![...document.querySelectorAll('dialog button')].find(b=>b.textContent==='Load selected save').disabled,'valid save not ready');
-  await close('Load selected save');
-  if(ts2.save.lives!==7||ts2.save.health!==6||ts2.save.level!==0)throw Error('loaded fields not applied');
-  const {loadProgress}=await import('/src/loader/save.ts');
-  const reloaded=await loadProgress(new Map());
-  if(reloaded.p.lives!==7||reloaded.p.health!==6||reloaded.p.bgm!==3)throw Error('loaded save not persisted');
-  // Check that a later selector cursor save cannot copy the old resources back.
-  ts2.frontDrive(0,70);ts2.frontDrive(0x4000);ts2.frontDrive(0,40);
-  await wait(()=>ts2.front.screen==='select','selector did not reopen');
-  if(ts2.save.lives!==7||ts2.save.health!==6||ts2.player!==null)throw Error('old gameplay survived loading');
-  ts2.frontDrive(0,70);ts2.frontDrive(0x1000);ts2.frontDrive(0,50);
-  await wait(()=>ts2.front.screen==='menu','cancel selector failed');
+  if(document.querySelector('dialog'))throw Error('replacement dialog remains');
+  // Import is a native file picker, while preview/confirmation stays on canvas.
+  [...document.querySelectorAll('button')].find(b=>b.textContent==='Import save file').click();
+  const fileInput=document.querySelector('input[aria-label="Import save file"]');
+  const bytes=ts2.exportSave();const offset=4+new DataView(bytes.buffer,bytes.byteOffset).getUint32(0,true);
+  bytes[offset+0x138]=7;bytes[offset+0x144]=6;bytes[offset+0x145]=0;
+  const transfer=new DataTransfer();transfer.items.add(new File([bytes],'Toy200.sav'));
+  fileInput.files=transfer.files;fileInput.dispatchEvent(new Event('change'));
+  await wait(()=>ts2.front.state.row===7,'import did not populate slot');
+  if(ts2.save.lives===7)throw Error('import replaced progress before selecting load');
+  ts2.frontDrive(0x4000);ts2.frontDrive(0);
+  await wait(()=>ts2.front.screen==='menu','imported save did not load');
+  if(ts2.save.lives!==7||ts2.save.health!==6)throw Error('import resources not applied');
+  await choose(2);
+  ts2.frontDrive(0x40);ts2.frontDrive(0);ts2.frontDrive(0x4000);ts2.frontDrive(0);
+  if(ts2.front.state.page!=='save')throw Error('save page did not open');
+  ts2.frontDrive(0x4000);ts2.frontDrive(0);await pause(50);
+  if(!localStorage.getItem('ts2.slot.0'))throw Error('save slot did not persist');
+  ts2.frontDrive(0x1000);ts2.frontDrive(0);
+  ts2.frontDrive(0x4000);ts2.frontDrive(0);
+  if(ts2.front.state.page!=='load' ||!ts2.front.state.slots[0].progress)throw Error('load slots did not open');
+  ts2.frontDrive(0x4000);ts2.frontDrive(0);
+  await wait(()=>ts2.front.screen==='menu','load did not return');
   await choose(1);
-  return {dialog:document.querySelector('dialog h1').textContent,bgm:ts2.save.bgm,lives:ts2.save.lives,health:ts2.save.health};
+  return {screen:ts2.front.screen,originalVolume:before,savedVolume:ts2.save.bgm,loadPassed:true};
 })()

@@ -61,16 +61,19 @@
  tools/endings-probe.ts covers timing/assets; tools/game-over-flow-check.js
  exercises real fatal damage; tools/credits-flow-check.js covers final-win
  routing with an isolated host (the actual final boss remains unported).
- OPTIONS/LOAD now have working browser dialogs (src/front/browser-menu.ts):
- volume/camera preview with Apply/Cancel; validated local save import with
- preview and persistence. Original controller/GFX pages, sprite layout and
- gamepad navigation remain; these are browser adaptations, not exact ports.
- MOVIE VIEWER now works as a browser dialog, with original table order and
- saved unlocks, local playback, restored selection and unchanged progress.
- tools/movie-viewer-probe.ts and tools/movie-viewer-flow-check.js cover it.
- NEXT implementation item: original options/load/movie presentation parity,
- including gamepad navigation, controller remapping and graphics settings.
- USER PREFERENCE: commit substantial completed changes as milestones. Earlier notes saying the summary or parseDat retile is next are stale.
+ RETAIL MENU ART RESTORED: browser dialogs removed. Options uses the
+ original Etch A Sketch and animated volume sprites; load/save uses the
+ Slinky picture and eight slots; movies use binocular sprites and clipped
+ thumbnails. Keyboard/gamepad navigation shares the front-end pad word.
+ Controller rebinding and detail preferences persist in browser storage;
+ controller/GFX subpages are limited to supported features. Native import
+ remains a small button opening the browser picker, then a canvas slot.
+ NEXT: complete controller/GFX parity and load/save transition timing;
+ unported lens flare/texture animation/gamma need renderer support first.
+ See docs/FRONTEND.md and tools/retail-menu-probe.ts for exact coverage.
+ USER PREFERENCE: commit substantial completed changes as milestones, with
+ a commit body explaining behavior, implementation and validation.
+ Earlier notes saying the summary or parseDat retile is next are stale.
 ================================================================================
 
  Read TODOPLAN.txt for WHAT to do. This file is about WHO should do it and what

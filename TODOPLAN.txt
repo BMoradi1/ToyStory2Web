@@ -866,14 +866,14 @@
            Credits scroll the install's text over cycling original pictures.
            Timing/assets and Chromium routing checks pass; finale routing was
            tested with a simulated win, since the final boss is not ported.
-           Browser OPTIONS/LOAD now work: volume/camera preview and rollback,
-           local-save validation/preview/import, all kept in browser storage.
-           tools/save-import-probe.ts and tools/settings-flow-check.js pass.
-           Original sprite layouts, controller/GFX pages and gamepad dialog
-           navigation remain. Browser MOVIE VIEWER now replays unlocked
-           local movies in original order and returns without changing saves.
-           Unlock and Chromium playback/return checks pass. Next: original
-           options/load/movie parity (movies texture set 2; load set 3).
+           RETAIL ART RESTORED: Etch A Sketch options/volume sprites,
+           Slinky load/save pages, binocular movie viewer/clipped thumbnails.
+           Keyboard/gamepad navigation; key rebinding/detail preferences;
+           eight browser save slots and native-file import bridge. Tests:
+           retail-menu-probe.ts, settings-flow-check.js, movie-viewer-flow-check.js.
+           Controller/GFX subpages expose supported features only; exact
+           helper parity and slot transition timing remain. Lens flare,
+           animated-texture and gamma settings need renderer support first.
  [was]     Cutscenes: MPEG-1 in the browser (jsmpeg-style decoder or
            WebCodecs), fed from the user's rtlibs files.
  [OPEN]    First-run flow explaining that users supply their own copy.

@@ -213,6 +213,7 @@ export class HudPainter {
     table: readonly (SpriteHeader | null)[], sheets: ReadonlyMap<number, Sheet>,
     index: number, frame: number, x: number, y: number,
     colour: Modulate, sx: number, py: number, scaleX = 0x1000, scaleY = 0x1000, alpha = 1,
+    clipX?: readonly [number, number],
   ): void {
     const h = table[index];
     if (!h) return;
@@ -226,9 +227,11 @@ export class HudPainter {
     const sheet = this.tinted(raw, colour);
     const ctx = this.ctx;
     this.queue.push(() => {
+      if (clipX) { ctx.save(); ctx.beginPath(); ctx.rect(clipX[0] * sx, 0, (clipX[1] - clipX[0]) * sx, this.canvas.height); ctx.clip(); }
       if (alpha !== 1) ctx.globalAlpha = alpha;
       ctx.drawImage(sheet, f.u, f.v, h.width, h.height, x * sx, y * py, w * sx, ht * py);
       if (alpha !== 1) ctx.globalAlpha = 1;
+      if (clipX) ctx.restore();
     });
   }
 
@@ -267,7 +270,7 @@ export class HudPainter {
     for (const item of frame.items) {
       if (item.kind === 'sprite') {
         this.blitSprite(table, sheets, item.index, item.frame, item.x, item.y, item.colour,
-          item.space === 512 ? px512 : px320, py, item.scaleX, item.scaleY, item.alpha);
+          item.space === 512 ? px512 : px320, py, item.scaleX, item.scaleY, item.alpha, item.clipX);
       } else if (item.kind === 'menu') {
         const colour = item.grey;
         for (const g of item.glyphs) {

@@ -67,12 +67,13 @@ export interface FrontArt {
  */
 export async function loadFrontArt(
   dir: GameDir, bundle = 'level', sheetSlots: readonly number[] = FRONT_SHEETS,
+  pictureSlots: readonly number[] = [],
 ): Promise<FrontArt> {
   const out: TitleCards = new Map();
   const sheets = new Map<number, HTMLCanvasElement>();
   const file = dir.get(`data/level00/${bundle}.ngn`);
   if (!file) return { cards: out, sheets };
-  const wanted = new Set<number>([...PICTURE_SLOTS, ...PICTURE_SLOTS_ALT, ...sheetSlots]);
+  const wanted = new Set<number>([...PICTURE_SLOTS, ...PICTURE_SLOTS_ALT, ...sheetSlots, ...pictureSlots]);
   let textures;
   try {
     textures = parseNgn(await file.read());

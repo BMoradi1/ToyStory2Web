@@ -109,3 +109,25 @@ body.front-scene #app header,
 body.front-scene #textures {
   visibility: hidden;
 }
+
+.game-dialog {
+  width: min(540px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  padding: 28px;
+  color: var(--text);
+  background: #182139;
+  border: 2px solid #5772ad;
+  border-radius: 12px;
+  box-shadow: 0 20px 80px #000a;
+}
+.game-dialog::backdrop { background: #02050ded; }
+.game-dialog h1 { color: #ffe35c; margin-bottom: 20px; }
+.game-dialog label { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin: 20px 0; }
+.game-dialog input[type=range] { grid-column: 1; width: 100%; accent-color: #ffe35c; }
+.game-dialog output { grid-column: 2; grid-row: 2; min-width: 2ch; }
+.game-dialog select { padding: 6px; font: inherit; }
+.game-dialog button { margin: 8px 8px 0 0; }
+.game-dialog button:disabled { opacity: .45; cursor: default; }
+.game-dialog :focus-visible { outline: 3px solid #ffe35c; outline-offset: 3px; }
+.game-dialog .dialog-help { color: #c4cce0; }

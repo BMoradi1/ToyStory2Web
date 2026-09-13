@@ -9,6 +9,7 @@
  * sound, a music track, a level played to its end, the boot chain again —
  * so the flow reads next to the decompiled routine.
  */
+import { createGameOver, stepGameOver, createCredits, stepCredits } from './endings.ts';
 import type { SpriteHeader } from '../formats/sprite-table.ts';
 import { HudPainter, type Sheet } from '../render/hud-draw.ts';
 import {
@@ -40,7 +41,8 @@ export interface FrontHost {
   /** The pad this tick as the engine's 16-bit word (screens.ts `PAD`). */
   pad(): number;
   playSound(effect: number): void;
-  music(track: number | null): void;
+  music(track: number | null, loop?: boolean): void;
+  musicEnded(): boolean;
   /** The save's token bytes by internal level, the select cursor, and the last level's entry byte. */
   tokens(): readonly number[];
   cursor(): number;
@@ -50,12 +52,18 @@ export interface FrontHost {
    * Play the level at a play position (1..15) — its intro included — and
    * resolve when it is over: left through the pause menu, or won.
    */
-  playLevel(position: number): Promise<'exit' | 'won'>;
+  playLevel(position: number): Promise<'exit' | 'won' | 'gameOver'>;
   /** The attract loop's boot again: logos and cards. */
   attract(): Promise<void>;
   /** Results captured before the played level is discarded; bosses skip the tally. */
   summary(): LevelSummary | null;
   loadSummaryArt(): Promise<FrontArt | null>;
+  loadCreditsArt(): Promise<FrontArt | null>;
+  creditsText(): string;
+  ending(): Promise<void>;
+  resetLives(): void;
+  options(): Promise<void>;
+  loadGame(): Promise<boolean>;
   /** "exit" on the list menu. */
   quit(): void;
   /**
@@ -82,7 +90,9 @@ type Screen =
   | { kind: 'title'; state: ReturnType<typeof createTitle> }
   | { kind: 'menu'; state: ReturnType<typeof createListMenu> }
   | { kind: 'select'; state: ReturnType<typeof createSelect> }
-  | { kind: 'summary'; state: SummaryState };
+  | { kind: 'summary'; state: SummaryState }
+  | { kind: 'gameOver'; state: ReturnType<typeof createGameOver> }
+  | { kind: 'credits'; state: ReturnType<typeof createCredits> };
 
 export class FrontEnd {
   private layer: HTMLDivElement | null = null;
@@ -117,7 +127,7 @@ export class FrontEnd {
       let next: 'title' | 'menu' | 'select' = 'title';
       for (;;) {
         if (next === 'title') {
-          this.host.music(TITLE.music);
+          this.host.music(TITLE.music, false);
           const done = await this.play({ kind: 'title', state: createTitle() });
           if (done === 'menu') { next = 'menu'; continue; }
           // The attract demo is not ported: the engine plays a recorded
@@ -132,8 +142,13 @@ export class FrontEnd {
           const done = await this.play({ kind: 'menu', state: createListMenu() });
           if (done === 'start') { next = 'select'; continue; }
           if (done === 'exit') return;
-          // options, load game and the movie viewer come back to the menu
-          // when they close; they are not ported, so they close at once.
+          if (done === 'options' || done === 'load') {
+            this.hide();
+            if (done === 'options') await this.host.options();
+            else if (await this.host.loadGame()) this.inGame = true;
+            this.show();
+          }
+          // The movie viewer is still unported.
           continue;
         }
         this.inGame = true;
@@ -150,12 +165,35 @@ export class FrontEnd {
         this.host.setCamNode(select.pos);
         this.hide();
         this.host.music(null);
-        await this.host.playLevel(select.pos);
+        const outcome = await this.host.playLevel(select.pos);
+        if (outcome === 'gameOver') {
+          this.summaryArt = await this.host.loadSummaryArt();
+          this.host.music(17, false);
+          this.show();
+          await this.play({ kind: 'gameOver', state: createGameOver() });
+          this.hide();
+          this.summaryArt = null;
+          this.host.music(null);
+          this.host.resetLives();
+          await this.host.attract();
+          next = 'title';
+          this.show();
+          continue;
+        }
+        if (outcome === 'won' && select.pos === 15) {
+          await this.host.ending();
+          this.summaryArt = await this.host.loadCreditsArt();
+          this.host.music(18);
+          this.show();
+          await this.play({ kind: 'credits', state: createCredits(this.host.creditsText()) });
+          this.hide();
+          this.summaryArt = null;
+        }
         const result = this.host.summary();
         if (result) {
           this.summaryArt = await this.host.loadSummaryArt();
           if (this.summaryArt) {
-            this.host.music(SUMMARY.music);
+            this.host.music(SUMMARY.music, false);
             this.show();
             await this.play({ kind: 'summary', state: createSummary(result) });
             this.hide();
@@ -207,6 +245,8 @@ export class FrontEnd {
     let result;
     if (screen.kind === 'title') result = stepTitle(screen.state, this.pad, this.host.strings);
     else if (screen.kind === 'menu') result = stepListMenu(screen.state, this.pad, this.host.strings, this.inGame);
+    else if (screen.kind === 'gameOver') result = stepGameOver(screen.state, this.pad, this.host.musicEnded());
+    else if (screen.kind === 'credits') result = stepCredits(screen.state, this.pad);
     else if (screen.kind === 'summary') {
       result = stepSummary(screen.state, this.pad, this.host.strings.pressJumpToExit, this.host.rand);
     } else {
@@ -247,8 +287,10 @@ export class FrontEnd {
 
   private paint(frame: FrontFrame, table: readonly (SpriteHeader | null)[]): void {
     if (!this.painter || !this.canvas) return;
-    const summary = this.screen?.kind === 'summary' ? this.summaryArt : null;
-    const card: Picture | null = frame.picture === null ? null : pictureFor(summary?.cards ?? this.host.cards, frame.picture);
+    const summary = this.summaryArt;
+    const cards = summary?.cards ?? this.host.cards;
+    const card: Picture | null = frame.pictureSlot !== undefined ? cards.get(frame.pictureSlot) ?? null
+      : frame.picture === null ? null : pictureFor(cards, frame.picture);
     const sheets = summary?.sheets ?? (this.diorama ? this.host.selectSheets() : null) ?? this.host.sheets;
     this.painter.paintFront(frame, table, sheets, card?.canvas ?? null);
   }

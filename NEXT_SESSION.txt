@@ -55,8 +55,18 @@
  Machine-code checks corrected the timing: one coin per three ticks;
  the clock holds at 180 until Jump. Chromium verified level -> summary
  -> clean selector; tools/front-flow-check.js reproduces that flow.
- NEXT implementation item: game-over screen and credits, then options/load
- game. Earlier notes saying the summary or parseDat retile is next are stale.
+ GAME OVER and CREDITS now ported (src/front/endings.ts). Final-life
+ death exits through game over -> boot/title; tokens survive and the next
+ run has five lives/full health. Credits use the install's text and backdrops.
+ tools/endings-probe.ts covers timing/assets; tools/game-over-flow-check.js
+ exercises real fatal damage; tools/credits-flow-check.js covers final-win
+ routing with an isolated host (the actual final boss remains unported).
+ OPTIONS/LOAD now have working browser dialogs (src/front/browser-menu.ts):
+ volume/camera preview with Apply/Cancel; validated local save import with
+ preview and persistence. Original controller/GFX pages, sprite layout and
+ gamepad navigation remain; these are browser adaptations, not exact ports.
+ NEXT implementation item: movie viewer, then original options/load parity.
+ USER PREFERENCE: commit substantial completed changes as milestones. Earlier notes saying the summary or parseDat retile is next are stale.
 ================================================================================
 
  Read TODOPLAN.txt for WHAT to do. This file is about WHO should do it and what

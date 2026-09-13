@@ -860,9 +860,18 @@
            tools/summary-probe.ts and Chromium level -> summary -> select
            pass. The selector no longer resumes the old level simulation
            or retains its entities/effects (tools/front-flow-check.js).
-           Left, in order: game over and the credits (small);
-           options and load game (unread; load game and the movie viewer
-           use the diorama scene with texture sets 3 and 2).
+           2026-09-12: GAME OVER and CREDITS ported (src/front/endings.ts).
+           Final-life death now ends play, skips the summary and boots back
+           to title; continue restores five lives/full health and keeps tokens.
+           Credits scroll the install's text over cycling original pictures.
+           Timing/assets and Chromium routing checks pass; finale routing was
+           tested with a simulated win, since the final boss is not ported.
+           Browser OPTIONS/LOAD now work: volume/camera preview and rollback,
+           local-save validation/preview/import, all kept in browser storage.
+           tools/save-import-probe.ts and tools/settings-flow-check.js pass.
+           Original sprite layouts, controller/GFX pages and gamepad dialog
+           navigation remain. Next: movie viewer (diorama texture set 2),
+           then original options/load parity (load uses texture set 3).
  [was]     Cutscenes: MPEG-1 in the browser (jsmpeg-style decoder or
            WebCodecs), fed from the user's rtlibs files.
  [OPEN]    First-run flow explaining that users supply their own copy.

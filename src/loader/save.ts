@@ -30,7 +30,7 @@ export interface Progress {
 function fromStorage(): Uint8Array | null {
   try {
     const hex = localStorage.getItem(KEY);
-    if (!hex || hex.length !== SAVE.blockSize * 2) return null;
+    if (!hex || hex.length !== SAVE.blockSize * 2 || !/^[0-9a-f]+$/i.test(hex)) return null;
     const block = new Uint8Array(SAVE.blockSize);
     for (let i = 0; i < block.length; i++) block[i] = parseInt(hex.substr(i * 2, 2), 16);
     return block;
@@ -73,6 +73,18 @@ export async function loadProgress(dir: GameDir): Promise<Progress> {
 export function commitProgress(progress: Progress): void {
   writeProgress(progress.block, progress.p);
   toStorage(progress.block);
+}
+
+/** Validate before replacing anything. The control-only slot 99 is not progress. */
+export function importProgress(bytes: Uint8Array): Progress {
+  if (bytes.length > 4096) throw new Error('This file is too large to be a Toy Story 2 save.');
+  const save = parseSaveFile(bytes, 0);
+  if (!save.release || !save.progress) throw new Error('This save uses an unsupported layout. Choose a release-version Toy200.sav.');
+  const p = save.progress;
+  if (p.level > 14 || p.health > SAVE.freshHealth || p.sfx > 10 || p.bgm > 10 || p.powerUps > 31 || p.lives === 255) {
+    throw new Error('This file does not contain valid game progress.');
+  }
+  return { block: new Uint8Array(save.block), p, origin: 'browser' };
 }
 
 /** The bytes of a `Toy200.sav` holding this progress. */

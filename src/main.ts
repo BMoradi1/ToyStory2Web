@@ -1,3 +1,5 @@
+import { CREDIT_SLOTS, CREDIT_TEXT } from './front/endings.ts';
+import { showOptions, showLoadGame, type BrowserOptions } from './front/browser-menu.ts';
 import { createSlimeBoss, slimeBossBar, slimeBlobTarget } from './sim/slime-boss.ts';
 import { GroupType, buildMeshData, parseAll, readHitShapes, type AllFile } from './formats/all.ts';
 import {
@@ -49,7 +51,7 @@ import { FrontEnd } from './front/run.ts';
 import { SUMMARY, type LevelSummary } from './front/summary.ts';
 import { PAD, readFrontStrings } from './front/screens.ts';
 import { readDioramaLists, type DioramaLists } from './front/diorama.ts';
-import { LEVEL_SELECT_ORDER, selectIndexOf, tokenCount } from './formats/save-file.ts';
+import { SAVE, LEVEL_SELECT_ORDER, selectIndexOf, tokenCount } from './formats/save-file.ts';
 import { MUSIC, MUSIC_SLIDER_MAX, MUSIC_TRACKS, MUSIC_VOLUME_CURVE, MusicPlayer, trackForLevel } from './audio/music.ts';
 import {
   PICKUP, createPickups, pickupObjects, PickupKind, revealToken, stepPickups, type PickupState,
@@ -460,6 +462,8 @@ async function open(dir: GameDir): Promise<void> {
       get viewer() { return viewer; },
       THREE,
       get player() { return player; },
+      /** Exercise the real health/death path in the browser harness. */
+      hurtPlayer() { if (viewer?.playMode && currentLevel) hurtPlayer(); },
       get anim() { return playerAnim; },
       get hasAnm() { return playerModel?.anm ? playerModel.anm.animations.length : null; },
       get sound() {
@@ -1866,6 +1870,7 @@ function hurtPlayer(): void {
   player.dying = true;
   player.hitStun = 0;
   deathTimer = DEATH_TICKS;
+  lastLifeLost = pickups.lives === 0;
   if (pickups.lives > 0) pickups.lives -= 1;
   playEvent(DEATH_EVENT, player);
 }
@@ -2145,7 +2150,7 @@ let frontCard: ReturnType<typeof showCard> | null = null;
 let frontSheets = new Map<number, Sheet>();
 let frontEnd: FrontEnd | null = null;
 /** Resolves the level the front end is waiting on (src/front/run.ts). */
-let frontLevelDone: ((how: 'exit' | 'won') => void) | null = null;
+let frontLevelDone: ((how: 'exit' | 'won' | 'gameOver') => void) | null = null;
 /** `DAT_00830ca8`: the token byte the last level was entered with. */
 let frontEnteredWith = 0;
 let lastLevelSummary: LevelSummary | null = null;
@@ -2239,10 +2244,61 @@ async function runFrontEnd(): Promise<void> {
       return word;
     },
     playSound(effect) { playEvent(effect); },
-    music(track) {
+    music(track, loop = true) {
       if (!music) return;
+      if (track === null) { music.stop(); return; }
       music.start();
-      music.want(track);
+      music.want(track, loop);
+    },
+    musicEnded: () => music?.ended ?? false,
+    async options() {
+      if (!progress) return;
+      input.detach();
+      const initial = { sfx: menu.sfx, bgm: menu.bgm, activeCamera: !cameraPassive };
+      const preview = (value: BrowserOptions) => {
+        menu.sfx = value.sfx; menu.bgm = value.bgm; cameraPassive = !value.activeCamera;
+        if (sound) sound.volume = (value.sfx / MENU.volumeSteps) * 0.6;
+        if (music) music.volume = Math.round((value.bgm / MENU.volumeSteps) * MUSIC_SLIDER_MAX);
+      };
+      try {
+        const accepted = await showOptions(initial, preview);
+        if (accepted) saveProgress();
+      } finally { frontKeys.enter = frontKeys.escape = false; input.attach(); }
+    },
+    async loadGame() {
+      if (!currentDir) return false;
+      input.detach();
+      try {
+        const loaded = await showLoadGame(currentDir, strings.levelNames);
+        if (!loaded) return false;
+        progress = loaded;
+        // A later menu save must not copy resources from the old level.
+        if (pickups) { pickups.lives = loaded.p.lives; pickups.health = loaded.p.health; }
+        lastLifeLost = false;
+        lastLevelSummary = null;
+        frontEnteredWith = 0;
+        selectCamNode = 0;
+        applyProgressOptions();
+        commitProgress(loaded);
+        return true;
+      } finally { frontKeys.enter = frontKeys.escape = false; input.attach(); }
+    },
+    resetLives() {
+      lastLifeLost = false;
+      if (pickups) { pickups.lives = SAVE.freshLives; pickups.health = SAVE.freshHealth; }
+      if (progress) { progress.p.lives = SAVE.freshLives; progress.p.health = SAVE.freshHealth; }
+      saveProgress();
+    },
+    async loadCreditsArt() {
+      return currentDir ? loadFrontArt(currentDir, 'levelt3', [31], CREDIT_SLOTS) : null;
+    },
+    creditsText: () => exeBytes ? exeString(exeBytes, CREDIT_TEXT) : '',
+    async ending() {
+      if (progress && !progress.p.gameBeaten) {
+        progress.p.gameBeaten = true;
+        saveProgress();
+        await playMovie(MOVIE_FLAG.ending + MOVIE_FLAG.base);
+      }
     },
     tokens: () => progress?.p.tokens ?? [],
     cursor: () => progress?.p.level ?? 0,
@@ -2405,8 +2461,9 @@ async function loadDioramaScene(): Promise<{ paths: DatLevel['paths']; placedOf:
  * — then the scene, Buzz, and play until the pause menu's "exit level" or
  * the boss falls.
  */
-async function playLevelFromFront(position: number): Promise<'exit' | 'won'> {
+async function playLevelFromFront(position: number): Promise<'exit' | 'won' | 'gameOver'> {
   lastLevelSummary = null;
+  lastLifeLost = false;
   const level = LEVEL_SELECT_ORDER[position - 1];
   if (level === undefined) return 'exit';
   const index = levels.findIndex((l) => l.id === `level${String(level).padStart(2, '0')}/level`);
@@ -2423,9 +2480,9 @@ async function playLevelFromFront(position: number): Promise<'exit' | 'won'> {
   frontEnteredWith = progress?.p.tokens[level] ?? 0;
   setPlaying(true);
   infoEl.textContent = 'playing — WASD or stick to move, space to jump, J spin, K fire, Escape for the menu';
-  const how = await new Promise<'exit' | 'won'>((resolve) => { frontLevelDone = resolve; });
+  const how = await new Promise<'exit' | 'won' | 'gameOver'>((resolve) => { frontLevelDone = resolve; });
   frontLevelDone = null;
-  if (position % 3 !== 0) {
+  if (how !== 'gameOver' && position % 3 !== 0) {
     lastLevelSummary = {
       position, enteredWith: frontEnteredWith,
       tokens: progress?.p.tokens[level] ?? pickups?.tokens ?? 0,
@@ -2582,6 +2639,7 @@ let soundTable: SoundTable | null = null;
 const soundLog: string[] = [];
 /** Ticks left of the death animation before Buzz is put back. */
 let deathTimer = 0;
+let lastLifeLost = false;
 
 /** A blow costs one health and holds Buzz for this long. */
 const HURT_TICKS = 0x5a;
@@ -3027,6 +3085,12 @@ function poseAnimation(hasInput: boolean): void {
 let spawnPoint: { x: number; y: number; z: number } | null = null;
 async function respawn(): Promise<void> {
   if (!player) return;
+  if (player.dying && lastLifeLost) {
+    if (frontLevelDone) { frontLevelDone('gameOver'); return; }
+    setPlaying(false);
+    infoEl.textContent = 'game over';
+    return;
+  }
   const safe = { x: player.safeX, y: player.safeY, z: player.safeZ, yaw: player.safeYaw };
   const back = spawnPoint && !Number.isFinite(safe.x) ? spawnPoint : safe;
   const died = player.dying;

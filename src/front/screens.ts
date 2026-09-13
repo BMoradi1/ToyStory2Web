@@ -170,6 +170,9 @@ export type FrontItem =
 export interface FrontFrame {
   /** The picture under everything, by `FUN_00438520` argument, or none. */
   picture: number | null;
+  /** Credits select backdrop slots directly and fade them beneath the text. */
+  pictureSlot?: number;
+  pictureAlpha?: number;
   /** In the engine's call order: later ones land BEHIND earlier ones. */
   items: FrontItem[];
   /** The screen's grey, 0..0x80. */

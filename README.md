@@ -72,7 +72,11 @@ Progress is the game's own save record: lives, health, the camera choice,
 the volume sliders and the tokens per level, kept in the browser and seeded
 from the `Toy200.sav` in your install the first time. The **save file**
 button downloads a `Toy200.sav` you can copy into the install yourself;
-the viewer never writes there.
+the viewer never writes there. **Load game** on the main menu lets you choose
+an exported save or the save in the selected install, preview it, and load it
+into the browser. **Options** previews music volume, sound effects volume and
+camera mode; Apply keeps changes and Cancel restores them. These browser
+panels use mouse and keyboard (Tab, arrow keys, Enter and Escape).
 | `s` | report what is actually in the scene |
 | `m` | mute or unmute |
 

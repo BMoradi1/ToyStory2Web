@@ -132,6 +132,8 @@ export class MusicPlayer {
 
   /** What is playing, by table index. */
   get current(): number | null { return this.track; }
+  /** Missing, muted or still-loading audio must not end a presentation early. */
+  get ended(): boolean { return this.element?.ended ?? false; }
 
   /** The name of what is playing, for a status line. */
   get currentName(): string | null {

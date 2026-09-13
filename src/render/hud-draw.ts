@@ -257,7 +257,11 @@ export class HudPainter {
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, W, H);
     }
-    if (picture) ctx.drawImage(picture, 0, 0, W, H);
+    if (picture) {
+      ctx.globalAlpha = frame.pictureAlpha ?? 1;
+      ctx.drawImage(picture, 0, 0, W, H);
+      ctx.globalAlpha = 1;
+    }
 
     const bigFont = sheets.get(BIG_TEXT.sheet) ?? null;
     for (const item of frame.items) {

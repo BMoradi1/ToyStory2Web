@@ -313,8 +313,8 @@ player, creatures or effects, and gameplay ticks remain disabled.
   with the `t1` textures into the viewer, every used object kept
   separate, and the runner lays the sprite layer over the viewer's own
   picture (the page's chrome steps aside); the objects are shown, hidden
-  and moved by id and the camera placed each tick. Options, load game and
-  the movie viewer close at once. The attract demo replays the boot
+  and moved by id and the camera placed each tick. Options and load game
+  open browser dialogs; the movie viewer still closes at once. The attract demo replays the boot
   chain. `exit` closes the front end.
 - Checked headlessly with `tools/browser-shot.ts`: title -> menu -> select
   -> level 2 -> pause menu "exit level" -> select, the diorama drawn with
@@ -322,11 +322,74 @@ player, creatures or effects, and gameplay ticks remain disabled.
   cursor, the repeat and the flash's timing under
   `tools/front-validate.ts`.
 
+## Game over and credits (ported 2026-09-12)
+
+`src/front/endings.ts` implements both routines as pure engine ticks.
+Game over uses picture 1 from `levelt1.ngn` and plays track 17 once.
+Its 1200-tick clock accepts a fresh face-button press only below 1140
+and above 23, reducing the clock to 24. Music ending reduces it to 23;
+the final 23 ticks fade to black at speed 12. Muted, unavailable or
+loading browser audio uses the clock instead of ending the screen early.
+Final-life death now resolves the running level as `gameOver`, skips the
+summary, and returns through the boot chain to title. The browser port
+restores five lives and full health for continuing, preserving collected
+progress; it keeps the exhausted-life flag separate so no negative value
+can wrap to 255 in the save's unsigned lives byte.
+
+Credits read the string at `0x4f5f54` from the selected executable, split
+on `~`, into the original 40-row ring. The scroll advances eight units
+per tick, feeds one row every 16 ticks, and places rows eight units apart
+with y wrapping at 320. Text uses the existing 320-wide big-font routine.
+The 600-tick backdrop clock cycles slots 48..57 from `levelt3.ngn`,
+with 25-tick black fades beneath the text. The routine initially requests
+picture 0; the first timed change selects slot 49. A fresh face-button
+press after the initial fade, or reaching the text terminator, starts a
+53-tick exit with fade speed 6. Track 18 loops. A final-level win plays
+the ending movie, records `gameBeaten`, then opens credits and returns
+to the selector. Title and summary tracks also now play once, as decoded.
+
+`tools/endings-probe.ts` verifies input gates, held input, fades, timeout,
+music completion, the full scroll (7606 ticks for this executable), and
+all ten picture assets. Chromium's `tools/game-over-flow-check.js` loses
+all six attempts through the real damage/death path and checks the return
+to title and retained progress. `tools/credits-flow-check.js` runs the
+final-win/ending/credits/selector flow with an isolated host and real local
+art/text; it does not claim a complete final boss playthrough. Credits
+were also visually inspected in Chromium.
+
+## Browser options and load game (2026-09-12)
+
+The list menu now opens `src/front/browser-menu.ts` for both choices.
+These are browser adaptations, not a port of the original sprite layouts.
+Options offers the supported music/SFX sliders (0..10) and active/passive
+camera, previewed immediately. Apply commits the existing save fields;
+Cancel or Escape restores the snapshot. Keyboard input is detached from
+gameplay while the modal owns focus. Native controls use Tab and arrow keys;
+these dialogs do not yet support gamepad navigation.
+
+Load game accepts a local `.sav` or the selected install's `Toy200.sav`.
+It validates the release layout and progress ranges before offering Load,
+shows the level, token count and lives, and leaves progress untouched on
+cancel or a failed read. Selecting a different file invalidates the earlier
+candidate immediately; stale asynchronous reads cannot enable loading it.
+The loaded record is committed to browser storage and its options/resources
+are applied before returning to the menu. No install file is changed.
+`tools/save-import-probe.ts` checks malformed files and round trips;
+`tools/settings-flow-check.js` verifies preview/cancel/apply, invalid input,
+loading, persistence and a clean selector in Chromium.
+
+The original options routine has four rows: controller setup, music volume,
+SFX volume and graphics setup (text at `0x4f5b24`, `0x4f5b3c`, `0x4f5b4c`,
+`0x4f6804`). Its subpage Cancel restores the captured settings, while Jump
+accepts them. The controller/GFX helper routines and the original load-game
+diorama presentation remain to be ported; the browser panels do not emulate
+Windows device or display-mode configuration.
+
 ## What is left
 
-1. **Game over, options, load game, the movie viewer, the credits** —
-   options and load are unread; game over and the credits are small. Load
-   game and the movie viewer run over this same scene with texture sets 3
-   and 2.
+1. **Movie viewer and original options/load presentation** — the browser
+   options/load functions work, but controller remapping, graphics settings,
+   gamepad dialog navigation and original sprite layouts remain. Load game
+   and the movie viewer use diorama texture sets 3 and 2.
 2. **The diorama's ambience** — the per-level sound event, and a check of
    the camera's flight against the real game once the parity harness runs.

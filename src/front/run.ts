@@ -64,6 +64,7 @@ export interface FrontHost {
   resetLives(): void;
   options(): Promise<void>;
   loadGame(): Promise<boolean>;
+  movies(): Promise<void>;
   /** "exit" on the list menu. */
   quit(): void;
   /**
@@ -142,13 +143,13 @@ export class FrontEnd {
           const done = await this.play({ kind: 'menu', state: createListMenu() });
           if (done === 'start') { next = 'select'; continue; }
           if (done === 'exit') return;
-          if (done === 'options' || done === 'load') {
+          if (done === 'options' || done === 'load' || done === 'movies') {
             this.hide();
             if (done === 'options') await this.host.options();
+            else if (done === 'movies') await this.host.movies();
             else if (await this.host.loadGame()) this.inGame = true;
             this.show();
           }
-          // The movie viewer is still unported.
           continue;
         }
         this.inGame = true;

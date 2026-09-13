@@ -1,5 +1,6 @@
 import { CREDIT_SLOTS, CREDIT_TEXT } from './front/endings.ts';
-import { showOptions, showLoadGame, type BrowserOptions } from './front/browser-menu.ts';
+import { showOptions, showLoadGame, showMovieViewer, type BrowserOptions } from './front/browser-menu.ts';
+import { movieChoices } from './front/movies.ts';
 import { createSlimeBoss, slimeBossBar, slimeBlobTarget } from './sim/slime-boss.ts';
 import { GroupType, buildMeshData, parseAll, readHitShapes, type AllFile } from './formats/all.ts';
 import {
@@ -2251,6 +2252,22 @@ async function runFrontEnd(): Promise<void> {
       music.want(track, loop);
     },
     musicEnded: () => music?.ended ?? false,
+    async movies() {
+      if (!progress || !exeBytes) return;
+      input.detach();
+      let selected = 10, message = '';
+      try {
+        for (;;) {
+          music?.start(); music?.want(MUSIC.menu);
+          const choices = movieChoices(exeBytes, progress.p, strings.levelNames, index => movieFile(index) !== null);
+          const index = await showMovieViewer(choices, selected, message);
+          if (index === null) break;
+          selected = index;
+          const result = await playMovie(index);
+          message = result === 'failed' || result === 'missing' ? 'This movie could not be played. Choose another movie.' : '';
+        }
+      } finally { frontKeys.enter = frontKeys.escape = false; input.attach(); }
+    },
     async options() {
       if (!progress) return;
       input.detach();

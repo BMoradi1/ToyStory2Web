@@ -77,6 +77,8 @@ an exported save or the save in the selected install, preview it, and load it
 into the browser. **Options** previews music volume, sound effects volume and
 camera mode; Apply keeps changes and Cancel restores them. These browser
 panels use mouse and keyboard (Tab, arrow keys, Enter and Escape).
+**Movie viewer** replays the trailer and unlocked cutscenes from your install.
+Skipping or finishing a movie returns to the list without changing progress.
 | `s` | report what is actually in the scene |
 | `m` | mute or unmute |
 

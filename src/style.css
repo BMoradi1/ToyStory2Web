@@ -131,3 +131,5 @@ body.front-scene #textures {
 .game-dialog button:disabled { opacity: .45; cursor: default; }
 .game-dialog :focus-visible { outline: 3px solid #ffe35c; outline-offset: 3px; }
 .game-dialog .dialog-help { color: #c4cce0; }
+.movie-list { display: grid; gap: 8px; }
+.movie-list button { margin: 0; text-align: left; }

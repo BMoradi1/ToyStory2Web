@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { movieChoices } from '../src/front/movies.ts';
+import { freshBlock, encodeSaveFile, parseSaveFile } from '../src/formats/save-file.ts';
+const exe = readFileSync(`${process.argv[2] ?? 'Toy Story 2'}/toy2.exe`);
+const p = parseSaveFile(encodeSaveFile('', freshBlock()), 0).progress!;
+assert.deepEqual(movieChoices(exe,p,[],()=>true).map(m=>m.index),[10]);
+p.shown[16]=true;p.shown[12]=true;
+assert.deepEqual(movieChoices(exe,p,[],()=>true).map(m=>m.index),[10,26,22]);
+p.shown.fill(true);p.allTokens=true;p.gameBeaten=true;
+const before=JSON.stringify(p);
+const all=movieChoices(exe,p,[],i=>i!==27);
+assert.equal(all.length,19);
+assert.equal(all.find(m=>m.index===27)?.available,false);
+assert.equal(all.at(-1)?.index,28);
+assert.equal(JSON.stringify(p),before,'browsing cannot unlock movies');
+console.log('Movie viewer: trailer, saved unlocks, Zurg intro order, endings, missing files and immutable progress passed.');

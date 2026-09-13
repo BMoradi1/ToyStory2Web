@@ -314,7 +314,7 @@ player, creatures or effects, and gameplay ticks remain disabled.
   separate, and the runner lays the sprite layer over the viewer's own
   picture (the page's chrome steps aside); the objects are shown, hidden
   and moved by id and the camera placed each tick. Options and load game
-  open browser dialogs; the movie viewer still closes at once. The attract demo replays the boot
+  and movie viewer open browser dialogs. The attract demo replays the boot
   chain. `exit` closes the front end.
 - Checked headlessly with `tools/browser-shot.ts`: title -> menu -> select
   -> level 2 -> pause menu "exit level" -> select, the diorama drawn with
@@ -385,11 +385,33 @@ accepts them. The controller/GFX helper routines and the original load-game
 diorama presentation remain to be ported; the browser panels do not emulate
 Windows device or display-mode configuration.
 
+## Browser movie viewer (2026-09-12)
+
+The movie menu now replays local cutscenes and returns to the same selection.
+`src/front/movies.ts` reads the original order table at `0x4f6e8c`:
+flags 0..11, 16, 12..15, 17, 18, terminated by 255. `FUN_0043a600`
+forces flag zero on for the trailer and filters the remaining entries by
+`shown[flag]`; the wrapper `FUN_00453fa0` plays movie `flag + 10` and
+reopens the list. Thus the level-12 intro precedes its boss movie; the
+secret ending and normal ending use the existing save flags.
+
+The browser dialog follows that ordering and unlock rule, disables entries
+whose files are absent, closes before video playback, restores selection
+when playback ends or is skipped, and resumes menu music. Replays call the
+video player directly, so they never mark new movies shown or alter progress.
+Errors return to the list with a message. Arrow keys/Tab move focus, Enter
+plays and Escape returns. Original sprites, the texture-set-2 diorama and
+gamepad navigation remain presentation work.
+
+`tools/movie-viewer-probe.ts` covers unlocks, order, missing files and
+unchanged progress. `tools/movie-viewer-flow-check.js` exercises the real
+menu, trailer decoding, skip, restored selection and return to the menu.
+
 ## What is left
 
-1. **Movie viewer and original options/load presentation** — the browser
-   options/load functions work, but controller remapping, graphics settings,
-   gamepad dialog navigation and original sprite layouts remain. Load game
+1. **Original options/load/movie presentation** — browser functions work,
+   but controller remapping, graphics settings, gamepad dialog navigation
+   and original sprite layouts remain. Load game
    and the movie viewer use diorama texture sets 3 and 2.
 2. **The diorama's ambience** — the per-level sound event, and a check of
    the camera's flight against the real game once the parity harness runs.

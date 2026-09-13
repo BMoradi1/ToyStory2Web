@@ -870,8 +870,10 @@
            local-save validation/preview/import, all kept in browser storage.
            tools/save-import-probe.ts and tools/settings-flow-check.js pass.
            Original sprite layouts, controller/GFX pages and gamepad dialog
-           navigation remain. Next: movie viewer (diorama texture set 2),
-           then original options/load parity (load uses texture set 3).
+           navigation remain. Browser MOVIE VIEWER now replays unlocked
+           local movies in original order and returns without changing saves.
+           Unlock and Chromium playback/return checks pass. Next: original
+           options/load/movie parity (movies texture set 2; load set 3).
  [was]     Cutscenes: MPEG-1 in the browser (jsmpeg-style decoder or
            WebCodecs), fed from the user's rtlibs files.
  [OPEN]    First-run flow explaining that users supply their own copy.

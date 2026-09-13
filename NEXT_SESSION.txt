@@ -65,7 +65,11 @@
  volume/camera preview with Apply/Cancel; validated local save import with
  preview and persistence. Original controller/GFX pages, sprite layout and
  gamepad navigation remain; these are browser adaptations, not exact ports.
- NEXT implementation item: movie viewer, then original options/load parity.
+ MOVIE VIEWER now works as a browser dialog, with original table order and
+ saved unlocks, local playback, restored selection and unchanged progress.
+ tools/movie-viewer-probe.ts and tools/movie-viewer-flow-check.js cover it.
+ NEXT implementation item: original options/load/movie presentation parity,
+ including gamepad navigation, controller remapping and graphics settings.
  USER PREFERENCE: commit substantial completed changes as milestones. Earlier notes saying the summary or parseDat retile is next are stale.
 ================================================================================
 

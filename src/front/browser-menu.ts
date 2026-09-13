@@ -3,6 +3,7 @@
 import { importProgress, type Progress } from '../loader/save.ts';
 import { LEVEL_SELECT_ORDER, tokenCount } from '../formats/save-file.ts';
 import type { GameDir } from '../loader/gamedir.ts';
+import type { MovieChoice } from './movies.ts';
 
 export interface BrowserOptions { sfx: number; bgm: number; activeCamera: boolean }
 
@@ -19,6 +20,40 @@ function panel(title: string) {
 function button(label: string, action: () => void): HTMLButtonElement {
   const b = document.createElement('button'); b.type = 'button'; b.textContent = label;
   b.onclick = action; return b;
+}
+
+/** Close the native modal before playing so it cannot obscure the video layer. */
+export function showMovieViewer(movies: readonly MovieChoice[], selected = 10, message = ''): Promise<number | null> {
+  const dialog = panel('Movie viewer');
+  const help = document.createElement('p');
+  help.textContent = message || 'Replay unlocked movies. Escape returns to the menu.';
+  help.setAttribute('role', 'status'); dialog.append(help);
+  return new Promise(resolve => {
+    let finished = false;
+    const close = (index: number | null) => {
+      if (finished) return; finished = true;
+      dialog.close(); dialog.remove(); resolve(index);
+    };
+    const list = document.createElement('div'); list.className = 'movie-list';
+    let focus: HTMLButtonElement | undefined;
+    for (const movie of movies) {
+      const b = button(movie.title + (movie.available ? '' : ' (file missing)'), () => close(movie.index));
+      b.dataset.movie = String(movie.index); b.disabled = !movie.available;
+      if (movie.index === selected && movie.available) focus = b;
+      list.append(b);
+    }
+    dialog.append(list, button('Back', () => close(null)));
+    dialog.oncancel = event => { event.preventDefault(); close(null); };
+    dialog.onkeydown = event => {
+      event.stopPropagation();
+      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+      event.preventDefault();
+      const buttons = [...dialog.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
+      const at = buttons.indexOf(document.activeElement as HTMLButtonElement);
+      buttons[(at + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length]?.focus();
+    };
+    dialog.showModal(); focus?.focus();
+  });
 }
 
 /** Changes preview immediately; Cancel restores the snapshot, Apply commits. */

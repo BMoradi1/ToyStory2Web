@@ -206,6 +206,8 @@ export const POWERUP = {
 } as const;
 
 export const ZIPLINE = {
+  /** Feet below the cable while hanging, in game units. */
+  hangOffset: 0x3e00,
   /** Attach when the squared horizontal distance in LEVEL units (game >> 5) is under this. */
   attachDistanceSq: 0x2000,
   /** Speed along the line ramps 1 per tick to this. */

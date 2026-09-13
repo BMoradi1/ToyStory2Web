@@ -295,7 +295,33 @@ The animation override at `0x401605` selects states 14 climbing, 15 holding,
 The existing sphere sweep still handles terrain clearance, so a ceiling can
 stop Buzz slightly before the authored top; jumping away remains available.
 The local probe exercises 104 climbable poles from playable scenes plus a real
-first-level rope's climb and release. Zip-line traversal remains unported.
+first-level rope's climb and release. Zip-line traversal is now ported; see the following section.
+
+### Zip-line controller port — 2026-09-13
+
+`src/sim/zip-lines.ts` reads consecutive endpoint pairs from **path 62**,
+confirmed by the pointer `0x559d68` in `FUN_004359d0`. Grabbing is automatic
+while airborne with coyote time spent, no conflicting special move, and no
+re-grab cooldown. The horizontal bound is the segment's box expanded by 0x800
+game units; squared lateral distance in level units must be below 0x2000.
+The last 200 level units cannot start a new grab. The height window is
+`-0x1000 < cableY + 0x3e00 - playerY < 0x3e00`.
+
+Catching holds horizontal movement until Buzz descends to cableY + 0x3e00.
+Riding pins the origin that far below the cable, advances by 1 level unit per
+tick up to 48, eases yaw toward travel, and selects animation state 17
+(slot 14), as the override at `0x40156e` does. A fresh Jump after ten riding
+ticks, or the endpoint, releases with vy -0x5c0 and a capped horizontal push;
+30 ticks prevent immediate reattachment. Damage, death, ground contact or a
+conflicting move cancels attachment. Player respawn and scene changes reset it.
+
+Browser geometry adaptation: the port projects onto the horizontal segment
+and interpolates along its full 3D length. This replaces the executable's
+axis-dependent integer projection/normalization, so it is not a bit-exact
+arithmetic transcription. It avoids singular division on axis-aligned data and
+keeps the hanging point on the authored cable. Terrain still uses the existing
+sphere sweep. Tests cover all 32 authored lines, early Jump, endpoint release,
+lockout, grounded/distant/damaged rejection and Level 1 collision traversal.
 
 ## Edge climb — ported 2026-09-08
 

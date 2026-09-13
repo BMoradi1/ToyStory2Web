@@ -26,6 +26,7 @@ import {
   MOVE_OVERRIDES, TURN, VERTICAL, type MoveTable,
 } from './player-constants.ts';
 import { cos, idiv, sin, YAW_MASK, yawDelta, yawOf } from './trig.ts';
+import { stepZipLine, type ZipLine } from './zip-lines.ts';
 import { stepPole, type Pole } from './poles.ts';
 import { CLIMB_TICKS, findLedge, type LedgeProbe, type LedgeTarget } from './ledge.ts';
 
@@ -50,6 +51,7 @@ export enum JumpState {
  */
 export interface Ground {
   poles?: readonly Pole[];
+  zipLines?: readonly ZipLine[];
   /** Moving props resolve after acceleration, before the collision sweep. */
   beforeMove?(player: PlayerState, input: PlayerInput): void;
   /** Optional on test worlds; real collision checks reach and body clearance. */
@@ -95,6 +97,13 @@ export const NO_INPUT: PlayerInput = {
 export interface PlayerState {
   /** Path-61 pole index, -1 when detached. */
   pole: number;
+  /** Path-62 line index and phase: 0 detached, 1 catching, 2 riding. */
+  zipLine: number;
+  zipPhase: number;
+  zipDistance: number;
+  zipSpeed: number;
+  zipTicks: number;
+  zipCooldown: number;
   /** Released pole blocked until Buzz leaves its horizontal regrab radius. */
   poleLock: number;
   poleTicks: number;
@@ -206,6 +215,7 @@ export function createPlayer(x = 0, y = 0, z = 0, yaw = 0): PlayerState {
     dying: false,
     animPhase: 0,
     climb: 0,
+    zipLine: -1, zipPhase: 0, zipDistance: 0, zipSpeed: 0, zipTicks: 0, zipCooldown: 0,
     pole: -1, poleLock: -1, poleTicks: 0, poleMotion: 0,
     fallTimer: 0,
     jumpedFromGround: false,
@@ -236,7 +246,7 @@ export function createRuntime(): PlayerRuntime {
 
 /** Is the player in a plain state — no attack, no stun, nothing special? */
 function isPlain(p: PlayerState): boolean {
-  return p.pole < 0 && p.climb === 0 && p.spin === 0 && p.spinCharge === 0 && p.laser === 0 && p.hitStun <= 0 && p.fallTimer >= 0;
+  return p.zipLine < 0 && p.pole < 0 && p.climb === 0 && p.spin === 0 && p.spinCharge === 0 && p.laser === 0 && p.hitStun <= 0 && p.fallTimer >= 0;
 }
 
 /**
@@ -506,11 +516,12 @@ export function stepPlayer(
   p.laserFired = null;
   const previousY = runtime.previousY;
   runtime.previousY = p.y;
-  const poleMoved = stepPole(p, input, prev, ground.poles ?? [], cameraYaw);
-  if (!poleMoved) {
+  const zipMoved = stepZipLine(p, input, prev, ground.zipLines ?? []);
+  const poleMoved = !zipMoved && p.zipLine < 0 && stepPole(p, input, prev, ground.poles ?? [], cameraYaw);
+  if (!zipMoved && !poleMoved) {
     if (p.dying || p.hitStun > 0) p.climb = 0;
     else if (p.climb > 0) p.climb--;
-    else if (p.vy > 0 && !p.onGround && p.coyote === 0 && p.fallTimer !== 0x50
+    else if (p.zipLine < 0 && p.vy > 0 && !p.onGround && p.coyote === 0 && p.fallTimer !== 0x50
         && p.spin === 0 && p.spinCharge === 0 && p.hitStun <= 0
         && p.fallTimer >= 0 && previousY !== null) {
       const edge = ground.ledge?.({ x: p.x, y: p.y, z: p.z, yaw: p.yaw, previousY });
@@ -561,6 +572,7 @@ export function stepPlayer(
     vertical(p, input, table);
     turn(p, table, hasInput);
     accelerate(p, table, hasInput);
+    if (p.zipPhase === 1) p.vx = p.vz = p.forwardSpeed = p.lateralSpeed = 0;
   }
   ground.beforeMove?.(p, input);
 
@@ -643,10 +655,10 @@ export function stepPlayer(
  * the query converts on the way in and the answer on the way out. Both sides
  * already agree that +Y is down, so nothing is flipped here.
  */
-export function groundFromCollision(world: CollisionWorld, poles: readonly Pole[] = []): Ground {
+export function groundFromCollision(world: CollisionWorld, poles: readonly Pole[] = [], zipLines: readonly ZipLine[] = []): Ground {
   const scale = GAME_UNITS_PER_LEVEL_UNIT;
   return {
-    poles,
+    poles, zipLines,
     ledge: probe => findLedge(world, probe),
     move(from, velocity) {
       return sweepSphere(world, from, velocity, COLLISION.radius, {

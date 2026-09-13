@@ -71,6 +71,7 @@ import { effectCardPlacement, type WorldSprite } from './render/world-sprites.ts
 import {
   exeString, HINT_SIGNS, levelNumber, PUSH_BLOCKS, SPAWN_TABLE, TALK_SCRIPTS, tokenSlotsAtStart,
 } from './sim/level-data.ts';
+import { readZipLines, type ZipLine } from './sim/zip-lines.ts';
 import { readPoles, type Pole } from './sim/poles.ts';
 import { createPushBlocks, stepPushBlocks, type PushState } from './sim/push-blocks.ts';
 import {
@@ -285,6 +286,7 @@ async function showLevel(index: number): Promise<void> {
   creatureSim = null;
   pushBlocks = null;
   levelPoles = [];
+  levelZipLines = [];
   tasks = null;
   talk = null;
   creatureArt.clear();
@@ -629,6 +631,7 @@ async function open(dir: GameDir): Promise<void> {
         player.yaw = b.segYaw;
         return { index: which, yaw: b.segYaw, block: { x: b.x, y: b.y, z: b.z }, player: { x: player.x, y: player.y, z: player.z } };
       },
+      get zipLines() { return levelZipLines; },
       get poles() { return levelPoles; },
       goToPole(which = 0) {
         if (!player || !levelPoles[which]) return null;
@@ -923,7 +926,7 @@ async function open(dir: GameDir): Promise<void> {
       revealTokens: revealAllTokens,
       drive(held: Partial<import('./sim/player.ts').PlayerInput>, ticks = 1) {
         if (!player || !playerRuntime || !currentCollisionWorld || !viewer) return null;
-        const ground = groundFromCollision(currentCollisionWorld, levelPoles);
+        const ground = groundFromCollision(currentCollisionWorld, levelPoles, levelZipLines);
         const full = {
           moveX: 0, moveY: 0, jump: false, spin: false, fire: false,
           cameraLeft: false, cameraRight: false, ...held,
@@ -1221,6 +1224,7 @@ async function spawnPlayer(): Promise<void> {
   // The crates Buzz shoves. Their rails are paths in the scene and their
   // collision is a numbered dynamic group in the terrain file.
   const S = GAME_UNITS_PER_LEVEL_UNIT;
+  levelZipLines = readZipLines(currentLevel!.level.paths.find(p => p.id === 62)?.points ?? []);
   levelPoles = readPoles(currentLevel!.level.paths.find(p => p.id === 61)?.points ?? []);
   const table = PUSH_BLOCKS[level];
   pushBlocks = table
@@ -2428,6 +2432,7 @@ async function loadDioramaScene(): Promise<{ paths: DatLevel['paths']; placedOf:
   laserBeams.length = 0;
   pushBlocks = null;
   levelPoles = [];
+  levelZipLines = [];
   tasks = null;
   talk = null;
   talkSlot = -1;
@@ -2648,6 +2653,7 @@ let talk: TalkState | null = null;
 /** The level's push blocks, once the player has spawned. */
 let pushBlocks: PushState | null = null;
 let levelPoles: Pole[] = [];
+let levelZipLines: ZipLine[] = [];
 /** Which token tasks are done, and the talkers' timers. */
 let tasks: TaskState | null = null;
 /** The slot the talk box will reveal when it closes, or -1. */
@@ -2731,7 +2737,7 @@ function tickPushBlocks(held: PlayerInput): void {
   if (!player) return;
   if (pushBlocks && currentCollisionWorld) {
     const busy = player.spin !== 0 || player.laser !== 0 || player.hitStun > 0
-      || player.jumpState !== 0 || player.pole >= 0 || player.climb > 0 || player.dying || !!talk;
+      || player.jumpState !== 0 || player.pole >= 0 || player.zipLine >= 0 || player.climb > 0 || player.dying || !!talk;
     const push = stepPushBlocks(pushBlocks, {
       x: player.x, y: player.y, z: player.z, yaw: player.yaw,
       onGround: player.onGround, busy, contacts: player.contacts,
@@ -2868,7 +2874,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     return;
   }
 
-  const playerGround = groundFromCollision(currentCollisionWorld, levelPoles);
+  const playerGround = groundFromCollision(currentCollisionWorld, levelPoles, levelZipLines);
   playerGround.beforeMove = () => tickPushBlocks(held);
   stepPlayer(player, held, playerRuntime, playerGround, cameraYaw);
 

@@ -10,6 +10,8 @@
    [DONE] Pushable artwork, collision and Buzz move together; resting contact
           and collision units fixed. Detailed coverage in docs/LEVELS.md.
    [DONE] Earlier NPC movement/animation throughout the outer wake range.
+   [DONE] Zip lines: path 62, airborne catch, ride, hanging animation,
+          Jump/end release and regrab cooldown; 32 authored lines tested.
    Menu controller/GFX parity and load/save timing remain queued, followed
    by the remaining boss ports. This priority change does not discard them.
 
@@ -488,7 +490,7 @@
                 a third of Buzz vanishes (284 triangles posed vs 417).
                 Working now: idle, walk/run, jump, fall, land, double jump,
                 spin, hard fall. The remaining 20 states belong to moves
-                that do not exist yet (zip lines, grapple, cutscenes)
+                that do not exist yet (grapple, cutscenes)
                 and are in the table but never selected.
                 Fixed 2026-09-08: laser/spin overrides now preserve the
                 base animation layer and its independent frame cursor.

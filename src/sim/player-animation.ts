@@ -14,7 +14,7 @@
  *
  * Scope: the states below are the locomotion set, which is what the controller
  * can currently reach. The table has 28 entries and the rest belong to moves
- * that are not implemented yet (poles, zip lines, the grapple, cutscenes), so
+ * that are not implemented yet (the grapple, cutscenes), so
  * they are listed but never selected. Nothing here is guessed: an unmapped
  * state stays unmapped.
  */
@@ -167,6 +167,7 @@ export function selectState(p: PlayerState, hasInput: boolean): number {
   if (p.dying) return AnimState.Dying;
   if (p.hitStun > HIT_ANIMATION_ABOVE) return AnimState.Hit;
   if (p.climb > 0) return AnimState.Climb;
+  if (p.zipPhase === 2) return 17;
   if (p.pole >= 0) return p.poleMotion === 2 ? 14 : p.poleMotion === 4 ? 16 : 15;
   // The charged spin IS a state, and a different one once he is dizzy. The
   // plain spin is not; it is the slot override at the bottom of stepAnimation.

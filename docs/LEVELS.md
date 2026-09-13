@@ -473,7 +473,7 @@ stores their pointers at `DAT_00559c70[tag]` like any other path and
   regardless).
 - **59** is read by `FUN_004038e0`, the laser-targeting view (`DAT_0050a13c`
   states 3..5, `GENBEEP2` on entry) — not decoded.
-- **60** is triples of points, used by the zip-line routine.
+- **60** is triples of points; its traversal role remains unconfirmed.
 - **61 — poles/ropes**, confirmed against `0x414600` and `0x4354e0` on
   2026-09-13. Endpoint pairs run bottom to top. Sentinel nodes with
   `|x| == |y| == |z|` set the following pairs' type to `|x| / 50` and are
@@ -481,7 +481,12 @@ stores their pointers at `DAT_00559c70[tag]` like any other path and
   type 2 slides under gravity, type 3 cannot be grabbed. `src/sim/poles.ts`
   now reads these lists. Level-script changes to pole endpoints remain
   unported; level 1's init has one such adjustment.
-- **62** and **63** are read by level inits.
+- **62 — zip lines**, confirmed at `0x4359d0` (pointer `0x559d68`).
+  Consecutive pairs define start/end and travel direction. The loader at
+  `0x4146d6` scales every coordinate by 32. `src/sim/zip-lines.ts` reads them;
+  all 32 pairs across playable scenes pass traversal probes. The earlier
+  attribution of zip lines to path 60 was wrong.
+- **63** is read by level inits.
 
 ## Creatures
 

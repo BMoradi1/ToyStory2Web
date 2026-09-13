@@ -78,7 +78,13 @@
  intentionally per user feedback. Dialogue/contact bounds stay separate.
  Probes: tools/poles-probe.ts, tools/push-blocks-probe.ts, and
  tools/gameplay-interactions-check.js. Remaining pole endpoint script
- adjustments and zip lines are documented in docs/PLAYER.md / LEVELS.md.
+ adjustments are documented in docs/PLAYER.md / LEVELS.md.
+ ZIP LINES now implemented (2026-09-13): path 62 endpoint pairs, airborne
+ catch, acceleration along the cable, hanging animation, Jump/end release
+ and regrab cooldown. All 32 authored lines pass tools/zip-lines-probe.ts;
+ tools/zip-line-flow-check.js checks the real browser ride and animation.
+ Path 60's earlier zip-line attribution was incorrect. The geometric
+ projection adaptation is explicit in docs/PLAYER.md.
  MENU QUEUE PRESERVED: complete controller/GFX parity and load/save transition timing;
  unported lens flare/texture animation/gamma need renderer support first.
  See docs/FRONTEND.md and tools/retail-menu-probe.ts for exact coverage.

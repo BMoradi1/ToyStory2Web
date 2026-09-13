@@ -233,6 +233,13 @@ For each of the 64 entities with `type > 0`:
   6 and anything with health 0xca is always awake. The focus `DAT_0052adc0`
   is the player position, smoothed toward it by `DAT_0050a140 / 64` a tick.
 
+**Browser behavior change, 2026-09-13:** at the user's request, movement and
+animation now update throughout the first-pass outer wake radius. The tighter
+400-step second-pass distance rejection described below is intentionally omitted;
+missing models are still rejected. This avoids visible frozen NPCs until Buzz
+gets close. Contact, chase-box and dialogue checks retain their own bounds.
+It updates more creatures per tick, while retaining a bounded outer range.
+
 The awake ones form the **near list** `DAT_0052f1d0` (up to 64). A second
 pass drops any without flag 0x001 whose distance is beyond
 `(hitRadius >> 3) + 400` (same 256-unit scale), or with flag 0x2000; the

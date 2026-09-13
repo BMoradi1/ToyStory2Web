@@ -210,7 +210,10 @@ export function stepPushBlocks(
   // --- pick one up, or drop the one held.
   if (!holdingDirection || player.busy || !player.onGround) {
     state.held = 0;
-  } else if (state.held === 0) {
+  } else if (state.held !== 0 && (Math.abs(yawDelta(state.pushYaw, player.yaw)) > PUSH.facing
+      || !player.contacts.some(c => c.group === state.blocks.find(b => b.index + 1 === state.held)?.group && Math.abs(c.normal.y) < 0.5))) {
+    state.held = 0;
+  } else if (state.held === 0 && state.freeze <= 0) {
     for (const b of state.blocks) {
       if (b.fallSpeed !== 0 || b.tipPoint < 0 || b.group < 0) continue;
       // Leaning on its side: a contact with this group whose face is upright.
@@ -274,7 +277,7 @@ export function stepPushBlocks(
 
   // --- the held block.
   if (state.held !== 0) {
-    const b = state.blocks[state.held - 1];
+    const b = state.blocks.find(b => b.index + 1 === state.held);
     if (!b || b.fallSpeed !== 0 || b.tipPoint < 0) { state.held = 0; return result; }
     const before = { x: b.x, z: b.z };
     const forward = Math.abs(yawDelta(state.pushYaw, b.segYaw)) < PUSH.alignment;

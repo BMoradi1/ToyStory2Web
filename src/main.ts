@@ -71,6 +71,7 @@ import { effectCardPlacement, type WorldSprite } from './render/world-sprites.ts
 import {
   exeString, HINT_SIGNS, levelNumber, PUSH_BLOCKS, SPAWN_TABLE, TALK_SCRIPTS, tokenSlotsAtStart,
 } from './sim/level-data.ts';
+import { readPoles, type Pole } from './sim/poles.ts';
 import { createPushBlocks, stepPushBlocks, type PushState } from './sim/push-blocks.ts';
 import {
   BoxPhase, TALK_SCRIPT, buildDialogueScript, startTalk, stepTalk, talkVisibleRows,
@@ -283,6 +284,7 @@ async function showLevel(index: number): Promise<void> {
   currentCollisionWorld = null;
   creatureSim = null;
   pushBlocks = null;
+  levelPoles = [];
   tasks = null;
   talk = null;
   creatureArt.clear();
@@ -350,10 +352,12 @@ async function showLevel(index: number): Promise<void> {
       // A pickup is one of the level's own objects, so it is drawn by the
       // level mesh. Keeping each in a draw group of its own is what lets a
       // collected one, or a token whose task is not done, be taken away.
-      const geometry = buildLevelGeometry(parsed, {
-        zones,
-        separate: pickupObjects(parsed, levelNumber(level.id) ?? 0),
-      });
+      const separate = pickupObjects(parsed, levelNumber(level.id) ?? 0);
+      for (const block of PUSH_BLOCKS[levelNumber(level.id) ?? 0] ?? []) {
+        const index = parsed.objectIds[block.sceneObject];
+        if (index !== undefined && index >= 0) separate.add(index);
+      }
+      const geometry = buildLevelGeometry(parsed, { zones, separate });
 
       setStatus(`${level.id}: uploading ${geometry.triangleCount} triangles\u2026`);
       await yieldToBrowser();
@@ -625,12 +629,24 @@ async function open(dir: GameDir): Promise<void> {
         player.yaw = b.segYaw;
         return { index: which, yaw: b.segYaw, block: { x: b.x, y: b.y, z: b.z }, player: { x: player.x, y: player.y, z: player.z } };
       },
+      get poles() { return levelPoles; },
+      goToPole(which = 0) {
+        if (!player || !levelPoles[which]) return null;
+        const pole = levelPoles[which]!;
+        player.x = pole.x + 3000; player.z = pole.z;
+        player.y = (pole.bottom + pole.top + 0x3600) / 2;
+        player.vx = player.vy = player.vz = 0;
+        player.onGround = false; player.pole = player.poleLock = -1;
+        player.fallTimer = player.climb = player.hitStun = 0;
+        resetZones(zones);
+        return { ...pole };
+      },
       get pushBlocks() {
         if (!pushBlocks) return null;
         return {
           held: pushBlocks.held,
           blocks: pushBlocks.blocks.map((b) => ({
-            index: b.index, seg: b.seg, run: b.run, segLen: b.segLen, tipPoint: b.tipPoint,
+            index: b.index, object: currentLevel?.level.objectIds[b.sceneObject] ?? -1, seg: b.seg, run: b.run, segLen: b.segLen, tipPoint: b.tipPoint,
             fall: b.fallSpeed, x: b.x, y: b.y, z: b.z, group: b.group,
           })),
         };
@@ -907,7 +923,7 @@ async function open(dir: GameDir): Promise<void> {
       revealTokens: revealAllTokens,
       drive(held: Partial<import('./sim/player.ts').PlayerInput>, ticks = 1) {
         if (!player || !playerRuntime || !currentCollisionWorld || !viewer) return null;
-        const ground = groundFromCollision(currentCollisionWorld);
+        const ground = groundFromCollision(currentCollisionWorld, levelPoles);
         const full = {
           moveX: 0, moveY: 0, jump: false, spin: false, fire: false,
           cameraLeft: false, cameraRight: false, ...held,
@@ -1205,6 +1221,7 @@ async function spawnPlayer(): Promise<void> {
   // The crates Buzz shoves. Their rails are paths in the scene and their
   // collision is a numbered dynamic group in the terrain file.
   const S = GAME_UNITS_PER_LEVEL_UNIT;
+  levelPoles = readPoles(currentLevel!.level.paths.find(p => p.id === 61)?.points ?? []);
   const table = PUSH_BLOCKS[level];
   pushBlocks = table
     ? createPushBlocks(
@@ -2023,38 +2040,21 @@ function talkDraw(): TalkDraw | null {
   };
 }
 
-/**
- * Show the push blocks. The size comes from the block's own collision group,
- * so the stand-in box is at least the shape of the crate it replaces.
- */
+/** Move the actual scene artwork by the same displacement as its collision. */
 function drawPushBlocks(): void {
-  if (!viewer) return;
-  if (!pushBlocks || !currentCollisionWorld) { viewer.setPushBlocks([]); return; }
-  const world = currentCollisionWorld;
-  const S = GAME_UNITS_PER_LEVEL_UNIT;
-  viewer.setPushBlocks(pushBlocks.blocks.map((b) => {
-    let sx = 1, sy = 1, sz = 1;
-    const group = world.groups[b.group];
-    if (group) {
-      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
-      for (const index of group.polys) {
-        for (const v of world.polys[index]!.vertices) {
-          minX = Math.min(minX, v.x); maxX = Math.max(maxX, v.x);
-          minY = Math.min(minY, v.y); maxY = Math.max(maxY, v.y);
-          minZ = Math.min(minZ, v.z); maxZ = Math.max(maxZ, v.z);
-        }
-      }
-      if (Number.isFinite(minX)) {
-        sx = Math.max(0.05, (maxX - minX) / WORLD_SCALE);
-        sy = Math.max(0.05, (maxY - minY) / WORLD_SCALE);
-        sz = Math.max(0.05, (maxZ - minZ) / WORLD_SCALE);
-      }
-    }
-    return {
-      x: b.x * GAME_TO_RENDER, y: -b.y * GAME_TO_RENDER - sy / 2, z: -b.z * GAME_TO_RENDER,
-      sx, sy, sz,
-    };
-  }));
+  if (!viewer || !pushBlocks || !currentLevel) return;
+  const transforms = new Map<number, ObjectTransform>();
+  for (const b of pushBlocks.blocks) {
+    const index = currentLevel.level.objectIds[b.sceneObject];
+    const object = index === undefined ? undefined : currentLevel.level.objects[index];
+    const start = b.path[0];
+    if (!object || index === undefined || !start) continue;
+    transforms.set(index, {
+      angles: [object.rotation.x, object.rotation.y, object.rotation.z],
+      offset: [(b.x - start.x) * GAME_TO_RENDER, -(b.y - start.y) * GAME_TO_RENDER, -(b.z - start.z) * GAME_TO_RENDER],
+    });
+  }
+  viewer.setObjectTransforms(transforms);
 }
 
 /** As `creatureColour`, but a creature the sim is actually updating shows brighter. */
@@ -2427,6 +2427,7 @@ async function loadDioramaScene(): Promise<{ paths: DatLevel['paths']; placedOf:
   effects = null;
   laserBeams.length = 0;
   pushBlocks = null;
+  levelPoles = [];
   tasks = null;
   talk = null;
   talkSlot = -1;
@@ -2646,6 +2647,7 @@ let music: MusicPlayer | null = null;
 let talk: TalkState | null = null;
 /** The level's push blocks, once the player has spawned. */
 let pushBlocks: PushState | null = null;
+let levelPoles: Pole[] = [];
 /** Which token tasks are done, and the talkers' timers. */
 let tasks: TaskState | null = null;
 /** The slot the talk box will reveal when it closes, or -1. */
@@ -2721,6 +2723,32 @@ function setPlaying(on: boolean): void {
     // Nothing drives the HUD outside play, so take it off the screen.
     hudPainter?.clear();
     viewer.setWorldCards([], []);
+  }
+}
+
+/** Resolve prop movement before Buzz is swept against the moved collision. */
+function tickPushBlocks(held: PlayerInput): void {
+  if (!player) return;
+  if (pushBlocks && currentCollisionWorld) {
+    const busy = player.spin !== 0 || player.laser !== 0 || player.hitStun > 0
+      || player.jumpState !== 0 || player.pole >= 0 || player.climb > 0 || player.dying || !!talk;
+    const push = stepPushBlocks(pushBlocks, {
+      x: player.x, y: player.y, z: player.z, yaw: player.yaw,
+      onGround: player.onGround, busy, contacts: player.contacts,
+    }, Math.hypot(held.moveX, held.moveY) > 0);
+    for (const move of push.moved) {
+      const block = pushBlocks.blocks.find(b => b.index === move.index);
+      if (block && block.group >= 0) {
+        const S = GAME_UNITS_PER_LEVEL_UNIT;
+        moveCollisionGroup(currentCollisionWorld, block.group, move.dx / S, move.dy / S, move.dz / S);
+      }
+    }
+    if (push.playerVelocity) {
+      player.vx = push.playerVelocity.x;
+      player.vz = push.playerVelocity.z;
+    }
+    for (const effect of pushBlocks.sounds) sound?.play(effect);
+    if (push.moved.length > 0) drawPushBlocks();
   }
 }
 
@@ -2840,7 +2868,9 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     return;
   }
 
-  stepPlayer(player, held, playerRuntime, groundFromCollision(currentCollisionWorld), cameraYaw);
+  const playerGround = groundFromCollision(currentCollisionWorld, levelPoles);
+  playerGround.beforeMove = () => tickPushBlocks(held);
+  stepPlayer(player, held, playerRuntime, playerGround, cameraYaw);
 
   // Game space to renderer space. A game facing of (sin yaw, cos yaw) becomes
   // (sin yaw, -cos yaw) once Z is negated. Characters are authored facing +Z
@@ -2904,27 +2934,6 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   // table, which is what lets the spin's whine and whirl hold rather than
   // restart every tick.
   for (const event of player.events) playEvent(event, player);
-
-  if (pushBlocks && currentCollisionWorld) {
-    const busy = player.spin !== 0 || player.laser !== 0 || player.hitStun > 0
-      || player.jumpState !== 0 || !!talk;
-    const push = stepPushBlocks(pushBlocks, {
-      x: player.x, y: player.y, z: player.z, yaw: player.yaw,
-      onGround: player.onGround, busy, contacts: player.contacts,
-    }, Math.hypot(held.moveX, held.moveY) > 0);
-    for (const move of push.moved) {
-      const block = pushBlocks.blocks[move.index];
-      if (block && block.group >= 0) {
-        moveCollisionGroup(currentCollisionWorld, block.group, move.dx, move.dy, move.dz);
-      }
-    }
-    if (push.playerVelocity) {
-      player.vx = push.playerVelocity.x;
-      player.vz = push.playerVelocity.z;
-    }
-    for (const effect of pushBlocks.sounds) sound?.play(effect);
-    if (push.moved.length > 0) drawPushBlocks();
-  }
 
   // The level's talkers. Only while nothing else is being said.
   if (creatureSim && tasks && !talk && exeBytes) {

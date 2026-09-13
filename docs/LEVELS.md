@@ -440,6 +440,18 @@ likewise, so the block moves in 32-unit steps; y is the segment's start
 node while pushing. Both the scene object and the collision object are
 moved every tick the block moves.
 
+### Browser push integration fixed 2026-09-13
+
+The controller now resolves pushing after acceleration and before its sweep.
+Collision deltas are converted from game to level units; split quad triangles
+own their vertices so shared corners cannot move twice. Resting side contacts
+are reported alongside floor contacts, and a lost contact releases the crate.
+The actual object indexed by `sceneObject` is kept separate in the level mesh
+and translated by the path displacement, replacing the translucent stand-in.
+Pending vertex uploads survive subsequent unchanged pickup updates.
+`tools/push-blocks-probe.ts` checks Buzz's offset, every moved collision vertex,
+release and an edge drop against the local first-level data.
+
 ## Reserved path tags
 
 Paths in `level.dat` with tags 58..63 are lists, not rails; the loader
@@ -461,11 +473,15 @@ stores their pointers at `DAT_00559c70[tag]` like any other path and
   regardless).
 - **59** is read by `FUN_004038e0`, the laser-targeting view (`DAT_0050a13c`
   states 3..5, `GENBEEP2` on entry) — not decoded.
-- **60** is triples of points; **61** pairs of vertically aligned points
-  with sentinel nodes like `(50, -50, -50)` that set a group value
-  (`|x| == |y| == |z|`, value `|x| / 50`); level scripts move nodes of 61
-  (level 1 init reads and writes one). Poles and zip lines are the obvious
-  candidates, by shape only. **62** and **63** are read by level inits.
+- **60** is triples of points, used by the zip-line routine.
+- **61 — poles/ropes**, confirmed against `0x414600` and `0x4354e0` on
+  2026-09-13. Endpoint pairs run bottom to top. Sentinel nodes with
+  `|x| == |y| == |z|` set the following pairs' type to `|x| / 50` and are
+  removed before scaling coordinates by 32. Type 1 auto-jumps from the top,
+  type 2 slides under gravity, type 3 cannot be grabbed. `src/sim/poles.ts`
+  now reads these lists. Level-script changes to pole endpoints remain
+  unported; level 1's init has one such adjustment.
+- **62** and **63** are read by level inits.
 
 ## Creatures
 

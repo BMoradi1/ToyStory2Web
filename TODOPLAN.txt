@@ -5,6 +5,14 @@
  fixed; post-level summary implemented and verified in Chromium).
 ================================================================================
 
+ CURRENT PRIORITY — user-reported gameplay, 2026-09-13
+   [DONE] Rope/pole climbing, sliding, rotation and jump-off via path 61.
+   [DONE] Pushable artwork, collision and Buzz move together; resting contact
+          and collision units fixed. Detailed coverage in docs/LEVELS.md.
+   [DONE] Earlier NPC movement/animation throughout the outer wake range.
+   Menu controller/GFX parity and load/save timing remain queued, followed
+   by the remaining boss ports. This priority change does not discard them.
+
  HOW TO USE THIS FILE
    Work top to bottom. Phases are ordered by dependency, not by appeal.
    Anything marked [BLOCKED] names what it waits on. Update status markers as
@@ -480,7 +488,7 @@
                 a third of Buzz vanishes (284 triangles posed vs 417).
                 Working now: idle, walk/run, jump, fall, land, double jump,
                 spin, hard fall. The remaining 20 states belong to moves
-                that do not exist yet (poles, zip lines, grapple, cutscenes)
+                that do not exist yet (zip lines, grapple, cutscenes)
                 and are in the table but never selected.
                 Fixed 2026-09-08: laser/spin overrides now preserve the
                 base animation layer and its independent frame cursor.
@@ -782,26 +790,12 @@
                 every table id is a sign on all seven levels. Port: the
                 script tick and camera flight, then the box (word wrap,
                 reveal, paging, two coordinate spaces).
- P3.9 [PART]    Push blocks: PORTED 2026-09-05 (src/sim/push-blocks.ts).
-                Buzz shoves a crate along its rail, it tips over a ledge,
-                falls and lands on the segment below, and can be pushed on
-                from there. The collision moves with it: the sphere sweep
-                now reports which collision GROUP it touched and with what
-                normal (needed for the "am I leaning on this" test), and
-                moveCollisionGroup shifts a group's polygons and re-files
-                them in the lookup grid.
-                LEFT: the crate the game DRAWS is part of the baked level
-                geometry and does not move, so a translucent stand-in box
-                is drawn at the block's position instead. Moving the real
-                object needs the .ngn instance to be drawable on its own.
-                Original note: DECODED 2026-09-05 (docs/LEVELS.md "Push
-                blocks"). Crates shoved along level.dat paths with edge
-                drops; the collision group is named by a number in the
-                TERRAIN.ALL group entry (+0x1a), new in the .all parser.
-                PUSH_BLOCKS in src/sim/level-data.ts, validated on all 24
-                blocks. Needs the controller's contact normal per collision
-                group (FUN_00488580/FUN_004885a0) which the port does not
-                keep yet.
+ P3.9 [DONE]    Push blocks: controller timing, collision units and real artwork
+                fixed 2026-09-13. Resting side contacts persist; lost contact
+                releases the prop. Split triangle vertices move once each.
+                tools/push-blocks-probe.ts validates real Level 1 movement,
+                Buzz's offset, collision shape, release and an edge drop.
+                Retail dust/sparkle/sustained-sound polish remains separate.
 
 ================================================================================
  PHASE 4 - SCALE TO 15 LEVELS

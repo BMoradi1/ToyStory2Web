@@ -433,7 +433,9 @@ export class Viewer {
       }
     }
     if (touched) position.needsUpdate = true;
-    else position.clearUpdateRanges();
+    // Three.js clears uploaded ranges after rendering. Another caller may have
+    // queued prop movement earlier this tick, so an unchanged pickup pass must
+    // not discard those pending ranges.
   }
 
   /** A group is drawn when its zone is showing and its object is not hidden. */

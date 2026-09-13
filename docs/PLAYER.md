@@ -280,6 +280,23 @@ per tick. Jump lets go with `vy = -0x400` and a run-clamped push along yaw,
 or -0x600 straight up from the very top. Type-2 poles are slides: gravity 16
 per tick to a cap of 0x800.
 
+### Pole/rope controller port — 2026-09-13
+
+`src/sim/poles.ts` now connects path 61 to `stepPlayer`. Grab distance is
+`((dx >> 8)^2 + (dz >> 8)^2) < 0x200`, with feet between bottom + 0x1e00
+and top + 0x3600. Position eases toward the rope by one quarter per tick;
+normal walking, gravity, laser and ledge acquisition yield to the pole move.
+Up/down climb/slide, left/right rotate, and a fresh Jump after ten attached
+ticks releases. Released poles stay locked until horizontal separation in
+level units exceeds squared distance 0x8400. Damage/death interrupts attachment.
+The animation override at `0x401605` selects states 14 climbing, 15 holding,
+16 sliding (the earlier state-name notes were inaccurate).
+
+The existing sphere sweep still handles terrain clearance, so a ceiling can
+stop Buzz slightly before the authored top; jumping away remains available.
+The local probe exercises 104 climbable poles from playable scenes plus a real
+first-level rope's climb and release. Zip-line traversal remains unported.
+
 ## Edge climb — ported 2026-09-08
 
 `FUN_00435f30` automatically grabs while descending, with coyote time spent,

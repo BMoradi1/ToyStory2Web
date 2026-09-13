@@ -26,6 +26,7 @@ import {
   MOVE_OVERRIDES, TURN, VERTICAL, type MoveTable,
 } from './player-constants.ts';
 import { cos, idiv, sin, YAW_MASK, yawDelta, yawOf } from './trig.ts';
+import { stepPole, type Pole } from './poles.ts';
 import { CLIMB_TICKS, findLedge, type LedgeProbe, type LedgeTarget } from './ledge.ts';
 
 /** Jump state, the original's field at `+0x8c`. */
@@ -48,6 +49,9 @@ export enum JumpState {
  * degrees this tick", which is what makes ledges, steps and slopes behave.
  */
 export interface Ground {
+  poles?: readonly Pole[];
+  /** Moving props resolve after acceleration, before the collision sweep. */
+  beforeMove?(player: PlayerState, input: PlayerInput): void;
   /** Optional on test worlds; real collision checks reach and body clearance. */
   ledge?(probe: LedgeProbe): LedgeTarget | null;
   move(
@@ -89,6 +93,13 @@ export const NO_INPUT: PlayerInput = {
  * player block at 0x52f300, so a value can be checked against a debugger.
  */
 export interface PlayerState {
+  /** Path-61 pole index, -1 when detached. */
+  pole: number;
+  /** Released pole blocked until Buzz leaves its horizontal regrab radius. */
+  poleLock: number;
+  poleTicks: number;
+  /** Retail animation flags: 2 climbing, 4 sliding, 0 holding. */
+  poleMotion: number;
   /** +0x00, +0x04, +0x08. Game units, +Y down. */
   x: number; y: number; z: number;
   /** +0x68, +0x6c, +0x70. Game units per tick. */
@@ -195,6 +206,7 @@ export function createPlayer(x = 0, y = 0, z = 0, yaw = 0): PlayerState {
     dying: false,
     animPhase: 0,
     climb: 0,
+    pole: -1, poleLock: -1, poleTicks: 0, poleMotion: 0,
     fallTimer: 0,
     jumpedFromGround: false,
     takeoffY: y,
@@ -224,7 +236,7 @@ export function createRuntime(): PlayerRuntime {
 
 /** Is the player in a plain state — no attack, no stun, nothing special? */
 function isPlain(p: PlayerState): boolean {
-  return p.climb === 0 && p.spin === 0 && p.spinCharge === 0 && p.laser === 0 && p.hitStun <= 0 && p.fallTimer >= 0;
+  return p.pole < 0 && p.climb === 0 && p.spin === 0 && p.spinCharge === 0 && p.laser === 0 && p.hitStun <= 0 && p.fallTimer >= 0;
 }
 
 /**
@@ -494,59 +506,63 @@ export function stepPlayer(
   p.laserFired = null;
   const previousY = runtime.previousY;
   runtime.previousY = p.y;
-  if (p.dying || p.hitStun > 0) p.climb = 0;
-  else if (p.climb > 0) p.climb--;
-  else if (p.vy > 0 && !p.onGround && p.coyote === 0 && p.fallTimer !== 0x50
-      && p.spin === 0 && p.spinCharge === 0 && p.hitStun <= 0
-      && p.fallTimer >= 0 && previousY !== null) {
-    const edge = ground.ledge?.({ x: p.x, y: p.y, z: p.z, yaw: p.yaw, previousY });
-    if (edge) {
-      p.x = edge.x; p.y = edge.y; p.z = edge.z; p.targetYaw = edge.yaw;
-      p.climb = CLIMB_TICKS;
-      p.laser = 0; p.laserCharge = 0;
-      p.fallTimer = 0;
-      p.events.push(0x17);
+  const poleMoved = stepPole(p, input, prev, ground.poles ?? [], cameraYaw);
+  if (!poleMoved) {
+    if (p.dying || p.hitStun > 0) p.climb = 0;
+    else if (p.climb > 0) p.climb--;
+    else if (p.vy > 0 && !p.onGround && p.coyote === 0 && p.fallTimer !== 0x50
+        && p.spin === 0 && p.spinCharge === 0 && p.hitStun <= 0
+        && p.fallTimer >= 0 && previousY !== null) {
+      const edge = ground.ledge?.({ x: p.x, y: p.y, z: p.z, yaw: p.yaw, previousY });
+      if (edge) {
+        p.x = edge.x; p.y = edge.y; p.z = edge.z; p.targetYaw = edge.yaw;
+        p.climb = CLIMB_TICKS;
+        p.laser = 0; p.laserCharge = 0;
+        p.fallTimer = 0;
+        p.events.push(0x17);
+      }
     }
+    if (p.climb > 0) {
+      // The animation contains the pull-up displacement relative to the new
+      // ledge anchor. Moving the controller as well would apply it twice.
+      p.yaw = (p.yaw + idiv(yawDelta(p.targetYaw, p.yaw), 16)) & YAW_MASK;
+      p.vx = p.vy = p.vz = p.forwardSpeed = p.lateralSpeed = 0;
+      p.onGround = false; p.coyote = 0; p.groundNormal = null; p.contacts = [];
+      p.animPhase = 9;
+      runtime.previousY = p.y;
+      runtime.previous = { ...input };
+      return;
+    }
+
+    // --- stick to target yaw and magnitude -----------------------------------
+    // The engine's dead zone is per axis on the raw pad value, and its magnitude
+    // is clamped to full scale. Its 8-sector angle remap table turned out to be
+    // the identity, so the angle is a plain atan2 plus the camera bearing.
+    const raw = TURN.stickFullScale;
+    let sx = Math.round(input.moveX * raw);
+    let sy = Math.round(input.moveY * raw);
+    if (Math.abs(sx) < TURN.stickDeadZone) sx = 0;
+    if (Math.abs(sy) < TURN.stickDeadZone) sy = 0;
+    const analog = Math.min(raw, Math.round(Math.hypot(sx, sy)));
+    const hasInput = analog > 0;
+    if (hasInput) p.targetYaw = (yawOf(sx, sy) + cameraYaw) & YAW_MASK;
+
+    const table = moveTableFor(p, hasInput ? analog : raw);
+
+    // --- attacks -------------------------------------------------------------
+    laser(p, input, prev);
+    spinAttack(p, input, prev);
+    if (p.skid > 0) p.skid -= 1;
+    if (p.hitStun > 0) p.hitStun -= 1;
+
+    // --- vertical, then turn, then horizontal --------------------------------
+    // The order matters: the original turns after resolving the jump, so a jump
+    // and a hard turn on the same tick both take effect this tick.
+    vertical(p, input, table);
+    turn(p, table, hasInput);
+    accelerate(p, table, hasInput);
   }
-  if (p.climb > 0) {
-    // The animation contains the pull-up displacement relative to the new
-    // ledge anchor. Moving the controller as well would apply it twice.
-    p.yaw = (p.yaw + idiv(yawDelta(p.targetYaw, p.yaw), 16)) & YAW_MASK;
-    p.vx = p.vy = p.vz = p.forwardSpeed = p.lateralSpeed = 0;
-    p.onGround = false; p.coyote = 0; p.groundNormal = null; p.contacts = [];
-    p.animPhase = 9;
-    runtime.previousY = p.y;
-    runtime.previous = { ...input };
-    return;
-  }
-
-  // --- stick to target yaw and magnitude -----------------------------------
-  // The engine's dead zone is per axis on the raw pad value, and its magnitude
-  // is clamped to full scale. Its 8-sector angle remap table turned out to be
-  // the identity, so the angle is a plain atan2 plus the camera bearing.
-  const raw = TURN.stickFullScale;
-  let sx = Math.round(input.moveX * raw);
-  let sy = Math.round(input.moveY * raw);
-  if (Math.abs(sx) < TURN.stickDeadZone) sx = 0;
-  if (Math.abs(sy) < TURN.stickDeadZone) sy = 0;
-  const analog = Math.min(raw, Math.round(Math.hypot(sx, sy)));
-  const hasInput = analog > 0;
-  if (hasInput) p.targetYaw = (yawOf(sx, sy) + cameraYaw) & YAW_MASK;
-
-  const table = moveTableFor(p, hasInput ? analog : raw);
-
-  // --- attacks -------------------------------------------------------------
-  laser(p, input, prev);
-  spinAttack(p, input, prev);
-  if (p.skid > 0) p.skid -= 1;
-  if (p.hitStun > 0) p.hitStun -= 1;
-
-  // --- vertical, then turn, then horizontal --------------------------------
-  // The order matters: the original turns after resolving the jump, so a jump
-  // and a hard turn on the same tick both take effect this tick.
-  vertical(p, input, table);
-  turn(p, table, hasInput);
-  accelerate(p, table, hasInput);
+  ground.beforeMove?.(p, input);
 
   // --- move ----------------------------------------------------------------
   // The mover. The sphere centre sits radius + centreLift above the origin, so
@@ -627,9 +643,10 @@ export function stepPlayer(
  * the query converts on the way in and the answer on the way out. Both sides
  * already agree that +Y is down, so nothing is flipped here.
  */
-export function groundFromCollision(world: CollisionWorld): Ground {
+export function groundFromCollision(world: CollisionWorld, poles: readonly Pole[] = []): Ground {
   const scale = GAME_UNITS_PER_LEVEL_UNIT;
   return {
+    poles,
     ledge: probe => findLedge(world, probe),
     move(from, velocity) {
       return sweepSphere(world, from, velocity, COLLISION.radius, {

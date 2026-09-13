@@ -1081,7 +1081,6 @@ export function stepCreatures(
   sim.sparks.length = 0;
   sim.shots.length = 0;
   const near: number[] = [];
-  const distances: number[] = [];
 
   for (let i = 0; i < sim.creatures.length; i++) {
     const c = sim.creatures[i]!;
@@ -1109,20 +1108,18 @@ export function stepCreatures(
       : dx * dx + dy * dy + dz * dz;
     if (d2 < wake * wake) {
       near.push(i);
-      distances.push(d2);
     }
   }
 
-  // The tighter second pass: anything not explicitly awake and beyond this
-  // radius drops out, as does anything whose model is missing.
+  // Keep the original outer wake bound, but animate/update the whole candidate
+  // list. The retail inner 400-step cutoff freezes visibly drawn creatures in
+  // this renderer. Contact, chase and dialogue retain their own distance tests.
   sim.near = [];
-  for (let k = 0; k < near.length; k++) {
-    const c = sim.creatures[near[k]!]!;
-    const reach = (c.hitRadius >> 3) + 400;
-    if (((c.flags & CREATURE_FLAGS.awake) === 0 && reach * reach <= distances[k]!)
-      || (c.flags & CREATURE_FLAGS.noModel) !== 0) continue;
+  for (const i of near) {
+    const c = sim.creatures[i]!;
+    if ((c.flags & CREATURE_FLAGS.noModel) !== 0) continue;
     c.flags |= CREATURE_FLAGS.near;
-    sim.near.push(near[k]!);
+    sim.near.push(i);
   }
 
   for (const i of sim.near) {

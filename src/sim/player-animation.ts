@@ -167,6 +167,7 @@ export function selectState(p: PlayerState, hasInput: boolean): number {
   if (p.dying) return AnimState.Dying;
   if (p.hitStun > HIT_ANIMATION_ABOVE) return AnimState.Hit;
   if (p.climb > 0) return AnimState.Climb;
+  if (p.pole >= 0) return p.poleMotion === 2 ? 14 : p.poleMotion === 4 ? 16 : 15;
   // The charged spin IS a state, and a different one once he is dizzy. The
   // plain spin is not; it is the slot override at the bottom of stepAnimation.
   if (p.spinCharge < 0) {

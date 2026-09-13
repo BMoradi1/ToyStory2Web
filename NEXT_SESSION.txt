@@ -68,7 +68,18 @@
  Controller rebinding and detail preferences persist in browser storage;
  controller/GFX subpages are limited to supported features. Native import
  remains a small button opening the browser picker, then a canvas slot.
- NEXT: complete controller/GFX parity and load/save transition timing;
+ 2026-09-13: USER GAMEPLAY PRIORITY: rope climbing, broken pushing, and
+ late NPC movement/animation take precedence over the queued menu polish.
+ Pole/rope path 61 is now read and driven by the controller, including
+ climb/slide/rotation/jump-off and the original animation states.
+ Push integration now moves Buzz, real artwork and collision together;
+ corrected 32x collision delta error and double-moved shared vertices.
+ NPC updates use the outer wake range; the tight inner cutoff is removed
+ intentionally per user feedback. Dialogue/contact bounds stay separate.
+ Probes: tools/poles-probe.ts, tools/push-blocks-probe.ts, and
+ tools/gameplay-interactions-check.js. Remaining pole endpoint script
+ adjustments and zip lines are documented in docs/PLAYER.md / LEVELS.md.
+ MENU QUEUE PRESERVED: complete controller/GFX parity and load/save transition timing;
  unported lens flare/texture animation/gamma need renderer support first.
  See docs/FRONTEND.md and tools/retail-menu-probe.ts for exact coverage.
  USER PREFERENCE: commit substantial completed changes as milestones, with

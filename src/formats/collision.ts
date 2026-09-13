@@ -317,7 +317,7 @@ export function buildCollisionWorld(groups: CollisionGroup[], cellSize = 1024): 
         for (const piece of pieces) {
         const { vertices, normal } = piece;
         const index = world.polys.length;
-        world.polys.push({ vertices, normal, walkable: normal.y <= -Math.cos((60 * Math.PI) / 180), group: groupIndex });
+        world.polys.push({ vertices: vertices.map(v => ({ ...v })), normal, walkable: normal.y <= -Math.cos((60 * Math.PI) / 180), group: groupIndex });
         world.groups[groupIndex]!.polys.push(index);
         for (const v of vertices) if (v.y > world.lowestY) world.lowestY = v.y;
         const xs = vertices.map((v) => v.x), zs = vertices.map((v) => v.z);
@@ -345,7 +345,8 @@ export function collisionGroupByObject(world: CollisionWorld, objectNumber: numb
 /**
  * Move one group's collision, the way the engine moves a pushed block's
  * (`FUN_00488510`). Shifts every vertex and re-files the polygons in the
- * lookup grid, since a moved block belongs in different cells.
+ * lookup grid, since a moved block belongs in different cells. Deltas are in
+ * level units, like the stored vertices (divide controller deltas by 32).
  */
 export function moveCollisionGroup(
   world: CollisionWorld,
@@ -689,7 +690,7 @@ export function sweepSphere(
     if (!hit) break;
 
     touched = true;
-    if (!contacts.some((c) => c.group === hit!.group)) {
+    if (!contacts.some((c) => c.group === hit!.group && dot(c.normal, hit!.normal) > 0.99)) {
       contacts.push({ group: hit.group, normal: hit.normal });
     }
     // Advance to just short of the contact, so the next pass starts outside.
@@ -740,6 +741,10 @@ export function sweepSphere(
     // is the underside of a ceiling and must not hold anyone up.
     if (dot(away, poly.normal) <= 0) continue;
     touched = true;
+    const normal = distance > 1e-6 ? scaled(away, 1 / distance) : poly.normal;
+    if (!contacts.some(c => c.group === poly.group && dot(c.normal, normal) > 0.99)) {
+      contacts.push({ group: poly.group, normal });
+    }
     if (distance < radius && distance > 1e-6) {
       const push = radius - distance;
       position = {

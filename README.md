@@ -87,7 +87,8 @@ use physical key capture; Enter accepts the controller page.
 | `m` | mute or unmute |
 
 While playing: **WASD** or a gamepad stick to move, **space** to jump (again at
-the top for a double jump), **J** to spin, **K** for the laser, **Q**/**E** or
+the top for a double jump), **J** to spin (**J** or **Shift** during a jump
+for ground pound), **K** for the laser, **Q**/**E** or
 the shoulder buttons to swing the camera, **M** to mute. The normal laser is a
 red beam; holding K to full charge and releasing fires a wider yellow beam.
 Disk ammunition switches firing to homing disks, consuming one round per shot;

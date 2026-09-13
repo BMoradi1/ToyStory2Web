@@ -1282,9 +1282,10 @@ export interface PlayerAttack {
 /**
  * Read the attack out of the player's state. The engine tests its own globals:
  * the spin timer past 20 of its 48 ticks, or the charged spin still in its
- * damaging phase. The dive is not ported, so kind 5 never appears yet.
+ * damaging phase. The descending stomp supplies dive damage (kind 5).
  */
-export function attackFromPlayer(p: { spin: number; spinCharge: number }): PlayerAttack {
+export function attackFromPlayer(p: { spin: number; spinCharge: number; stomp?: number; vy?: number }): PlayerAttack {
+  if ((p.stomp ?? 0) > 0 && (p.vy ?? 0) > 0) return { kind: DAMAGE.dive, reach: 400 };
   if (p.spin > 20 || p.spinCharge < -119) return { kind: DAMAGE.spinBody, reach: 400 };
   return { kind: 0, reach: 150 };
 }

@@ -1285,3 +1285,66 @@ Each also has its attack:
 
 With that, every boss in the game is decoded: 6 is ported, 3, 9, 12 and
 15 are written up above with what each needs.
+
+
+## Ground-pound chair and trailer paint (ported 2026-09-13)
+
+`src/sim/stomp-props.ts` connects ground-pound landings to the actual terrain
+surface IDs. These are independent of numbered moving collision objects:
+`FUN_00489980` copies entry +0x28 to collision-group +0x2e;
+`0x483f11..0x483f2d` copies the low byte from a contacted group into the entity's
+contact record, and `FUN_00487ab0(0)` returns Buzz's standing surface.
+The browser retains this byte through AllGroup -> CollisionGroup -> world
+and reads upward-facing contacts. A side hit or normal jump does not activate
+a ground-pound prop.
+
+**Level 1 chair (`FUN_00417680`, 0x41823d..0x41836f).** Surface 8 arms the
+clock at 2. It advances to 7 before clearing the stomp and flinging Buzz
+with vy -0x1280, vx sin(0x11e), vz cos(0x11e), heading 0x11e. The launched
+movement table caps horizontal speed at 0xb80 until landing. The clock
+continues to 32, wraps to -32, and returns to zero. Original object 23 is
+the spring: its Y scale is abs(clock)/32 and Z angle abs(clock)*32. The
+port triggers from the contact itself, without requiring the camera to be
+in zone 3. The chair uses the existing launch sound event 0x1c.
+
+**Level 4 trailer (`FUN_0041c640`, 0x41cf73..0x41d4d4).** Ground-pound
+surface 33/34/35 starts a 60-tick pour of red/blue/yellow. Crucially,
+`FUN_004879c0(0)` queries the **bucket**, not Buzz: numbered collision object
+0, render object 32, push path 3. Its seven X lanes are the three mixture
+targets, an unused middle lane, then the three outlets. A lane is active
+within 200 level units of its path point. The bucket must be under the
+selected outlet to receive paint; standing near an outlet is insufficient.
+
+The script retains the first two colors; a third pour does not add more
+liquid. Adding the same color twice drains after the pour, allowing a retry.
+The target at path node 0 accepts red+blue (purple), node 1 red+yellow
+(orange), node 2 blue+yellow (green), in either order. Delivering a matching
+bucket drains it over 32 ticks and sets bit 1/2/4. All three reveal puzzle
+slot 3, object 0x61, through the normal pickup system. Render IDs 48..50
+and 51..53 are the flashing completed target variants (table 0x4f1b64).
+
+Falling-paint objects 33..35 grow for eight ticks, stay on until the final
+12 ticks, then disappear. The PAINT creature (type 17, placement slot 5)
+is the original liquid mesh. The renderer places it inside the moving
+bucket and applies the script's nonuniform fill scale and RGB transitions;
+no replacement artwork is generated. Completion/error sound sequences
+(-5/-6 through the separate sequence player) and guide-sparkle retirement
+remain outside this port; the ground-pound and chair sound events work.
+
+**Two additional bucket fixes found by playing the puzzle:**
+
+- `FUN_004335d0` relocates both artwork and collision to the starting path
+  node. The bucket is authored at x=9500 but starts at x=7300. Previously
+  only the push simulation started there, leaving collision and artwork
+  2200 units away. All pushables now apply the starting placement, and
+  artwork offsets are relative to its baked origin rather than path node 0.
+- A missing node beyond a flat rail's endpoint was clamped to the last
+  point, which looked like a vertical segment and falsely tipped the bucket
+  off its track. Drop detection now requires a real following segment; Buzz
+  can push the bucket back from the yellow outlet.
+
+`tools/stomp-flow-check.js` completes all three mixtures by physical push
+inputs and ground-pound landings, checks the liquid fill, and verifies the
+reward reveal. Existing controller, crate, zip-line, NPC/pole browser, and
+level-to-selector regressions also pass. State and transformed meshes are
+recreated on level load; nothing from the puzzle runs in the selector.

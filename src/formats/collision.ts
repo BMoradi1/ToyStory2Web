@@ -65,6 +65,7 @@ export interface CollisionGroup {
   dynamic: boolean;
   /** The number the level code moves a dynamic group by (`AllGroup.objectNumber`), -1 if none. */
   objectNumber: number;
+  surface?: number;
   /**
    * Set on a ZONE FLOOR: a slab standing for one visibility zone, at a
    * quarter of the level's scale, that the engine never collides with and
@@ -131,7 +132,7 @@ export function parseCollisionGroup(group: AllGroup): CollisionGroup | null {
     if (view.getUint32(pos, true) === GROUP_TERMINATOR) {
       // The terminator must close the payload exactly.
       return pos + 4 === p.length
-        ? { meshes, position: group.position, dynamic: group.type === GroupType.DynamicCollision, objectNumber: group.objectNumber, zone: group.zone }
+        ? { meshes, position: group.position, dynamic: group.type === GroupType.DynamicCollision, objectNumber: group.objectNumber, surface: group.surface, zone: group.zone }
         : null;
     }
     if (pos + MESH_HEADER > p.length) return null;
@@ -266,7 +267,7 @@ export interface CollisionWorld {
    * level code moves a dynamic group by (docs/FORMATS.md); `polys` lets a
    * whole group be moved, which is what a pushed block does.
    */
-  groups: { objectNumber: number; dynamic: boolean; polys: number[] }[];
+  groups: { position?: Vec3; surface?: number; objectNumber: number; dynamic: boolean; polys: number[] }[];
   /** Poly indices by grid cell, keyed `gx,gz`. */
   cells: Map<string, number[]>;
   cellSize: number;
@@ -298,7 +299,7 @@ export function buildCollisionWorld(groups: CollisionGroup[], cellSize = 1024): 
     // origin. They are answered by zoneAt-style lookups, not by sweeps.
     if (group.zone !== null) continue;
     const groupIndex = world.groups.length;
-    world.groups.push({ objectNumber: group.objectNumber, dynamic: group.dynamic, polys: [] });
+    world.groups.push({ position: { ...group.position }, objectNumber: group.objectNumber, surface: group.surface, dynamic: group.dynamic, polys: [] });
     for (const mesh of group.meshes) {
       for (const poly of mesh.polys) {
         const place = (v: { x: number; y: number; z: number }) => ({
@@ -355,6 +356,7 @@ export function moveCollisionGroup(
 ): void {
   const group = world.groups[groupIndex];
   if (!group || (dx === 0 && dy === 0 && dz === 0)) return;
+  if (group.position) { group.position.x += dx; group.position.y += dy; group.position.z += dz; }
   for (const index of group.polys) {
     const poly = world.polys[index]!;
     // Out of its old cells first, because the extent changes with the move.

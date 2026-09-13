@@ -61,7 +61,7 @@ function detach(p: PlayerState): void {
 export function stepZipLine(p: PlayerState, input: PlayerInput, previous: PlayerInput,
   lines: readonly ZipLine[]): boolean {
   if (p.zipCooldown > 0) p.zipCooldown--;
-  const busy = p.dying || p.hitStun > 0 || p.spin !== 0 || p.spinCharge !== 0
+  const busy = p.stomp !== 0 || p.launched || p.dying || p.hitStun > 0 || p.spin !== 0 || p.spinCharge !== 0
     || p.climb > 0 || p.pole >= 0 || p.fallTimer < 0 || p.fallTimer === 0x50;
   if (busy || p.onGround || p.coyote > 0) {
     if (p.zipLine >= 0) detach(p);

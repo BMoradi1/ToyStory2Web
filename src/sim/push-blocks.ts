@@ -131,7 +131,9 @@ export function setPushSegment(b: PushBlock): void {
   b.dirX = length === 0 ? 0 : Math.trunc((dx / length) * 0x1000);
   b.dirZ = length === 0 ? 0 : Math.trunc((dz / length) * 0x1000);
   b.tipPoint = 0;
-  if (b.floorSeg < b.path.length - 2) {
+  // node() clamps missing points to the endpoint. Do not mistake that
+  // duplicate for a vertical drop at the end of a flat rail (the paint bucket).
+  if (b.floorSeg < b.path.length - 2 && b.seg + 2 < b.path.length) {
     const next = node(b, b.seg + 2);
     if (c.x === next.x && c.z === next.z) b.tipPoint = Math.trunc(b.segLen / 2);
   }

@@ -80,7 +80,7 @@ that the physics touches (byte offsets):
                                2 released, 3 falling, 5 double jump,
                                6 double jump released
     +0x8e  i16 on ground       nonzero when the mover found floor this tick
-    +0x90  i16 anim phase      8 after a double jump; 0x1a stomp; 2, 3 pole
+    +0x90  i16 anim phase      8 after a double jump; 0x1a hard landing; 2, 3 pole
     +0x94  i16 slip timer      counts down; flag 0x20 while nonzero
     +0x98  i16 hit stun        counts down; jump impulse and accel reduced
     +0x9c  i16 coyote          set to 6 while grounded, counts down in air
@@ -679,3 +679,35 @@ segments, tested like walls) is dead on PC: the machine code reads that
 head in three places (`FUN_00484380`, `FUN_0048c860`, `FUN_0048d530`),
 zeroes it with the rest of its block at level load (`FUN_00489980`), and
 never writes it, so every walk is over an empty list. Nothing to port.
+
+
+## Ground pound (ported 2026-09-13)
+
+`FUN_00434d20` owns `DAT_0053c64c`, now `PlayerState.stomp`. A fresh
+Spin press during jump states 1/2 or double-jump animation phase 8 starts
+at 1 and raises event 0x17. Pole/zip-line/ledge/charged-spin/hit states block
+entry; a pending laser can be cancelled into the stomp. The positive timer
+increments to 14 with motion frozen, then stays at 14 while descending at
+0x800 game units/tick with no horizontal movement. Animation state 23 plays
+the original slot 12; the descending body supplies dive damage (kind 5).
+
+Landing starts the -40 recovery timer, animation state 24, sound event 0x0f,
+the two existing impact effects (kind 0x12/template 0xb and kind
+0x13/template 0xc), and the camera's 40-tick shake. Movement resumes at
+-14, while the tail still blocks starting another special move. Damage and
+respawn clear the move. The port emits `stompImpact` once on the sweep's
+landing tick; the original detects the mover's previous grounded flag on
+the following controller tick. This explicit event prevents a 40-tick
+recovery from repeatedly activating a prop.
+
+The spring chair launches with the original -0x1280 upward impulse and
+heading 0x11e. `launched` selects the no-friction 0xb80 speed table until
+landing, so regular movement cannot immediately clamp the launch to walking
+speed. Ordinary jumping is suppressed during this launch. Level-specific
+chair and paint scripts are documented in LEVELS.md.
+
+Validation: tools/stomp-probe.ts checks pause/drop/recovery timing, animation,
+dive damage, interruption, the real chair/control collision surfaces, both
+orders of every paint mixture, duplicate colors, and bucket rail endpoints.
+The browser test tools/stomp-flow-check.js uses real controller inputs for
+stomps and pushing; only travel between test interactions is teleported.

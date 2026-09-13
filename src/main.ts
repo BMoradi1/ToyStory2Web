@@ -1,3 +1,4 @@
+import { createStompProps, stepStompProps, stompObjects, paintStreamScale } from './sim/stomp-props.ts';
 import { CREDIT_SLOTS, CREDIT_TEXT } from './front/endings.ts';
 import { chooseSaveFile } from './front/browser-menu.ts';
 import { movieChoices } from './front/movies.ts';
@@ -287,6 +288,7 @@ async function showLevel(index: number): Promise<void> {
   pushBlocks = null;
   levelPoles = [];
   levelZipLines = [];
+  stompProps = createStompProps();
   tasks = null;
   talk = null;
   creatureArt.clear();
@@ -357,6 +359,10 @@ async function showLevel(index: number): Promise<void> {
       const separate = pickupObjects(parsed, levelNumber(level.id) ?? 0);
       for (const block of PUSH_BLOCKS[levelNumber(level.id) ?? 0] ?? []) {
         const index = parsed.objectIds[block.sceneObject];
+        if (index !== undefined && index >= 0) separate.add(index);
+      }
+      for (const id of stompObjects(levelNumber(level.id) ?? 0)) {
+        const index = parsed.objectIds[id];
         if (index !== undefined && index >= 0) separate.add(index);
       }
       const geometry = buildLevelGeometry(parsed, { zones, separate });
@@ -630,6 +636,14 @@ async function open(dir: GameDir): Promise<void> {
         player.vx = 0; player.vy = 0; player.vz = 0;
         player.yaw = b.segYaw;
         return { index: which, yaw: b.segYaw, block: { x: b.x, y: b.y, z: b.z }, player: { x: player.x, y: player.y, z: player.z } };
+      },
+      get stompProps() { return stompProps; },
+      get stompSurfaces() {
+        return currentCollisionWorld?.groups.flatMap((g, group) => {
+          if (![8, 32, 33, 34, 35].includes(g.surface ?? -1)) return [];
+          const vertices = g.polys.flatMap(i => currentCollisionWorld!.polys[i]!.vertices);
+          return [{ group, surface: g.surface, vertices, tops: g.polys.map(i => currentCollisionWorld!.polys[i]!).filter(p => p.normal.y < -0.99).map(p => p.vertices) }];
+        });
       },
       get zipLines() { return levelZipLines; },
       get poles() { return levelPoles; },
@@ -1187,6 +1201,8 @@ async function spawnPlayer(): Promise<void> {
   // the one the level's own init reveals is shown; the tasks are not
   // implemented, so the rest stay hidden until `ts2.revealTokens()`.
   const level = levelNumber(sceneId) ?? 0;
+  stompProps = createStompProps();
+  drawStompProps(level);
   // The cast starts running now. The engine builds its entities at level load
   // and ticks them beside the player, so the random stream is rewound here to
   // match: a level replays the same way every time.
@@ -1238,6 +1254,13 @@ async function spawnPlayer(): Promise<void> {
       level,
     )
     : null;
+  // FUN_004335d0 relocates both the render and collision objects to the
+  // starting path node. The paint bucket is authored at lane 4, but starts at 1.
+  for (const b of pushBlocks?.blocks ?? []) {
+    const origin = currentCollisionWorld.groups[b.group]?.position;
+    if (origin) moveCollisionGroup(currentCollisionWorld, b.group,
+      b.x / S - origin.x, b.y / S - origin.y, b.z / S - origin.z);
+  }
   drawPushBlocks();
 
   // The sprite table the HUD and the coins draw from lives in the user's own
@@ -1854,6 +1877,19 @@ function drawCreatures(): void {
         sceneTextures,
       );
     }
+    // The trailer's PAINT creature is the liquid inside pushable object 0.
+    // Place it after the generic creature pass, which otherwise treats it as a static actor.
+    if ((levelNumber(levels[levelEl.selectedIndex]?.id ?? '') ?? 0) === 4) {
+      const paint = creatureSim.creatures.find(c => c.type === 17);
+      const bucket = pushBlocks?.blocks.find(b => b.collisionObject === 0);
+      if (paint && bucket) {
+        const a = stompProps.paint;
+        viewer.placeCreatureMesh(paint.slot, bucket.x * GAME_TO_RENDER, -bucket.y * GAME_TO_RENDER,
+          -bucket.z * GAME_TO_RENDER, 0);
+        viewer.setCreatureAppearance(paint.slot, [1, a.height / 4096 * (a.drain > 0 ? a.drain / 32 : 1), 1],
+          a.colour.map(c => c / 2048) as [number, number, number]);
+      }
+    }
     viewer.setCreatures(markers);
     return;
   }
@@ -2051,12 +2087,38 @@ function drawPushBlocks(): void {
   for (const b of pushBlocks.blocks) {
     const index = currentLevel.level.objectIds[b.sceneObject];
     const object = index === undefined ? undefined : currentLevel.level.objects[index];
-    const start = b.path[0];
-    if (!object || index === undefined || !start) continue;
+    if (!object || index === undefined) continue;
+    const start = { x: object.position.x * object.unitScale * 32, y: object.position.y * object.unitScale * 32, z: object.position.z * object.unitScale * 32 };
     transforms.set(index, {
       angles: [object.rotation.x, object.rotation.y, object.rotation.z],
       offset: [(b.x - start.x) * GAME_TO_RENDER, -(b.y - start.y) * GAME_TO_RENDER, -(b.z - start.z) * GAME_TO_RENDER],
     });
+  }
+  viewer.setObjectTransforms(transforms);
+}
+
+/** Animate the original spring, falling paint, and completed colour panels. */
+function drawStompProps(level: number): void {
+  if (!viewer || !currentLevel) return;
+  const transforms = new Map<number, ObjectTransform>();
+  for (const id of stompObjects(level)) {
+    const index = currentLevel.level.objectIds[id];
+    const object = index === undefined ? undefined : currentLevel.level.objects[index];
+    if (!object || index === undefined) continue;
+    let scale: [number, number, number] = [1, 1, 1];
+    const angles: [number, number, number] = [object.rotation.x, object.rotation.y, object.rotation.z];
+    if (level === 1) { scale[1] = Math.abs(stompProps.chair) / 32; angles[2] = Math.abs(stompProps.chair) * 32; }
+    else if (id <= 35) {
+      const height = paintStreamScale(stompProps, id);
+      scale = height > 0 ? [1, height, 1] : [0, 0, 0];
+    }
+    else {
+      const bit = 1 << ((id - 48) % 3);
+      const completed = (stompProps.paint.solved & bit) !== 0;
+      const bright = completed && stompProps.paint.pulse < 32;
+      scale = (id < 51 ? bright : !bright) ? [1, 1, 1] : [0, 0, 0];
+    }
+    transforms.set(index, { angles, scale });
   }
   viewer.setObjectTransforms(transforms);
 }
@@ -2433,6 +2495,7 @@ async function loadDioramaScene(): Promise<{ paths: DatLevel['paths']; placedOf:
   pushBlocks = null;
   levelPoles = [];
   levelZipLines = [];
+  stompProps = createStompProps();
   tasks = null;
   talk = null;
   talkSlot = -1;
@@ -2654,6 +2717,7 @@ let talk: TalkState | null = null;
 let pushBlocks: PushState | null = null;
 let levelPoles: Pole[] = [];
 let levelZipLines: ZipLine[] = [];
+let stompProps = createStompProps();
 /** Which token tasks are done, and the talkers' timers. */
 let tasks: TaskState | null = null;
 /** The slot the talk box will reveal when it closes, or -1. */
@@ -2736,7 +2800,7 @@ function setPlaying(on: boolean): void {
 function tickPushBlocks(held: PlayerInput): void {
   if (!player) return;
   if (pushBlocks && currentCollisionWorld) {
-    const busy = player.spin !== 0 || player.laser !== 0 || player.hitStun > 0
+    const busy = player.stomp !== 0 || player.spin !== 0 || player.laser !== 0 || player.hitStun > 0
       || player.jumpState !== 0 || player.pole >= 0 || player.zipLine >= 0 || player.climb > 0 || player.dying || !!talk;
     const push = stepPushBlocks(pushBlocks, {
       x: player.x, y: player.y, z: player.z, yaw: player.yaw,
@@ -2877,6 +2941,18 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   const playerGround = groundFromCollision(currentCollisionWorld, levelPoles, levelZipLines);
   playerGround.beforeMove = () => tickPushBlocks(held);
   stepPlayer(player, held, playerRuntime, playerGround, cameraYaw);
+  if (player.stompImpact && camera) camera.shake = 40;
+  if (player.stompImpact && effects) {
+    spawnChild(effects, effectWorld(), player.x, player.y - 0x400, player.z, 0x12, 0xb);
+    spawnChild(effects, effectWorld(), player.x, player.y - 0x400, player.z, 0x13, 0xc);
+  }
+  if (currentLevel) {
+    stepStompProps(stompProps, levelNow, player, currentCollisionWorld, currentLevel.level, pushBlocks?.blocks.find(b => b.collisionObject === 0));
+    if (levelNow === 4 && stompProps.paint.solved === 7 && !stompProps.paint.reward && pickups) {
+      revealToken(pickups, 3); stompProps.paint.reward = true; drawPickups();
+    }
+    drawStompProps(levelNow);
+  }
 
   // Game space to renderer space. A game facing of (sin yaw, cos yaw) becomes
   // (sin yaw, -cos yaw) once Z is negated. Characters are authored facing +Z

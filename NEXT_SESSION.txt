@@ -85,6 +85,16 @@
  tools/zip-line-flow-check.js checks the real browser ride and animation.
  Path 60's earlier zip-line attribution was incorrect. The geometric
  projection adaptation is explicit in docs/PLAYER.md.
+ GROUND POUND now implemented (2026-09-13), per user priority: fresh Spin
+ during a jump drives the original stomp animation, drop, recovery, damage,
+ effects and camera shake. Level 1's chair launches Buzz; level 4's trailer
+ bucket mixes red/blue/yellow and reveals the puzzle token after all targets.
+ Original spring, paint streams, liquid mesh and target panels animate.
+ Fixed pushable initial placement (bucket artwork/collision started 2200
+ level units away from its simulation) and false tipping at flat rail ends.
+ tools/stomp-probe.ts and tools/stomp-flow-check.js cover the moves and the
+ full puzzle. User clarified the paint-mixing trailer, not outdoor paint cans.
+ Remaining cosmetic sound sequences/sparkles are explicit in docs/LEVELS.md.
  MENU QUEUE PRESERVED: complete controller/GFX parity and load/save transition timing;
  unported lens flare/texture animation/gamma need renderer support first.
  See docs/FRONTEND.md and tools/retail-menu-probe.ts for exact coverage.

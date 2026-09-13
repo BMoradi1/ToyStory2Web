@@ -28,7 +28,7 @@ export function stepPole(p: PlayerState, input: PlayerInput, previous: PlayerInp
     const old = poles[p.poleLock];
     if (!old || ((p.x - old.x) >> 5) ** 2 + ((p.z - old.z) >> 5) ** 2 > 0x8400) p.poleLock = -1;
   }
-  if (p.dying || p.hitStun > 0 || p.spin !== 0 || p.spinCharge !== 0 || p.climb > 0 || p.fallTimer < 0 || p.fallTimer === 0x50) {
+  if (p.stomp !== 0 || p.launched || p.dying || p.hitStun > 0 || p.spin !== 0 || p.spinCharge !== 0 || p.climb > 0 || p.fallTimer < 0 || p.fallTimer === 0x50) {
     if (p.pole >= 0) p.poleLock = p.pole;
     p.pole = -1; return false;
   }

@@ -95,6 +95,11 @@ export const NO_INPUT: PlayerInput = {
  * player block at 0x52f300, so a value can be checked against a debugger.
  */
 export interface PlayerState {
+  /** Retail stomp timer: positive wind-up/drop, negative landing recovery. */
+  stomp: number;
+  stompImpact: boolean;
+  /** Prop launch uses the faster, frictionless movement table until landing. */
+  launched: boolean;
   /** Path-61 pole index, -1 when detached. */
   pole: number;
   /** Path-62 line index and phase: 0 detached, 1 catching, 2 riding. */
@@ -202,6 +207,7 @@ export interface PlayerState {
 
 export function createPlayer(x = 0, y = 0, z = 0, yaw = 0): PlayerState {
   return {
+    stomp: 0, stompImpact: false, launched: false,
     x, y, z,
     vx: 0, vy: 0, vz: 0,
     yaw, targetYaw: yaw,
@@ -246,7 +252,7 @@ export function createRuntime(): PlayerRuntime {
 
 /** Is the player in a plain state — no attack, no stun, nothing special? */
 function isPlain(p: PlayerState): boolean {
-  return p.zipLine < 0 && p.pole < 0 && p.climb === 0 && p.spin === 0 && p.spinCharge === 0 && p.laser === 0 && p.hitStun <= 0 && p.fallTimer >= 0;
+  return p.stomp === 0 && p.zipLine < 0 && p.pole < 0 && p.climb === 0 && p.spin === 0 && p.spinCharge === 0 && p.laser === 0 && p.hitStun <= 0 && p.fallTimer >= 0;
 }
 
 /**
@@ -265,6 +271,7 @@ function moveTableFor(p: PlayerState, analog: number): MoveTable {
   // so a player one tick into a fall still turns with ground authority.
   if (p.coyote === 0) Object.assign(t, MOVE_OVERRIDES.airborne);
   if (p.skid > 0) Object.assign(t, MOVE_OVERRIDES.skidWithInput);
+  if (p.launched) Object.assign(t, MOVE_OVERRIDES.launched);
 
   // Analog magnitude scales the TOP SPEED, not the acceleration: the engine
   // does `top = magnitude * top >> 14` on the way into the turn routine. A
@@ -516,12 +523,32 @@ export function stepPlayer(
   p.laserFired = null;
   const previousY = runtime.previousY;
   runtime.previousY = p.y;
-  const zipMoved = stepZipLine(p, input, prev, ground.zipLines ?? []);
-  const poleMoved = !zipMoved && p.zipLine < 0 && stepPole(p, input, prev, ground.poles ?? [], cameraYaw);
-  if (!zipMoved && !poleMoved) {
+  p.stompImpact = false;
+  if (p.dying || p.hitStun > 0) { p.stomp = 0; p.launched = false; }
+  // FUN_00434d20: a fresh spin press during a jump starts the stomp.
+  if (input.spin && !prev.spin && !p.onGround && p.coyote === 0
+      && p.stomp === 0 && p.zipLine < 0 && p.pole < 0 && p.climb === 0
+      && p.spin === 0 && p.spinCharge === 0 && p.hitStun <= 0 && p.fallTimer >= 0 && p.fallTimer !== 0x50
+      && !p.dying && (p.jumpState === JumpState.Rising || p.jumpState === JumpState.Released || p.animPhase === 8)) {
+    p.stomp = 1; p.launched = false; p.laser = p.laserCharge = 0;
+    p.fallTimer = 0; p.events.push(0x17);
+  }
+  if (p.stomp < 0) p.stomp++;
+  const stomping = p.stomp > 0 || p.stomp < -VERTICAL.stompHangTicks;
+  if (p.stomp > 0) {
+    p.stomp++;
+    p.vy = p.stomp > VERTICAL.stompHangTicks ? VERTICAL.stompDropSpeed : 0;
+    p.stomp = Math.min(p.stomp, VERTICAL.stompHangTicks);
+  } else if (stomping) {
+    p.vy = Math.min(p.vy + VERTICAL.gravity(), VERTICAL.stompDropSpeed);
+  }
+  if (stomping) p.vx = p.vz = p.forwardSpeed = p.lateralSpeed = 0;
+  const zipMoved = !stomping && stepZipLine(p, input, prev, ground.zipLines ?? []);
+  const poleMoved = !stomping && !zipMoved && p.zipLine < 0 && stepPole(p, input, prev, ground.poles ?? [], cameraYaw);
+  if (!stomping && !zipMoved && !poleMoved) {
     if (p.dying || p.hitStun > 0) p.climb = 0;
     else if (p.climb > 0) p.climb--;
-    else if (p.zipLine < 0 && p.vy > 0 && !p.onGround && p.coyote === 0 && p.fallTimer !== 0x50
+    else if (p.stomp === 0 && p.zipLine < 0 && p.vy > 0 && !p.onGround && p.coyote === 0 && p.fallTimer !== 0x50
         && p.spin === 0 && p.spinCharge === 0 && p.hitStun <= 0
         && p.fallTimer >= 0 && previousY !== null) {
       const edge = ground.ledge?.({ x: p.x, y: p.y, z: p.z, yaw: p.yaw, previousY });
@@ -569,7 +596,7 @@ export function stepPlayer(
     // --- vertical, then turn, then horizontal --------------------------------
     // The order matters: the original turns after resolving the jump, so a jump
     // and a hard turn on the same tick both take effect this tick.
-    vertical(p, input, table);
+    vertical(p, p.launched ? { ...input, jump: false } : input, table);
     turn(p, table, hasInput);
     accelerate(p, table, hasInput);
     if (p.zipPhase === 1) p.vx = p.vz = p.forwardSpeed = p.lateralSpeed = 0;
@@ -596,6 +623,11 @@ export function stepPlayer(
   p.contacts = swept.contacts ?? [];
 
   if (swept.onGround) {
+    p.launched = false;
+    if (p.stomp > 0) {
+      p.stomp = -VERTICAL.stompRecoveryTicks; p.stompImpact = true;
+      p.fallTimer = 0; p.events.push(0x0f);
+    }
     // Landing. A flagged hard fall costs velocity and control on the way down.
     if (!wasOnGround && p.fallTimer === 0x50) {
       p.fallTimer = -VERTICAL.hardFallStunTicks;
@@ -620,7 +652,7 @@ export function stepPlayer(
   if (p.fallTimer < 0) {
     // Stunned after a hard landing, counting back up to zero.
     p.fallTimer += 1;
-  } else if (!p.onGround && p.vy > VERTICAL.hardFallSpeed) {
+  } else if (p.stomp === 0 && !p.onGround && p.vy > VERTICAL.hardFallSpeed) {
     p.fallTimer += 1;
     if (p.fallTimer > VERTICAL.hardFallTicks) {
       if (p.fallTimer !== 0x50) p.sounds.push('BUZFALL1');

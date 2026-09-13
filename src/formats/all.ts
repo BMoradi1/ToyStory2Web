@@ -56,6 +56,8 @@ export interface AllGroup {
    * Checked on all 24 push blocks across eight levels.
    */
   objectNumber: number;
+  /** Low byte of +0x28 on ordinary collision: level-script surface ID. */
+  surface?: number;
   /**
    * On a `HitShapes` group, the coarse sphere the creature code keeps in its
    * entity: the centre offset at entry +0x2c/+0x2e/+0x30 (signed — a creature's
@@ -195,6 +197,7 @@ export function parseAll(buffer: ArrayBuffer | Uint8Array): AllFile {
         y: view.getInt32(entry + 0x08, true),
         z: view.getInt32(entry + 0x0c, true),
       },
+      surface: view.getUint8(entry + 0x28),
       objectNumber: view.getUint16(entry + 0x1a, true) - 1,
       hitSphere: view.getUint32(entry + 0x10, true) === GroupType.HitShapes
         ? {

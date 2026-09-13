@@ -51,6 +51,8 @@ export const DETAIL_ROWS: readonly { nearLimit: number; farLimit: number }[] = [
 export interface ObjectTransform {
   angles: readonly [number, number, number];
   offset?: readonly [number, number, number];
+  /** Per-axis multiplier relative to the baked object scale. */
+  scale?: readonly [number, number, number];
 }
 
 export class Viewer {
@@ -391,7 +393,8 @@ export class Viewer {
       if (!transform) continue;
       const want = transform.angles;
       const [dx, dy, dz] = transform.offset ?? [0, 0, 0];
-      const key = `${want[0]},${want[1]},${want[2]}|${dx},${dy},${dz}`;
+      const scale = transform.scale ?? [1, 1, 1];
+      const key = `${want[0]},${want[1]},${want[2]}|${dx},${dy},${dz}|${scale}`;
       if (this.objectTransforms.get(object) === key) continue;
       const group = groups.find((g) => g.object === object);
       if (!group || !group.origin || !group.rotation) continue;
@@ -408,7 +411,7 @@ export class Viewer {
       for (let i = 0; i < 3; i++) {
         for (let j = 0; j < 3; j++) {
           let sum = 0;
-          for (let k = 0; k < 3; k++) sum += next[i * 3 + k]! * base[j * 3 + k]!;
+          for (let k = 0; k < 3; k++) sum += next[i * 3 + k]! * scale[k]! * base[j * 3 + k]!;
           // Y and Z are negated on the way to the renderer, so a term
           // changes sign whenever exactly one of its ends is flipped.
           m[i * 3 + j] = i === 0 === (j === 0) ? sum : -sum;
@@ -701,6 +704,14 @@ export class Viewer {
     // Characters are authored facing +Z and Z is negated on the way in, the
     // same correction the player gets.
     object.rotation.set(0, Math.PI - facing, 0);
+  }
+
+  /** Script-controlled liquid fill and RGB, applied to the original paint mesh. */
+  setCreatureAppearance(id: number, scale: readonly [number, number, number], colour: readonly [number, number, number]): void {
+    const object = this.creatureMeshes.get(id);
+    if (!object) return;
+    object.scale.set(...scale);
+    for (const material of object.material as THREE.MeshBasicMaterial[]) material.color.setRGB(...colour);
   }
 
   /** Which creatures currently have a model. */

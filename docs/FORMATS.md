@@ -169,7 +169,9 @@ The consequence matters: **level visual geometry is not in `.ALL` at all.**
                   Checked against all 24 push blocks (docs/LEVELS.md).
       +0x28  u16  ZONE FLOOR word (TERRAIN.ALL / TERR1.ALL only): bit 0x400
                   marks a zone floor and the low byte is its visibility zone;
-                  0xff00-ish on every other collision group. Copied whole into
+                  on ordinary collision the low byte is the surface ID (255
+                  means none). Surface 8 is the level-1 chair, 33..35 the
+                  level-4 paint controls. Copied whole into
                   the runtime collision record (+0x2e) by `FUN_00489980`.
                   The earlier reading, "collision category / LOD bit", was a
                   guess. Zone floors are authored at a QUARTER of the level's

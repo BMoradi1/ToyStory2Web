@@ -166,6 +166,8 @@ export function selectState(p: PlayerState, hasInput: boolean): number {
   // they beat everything below.
   if (p.dying) return AnimState.Dying;
   if (p.hitStun > HIT_ANIMATION_ABOVE) return AnimState.Hit;
+  if (p.stomp > 0) return 23;
+  if (p.stomp < -14) return 24;
   if (p.climb > 0) return AnimState.Climb;
   if (p.zipPhase === 2) return 17;
   if (p.pole >= 0) return p.poleMotion === 2 ? 14 : p.poleMotion === 4 ? 16 : 15;

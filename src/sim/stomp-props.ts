@@ -6,11 +6,14 @@ import { cos, sin } from './trig.ts';
 
 export interface StompProps {
   chair: number;
+  /** One-tick outputs for guide retirement and the global sound-sequence player. */
+  guidesSpent: number[];
+  sequence: number | null;
   paint: { first: number; second: number; excess: boolean; cooldown: number; drain: number;
     height: number; colour: [number, number, number]; button: number; solved: number; reward: boolean; pulse: number; success: boolean };
 }
 export function createStompProps(): StompProps {
-  return { chair: 0, paint: { first: 0, second: 0, excess: false, cooldown: 0, drain: 0,
+  return { chair: 0, guidesSpent: [], sequence: null, paint: { first: 0, second: 0, excess: false, cooldown: 0, drain: 0,
     height: 0, colour: [0, 0, 0], button: 0, solved: 0, reward: false, pulse: 0, success: false } };
 }
 export function stompObjects(level: number): number[] {
@@ -28,12 +31,14 @@ export function standingSurface(p: PlayerState, world: CollisionWorld): number {
 
 export function stepStompProps(s: StompProps, level: number, p: PlayerState, world: CollisionWorld,
   dat: DatLevel, bucket?: { x: number; y: number; z: number }): void {
+  s.guidesSpent.length = 0; s.sequence = null;
   const surface = standingSurface(p, world);
   if (level === 1) {
     if (s.chair === 0 && p.stompImpact && surface === 8) s.chair = 2;
     if (s.chair !== 0) {
       s.chair++;
       if (s.chair === 7) {
+        s.guidesSpent.push(0);
         p.stomp = 0; p.vy = -0x1280; p.jumpState = JumpState.Released;
         p.onGround = false; p.coyote = 0; p.animPhase = 2; p.fallTimer = 0;
         p.vx = sin(0x11e); p.vz = cos(0x11e);
@@ -53,6 +58,7 @@ export function stepStompProps(s: StompProps, level: number, p: PlayerState, wor
   const lanes = dat.paths.find(path => path.id === 3)?.points ?? [];
   const lane = lanes.findIndex(point => Math.abs((bucket.x >> 5) - point.x) < 200) + 1;
   if (p.stompImpact && surface >= 32 && surface <= 35 && a.cooldown === 0) {
+    s.guidesSpent.push(0, 1, 2);
     a.button = surface - 31; a.cooldown = 60;
     if (lane > 4 && lane - 3 === a.button) {
       if (a.first === 0) a.first = lane - 4;
@@ -77,13 +83,13 @@ export function stepStompProps(s: StompProps, level: number, p: PlayerState, wor
     if (a.cooldown > 0) return;
   }
   if (a.first !== 0 && a.first === a.second) {
-    a.first = a.second = 0; a.excess = false; a.drain = 32; return;
+    a.first = a.second = 0; a.excess = false; a.drain = 32; s.sequence = -6; return;
   }
   const key = a.first + a.second * 3 - 1;
   const accepts = [[4, 6], [5, 9], [8, 10]];
   if (lane >= 1 && lane <= 3 && accepts[lane - 1]!.includes(key)) {
     a.solved |= 1 << (lane - 1); a.first = a.second = 0; a.drain = 32;
-    a.success = true;
+    a.success = true; s.sequence = -5;
   }
 }
 

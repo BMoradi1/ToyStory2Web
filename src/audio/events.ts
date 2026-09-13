@@ -96,6 +96,8 @@ export interface SoundTable {
   events: readonly SoundEvent[];
   /** The effect's file name, or null when nothing supplies it. */
   nameOf(event: number): string | null;
+  /** Sequences name an effect directly, not a sound event. */
+  nameOfEffect(effect: number): string | null;
 }
 
 function readString(exe: Uint8Array, address: number): string | null {
@@ -171,14 +173,17 @@ export function readSoundTable(exe: Uint8Array, level: number): SoundTable {
     });
   }
 
+  const nameOfEffect = (effect: number): string | null => {
+    if (effect < 1) return null;
+    if (effect <= GLOBAL_COUNT) return global[effect - 1] || null;
+    return own[effect - base] ?? null;
+  };
   return {
-    events,
+    events, nameOfEffect,
     nameOf(event: number): string | null {
       const record = events[event];
       if (!record || record.effect < 1) return null;
-      const effect = record.effect;
-      if (effect <= GLOBAL_COUNT) return global[effect - 1] || null;
-      return own[effect - base] ?? null;
+      return nameOfEffect(record.effect);
     },
   };
 }

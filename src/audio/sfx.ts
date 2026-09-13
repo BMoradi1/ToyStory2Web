@@ -169,8 +169,11 @@ export class SoundBank {
     offset: { x: number; y: number; z: number },
     yaw: { sin: number; cos: number },
     sustained = false,
+    volume?: number,
   ): void {
-    const { left, right } = earLevels(offset, yaw);
+    const ears = earLevels(offset, yaw);
+    const left = volume === undefined ? ears.left : Math.min(128, ears.left * volume / 128);
+    const right = volume === undefined ? ears.right : Math.min(128, ears.right * volume / 128);
     const loudest = Math.max(left, right);
     if (loudest <= 0) return;
     const dB = MUSIC_VOLUME_CURVE[Math.min(MUSIC_VOLUME_CURVE.length - 1, Math.round(loudest))] ?? 0;

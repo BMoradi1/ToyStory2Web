@@ -94,7 +94,13 @@
  level units away from its simulation) and false tipping at flat rail ends.
  tools/stomp-probe.ts and tools/stomp-flow-check.js cover the moves and the
  full puzzle. User clarified the paint-mixing trailer, not outdoor paint cans.
- Remaining cosmetic sound sequences/sparkles are explicit in docs/LEVELS.md.
+ PROP FEEDBACK now implemented (2026-09-13): retail paint success/error
+ sound scripts, including timed notes and shared error-tail jump. Path 58
+ guide sparkles use the authored positions, 16-tick emission gate and four
+ phases; chair, pushable and trailer-control interactions retire their hints.
+ Level/selector loads clear the sequence and guide state. Other unported
+ props still need guide-retirement hooks. tools/prop-feedback-probe.ts plus
+ stomp/paint and level-to-selector browser checks cover this follow-up.
  MENU QUEUE PRESERVED: complete controller/GFX parity and load/save transition timing;
  unported lens flare/texture animation/gamma need renderer support first.
  See docs/FRONTEND.md and tools/retail-menu-probe.ts for exact coverage.

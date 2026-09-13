@@ -47,6 +47,7 @@
   const before = { scene:ts2.front.scene, player:ts2.player, creatures:ts2.creatures, effects:ts2.effects };
   await pause(2000);
   const after = { scene:ts2.front.scene, player:ts2.player, creatures:ts2.creatures, effects:ts2.effects };
+  if (ts2.guideSparkles.points.length || ts2.soundSequence) throw new Error('previous prop feedback remains in selector');
   if (ts2.player != null) throw new Error('previous player remains in selector');
   if (ts2.tickGame({},60) !== null) throw new Error('previous gameplay still ticks');
   return {screen:ts2.front.screen, before, after};

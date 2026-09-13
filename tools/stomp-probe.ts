@@ -55,11 +55,12 @@ function land(level:number,surface:number){
 }
 const chair=land(1,8);assert.equal(chair.state.chair,3);
 for(let i=0;i<4;i++) {stepPlayer(chair.buzz,NO_INPUT,chair.run,chair.floor,0);stepStompProps(chair.state,1,chair.buzz,chair.world,chair.dat);}
+assert.deepEqual(chair.state.guidesSpent,[0]);
 assert(chair.buzz.launched);assert.equal(chair.buzz.vy,-4736);assert.equal(chair.buzz.stomp,0);
 stepPlayer(chair.buzz,NO_INPUT,chair.run,chair.floor,0);
 assert(chair.buzz.vy< -4000);assert(Math.hypot(chair.buzz.vx,chair.buzz.vz)>2800,'spring speed survives regular movement clamp');
 for(const surface of [33,34,35]) {
- const paint=land(4,surface);assert.equal(paint.state.paint.button,surface-31);assert.equal(paint.state.paint.cooldown,59);
+ const paint=land(4,surface);assert.deepEqual(paint.state.guidesSpent,[0,1,2]);assert.equal(paint.state.paint.button,surface-31);assert.equal(paint.state.paint.cooldown,59);
 }
 const {world,dat}=scene(4);
 const misplaced=createStompProps(),buttonBuzz=createPlayer();buttonBuzz.onGround=true;buttonBuzz.stompImpact=true;
@@ -72,7 +73,8 @@ stepStompProps(misplaced,4,buttonBuzz,world,dat,{x:10300*32,y:-4000*32,z:19050*3
 assert.equal(misplaced.paint.cooldown,0,'standing on the button does not retrigger it');
 for(const reverse of [false,true]) {
  const state=createStompProps(),buzz=createPlayer(),bucket={x:0,y:-4000*32,z:19050*32};buzz.onGround=true;
- const tick=()=>{stepStompProps(state,4,buzz,world,dat,bucket);buzz.stompImpact=false;};
+ const cues:number[]=[];
+ const tick=()=>{stepStompProps(state,4,buzz,world,dat,bucket);if(state.sequence!==null)cues.push(state.sequence);buzz.stompImpact=false;};
  const fill=(colour:number)=>{
    bucket.x=dat.paths.find(p=>p.id===3)!.points[colour+3]!.x*32;
    buzz.contacts=[{group:world.groups.findIndex(g=>g.surface===32+colour),normal:{x:0,y:-1,z:0}}];
@@ -84,7 +86,8 @@ for(const reverse of [false,true]) {
    assert(state.paint.solved&(1<<target));for(let i=0;i<32;i++)tick();
  }
  assert.equal(state.paint.solved,7);
- fill(1);fill(1);assert.equal(state.paint.first,0,'same colour drains instead of getting stuck');
+ assert.deepEqual(cues,[-5,-5,-5]);
+ fill(1);fill(1);assert.equal(cues.at(-1),-6);assert.equal(state.paint.first,0,'same colour drains instead of getting stuck');
 }
 console.log('PASS: stomp timing, recovery, damage, interruption; real chair and three paint surfaces; all mixes in both orders and duplicate-colour reset.');
 

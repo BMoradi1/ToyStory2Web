@@ -387,3 +387,30 @@ One thing the port had to get right that the decode only implies: the
 original re-reads the target's hit-shape centre EVERY tick, so a bolt
 tracks what it is chasing. Snapshotting it at spawn leaves the bolt
 orbiting the spot a flier has left.
+
+### Prop feedback: guide points and sound sequences
+
+`src/sim/guide-sparkles.ts` reads path 58 without modifying the source data.
+The zero point separates primary kind `0x71` hints from secondary kind `0x73`
+hints. `FUN_0049fb40` runs on the 16-tick gate, visits one of four interleaved
+point groups, and emits only within the original squared camera-distance
+threshold. `FUN_0049fab0` retirement prevents future emission and kills live
+hints at the exact authored position. Pushable engagement retires its primary
+index; the chair launch retires secondary 0; a trailer paint control retires
+secondary 0–2. Other prop scripts need retirement hooks as they are ported.
+
+`src/audio/sequences.ts` implements the shared global sequence slot from
+`FUN_0049e910` / `FUN_0049e9d0`. It reads the six pointers and shared script
+pool from the user's executable, skips the three rumble-header words, and
+processes effect/pitch/volume/delay records, termination and backward jumps.
+The delay comparison is strictly negative: a delay of 5 spaces notes six
+simulation ticks apart. A new cue replaces the old one. Paint success is -5;
+error is -6, whose jump reuses -5's final volume-16 note. Playback resolves
+one-based effect IDs directly, applies positional attenuation and script
+volume, and retains the PC path's ignored SPU pitch. Sequence sounds are
+preloaded when audio starts. Simulation pause freezes their clock; level
+loads, respawn and selector entry clear the active slot and guide state.
+
+`tools/prop-feedback-probe.ts` verifies actual script timing, the shared tail,
+looping control flow and guide cadence/lifetime. The stomp probes verify cue
+triggers and retirement, including duplicate-colour reset and all mixtures.

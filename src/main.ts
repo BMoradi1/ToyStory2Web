@@ -1,3 +1,5 @@
+import { readSoundSequences, startSequence, stepSequence, type SoundSequences, type SequenceVoice } from './audio/sequences.ts';
+import { createGuideSparkles, stepGuideSparkles, spendGuide } from './sim/guide-sparkles.ts';
 import { createStompProps, stepStompProps, stompObjects, paintStreamScale } from './sim/stomp-props.ts';
 import { CREDIT_SLOTS, CREDIT_TEXT } from './front/endings.ts';
 import { chooseSaveFile } from './front/browser-menu.ts';
@@ -289,6 +291,8 @@ async function showLevel(index: number): Promise<void> {
   levelPoles = [];
   levelZipLines = [];
   stompProps = createStompProps();
+  guideSparkles = createGuideSparkles([]);
+  sequenceVoice = null;
   tasks = null;
   talk = null;
   creatureArt.clear();
@@ -638,6 +642,8 @@ async function open(dir: GameDir): Promise<void> {
         return { index: which, yaw: b.segYaw, block: { x: b.x, y: b.y, z: b.z }, player: { x: player.x, y: player.y, z: player.z } };
       },
       get stompProps() { return stompProps; },
+      get guideSparkles() { return guideSparkles; },
+      get soundSequence() { return sequenceVoice; },
       get stompSurfaces() {
         return currentCollisionWorld?.groups.flatMap((g, group) => {
           if (![8, 32, 33, 34, 35].includes(g.surface ?? -1)) return [];
@@ -1202,6 +1208,8 @@ async function spawnPlayer(): Promise<void> {
   // implemented, so the rest stay hidden until `ts2.revealTokens()`.
   const level = levelNumber(sceneId) ?? 0;
   stompProps = createStompProps();
+  guideSparkles = createGuideSparkles([]);
+  sequenceVoice = null;
   drawStompProps(level);
   // The cast starts running now. The engine builds its entities at level load
   // and ticks them beside the player, so the random stream is rewound here to
@@ -1267,6 +1275,10 @@ async function spawnPlayer(): Promise<void> {
   // executable, and its second half is per level (docs/HUD.md).
   spriteTable = exeBytes ? readSpriteTable(exeBytes, level) : [];
   soundTable = exeBytes ? readSoundTable(exeBytes, level) : null;
+  sequenceTable = exeBytes ? readSoundSequences(exeBytes) : null;
+  sequenceVoice = null;
+  guideSparkles = createGuideSparkles(currentLevel.level.paths.find(p => p.id === 58)?.points ?? []);
+  preloadSequenceSounds();
   // The effect pool: the laser bolt, the robots' shots, sparks, dust and the
   // coins a creature spills (docs/EFFECTS.md). Its templates come from the
   // user's own executable, like the sprite and sound tables.
@@ -1340,6 +1352,7 @@ function stepEffectsNow(): void {
   const world = effectWorld();
   effects.spinning = player.spin > 0;
   stepEffects(effects, world);
+  stepGuideSparkles(guideSparkles, effects, world);
   touchPlayer(effects, world);
 
   // Damage the laser landed. The creature port already knows what kind 4 is.
@@ -1675,6 +1688,10 @@ function drawCoins(): void {
  */
 function playEvent(event: number, at?: { x: number; y: number; z: number }): void {
   if (!sound || !soundTable) return;
+  if (event < 0 && sequenceTable) {
+    sequenceVoice = startSequence(sequenceTable, event, at ?? player ?? { x: 0, y: 0, z: 0 });
+    return;
+  }
   const name = soundTable.nameOf(event);
   // Kept whether or not anything is audible, so a test can see that the right
   // event was raised without a sound device.
@@ -1696,6 +1713,35 @@ function playEvent(event: number, at?: { x: number; y: number; z: number }): voi
     { sin: sinOf(camera.yaw) / 0x4000, cos: cosOf(camera.yaw) / 0x4000 },
     sustained,
   );
+}
+
+function preloadSequenceSounds(): void {
+  if (!sequenceTable || !soundTable) return;
+  const names = new Set<string>();
+  for (let id = -1; id >= -6; id--) {
+    const voice = startSequence(sequenceTable, id, { x: 0, y: 0, z: 0 })!;
+    for (let tick = 0; tick < 256 && voice.pc >= 0; tick++) {
+      const note = stepSequence(sequenceTable, voice);
+      const name = note ? soundTable.nameOfEffect(note.effect) : null;
+      if (name) names.add(name);
+    }
+  }
+  sound?.preload([...names]);
+}
+
+function tickSoundSequence(): void {
+  if (!sequenceTable || !sequenceVoice) return;
+  const voice = sequenceVoice;
+  const note = stepSequence(sequenceTable, voice);
+  if (voice.pc < 0) sequenceVoice = null;
+  if (!note || !soundTable || !sound || !camera) return;
+  const name = soundTable.nameOfEffect(note.effect);
+  soundLog.push(`sequence:${voice.id}:${name ?? 'silent'}:${note.volume}`);
+  if (soundLog.length > 32) soundLog.shift();
+  // Retail PC ignores the script's SPU pitch word.
+  if (name) sound.playAt(name,
+    { x: voice.x - camera.x, y: voice.y - camera.y, z: voice.z - camera.z },
+    { sin: sinOf(camera.yaw) / 0x4000, cos: cosOf(camera.yaw) / 0x4000 }, false, note.volume);
 }
 
 /** What the HUD needs to know this tick, gathered from the sim. */
@@ -2496,6 +2542,8 @@ async function loadDioramaScene(): Promise<{ paths: DatLevel['paths']; placedOf:
   levelPoles = [];
   levelZipLines = [];
   stompProps = createStompProps();
+  guideSparkles = createGuideSparkles([]);
+  sequenceVoice = null;
   tasks = null;
   talk = null;
   talkSlot = -1;
@@ -2718,6 +2766,9 @@ let pushBlocks: PushState | null = null;
 let levelPoles: Pole[] = [];
 let levelZipLines: ZipLine[] = [];
 let stompProps = createStompProps();
+let guideSparkles = createGuideSparkles([]);
+let sequenceTable: SoundSequences | null = null;
+let sequenceVoice: SequenceVoice | null = null;
 /** Which token tasks are done, and the talkers' timers. */
 let tasks: TaskState | null = null;
 /** The slot the talk box will reveal when it closes, or -1. */
@@ -2776,7 +2827,7 @@ function setPlaying(on: boolean): void {
     input.attach();
     // Entering play is a key press, which is the gesture browsers want before
     // they will start an audio device.
-    void sound?.start().then(() => sound?.preload(PLAYER_EFFECTS));
+    void sound?.start().then(() => { sound?.preload(PLAYER_EFFECTS); preloadSequenceSounds(); });
     // The engine picks the track from the level every tick; here the level
     // only changes on a load, so asking once when play starts is the same.
     music?.start();
@@ -2817,6 +2868,7 @@ function tickPushBlocks(held: PlayerInput): void {
       player.vx = push.playerVelocity.x;
       player.vz = push.playerVelocity.z;
     }
+    for (const index of pushBlocks.sparksSpent) spendGuide(guideSparkles, effects, index, false);
     for (const effect of pushBlocks.sounds) sound?.play(effect);
     if (push.moved.length > 0) drawPushBlocks();
   }
@@ -2948,6 +3000,8 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   }
   if (currentLevel) {
     stepStompProps(stompProps, levelNow, player, currentCollisionWorld, currentLevel.level, pushBlocks?.blocks.find(b => b.collisionObject === 0));
+    for (const index of stompProps.guidesSpent) spendGuide(guideSparkles, effects, index, true);
+    if (stompProps.sequence !== null) playEvent(stompProps.sequence, player);
     if (levelNow === 4 && stompProps.paint.solved === 7 && !stompProps.paint.reward && pickups) {
       revealToken(pickups, 3); stompProps.paint.reward = true; drawPickups();
     }
@@ -3120,6 +3174,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   // Beams hit immediately; disks move in the effect pool.
   if (player.laserFired !== null) fireLaser();
   stepEffectsNow();
+  tickSoundSequence();
 
   if (pickups) {
     const taken = stepPickups(pickups, player);

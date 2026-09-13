@@ -1327,9 +1327,14 @@ Falling-paint objects 33..35 grow for eight ticks, stay on until the final
 12 ticks, then disappear. The PAINT creature (type 17, placement slot 5)
 is the original liquid mesh. The renderer places it inside the moving
 bucket and applies the script's nonuniform fill scale and RGB transitions;
-no replacement artwork is generated. Completion/error sound sequences
-(-5/-6 through the separate sequence player) and guide-sparkle retirement
-remain outside this port; the ground-pound and chair sound events work.
+no replacement artwork is generated. Completion/error cues (-5/-6) now use
+the executable's separate timed sequence player, including the error cue's
+jump into the success cue's final fade note. PC ignores the SPU pitch word.
+Authored path-58 guide sparkles retire when the chair launches, a pushable
+engages, or a trailer paint control activates (all three control guides).
+Both future emission and matching live sparkles stop. Other unported props
+still need their own guide-retirement hooks; this does not implement the
+outdoor paint cans.
 
 **Two additional bucket fixes found by playing the puzzle:**
 

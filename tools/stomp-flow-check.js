@@ -51,6 +51,7 @@
   pound(8);
   ts2.tickGame({},4,0);
   if(!ts2.player.launched||ts2.player.vy!==-4736)throw Error('chair failed to fling Buzz '+JSON.stringify({player:ts2.player,props:ts2.stompProps,zones:ts2.zones}));
+  if(!ts2.guideSparkles.points.find(p=>p.kind===0x73&&p.index===0&&p.spent))throw Error("chair guide not retired");
   const chair={vy:ts2.player.vy,timer:ts2.stompProps.chair};
   const selector=document.querySelector('#level');
   selector.selectedIndex=[...selector.options].findIndex(o=>o.text==='level04/level');
@@ -58,6 +59,7 @@
   await wait(()=>document.querySelector('#status').textContent.includes('level04/level: ready'), 'construction did not load');
   await ts2.spawnPlayer();
   ts2.viewer.stop();
+  if(ts2.soundSequence||ts2.guideSparkles.points.some(p=>p.spent))throw Error("feedback state leaked across levels");
   function pushTo(x) {
     reset();ts2.goToPushBlock(0);
     let b=ts2.pushBlocks.blocks[0];
@@ -69,6 +71,12 @@
     ts2.tickGame({},1,0);
     if(ticks>=700)throw Error('bucket cannot reach '+x+': '+JSON.stringify({blocks:ts2.pushBlocks,player:ts2.player}));
   }
+  pushTo(10300);
+  for(let i=0;i<2;i++){pound(33);ts2.tickGame({},65,0);}
+  ts2.tickGame({},35,0);
+  if(ts2.stompProps.paint.first!==0||!ts2.sound.raised.some(s=>s.startsWith('sequence:-6:')))
+    throw Error('duplicate-colour error cue/reset missing');
+  if(!ts2.guideSparkles.points.find(p=>p.kind===0x71&&p.index===0&&p.spent))throw Error('bucket guide not retired');
   const mixes=[];
   for(const [target,colours] of [[7300,[1,2]],[8000,[1,3]],[8700,[2,3]]]) {
     for(const colour of colours) {
@@ -79,9 +87,11 @@
     const liquid=ts2.viewer.creatureMeshes.get(5);
     if(!liquid||liquid.scale.y<0.4)throw Error('liquid mesh did not fill');
     pushTo(target);ts2.tickGame({},35,0);
+    if(!ts2.sound.raised.some(s=>s.startsWith("sequence:-5:")))throw Error("paint success cue missing");
     mixes.push({...ts2.stompProps.paint});
   }
   if(ts2.stompProps.paint.solved!==7||!ts2.stompProps.paint.reward)throw Error('paint puzzle did not reveal its token');
+  if(ts2.guideSparkles.points.filter(p=>p.kind===0x73&&p.index<3).some(p=>!p.spent))throw Error("paint guides not retired");
   ts2.zoneCulling(false);
   ts2.viewer.renderer.render(ts2.viewer.scene,ts2.viewer.camera);
   console.log('STOMP BROWSER PASS',JSON.stringify({chair,mixes,blocks:ts2.pushBlocks}));

@@ -16,8 +16,9 @@ import {
   stepListMenu, stepSelect, stepTitle,
   type FrontFrame, type FrontStrings, type PadWord,
 } from './screens.ts';
-import type { Picture, TitleCards } from './title.ts';
+import type { FrontArt, Picture, TitleCards } from './title.ts';
 import { pictureFor } from './title.ts';
+import { createSummary, stepSummary, SUMMARY, type LevelSummary, type SummaryState } from './summary.ts';
 import {
   createDiorama, dioramaScene, hiddenObjects, stepDiorama,
   type DioramaFrame, type DioramaLists, type DioramaScene, type DioramaState, type Placing,
@@ -52,6 +53,9 @@ export interface FrontHost {
   playLevel(position: number): Promise<'exit' | 'won'>;
   /** The attract loop's boot again: logos and cards. */
   attract(): Promise<void>;
+  /** Results captured before the played level is discarded; bosses skip the tally. */
+  summary(): LevelSummary | null;
+  loadSummaryArt(): Promise<FrontArt | null>;
   /** "exit" on the list menu. */
   quit(): void;
   /**
@@ -77,7 +81,8 @@ export interface FrontHost {
 type Screen =
   | { kind: 'title'; state: ReturnType<typeof createTitle> }
   | { kind: 'menu'; state: ReturnType<typeof createListMenu> }
-  | { kind: 'select'; state: ReturnType<typeof createSelect> };
+  | { kind: 'select'; state: ReturnType<typeof createSelect> }
+  | { kind: 'summary'; state: SummaryState };
 
 export class FrontEnd {
   private layer: HTMLDivElement | null = null;
@@ -97,6 +102,7 @@ export class FrontEnd {
   /** The diorama while the select is up, or null without its scene. */
   private diorama: { scene: DioramaScene; state: DioramaState; hidden: Set<number> } | null = null;
   lastDiorama: DioramaFrame | null = null;
+  private summaryArt: FrontArt | null = null;
 
   constructor(private readonly host: FrontHost, private readonly parent: HTMLElement) {}
 
@@ -145,6 +151,17 @@ export class FrontEnd {
         this.hide();
         this.host.music(null);
         await this.host.playLevel(select.pos);
+        const result = this.host.summary();
+        if (result) {
+          this.summaryArt = await this.host.loadSummaryArt();
+          if (this.summaryArt) {
+            this.host.music(SUMMARY.music);
+            this.show();
+            await this.play({ kind: 'summary', state: createSummary(result) });
+            this.hide();
+          }
+          this.summaryArt = null;
+        }
         this.show();
       }
     } finally {
@@ -190,7 +207,9 @@ export class FrontEnd {
     let result;
     if (screen.kind === 'title') result = stepTitle(screen.state, this.pad, this.host.strings);
     else if (screen.kind === 'menu') result = stepListMenu(screen.state, this.pad, this.host.strings, this.inGame);
-    else {
+    else if (screen.kind === 'summary') {
+      result = stepSummary(screen.state, this.pad, this.host.strings.pressJumpToExit, this.host.rand);
+    } else {
       result = stepSelect(screen.state, this.pad, this.host.strings);
       if (this.diorama) {
         const frame = stepDiorama(this.diorama.state, this.diorama.scene, screen.state.pos, screen.state.ticks, this.host.rand);
@@ -228,8 +247,9 @@ export class FrontEnd {
 
   private paint(frame: FrontFrame, table: readonly (SpriteHeader | null)[]): void {
     if (!this.painter || !this.canvas) return;
-    const card: Picture | null = frame.picture === null ? null : pictureFor(this.host.cards, frame.picture);
-    const sheets = (this.diorama ? this.host.selectSheets() : null) ?? this.host.sheets;
+    const summary = this.screen?.kind === 'summary' ? this.summaryArt : null;
+    const card: Picture | null = frame.picture === null ? null : pictureFor(summary?.cards ?? this.host.cards, frame.picture);
+    const sheets = summary?.sheets ?? (this.diorama ? this.host.selectSheets() : null) ?? this.host.sheets;
     this.painter.paintFront(frame, table, sheets, card?.canvas ?? null);
   }
 

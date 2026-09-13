@@ -45,6 +45,18 @@
  takes ten off the number), and the select's diorama - camera, show/hide
  lists, vehicles - is ported over it. Next on Opus: the summary screen
  (FUN_004398b0, decoded in the doc, art present in levelt1.ngn).
+ 2026-09-12: SLIME GAMEPLAY is ported (src/sim/slime-boss.ts); its
+ paired animation layers and five stages pass tools/slime-probe.ts.
+ Cosmetic scene effects and exact cut framing remain in docs/LEVELS.md.
+ SELECTOR RETURN fixed: discard gameplay state before loading the diorama,
+ including particles/HUD, so its scripted camera cannot restart gameplay.
+ SUMMARY IS IN (src/front/summary.ts, docs/FRONTEND.md): token reveals,
+ sparks, coin tally, power-up icons and exit fade using levelt1.ngn.
+ Machine-code checks corrected the timing: one coin per three ticks;
+ the clock holds at 180 until Jump. Chromium verified level -> summary
+ -> clean selector; tools/front-flow-check.js reproduces that flow.
+ NEXT implementation item: game-over screen and credits, then options/load
+ game. Earlier notes saying the summary or parseDat retile is next are stale.
 ================================================================================
 
  Read TODOPLAN.txt for WHAT to do. This file is about WHO should do it and what

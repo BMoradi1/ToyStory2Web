@@ -1,8 +1,8 @@
 ================================================================================
  ToyStory2Web - PROJECT ROADMAP
  Browser reimplementation of Toy Story 2: Buzz Lightyear to the Rescue (1999)
- Last updated: 2026-09-04 (Phase 1 done; Phase 2 playable - Buzz walks, jumps
- and is animated from the game's own tables. P2.3's mover is the open front.)
+ Last updated: 2026-09-12 (slime gameplay ported; selector entity leak
+ fixed; post-level summary implemented and verified in Chromium).
 ================================================================================
 
  HOW TO USE THIS FILE
@@ -748,20 +748,19 @@
                 The camera cuts every boss uses are ported 2026-09-07
                 (docs/CAMERA.md "Cuts", src/sim/camera-cut.ts), and the
                 talk box now eases back through the same blend. Left:
-                internal levels 3, 9, 12 and 15, each its own fight.
-                LEVEL 3 (the Slime, sixth played) is DECODED 2026-09-07
-                (docs/LEVELS.md "The Slime"); it is a size-is-health
-                blob with five stages and needs four things first: a
-                per-creature draw scale, a rewritable hit table, effect
-                kinds 0x3f/0x41/0x1b, and the player knockback
-                FUN_004071e0. LEVEL 9 (the pod, ninth played) is
+                internal levels 9, 12 and 15, each its own fight.
+                LEVEL 3 (the Slime, sixth played) GAMEPLAY PORTED 2026-09-12:
+                paired animation layers, size-based health, five stages,
+                regrowth, attacks, hit geometry, HUD and victory routing.
+                tools/slime-probe.ts passes against the install. Cosmetic
+                scene effects and exact cut framing remain (docs/LEVELS.md). LEVEL 9 (the pod, ninth played) is
                 DECODED 2026-09-07 (docs/LEVELS.md "The pod"): a
                 stage-clamped boss that releases helpers you must kill,
                 six orbiting BUBs, a wrist laser. LEVEL 12 (Zurg) is
                 DECODED ("Zurg"): the easiest port after 6, but its
                 scene cannot load until parseDat is retiled. LEVEL 15
                 is DECODED ("The finale"), fighters included. Every boss
-                is now read; 3, 9, 12 and 15 wait on the port pieces
+                is now read; 9, 12 and 15 wait on the port pieces
                 each write-up names, 12 being the easiest.
  P3.8 [PART]    The talk box: DONE for hint signs 2026-09-05
                 (src/sim/talk.ts). Touching a signpost freezes Buzz, flies
@@ -855,9 +854,13 @@
            2026-09-08: the select's DIORAMA is in (src/front/diorama.ts)
            - "level 16" is level06/level1 with the t1 textures, and the
            camera, the show/hide lists and the vehicles follow the
-           routine. Left, in order: the SUMMARY screen FUN_004398b0
-           (decoded in the doc; levelt1.ngn has all its art) between a
-           level and the select; game over and the credits (small);
+           routine. 2026-09-12: SUMMARY PORTED (src/front/summary.ts):
+           original art, token reveals/sparks, coin tally, power-up icons,
+           fade and Jump-to-exit. Timing checked against machine code.
+           tools/summary-probe.ts and Chromium level -> summary -> select
+           pass. The selector no longer resumes the old level simulation
+           or retains its entities/effects (tools/front-flow-check.js).
+           Left, in order: game over and the credits (small);
            options and load game (unread; load game and the movie viewer
            use the diorama scene with texture sets 3 and 2).
  [was]     Cutscenes: MPEG-1 in the browser (jsmpeg-style decoder or

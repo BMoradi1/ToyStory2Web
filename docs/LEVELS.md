@@ -878,14 +878,13 @@ chases and charges across the garden; and taking it to 10 health starts
 the death, sinks it, wins the level and puts 0x80 in the save's level 6
 token byte. The boss bar and the boss theme both come up with the fight.
 
-## The Slime, internal level 3 — DECODED, not ported
+## The Slime, internal level 3 — gameplay ported 2026-09-12
 
 Decoded 2026-09-07 from `FUN_0041a8a0` (init) and `FUN_0041aa10` (tick),
 the sixth level played and world 2's boss. Scene `level03/level`, one
 creature, type 16 SLIME on AI script 14, placed with 99 health and speed
-64. This is a different kind of fight from level 6's and needs four
-things the port does not have yet, listed at the end; the numbers here
-are the whole of it.
+64. This is a different kind of fight from level 6's; the original
+behaviour is described below, with current port coverage at the end.
 
 **The idea.** The slime is a blob whose SIZE is its health. Two numbers
 carry it: the size it is trying to be, `DAT_0052f75c`, and the size it
@@ -988,15 +987,31 @@ position). Where "light" appears below, read "scene object".
    (`DAT_00830d88 = -3`), which the laser homes on and the HUD marks;
    with none, the marker is off.
 
-**What the port needs before this can move.** (1) A per-creature draw
-scale (+0x2c/2e/30, 0x2000 = 1) and the draw modifier triple +0x24/26/28
-with its mode word +0x34, which the port's `offsetX/Y/Z` currently
-holds from the model — the two uses want reconciling. (2) Rewriting the
-hit table per tick, which `hitShapes` is read-only for now. (3) Effect
-kinds 0x3f (the spat blob, with the laser target hook), 0x41 and 0x1b,
-none exercised yet. (4) The knockback `FUN_004071e0(yaw, bits)` on the
-player. Lights and the overlay are cosmetic; the camera cuts and the
-save bit are already there.
+**Port coverage (2026-09-12).** `src/sim/slime-boss.ts` owns the entrance,
+five shrinking/regrowing stages, script handoffs, spit and landing signals,
+player contact, death delay and win flags. The level-task dispatcher forwards
+completion to the existing save and level-exit path. The HUD uses the staged
+size bar. The existing effect templates implement spit kind 0x3f and mist
+kind 0x41; stage transitions burst the live blobs, and the first live blob
+is a wrist-beam target. Creature hit shapes are cloned from the model before
+being rewritten, so restarting a level cannot inherit another fight's shapes.
+
+The renderer now applies per-creature scale and pairs the slime's animation
+slots (0/1, 2/3, 4/5, 6/7). Each pair has complementary tracks; rendering only
+the script-selected odd slot omitted the other animated parts.
+
+`tools/slime-probe.ts "Toy Story 2"` validates the animation pairs across all
+frames, the original attack script, all five stages through the damage/stun
+path, regrowth cuts, delayed victory, independent hit geometry, and blob/beam
+intersection against the user's local assets. Browser visual verification was
+unavailable during this change.
+
+Remaining presentation work: scene-object 0's movement/bounce, object 0x32
+and the saved packet word, the wobble/flash draw modifier, ambient drips and
+overlay/light effects, voice sequences, and the HUD's blob marker. Camera cut
+timings and look heights are implemented; eye distance is an approximation
+(0x40 cut units). Disk-launcher targeting still uses the existing creature
+selection path.
 
 ## The pod, internal level 9 — DECODED, not ported
 

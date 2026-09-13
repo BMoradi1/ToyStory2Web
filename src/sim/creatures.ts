@@ -119,6 +119,8 @@ export interface Creature {
    * none. The race car's wheels.
    */
   partSpin: number[] | null;
+  /** Per-creature model scale; 1 is the authored size. */
+  drawScale: number;
   /** The `.anm` slot the anim opcode selected. */
   animState: number;
   /** 16.16: the whole part is the frame number. */
@@ -281,6 +283,7 @@ export function buildCreature(record: CreatureRecord, fromList: boolean, previou
     wantYaw: heading,
     hover: 0,
     partSpin: null,
+    drawScale: 1,
     animState: 0,
     frame: 0,
     floorY: INT_MIN,

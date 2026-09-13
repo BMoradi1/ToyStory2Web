@@ -17,6 +17,7 @@ import { CREATURE_FLAGS, CREATURE_HEALTH, type Creature } from './creatures.ts';
 import { HAMM_COINS, POTATO_PARTS, TASK_TEXT, type LevelTasks } from './level-data.ts';
 import type { RandomStream } from './creatures.ts';
 import { cos, sin } from './trig.ts';
+import { stepSlimeBoss, type SlimeBoss, type SlimeWorld } from './slime-boss.ts';
 
 /** A dialogue the level wants opened, as `FUN_004027f0` takes it. */
 export interface DialogueRequest {
@@ -46,6 +47,7 @@ export const enum RaceState {
 }
 
 export interface TaskState {
+  slime: SlimeBoss | null;
   /** Bit per slot, the engine's own per-level byte of saved token bits. */
   done: number;
   /** Idle-chatter timers, one per talker. */
@@ -151,6 +153,7 @@ export function startLevelTasks(tasks: TaskState, level: number, held = 0): void
 export function createTasks(): TaskState {
   return {
     done: 0, hammChatter: 0, hintChatter: 0, hintIndex: -1,
+    slime: null,
     boss: 0, bossGone: 0, reach: 0, fetch: 0, fetchDone: 0, fetchClock: 100, slowTick: 0, potatoPart: 0, powerUps: 0, potatoChatter: 0, challenge: 0, challengeFrom: 0,
     bossPhase: 0, bossClock: 0, bossHurt: 0, bossHealthWas: -1, bossRamp: 0, bossSwing: 0,
     bossTaunt: 0, bossShout: 0, bossYaw: 0, bossFlip: 0, bossCut: 0,
@@ -450,6 +453,10 @@ export function stepTasks(
   level: LevelTasks,
   creatureAt: (index: number) => Creature | undefined,
   world: {
+    spit?: SlimeWorld['spit'];
+    burstBlobs?: SlimeWorld['burstBlobs'];
+    touch?: SlimeWorld['touch'];
+    shake?: SlimeWorld['shake'];
     coins: number; found: number; rand: RandomStream; talking: boolean;
     /** Where Buzz is, for the race's lap box and the boss's height band. */
     x: number; y: number; z: number;
@@ -651,6 +658,16 @@ export function stepTasks(
         };
       }
     }
+  }
+
+  if (level.slimeBoss && tasks.slime) {
+    const boss = creatureAt(level.slimeBoss.creature);
+    if (boss) stepSlimeBoss(tasks.slime, boss, world);
+    tasks.bossPhase = tasks.slime.phase === 999 ? 2 : tasks.slime.phase >= 1000 ? 3 : tasks.slime.phase;
+    tasks.bossCut = tasks.slime.cutTicks;
+    if (tasks.slime.beaten) { tasks.bossBeaten = true; tasks.slime.beaten = false; }
+    if (tasks.slime.won) { tasks.levelWon = true; tasks.slime.won = false; }
+    return null;
   }
 
   // --- a world boss owns the whole level.

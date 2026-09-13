@@ -14,13 +14,14 @@
  *
  *   npx tsx tools/browser-shot.ts "Toy Story 2" out.png [--level N] [--eval "js"]
  *
+ * `--eval-file path.js` reads the same script from a file for repeatable checks.
  * `--eval` runs after the level is up, with `ts2.viewer` in scope, so a camera
  * can be placed to reproduce a particular screenshot. Needs `npm run dev` on
  * port 5173 (or BASE_URL).
  */
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 const args = process.argv.slice(2);
 const positional = args.filter((a, i) => !a.startsWith('--') && !(args[i - 1] ?? '').startsWith('--'));
@@ -35,7 +36,8 @@ const levelIndex = Number(flag('--level') ?? 0);
 if (!Number.isInteger(levelIndex) || levelIndex < 0) {
   throw new Error('--level must be a non-negative integer');
 }
-const evalJs = flag('--eval');
+const evalFile = flag('--eval-file');
+const evalJs = evalFile ? readFileSync(evalFile, 'utf8') : flag('--eval');
 const baseUrl = process.env.BASE_URL ?? 'http://localhost:5173/';
 const browser = process.env.CHROMIUM ?? 'chromium';
 

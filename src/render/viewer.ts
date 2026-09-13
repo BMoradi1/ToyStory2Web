@@ -691,10 +691,11 @@ export class Viewer {
   }
 
   /** Where a drawn creature stands and which way it faces. Renderer units. */
-  placeCreatureMesh(id: number, x: number, y: number, z: number, facing: number): void {
+  placeCreatureMesh(id: number, x: number, y: number, z: number, facing: number, scale = 1): void {
     const object = this.creatureMeshes.get(id);
     if (!object) return;
     object.position.set(x, y, z);
+    object.scale.setScalar(scale);
     // Characters are authored facing +Z and Z is negated on the way in, the
     // same correction the player gets.
     object.rotation.set(0, Math.PI - facing, 0);

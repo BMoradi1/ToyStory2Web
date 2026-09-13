@@ -78,6 +78,7 @@ export interface FrontStrings {
   jumpToSelect: string;
   cancelToGoBack: string;
   needMoreTokens: string;
+  pressJumpToExit: string;
   /** Indexed by play position 1..15; index 0 unused. */
   levelNames: string[];
   tokensWanted: number[];
@@ -107,6 +108,7 @@ export function readFrontStrings(exe: Uint8Array, exeString: (exe: Uint8Array, a
     jumpToSelect: exeString(exe, FRONT_TEXT.jumpToSelect),
     cancelToGoBack: exeString(exe, FRONT_TEXT.cancelToGoBack),
     needMoreTokens: exeString(exe, FRONT_TEXT.needMoreTokens),
+    pressJumpToExit: exeString(exe, FRONT_TEXT.pressJumpToExit),
     levelNames,
     tokensWanted,
   };

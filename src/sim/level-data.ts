@@ -332,6 +332,8 @@ export interface BossFight {
 }
 
 export interface LevelTasks {
+  /** Internal level 3 uses size and regrowth rather than entity health. */
+  slimeBoss?: { creature: number };
   /** The level's boss, on a level whose number divides by three. */
   bossFight?: BossFight;
   /** `FUN_004a1ce0(creature, pathTag, x, y, slot)`: talk to him holding fifty coins. */
@@ -600,6 +602,7 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
       askText: 0x4f0fc0, doneText: 0x4f1078, slot: 1, needed: 5, countedBy: 'creature',
     },
   },
+  3: { slimeBoss: { creature: 0 } },
   4: {
     boss: {
       creature: 0x18,

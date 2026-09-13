@@ -252,7 +252,7 @@ The level select's sprite table (level 16's) names its art on this
 bundle: the token spinner on slot 0, the "tokens" sign on 4, the arrows
 and digits on 17 (the same sheet as `level00`'s 17) and the font on 31.
 
-## The summary, `FUN_004398b0` (decoded, not ported)
+## The summary, `FUN_004398b0` (ported 2026-09-12)
 
 Picture 0 of `levelt1` (`token256`), track 0x15 `levcomp`, over the 320
 space. The five token slots at `0x24 + 0x34 i`, y 0x20 as sprite 76
@@ -264,10 +264,34 @@ sound 1, each throwing fifteen sparks from the random table
 0x52 and 0x53 (`levcomp1/2`, slots 18 and 19) at y 0x3c; the five
 power-up icons of sprite 0x51 (`all_pickups`, slot 3) at `0x44 + 0x28 i`,
 y 0xad, white where `DAT_0052f2d8` has the bit; the coin count
-`DAT_0052f39e` counted up three a tick from 0x10 at y 0x7a with sprite 0x4f.
-"press jump to exit" at (0xa0, 0xdc) blinks while the clock is between
-0x78 and 0xf0; jump then either skips the count (first press) or fades
-out. 0x168 ticks in all.
+`DAT_0052f39e` appears at y 0x7a with sprite 0x4f.
+
+Machine-code verification on 2026-09-12 corrected the initial timing notes:
+coins start at zero and advance ONE every THREE ticks; `coins * 3 + 0x10`
+is their timer, not their starting value. New-token counting has a
+`60 * newTokens + 60` timer, with the first reveal after 60 counting ticks
+and later reveals 30 ticks apart. Counting starts once the main clock is
+below 300. The clock starts at 0x168 and HOLDS at 180 until Jump; it does
+not automatically expire. The prompt blinks while the clock is strictly
+between 120 and 240. Jump with counts unfinished reveals everything and
+starts a 120-tick exit; with counts finished it starts a 24-tick exit.
+The final 23 ticks fade to black. Evidence: 0x439a4b..0x439a8d,
+0x439dac..0x439eac, 0x43a002..0x43a110.
+
+`summary.ts` implements that state machine and the 64-slot spark pool.
+`run.ts` shows it after ordinary levels, including pause-menu exits; boss
+levels keep their movie/selector path. Results are copied before the level
+is discarded. Its `levelt1.ngn` sheets and picture are loaded separately
+from the title art and never replace the selector's textures. Power-up
+icons use bits 1, 2, 4, 16, 8 (grapple before hover boots).
+
+`tools/summary-probe.ts` checks the tally, input gates, fades, new versus
+retained tokens, power-up mapping, spark capacity, and each sprite frame's
+bounds against the supplied install. `tools/front-flow-check.js`, passed to
+`tools/browser-shot.ts --eval-file`, exercises boot -> select -> Andy's
+House -> pause exit -> summary -> select. The summary and selector were
+captured and visually inspected in Chromium. The returned selector has no
+player, creatures or effects, and gameplay ticks remain disabled.
 
 ## In the port (src/front/)
 
@@ -283,6 +307,8 @@ out. 0x168 ticks in all.
   and Buzz) and the select again when the pause menu's "exit level" or
   the boss movie ends it. `HudPainter.paintFront` draws a frame with the
   HUD's own blitter over the picture.
+- `summary.ts` — the post-level tally, with the original sprite art,
+  token sparks, coin counting, power-up icons and Jump-to-exit timing.
 - `diorama.ts` — the select's scene: `main.ts` loads `level06/level1`
   with the `t1` textures into the viewer, every used object kept
   separate, and the runner lays the sprite layer over the viewer's own
@@ -298,11 +324,9 @@ out. 0x168 ticks in all.
 
 ## What is left
 
-1. **The summary screen** (above): `levelt1.ngn` has every sheet it
-   needs; it goes between a level and the select on the way back.
-2. **Game over, options, load game, the movie viewer, the credits** —
+1. **Game over, options, load game, the movie viewer, the credits** —
    options and load are unread; game over and the credits are small. Load
    game and the movie viewer run over this same scene with texture sets 3
    and 2.
-3. **The diorama's ambience** — the per-level sound event, and a check of
+2. **The diorama's ambience** — the per-level sound event, and a check of
    the camera's flight against the real game once the parity harness runs.

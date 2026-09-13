@@ -65,12 +65,14 @@ export interface FrontArt {
  * name are decoded, so the other bundles' art costs nothing. Returns empty
  * maps if the install has no `level00`.
  */
-export async function loadFrontArt(dir: GameDir): Promise<FrontArt> {
+export async function loadFrontArt(
+  dir: GameDir, bundle = 'level', sheetSlots: readonly number[] = FRONT_SHEETS,
+): Promise<FrontArt> {
   const out: TitleCards = new Map();
   const sheets = new Map<number, HTMLCanvasElement>();
-  const file = dir.get('data/level00/level.ngn');
+  const file = dir.get(`data/level00/${bundle}.ngn`);
   if (!file) return { cards: out, sheets };
-  const wanted = new Set<number>([...PICTURE_SLOTS, ...PICTURE_SLOTS_ALT, ...FRONT_SHEETS]);
+  const wanted = new Set<number>([...PICTURE_SLOTS, ...PICTURE_SLOTS_ALT, ...sheetSlots]);
   let textures;
   try {
     textures = parseNgn(await file.read());
@@ -92,7 +94,7 @@ export async function loadFrontArt(dir: GameDir): Promise<FrontArt> {
     if (!ctx) continue;
     ctx.putImageData(new ImageData(new Uint8ClampedArray(image.rgba), image.width, image.height), 0, 0);
     // `decodeBmp` has already punched the sheets' green key out to alpha 0.
-    if ((FRONT_SHEETS as readonly number[]).includes(texture.slot)) {
+    if (sheetSlots.includes(texture.slot)) {
       sheets.set(texture.slot, canvas);
     } else {
       out.set(texture.slot, { width: image.width, height: image.height, canvas });

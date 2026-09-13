@@ -1,3 +1,4 @@
+import { createSlimeBoss, slimeBossBar, slimeBlobTarget } from './sim/slime-boss.ts';
 import { GroupType, buildMeshData, parseAll, readHitShapes, type AllFile } from './formats/all.ts';
 import {
   DEFAULT_ANIMATION_FPS, buildPosedMeshData, parseAnm,
@@ -45,6 +46,7 @@ import { commitProgress, exportProgress, forgetProgress, loadProgress, type Prog
 import { BOOT_MOVIES, MOVIES, MOVIE_FLAG, playCutscene } from './video/cutscene.ts';
 import { PICTURE, loadFrontArt, pictureFor, showCard, type TitleCards } from './front/title.ts';
 import { FrontEnd } from './front/run.ts';
+import { SUMMARY, type LevelSummary } from './front/summary.ts';
 import { PAD, readFrontStrings } from './front/screens.ts';
 import { readDioramaLists, type DioramaLists } from './front/diorama.ts';
 import { LEVEL_SELECT_ORDER, selectIndexOf, tokenCount } from './formats/save-file.ts';
@@ -654,7 +656,7 @@ async function open(dir: GameDir): Promise<void> {
       },
       get tasks() {
         return tasks ? {
-          done: tasks.done, hintIndex: tasks.hintIndex,
+          done: tasks.done, hintIndex: tasks.hintIndex, slime: tasks.slime ? { ...tasks.slime } : null,
           boss: tasks.boss, potatoPart: tasks.potatoPart, powerUps: tasks.powerUps,
           bossPhase: tasks.bossPhase, bossClock: tasks.bossClock, bossHurt: tasks.bossHurt,
           bossCut: tasks.bossCut, bossRamp: tasks.bossRamp, bossSwing: tasks.bossSwing,
@@ -1460,6 +1462,8 @@ function fireLaser(): void {
     if (!shape || c.deathTimer < 0 || c.health <= 0 || c.stun < 0 || (c.flags & CREATURE_FLAGS.near) === 0) continue;
     targets.push({ creature: c, position: c, heading: c.heading, shape, vulnerable: c.record.vulnerable });
   }
+  const blobTarget = tasks?.slime && effects ? slimeBlobTarget(effects.effects) : null;
+  if (blobTarget) targets.unshift(blobTarget);
   const mode = pickups && pickups.powerTimer > 0 ? 2 : (player.laserFired ?? 0) >= 64 ? 1 : 0;
   if (mode === 2 && pickups) pickups.powerTimer = Math.max(0, pickups.powerTimer - 10);
   const shot = fireBeam(laserBeams, origin, player.yaw, mode, targets, (from, delta) => {
@@ -1470,6 +1474,10 @@ function fireLaser(): void {
   if (shot.hit && creatureSim) {
     const c = creatureSim.creatures.find(c => c === shot.hit!.creature);
     if (c) damageCreature(creatureSim, c, shot.yaw, shot.damageKind);
+    else {
+      const blob = effects?.effects.find(e => e === shot.hit!.creature && e.kind === 0x3f && e.life > 1);
+      if (blob) blob.life = 1;
+    }
   }
   if (effects && (shot.hit || shot.wall)) {
     const p = shot.beam.to, world = effectWorld();
@@ -1659,6 +1667,7 @@ function hudReadout(level: number): HudReadout {
         Math.round(((c.health - fight.bar.from) * 0x36) / fight.bar.over)));
     }
   }
+  if (tasks?.slime && tasks.slime.phase >= 999) bossBar = slimeBossBar(tasks.slime);
   // The shared task counter: under 100 the flag counts laps down, at 100 or
   // more it is a countdown in tenths of a minute.
   let clock: number | null = null;
@@ -1784,7 +1793,7 @@ function drawCreatures(): void {
       viewer.placeCreatureMesh(
         c.slot,
         c.x * GAME_TO_RENDER, -c.y * GAME_TO_RENDER, -c.z * GAME_TO_RENDER,
-        toRadians(c.heading),
+        toRadians(c.heading), c.drawScale,
       );
       // Pose it only when something changed, and only while the sim is
       // actually updating it — a creature outside the update radius is frozen
@@ -1793,6 +1802,9 @@ function drawCreatures(): void {
       const animation = art.anm.animations[c.animState];
       if (!animation) continue;
       const frame = (c.frame >>> 16) % Math.max(1, animation.frameCount);
+      // Slime animation slots are paired: odd slots carry the face, even
+      // slots the body. Drawing only the script's odd slot drops the blob.
+      const slimeLayer = c.type === 16 ? art.anm.animations[c.animState ^ 1] : undefined;
       // A handler's part rotations are part of the pose too, at a sixteenth
       // of a turn's resolution so the cache is not defeated by every tick.
       const spin = c.partSpin ? c.partSpin.map((a) => a >> 4) : null;
@@ -1802,7 +1814,8 @@ function drawCreatures(): void {
       viewer.setCreatureMesh(
         c.slot,
         buildPosedMeshData(
-          art.model, art.anm, animation, frame, null,
+          art.model, art.anm, animation, frame,
+          slimeLayer ? { animation: slimeLayer, frame: frame % Math.max(1, slimeLayer.frameCount) } : null,
           spin ? spin.map((a) => (a << 4) * (Math.PI * 2 / 4096)) : null,
         ),
         sceneTextures,
@@ -2135,6 +2148,7 @@ let frontEnd: FrontEnd | null = null;
 let frontLevelDone: ((how: 'exit' | 'won') => void) | null = null;
 /** `DAT_00830ca8`: the token byte the last level was entered with. */
 let frontEnteredWith = 0;
+let lastLevelSummary: LevelSummary | null = null;
 /** Enter and Escape, which the pad reader does not own, for the front end. */
 const frontKeys = { enter: false, escape: false };
 /** `DAT_0055a0e4`: the level select's camera node between visits. */
@@ -2239,6 +2253,12 @@ async function runFrontEnd(): Promise<void> {
     },
     enteredWith: () => frontEnteredWith,
     playLevel: playLevelFromFront,
+    summary: () => lastLevelSummary,
+    async loadSummaryArt() {
+      if (!currentDir) return null;
+      const art = await loadFrontArt(currentDir, 'levelt1', SUMMARY.sheets);
+      return pictureFor(art.cards, 0) ? art : null;
+    },
     attract: bootChain,
     quit() { infoEl.textContent = 'front end closed — the dropdown picks a scene'; },
     loadDiorama: loadDioramaScene,
@@ -2309,6 +2329,42 @@ async function runFrontEnd(): Promise<void> {
  */
 async function loadDioramaScene(): Promise<{ paths: DatLevel['paths']; placedOf: (id: number) => { position: { x: number; y: number; z: number }; yaw: number } | null } | null> {
   if (!viewer) return null;
+  // The diorama uses playMode for its scripted camera, too. Discard the
+  // level simulation before any await so enabling that camera cannot resume
+  // the old level and recreate its creatures, pickups, effects or HUD.
+  currentLevel = null;
+  currentCollision = null;
+  currentCollisionWorld = null;
+  currentTerrainFile = null;
+  currentCreatures = [];
+  creatureSim = null;
+  creatureArt.clear();
+  creaturePosed.clear();
+  player = null;
+  playerRuntime = null;
+  playerAnim = null;
+  camera = null;
+  pickups = null;
+  effects = null;
+  laserBeams.length = 0;
+  pushBlocks = null;
+  tasks = null;
+  talk = null;
+  talkSlot = -1;
+  menu.open = false;
+  Object.assign(cut, createCut());
+  playing = null;
+  current = null;
+  viewer.setPlayer(null);
+  viewer.clearCreatureMeshes();
+  viewer.setCreatures([]);
+  viewer.setCollision(null);
+  viewer.setWorldCards([], []);
+  viewer.setEffectCards([], []);
+  viewer.setCardSheet(null);
+  viewer.setVisibleZones(null);
+  viewer.setHiddenObjects(new Set());
+  hudPainter?.clear();
   const scene = levels.find((l) => l.id === 'level06/level1');
   // The texture set is a bundle on its own, not a scene, so it is not in
   // the scene list; it is read straight from the install.
@@ -2324,14 +2380,10 @@ async function loadDioramaScene(): Promise<{ paths: DatLevel['paths']; placedOf:
   const reflectionSlot = textures.find((t) => t.tag === 'tex14')?.slot ?? null;
   viewer.setLevel(geometry, gpuTextures, reflectionSlot === null ? undefined : gpuTextures.get(reflectionSlot));
   viewer.setFog(null);
-  viewer.setPlayer(null);
-  viewer.clearCreatureMeshes();
-  viewer.setCreatures([]);
   viewer.playMode = true;
   document.body.classList.add('front-scene');
   const placedIndex = (id: number): number => level.objectIds[id] ?? -1;
   diorama = { level, placedIndex };
-  currentLevel = null;
   setStatus('level select');
   return {
     paths: level.paths,
@@ -2354,6 +2406,7 @@ async function loadDioramaScene(): Promise<{ paths: DatLevel['paths']; placedOf:
  * the boss falls.
  */
 async function playLevelFromFront(position: number): Promise<'exit' | 'won'> {
+  lastLevelSummary = null;
   const level = LEVEL_SELECT_ORDER[position - 1];
   if (level === undefined) return 'exit';
   const index = levels.findIndex((l) => l.id === `level${String(level).padStart(2, '0')}/level`);
@@ -2372,6 +2425,13 @@ async function playLevelFromFront(position: number): Promise<'exit' | 'won'> {
   infoEl.textContent = 'playing — WASD or stick to move, space to jump, J spin, K fire, Escape for the menu';
   const how = await new Promise<'exit' | 'won'>((resolve) => { frontLevelDone = resolve; });
   frontLevelDone = null;
+  if (position % 3 !== 0) {
+    lastLevelSummary = {
+      position, enteredWith: frontEnteredWith,
+      tokens: progress?.p.tokens[level] ?? pickups?.tokens ?? 0,
+      coins: pickups?.coins ?? 0, powerUps: tasks?.powerUps ?? progress?.p.powerUps ?? 0,
+    };
+  }
   if (viewer?.playMode) setPlaying(false);
   input.attach();
   return how;
@@ -2431,6 +2491,12 @@ function saveProgress(): void {
  * `bossFight` have one.
  */
 function startBossFight(level: number): void {
+  const slime = LEVEL_TASKS[level]?.slimeBoss;
+  if (slime && creatureSim && tasks) {
+    const boss = creatureSim.creatures.find(c => c.slot === slime.creature);
+    if (boss) tasks.slime = createSlimeBoss(boss);
+    return;
+  }
   const fight = LEVEL_TASKS[level]?.bossFight;
   if (!fight || !creatureSim || !tasks) return;
   const boss = creatureSim.creatures.find((c) => c.slot === fight.creature);
@@ -2583,7 +2649,7 @@ function setPlaying(on: boolean): void {
  * bearing that the stick is measured against.
  */
 function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
-  if (!viewer || !player || !playerRuntime || !currentCollisionWorld) return;
+  if (!viewer || !currentLevel || !player || !playerRuntime || !currentCollisionWorld) return;
 
   if (cutsceneUp) return;
   if (player.fellOut) { void respawn(); return; }
@@ -2805,6 +2871,17 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
           pathPoints: (tag) => currentLevel?.level.paths.find((p) => p.id === tag)?.points ?? null,
           cameraYaw: camera?.yaw ?? 0,
           cut: cutHandle,
+          touch: applyCreatureTouch,
+          shake: (ticks) => { if (camera) camera.shake = ticks; },
+          spit: (boss) => {
+            if (!effects || !camera) return;
+            const blob = spawnEffect(effects, effectWorld(), boss.x, boss.y - 10000, boss.z,
+              0, -2, 0, boss.heading * 4, 0, 0, 0x3f);
+            if (blob) blob.pitch = 0;
+          },
+          burstBlobs: () => {
+            for (const e of effects?.effects ?? []) if (e.kind === 0x3f && e.life > 0) e.life = 1;
+          },
           sound: (event: number, at: { x: number; y: number; z: number } | null) =>
             playEvent(event, at ?? undefined),
           // The boss throws dust off its feet; the effect pool does the rest.

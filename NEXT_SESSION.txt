@@ -144,7 +144,12 @@
  360-tick drift/beam cycle. Posed muzzle, downward terrain cast, green strip,
  impact damage/sparks/sounds and flare 00406880 connected. Beam casts stop
  at first contact; movement retains sliding. Paused beams freeze; exits clear.
- NEXT RENDER WORK: remaining beam-impact flare 0042537d in level 9 boss laser,
+ LEVEL 9 POD (2026-09-13): fight gameplay and final flare call connected.
+ Entrance, six helper waves, shell health limits, final phase and delayed
+ death/win pass unit and real-arena browser tests (synthetic damage).
+ Victory/movie/summary/selector cleanup passes. All 16 flare calls connected.
+ NEXT: pod presentation refinements (animated BUB attachments, release
+ particles/light, helper cut/follow framing, final-phase hurt flash),
  clear-colour/backdrop matching and sprite fog-enable comparison. Exact routines and gamma lookup
  findings are in docs/FRONTEND.md. Controller visor/target-lock and menu/
  cancel bindings still need corresponding input work. Do not claim full parity.

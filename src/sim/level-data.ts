@@ -712,6 +712,7 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
       askText: 0x4f2ae4, doneText: 0x4f2b58, slot: 1, needed: 5, countedBy: 'creature',
     },
   },
+  9: {}, // The pod fight owns the whole level (src/sim/pod-boss.ts).
   10: {
     potato: { creature: 7, pathTag: 0x25, pathTagDone: 0x20, askText: 0x4f30a0, thanksText: 0x4f3120, explainText: 0x4f31ec, playerYaw: -1, creatureYaw: 0xe00 },
     offer: { creature: 0x16, pathTag: 0x21, text: 0x4f3284, slot: 2 },

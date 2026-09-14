@@ -570,9 +570,9 @@ batches and texture references. Nothing persists into the selector.
 The original lens-flare option is now first at y75, followed by detail,
 gamma and animated textures at y100/125/150. It supports preview, rollback
 and persistence under `ts2.lensFlare`, default on. This does not imply all
-sources are ported: after the follow-ups below, the remaining call is
-`0042537d`. Its boss beam state still needs connecting; do not
-substitute an unconditional light for it.
+sources were ported by that milestone alone. The follow-ups below now
+connect all sixteen recovered calls; projection, collision and pose parity
+limits still apply.
 
 Validation: local table/art and visibility probe; actual arena source in
 Chromium with ten sprites; off preference persistence; looking away removes
@@ -657,7 +657,24 @@ cleared on respawn/exit; it does not occupy wrist-laser slots or retract.
 
 Limits: attachment posing uses the browser's floating animation matrices
 rather than the retail fixed-point routine; collision uses the browser hull
-and existing point-light approximation. Level 9's separate boss laser remains
-unported. Tests cover timer edges, drift/reset, muzzle transforms, first-hit
+and existing point-light approximation. Level 9's separate boss laser is connected by the follow-up below. Tests cover timer edges, drift/reset, muzzle transforms, first-hit
 terrain clipping versus movement sliding, impact radius, a real level 4 pod,
 damage/invulnerability through the attack resolver, and pause/selector cleanup.
+
+### Level 9 boss laser (2026-09-13)
+
+The fight state in `pod-boss.ts` now gates `0042537d`: no beam during the
+entrance, helper-release cuts, spin cooldown or death; the active boss also
+requires Buzz within 400 signed 256-unit steps. Its part-zero muzzle uses
+(0,0,-400), and aiming clamps to +/-0x200 of heading. The negative wrap
+subtracts 4095, matching `00425217`, rather than the usual 4096.
+
+The same downward delta and first-contact terrain cast as ZPOD drive a
+sprite-9 beam with half-width 128 and a green size-64 endpoint flare.
+Impact sound is 0x87, damage radius 30 steps, reaction 3; a fresh hit raises
+0x84 and the 0xd7 voice with its 1200-tick cooldown. Existing spark gates
+and the shared point-light approximation apply. The full arena regression
+covers entrance, beam/flare, six helper waves, final phase, delayed death,
+victory movie/summary and clean selector return. See docs/LEVELS.md for
+remaining fight presentation differences; all sixteen recovered flare
+calls being connected does not imply complete renderer parity.

@@ -1,6 +1,7 @@
 import { readLensFlareTable, buildLensFlares, flareRay, levelFlareSources, pathFlareSources, createFlareFlicker, stepFlareFlicker, type FlareEntry, type FlareSprite } from './sim/lens-flare.ts';
 import { getGamma, setGamma } from './render/gamma.ts';
-import {podMuzzle,podBeam,podImpactHits} from './sim/pod-beam.ts';
+import {podMuzzle,podBeam,podImpactHits,podBossAim} from './sim/pod-beam.ts';
+import {createPodBoss,readPodHelpers,podBossBar} from './sim/pod-boss.ts';
 import { createTextureAnimation, stepTextureAnimation, copyScrolledTexture } from './sim/texture-animation.ts';
 import { readSoundSequences, startSequence, stepSequence, type SoundSequences, type SequenceVoice } from './audio/sequences.ts';
 import { createGuideSparkles, stepGuideSparkles, spendGuide } from './sim/guide-sparkles.ts';
@@ -732,6 +733,7 @@ async function open(dir: GameDir): Promise<void> {
       get tasks() {
         return tasks ? {
           done: tasks.done, hintIndex: tasks.hintIndex, slime: tasks.slime ? { ...tasks.slime } : null,
+          pod:tasks.pod?{...tasks.pod}:null,
           boss: tasks.boss, potatoPart: tasks.potatoPart, powerUps: tasks.powerUps,
           bossPhase: tasks.bossPhase, bossClock: tasks.bossClock, bossHurt: tasks.bossHurt,
           bossCut: tasks.bossCut, bossRamp: tasks.bossRamp, bossSwing: tasks.bossSwing,
@@ -1415,18 +1417,27 @@ function stepEffectsNow(): void {
 function stepPodBeams():void{
   podBeams.length=0;
   if(!creatureSim||!player||!currentCollisionWorld)return;
-  for(const c of creatureSim.beamCasters){
+  const casters=[...creatureSim.beamCasters];
+  const boss=tasks?.pod?.laserReady?creatureSim.creatures.find(c=>c.slot===0):null;
+  if(boss)casters.push(boss);
+  for(const c of casters){
     if(c.health<=0||c.deathTimer<0)continue;
     const art=creatureArt.get(c.type),animation=art?.anm?.animations[c.animState];
     const pose=art?.anm&&animation?poseBone(art.anm,animation,(c.frame>>>16)%Math.max(1,animation.frameCount),0):null;
-    const beam=podBeam(podMuzzle(c,pose),c.heading,(from,delta)=>{
+    const isBoss=c===boss,from=podMuzzle(c,pose,isBoss?-400:-100);
+    if(isBoss&&tasks?.pod)from.y=c.y+(from.y-c.y)*tasks.pod.stretch;
+    const beam=podBeam(from,isBoss?podBossAim(from,player,c.heading):c.heading,(from,delta)=>{
       const hit=sweepSphere(currentCollisionWorld!,from,delta,0x100,{passes:1,skin:0,stopAtFirstContact:true});
       return {x:hit.x,y:hit.y,z:hit.z};
     });
-    podBeams.push(beam);
+    if(isBoss)beam.width=128;
+    podBeams.push({...beam,flareSize:isBoss?64:32});
     const p=beam.to;
-    playEvent(0x5c,p);
-    if(podImpactHits(player,p))applyCreatureTouch(yawOf(player.x-p.x,player.z-p.z),3);
+    playEvent(isBoss?0x87:0x5c,p);
+    if(podImpactHits(player,p,isBoss?30:25)){
+      if(isBoss&&player.hitStun===0){playEvent(0x84,c);if(tasks?.pod&&tasks.pod.voice===0){playEvent(0xd7,player);tasks.pod.voice=1200;}}
+      applyCreatureTouch(yawOf(player.x-p.x,player.z-p.z),3);
+    }
     if(effects){
       const world=effectWorld();
       for(let i=0;i<effects.gate.two;i++)spawnChild(effects,world,p.x,p.y,p.z,4,4);
@@ -1824,6 +1835,7 @@ function hudReadout(level: number): HudReadout {
     }
   }
   if (tasks?.slime && tasks.slime.phase >= 999) bossBar = slimeBossBar(tasks.slime);
+  if(tasks?.pod&&tasks.pod.phase>=2)bossBar=podBossBar(tasks.pod);
   // The shared task counter: under 100 the flag counts laps down, at 100 or
   // more it is a countdown in tenths of a minute.
   let clock: number | null = null;
@@ -1909,7 +1921,7 @@ function drawHud(level: number): void {
   const eye=viewer.camera.position;
   const eyeGame={x:eye.x*scale,y:-eye.y*scale,z:-eye.z*scale};
   const sources=[...levelFlareSources(level),
-    ...podBeams.map(b=>({...b.to,r:0,g:128,b:0,size:32})),
+    ...podBeams.map(b=>({...b.to,r:0,g:128,b:0,size:b.flareSize})),
     ...(player?pathFlareSources(level,currentLevel?.level.paths??[],eyeGame,player,zones.camera,flareFlicker):[]),
     ...(effects?.lights.filter(l=>l.glow).map(l=>({...l,size:48}))??[])];
   flareSprites=lensFlare?buildLensFlares(sources,flareTable,source=>{
@@ -1990,6 +2002,7 @@ function drawCreatures(): void {
         sceneTextures,
       );
     }
+    if(tasks?.pod)viewer.setCreatureAppearance(0,[1,tasks.pod.stretch,1],[1,1,1]);
     // The trailer's PAINT creature is the liquid inside pushable object 0.
     // Place it after the generic creature pass, which otherwise treats it as a static actor.
     if ((levelNumber(levels[levelEl.selectedIndex]?.id ?? '') ?? 0) === 4) {
@@ -2268,7 +2281,7 @@ let camera: CameraState | null = null;
 /** The effect pool, or null before a level is up. */
 let effects: EffectSim | null = null;
 const laserBeams: LaserBeam[] = [];
-const podBeams: LaserBeam[] = [];
+const podBeams: (LaserBeam&{flareSize:number})[] = [];
 /** This frame's effect cards, rebuilt each tick. */
 const effectCards: WorldSprite[] = [];
 const effectFlat: WorldSprite[] = [];
@@ -2762,6 +2775,10 @@ function saveProgress(): void {
  * `bossFight` have one.
  */
 function startBossFight(level: number): void {
+  if(level===9&&creatureSim&&tasks&&exeBytes){
+    tasks.pod=createPodBoss(slot=>creatureSim!.creatures.find(c=>c.slot===slot),readPodHelpers(exeBytes));
+    return;
+  }
   const slime = LEVEL_TASKS[level]?.slimeBoss;
   if (slime && creatureSim && tasks) {
     const boss = creatureSim.creatures.find(c => c.slot === slime.creature);

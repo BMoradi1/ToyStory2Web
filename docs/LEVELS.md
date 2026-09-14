@@ -1034,7 +1034,7 @@ timings and look heights are implemented; eye distance is an approximation
 (0x40 cut units). Disk-launcher targeting still uses the existing creature
 selection path.
 
-## The pod, internal level 9 — DECODED, not ported
+## The pod, internal level 9 — gameplay ported (2026-09-13)
 
 Decoded 2026-09-07 from `FUN_00424390` (init) and `FUN_00424490` (tick,
 the largest level tick in the game). Scene `level09/level`, music
@@ -1047,8 +1047,8 @@ before it opens again.
 
 **Init.** Stage `DAT_0052fbd4` = 1, base height `DAT_0052fbcc` =
 -0x58000, the released pair both "slot 7" (none), a spin cooldown of 200
-and a voice timer of 0x78; the boss's record speed set to 0; every BUB
-(slots 1-6, 0x9c apart) given respawn 10000 and its record's home box
+and a voice timer of 0x78; the boss's record speed set to 0; every helper
+(slots 7-11, 0x9c apart) given health 0 and respawn 10000 and its record's home box
 copied from the boss's.
 
 **Every tick, first.** The boss is held inside a ring of radius 0x1068
@@ -1071,14 +1071,14 @@ advancing 0x20 a tick.
 | 0 | waiting. Buzz's z rising past -0x1bb58 starts it: the level's music, base height -0x38000, a 360-tick cut to the boss from 0x8000 above Buzz |
 | 1 | the entrance: the cut's eye sinks 0x80 a tick and its look tracks the boss; the base height rises 0x280 a tick to -0x8000; voice sequence 0xd5 once after 0x78 ticks; at the cut's end phase 2 and the boss's record speed 0x10 |
 | 2 | the fight |
-| 3 | stage 7 reached: the boss's animState 2, record speed 0x14 — it comes down for you |
+| 3 | stage 7 reached: the boss's record turnRate 2, record speed 0x14 — it comes down for you |
 | 4 | dying: the cut eye rises; under 0x78 of the cut the boss is killed (`FUN_00405d20`) |
 | 5 | the level is won when the cut ends |
 
 **A hit** (health changed, phase under 4): sound 0x83; health is put
 back to `0x1a - stage` while the stage is under 6, so it only ever falls
 one point a stage; the next pair of helper slots is read from the table
-at 0x4f2f58 — twelve dwords `8 8 7 7 8 9 10 7 11 8 11 7` read two at a
+at 0x4f2f5c (after the -1 sentinel at 0x4f2f58) — twelve dwords `8 8 7 7 8 9 10 7 11 8 11 7` read two at a
 time, so the stages release ZURG1, then the small ZPOD, then ZURG1 with
 ZURG3, ZGCAR with the small ZPOD, SHINY with ZURG1 — the shell closes
 (`vulnerable` 4), and in phase 2 the stun `DAT_0052fbc0` is 600 with a
@@ -1089,8 +1089,8 @@ token byte.
 
 **The stun** counts down; at 0 the shell opens (`vulnerable` 7) and, at
 stage 7 in phase 2, phase 3 begins. While it runs in phase 2 the boss
-flickers between 0x1000 and a pulse off the frame counter through the
-draw triple +0x24/26/28 under mode `+0x34 = 1`; in other phases it
+stretches vertically: X/Z stay 0x1000, Y pulses from 0x1000 to 0x1f80
+through the draw triple +0x24/26/28 under mode `+0x34 = 1`; in other phases it
 alternates 0x2000 and off.
 
 **Releasing the helpers** (phase 2, stun running; the stun is capped at
@@ -1107,7 +1107,7 @@ scale zeroed with `+0x32 = 0x8000` as a "grow" marker, and sound 0x86
 plays at the first. Between 0xb9 and 300 ticks of cut, an effect (0x11
 mode 2, or kind 4 mode 4 without detail) is thrown from (0, 400, 0x4b0)
 ahead of that BUB. Once the BUB's health is 1 the pair are parked at its
-ground point 0x1000 up with velocity zero and `+0x8a = 0x1cc` unless in
+ground point plus 0x1000 in Y with velocity zero and `+0x8a = 0x1cc` unless in
 animState 0xe; and under 0x3c ticks of cut with the BUB in animState 1,
 four explosions (kind 0x23, mode 0xe), sound 0x85, voice 0xd6, a glow
 (`FUN_0049ee50`, 0xf08000, 0x20) and the BUB is killed. A released
@@ -1130,9 +1130,23 @@ whichever living released helper is nearer the camera, 0x2000 above it,
 else the boss 0x4000 above. The boss theme timer is set in phases 2 and
 3. The bar is `(health - 10) * 0x36 / 16`.
 
-**What the port needs first.** The same four things as the Slime plus
-one: a creature reset from placement (`FUN_00406cd0`, which the sim's
-respawn nearly is), and the beam draw.
+**Port status (2026-09-13).** `src/sim/pod-boss.ts` connects the entrance,
+ring confinement, BUB placement/bob/frame staggering, shell health limits,
+six releases from the executable's table, helper growth, final phase,
+death and one-shot victory. Main connects the bar, music state, cut host,
+save/movie/summary transition, and boss laser/impact damage and flare.
+The turn-rate, helper-init and sentinel corrections above were rechecked
+against the machine code during implementation.
+
+`tools/pod-boss-probe.ts` exercises all six waves and death; Chromium's
+`tools/pod-boss-flow-check.js` drives the real arena with synthetic hits,
+including helper death animations, laser gating and the victory exit.
+This is not complete retail visual parity: BUB ground points use radial
+approximations rather than animated part-one attachments; the release
+particle stream and orange burst light still need matching. Helper cut
+framing and alternating follow-camera targets need refinement. Final-phase
+hurt flashing is unfinished. Beam posing and collision retain the browser
+approximations documented in docs/EFFECTS.md.
 
 ## Zurg, internal level 12 — DECODED, not ported
 

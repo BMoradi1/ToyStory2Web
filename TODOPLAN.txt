@@ -883,7 +883,10 @@
            Seven path-light calls now connected on levels 5, 10–15, including
            distance/zone gates, airport bands/fade and finale red light.
            Local-map probes and browser pixels/selector cleanup pass.
-           Remaining: three conditional flare sources, backdrop matching, conditional
+           Level 4 path 6 flicker now follows simulation time/shared randomness,
+           with yellow-to-white fade and respawn reset.
+           Remaining: two beam-impact flare sources (type 20 and level 9 boss),
+           backdrop matching, conditional
            level 8/Shield texture scripts, plus visor/target-lock and menu/cancel
            binding support. Full controller/GFX feature parity is still open.
  [was]     Cutscenes: MPEG-1 in the browser (jsmpeg-style decoder or

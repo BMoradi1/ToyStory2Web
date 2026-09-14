@@ -1,4 +1,4 @@
-import { readLensFlareTable, buildLensFlares, flareRay, levelFlareSources, pathFlareSources, type FlareEntry, type FlareSprite } from './sim/lens-flare.ts';
+import { readLensFlareTable, buildLensFlares, flareRay, levelFlareSources, pathFlareSources, createFlareFlicker, stepFlareFlicker, type FlareEntry, type FlareSprite } from './sim/lens-flare.ts';
 import { getGamma, setGamma } from './render/gamma.ts';
 import { createTextureAnimation, stepTextureAnimation, copyScrolledTexture } from './sim/texture-animation.ts';
 import { readSoundSequences, startSequence, stepSequence, type SoundSequences, type SequenceVoice } from './audio/sequences.ts';
@@ -294,6 +294,7 @@ async function showLevel(index: number): Promise<void> {
   levelPoles = [];
   levelZipLines = [];
   stompProps = createStompProps();
+  flareFlicker = createFlareFlicker();
   resetTextureAnimations();
   flareSprites=[];
   viewer?.setLensFlares([]);
@@ -655,7 +656,7 @@ async function open(dir: GameDir): Promise<void> {
       },
       get stompProps() { return stompProps; },
       redrawHud(){if(player)drawHud(levelNumber(levels[levelEl.selectedIndex]?.id??'')??0);return flareSprites;},
-      get lensFlares(){return {enabled:lensFlare,sprites:flareSprites};},
+      get lensFlares(){return {enabled:lensFlare,sprites:flareSprites,flicker:{...flareFlicker}};},
       get textureAnimation() {return { ...textureAnimation,enabled:animatedTextures };},
       texturePixels(page:number) {
         const texture=sceneTextures.get(page);
@@ -1228,6 +1229,7 @@ async function spawnPlayer(): Promise<void> {
   // implemented, so the rest stay hidden until `ts2.revealTokens()`.
   const level = levelNumber(sceneId) ?? 0;
   stompProps = createStompProps();
+  flareFlicker = createFlareFlicker();
   resetTextureAnimations();
   flareSprites=[];
   viewer?.setLensFlares([]);
@@ -1878,7 +1880,7 @@ function drawHud(level: number): void {
   const eye=viewer.camera.position;
   const eyeGame={x:eye.x*scale,y:-eye.y*scale,z:-eye.z*scale};
   const sources=[...levelFlareSources(level),
-    ...(player?pathFlareSources(level,currentLevel?.level.paths??[],eyeGame,player,zones.camera):[]),
+    ...(player?pathFlareSources(level,currentLevel?.level.paths??[],eyeGame,player,zones.camera,flareFlicker):[]),
     ...(effects?.lights.filter(l=>l.glow).map(l=>({...l,size:48}))??[])];
   flareSprites=lensFlare?buildLensFlares(sources,flareTable,source=>{
     const p=new THREE.Vector3(source.x/scale,-source.y/scale,-source.z/scale).project(viewer!.camera);
@@ -2807,6 +2809,7 @@ let levelPoles: Pole[] = [];
 let levelZipLines: ZipLine[] = [];
 let stompProps = createStompProps();
 let textureAnimation = createTextureAnimation();
+let flareFlicker = createFlareFlicker();
 const animatedTextureOriginals = new Map<THREE.DataTexture, Uint8Array | Uint8ClampedArray>();
 function resetTextureAnimations(): void {
   for(const [texture,original] of animatedTextureOriginals){texture.image.data.set(original);texture.needsUpdate=true;}
@@ -3225,6 +3228,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   // Beams hit immediately; disks move in the effect pool.
   if (player.laserFired !== null) fireLaser();
   const textureScrolls=stepTextureAnimation(textureAnimation,levelNow,zones.camera,zones.player);
+  if(levelNow===4&&creatureSim)stepFlareFlicker(flareFlicker,creatureSim.rand);
   if(animatedTextures)for(const scroll of textureScrolls){
     const texture=sceneTextures.get(scroll.page);
     if(texture instanceof THREE.DataTexture){

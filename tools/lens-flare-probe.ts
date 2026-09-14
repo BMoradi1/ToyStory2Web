@@ -3,7 +3,7 @@ import {createEffects,spawnEffect,stepEffects,type EffectWorld} from '../src/sim
 import {RandomStream} from '../src/sim/creatures.ts';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {readLensFlareTable,buildLensFlares,flareRay,levelFlareSources,pathFlareSources} from '../src/sim/lens-flare.ts';
+import {readLensFlareTable,buildLensFlares,flareRay,levelFlareSources,pathFlareSources,createFlareFlicker,stepFlareFlicker} from '../src/sim/lens-flare.ts';
 import {parseDat} from '../src/formats/dat.ts';
 import {sceneForLevel} from '../src/sim/level-data.ts';
 import {readSpriteTable} from '../src/formats/sprite-table.ts';
@@ -43,6 +43,28 @@ stepEffects(coloured,world);assert(coloured.lights.some(l=>l.glow&&l.r===32&&l.g
 console.log('PASS: effect glow emission, deferred visibility cap and mode 0x1a colour channels.');
 
 const origin={x:0,y:0,z:0};
+const flicker=createFlareFlicker();let draws=0;
+const rand={byte:()=>{draws++;return 0xff;}};
+const lamps=[{id:6,points:[origin]}];
+assert.equal(pathFlareSources(4,lamps,origin,origin,0,flicker).length,0);
+stepFlareFlicker(flicker,rand,32);
+assert.deepEqual(flicker,{timer:28,target:128,intensity:64});
+let lamp=pathFlareSources(4,lamps,origin,origin,0,flicker)[0]!;
+assert.deepEqual([lamp.r,lamp.g,lamp.b],[128,128,0]);
+stepFlareFlicker(flicker,rand,28);assert.equal(draws,0,'timer zero does not toggle');
+assert.equal(flicker.intensity,120);
+lamp=pathFlareSources(4,lamps,origin,origin,0,flicker)[0]!;
+assert.deepEqual([lamp.r,lamp.g,lamp.b],[128,128,112]);
+stepFlareFlicker(flicker,rand);
+assert.deepEqual(flicker,{timer:63,target:0,intensity:118});assert.equal(draws,1);
+stepFlareFlicker(flicker,rand,60);assert.equal(flicker.intensity,0);
+assert.equal(pathFlareSources(4,lamps,origin,origin,0,flicker).length,0);
+stepFlareFlicker(flicker,rand,4);assert.equal(flicker.target,128);assert.equal(flicker.intensity,8);
+const before={...flicker};
+for(let i=0;i<5;i++)pathFlareSources(4,lamps,origin,origin,0,flicker);
+assert.deepEqual(flicker,before,'rendering must not advance flicker or random stream');
+assert.equal(draws,2);
+assert.deepEqual(createFlareFlicker(),{timer:60,target:128,intensity:0});
 const paths=[{id:17,points:[origin]}];
 assert.equal(pathFlareSources(5,paths,{x:256000,y:0,z:0},origin,0).length,0);
 assert.equal(pathFlareSources(5,paths,{x:255999,y:0,z:0},origin,0).length,1);
@@ -57,11 +79,11 @@ assert.equal(pathFlareSources(14,airport,{x:512*256,y:0,z:0},origin,0).length,0)
 assert.equal(pathFlareSources(14,[],origin,origin,0).length,0);
 const finale=pathFlareSources(15,[{id:0,points:[origin,origin,origin]}],origin,origin,0);
 assert.deepEqual(finale.map(s=>[s.r,s.g,s.b]),[[128,128,128],[128,128,128],[128,0,0]]);
-for(const [level,id] of [[5,17],[10,13],[11,19],[12,0],[13,10],[14,40],[15,0]] as const){
+for(const [level,id] of [[4,6],[5,17],[10,13],[11,19],[12,0],[13,10],[14,40],[15,0]] as const){
   const dat=parseDat(readFileSync(`${process.argv[2]??'Toy Story 2'}/data/${sceneForLevel(level)}.dat`));
   const point=dat.paths.find(p=>p.id===id)?.points[0];assert(point,`level ${level} path ${id}`);
   const camera={x:point.x*32,y:point.y*32,z:point.z*32};
-  const sources=pathFlareSources(level,dat.paths,camera,origin,0);
+  const sources=pathFlareSources(level,dat.paths,camera,origin,0,flicker);
   assert(sources.some(s=>s.x===camera.x&&s.y===camera.y&&s.z===camera.z),`level ${level} authored source`);
   console.log(`PASS: level ${level} path ${id}, ${sources.length} nearby sources`);
 }

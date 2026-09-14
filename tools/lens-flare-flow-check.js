@@ -45,18 +45,29 @@
   await wait(() => ts2.front.inLevel, 'level did not start');
   ts2.viewer.stop();
   const selector=document.querySelector('#level');
-  const pathLight=location.search.includes('flares=paths');
-  const scene=pathLight?'level10/level':'level03/level';
+  const flickering=location.search.includes('flares=flicker');
+  const pathLight=flickering||location.search.includes('flares=paths');
+  const scene=flickering?'level04/level':pathLight?'level10/level':'level03/level';
   selector.selectedIndex=[...selector.options].findIndex(o=>o.text===scene);
   selector.dispatchEvent(new Event('change'));
   await wait(()=>document.querySelector('#status').textContent.includes(scene+': ready'),scene);
   await ts2.spawnPlayer();ts2.viewer.stop();
+  if(flickering){
+    const initial=ts2.lensFlares.flicker;
+    if(initial.intensity!==0||initial.timer!==60)throw Error('flicker did not reset at spawn');
+    ts2.tickGame({},32);
+    if(ts2.lensFlares.flicker.intensity!==64)throw Error('simulation did not advance flicker');
+    const frozen=JSON.stringify(ts2.lensFlares.flicker);
+    for(let i=0;i<5;i++)ts2.redrawHud();
+    if(JSON.stringify(ts2.lensFlares.flicker)!==frozen)throw Error('HUD redraw advanced flicker');
+    console.log('FLARE FLICKER TIMING PASS');
+  }
   const viewer=ts2.viewer,enabled=!location.search.includes('flares=off');
   let source={x:0x3889/8192,y:-(0xfffc9f67|0)/8192,z:-(0xffffe044|0)/8192};
   if(pathLight){
     const file=[...document.querySelector('#pickfile').files].find(f=>f.webkitRelativePath.endsWith('/data/'+scene+'.dat'));
     const {parseDat}=await import('/src/formats/dat.ts');
-    const point=parseDat(await file.arrayBuffer()).paths.find(p=>p.id===13).points[0];
+    const point=parseDat(await file.arrayBuffer()).paths.find(p=>p.id===(flickering?6:13)).points[0];
     source={x:point.x/256,y:-point.y/256,z:-point.z/256};
   }
   let visible=false;
@@ -88,11 +99,21 @@
     console.log('FLARE ADDITIVE PIXELS PASS',brightened);
   }
   viewer.onTick=tick;
+  if(flickering){
+    await ts2.spawnPlayer();viewer.stop();
+    if(JSON.stringify(ts2.lensFlares.flicker)!==JSON.stringify({timer:60,target:128,intensity:0}))throw Error('respawn retained flicker');
+  }
   if(!enabled||pathLight||location.search.includes('cleanup')){
   ts2.tickGame({}, 10);
   window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));
   window.dispatchEvent(new KeyboardEvent('keyup',{key:'Escape'}));
   await pause(100);
+  if(flickering){
+    const frozen=JSON.stringify(ts2.lensFlares.flicker);
+    ts2.tickGame({},20);
+    if(JSON.stringify(ts2.lensFlares.flicker)!==frozen)throw Error('pause advanced flicker');
+    console.log('FLARE FLICKER RESPAWN/PAUSE PASS');
+  }
   // Pause menu: continue, camera, volume, exit; then confirm yes.
   for (let i=0; i<3; i++) { ts2.pressMenu('down'); ts2.tickGame({},1); }
   ts2.pressMenu('select'); ts2.tickGame({},1);

@@ -4,6 +4,17 @@ export interface FlareSource { x:number; y:number; z:number; r:number; g:number;
 export interface FlareEntry { sprite:number; scaleX:number; scaleY:number; r:number; g:number; b:number }
 export interface FlareSprite { sprite:number; x:number; y:number; scaleX:number; scaleY:number; colour:readonly [number,number,number] }
 export interface FlareProjection { x:number; y:number; depth:number }
+export interface FlareFlicker { timer:number; target:number; intensity:number }
+/** Level 4 init, 0041c286: initially dark, fading toward white for 60 ticks. */
+export function createFlareFlicker():FlareFlicker{return {timer:60,target:128,intensity:0};}
+/** 0041d8b0: run in simulation, even when the graphics option is disabled. */
+export function stepFlareFlicker(state:FlareFlicker,rand:{byte():number},dt=1):void{
+  state.timer-=dt;
+  if(state.timer<0){state.target=(state.target-128)&128;state.timer=rand.byte()&63;}
+  state.intensity=state.intensity<state.target
+    ?Math.min(state.target,state.intensity+dt*2)
+    :Math.max(state.target,state.intensity-dt*2);
+}
 /** The table stays in the user's executable; disabled entries still advance the chain. */
 export function readLensFlareTable(exe:Uint8Array):FlareEntry[]{
   const offset=0x4f72d8-0x400000;
@@ -50,8 +61,10 @@ export function levelFlareSources(level:number):FlareSource[]{
 /** Level-tick path lights. Paths are in DAT units; camera/player are in game units.
  * Keep authored order: the renderer admits only eight visible sources.
  */
-export function pathFlareSources(level:number,paths:readonly Path[],camera:Vec3,player:Vec3,cameraZone:number):FlareSource[]{
+export function pathFlareSources(level:number,paths:readonly Path[],camera:Vec3,player:Vec3,cameraZone:number,flicker?:FlareFlicker):FlareSource[]{
+  const intensity=flicker?.intensity??0;
   const settings:Record<number,readonly [number,number,number,number,number]>={
+    4:[6,Math.min(128,intensity*2),Math.min(128,intensity*2),Math.max(0,intensity*2-128),64], // 0041d9d0
     5:[17,64,48,32,128], // 0041fdc4
     10:[13,128,128,128,64], // 00425ff0
     11:[19,32,32,32,128], // 0042addd
@@ -61,7 +74,7 @@ export function pathFlareSources(level:number,paths:readonly Path[],camera:Vec3,
     15:[0,128,128,128,128], // 004307d1
   };
   const config=settings[level];
-  if(!config||(level===11&&cameraZone===4))return [];
+  if(!config||(level===4&&intensity===0)||(level===11&&cameraZone===4))return [];
   const [id,r,g,b,size]=config,points=paths.find(p=>p.id===id)?.points??[];
   const outer=level===14&&(player.x>>8)**2+(player.z>>8)**2>=0x8e5144;
   const start=outer?16:0,end=level===14&&!outer?Math.min(16,points.length):points.length;

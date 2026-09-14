@@ -571,8 +571,7 @@ The original lens-flare option is now first at y75, followed by detail,
 gamma and animated textures at y100/125/150. It supports preview, rollback
 and persistence under `ts2.lensFlare`, default on. This does not imply all
 sources are ported: after the path-light follow-up below, remaining calls
-are `00406880`, `0041d9d0` (level 4's flickering path 6 lights) and
-`0042537d`. Their prop/creature state still needs connecting; do not
+are `00406880` and `0042537d`. Their creature/boss beam state still needs connecting; do not
 substitute unconditional lights for them.
 
 Validation: local table/art and visibility probe; actual arena source in
@@ -610,3 +609,26 @@ source positions, strict/signed distance boundaries, room gate, airport
 band selection/fade and finale colours. Browser `?flares=paths` exercises
 an authored level 10 light, checks additive framebuffer pixels, and exits
 through pause/summary to a clean selector. Production build passes.
+
+### Level 4 flicker (2026-09-13)
+
+`0041c286` initializes intensity 0, target 128, timer 60. `0041d8b0`
+subtracts elapsed ticks; strictly below zero it toggles target between 0/128
+and consumes one random byte masked with 63 for the next interval. Intensity
+approaches the target by twice elapsed ticks, clamped. Zero emits no source;
+1–64 sends (2i,2i,0), 65–128 sends (128,128,2i-128). Path 6 lights use size
+64 and the same strict 1,000,000 camera-distance cutoff as other path lights.
+
+The port steps this state during gameplay with the creature simulation's
+shared random stream, regardless of the graphics preference. HUD redraws
+only read it; pause freezes it and spawning resets it. This recovers local
+timing, not the exact global random cursor of all still-unported scripts.
+The probe covers timer-zero behavior, random consumption, fade clamps,
+colours, darkness and the installed path. Browser `?flares=flicker` verifies
+timing and additive pixels, plus pause, respawn and selector cleanup.
+
+Remaining source dependencies: `00406880` belongs to type 20's handler
+`00406620`, during its active beam interval (private timer 100..280).
+`0042537d` belongs to level 9's boss laser, gated by spin cooldown and
+player proximity (docs/LEVELS.md). Both are green beam-impact lights,
+size 32 and 64 respectively; their rays/attacks need porting together.

@@ -2,6 +2,12 @@
 import {poseMatrix,type BonePose} from '../formats/anm.ts';
 import {sin,cos,yawOf} from './trig.ts';
 import type {LaserBeam,Point} from './laser.ts';
+import type {PointLight} from './point-light.ts';
+
+/** 0040685e / 0042535d: both impact lights share owner -2 and a 32-tick gate. */
+export function podImpactLight(impact:Point,emit:boolean):PointLight|null{
+  return emit?{...impact,r:0,g:192,b:0,life:16,owner:-2}:null;
+}
 
 /** Part-zero attachment (0,0,-100), posed before entity yaw and hover roll. */
 export function podMuzzle(c:Point&{heading:number;hover:number;drawScale:number},pose:BonePose|null,offset=-100):Point{

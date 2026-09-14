@@ -1,6 +1,6 @@
 import { readLensFlareTable, buildLensFlares, flareRay, levelFlareSources, pathFlareSources, createFlareFlicker, stepFlareFlicker, type FlareEntry, type FlareSprite } from './sim/lens-flare.ts';
 import { getGamma, setGamma } from './render/gamma.ts';
-import {podMuzzle,podBeam,podImpactHits,podBossAim,podAttachment} from './sim/pod-beam.ts';
+import {podMuzzle,podBeam,podImpactHits,podBossAim,podAttachment,podImpactLight} from './sim/pod-beam.ts';
 import {createPodBoss,readPodHelpers,podBossBar} from './sim/pod-boss.ts';
 import {createPointLights,addPointLight,setScriptedLight,stepPointLights,type PlayerLight} from './sim/point-light.ts';
 import {scriptedPathLight,slimeBaseLight,slimeBlobLight} from './sim/scripted-light.ts';
@@ -1456,7 +1456,8 @@ function stepPodBeams():void{
       const world=effectWorld();
       for(let i=0;i<effects.gate.two;i++)spawnChild(effects,world,p.x,p.y,p.z,4,4);
       if(effects.gate.four)spawnChild(effects,world,p.x,p.y,p.z,0x46,2);
-      if(effects.gate.thirtyTwo)effects.lights.push({...p,r:0,g:128,b:0,glow:false});
+      const light=podImpactLight(p,effects.gate.thirtyTwo);
+      if(light)addPointLight(pointLights,light);
     }
   }
 }

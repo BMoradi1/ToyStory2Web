@@ -50,6 +50,29 @@
   if(!beam)throw Error('ZPOD never fired');
   if(beam.colour.join(',')!=='0,1,0'||beam.to.y<=beam.from.y)throw Error('wrong beam direction/colour');
   if(!ts2.effects.cards)throw Error('beam art missing');
+  let impactLit=false;
+  for(let i=0;i<160;i++){
+    const previous=ts2.effects.podBeams.find(b=>b.flareSize===32);
+    // Stay inside the authored chase box while approaching the beam endpoint.
+    const caster=ts2.creatures.find(c=>c.slot===pod.slot);
+    const toward=previous?.to??beam.to;
+    ts2.player.x=caster.homeX+Math.max(-caster.rangeX*200,Math.min(caster.rangeX*200,toward.x-caster.homeX));
+    ts2.player.z=caster.homeZ+Math.max(-caster.rangeZ*200,Math.min(caster.rangeZ*200,toward.z-caster.homeZ));
+    ts2.player.y=toward.y+8192;
+    ts2.player.hitStun=1000;ts2.tickGame({},1);
+    const pool=ts2.effects.pointLights,selected=ts2.effects.lightTransition.selected;
+    const light=pool.find(l=>l.owner===-2&&l.life>0);
+    if(light){
+      if(light.r!==0||light.g!==192||light.b!==0||light.life>15)throw Error('wrong impact light');
+      if(selected>=0&&pool[selected].owner===-2&&ts2.effects.playerLight?.colour[1]>0){impactLit=true;break;}
+    }
+  }
+  if(!impactLit)throw Error('ZPOD impact never lit Buzz '+JSON.stringify({player:ts2.player,pod:ts2.creatures.find(c=>c.slot===pod.slot),beams:ts2.effects.podBeams,lights:ts2.effects.pointLights}));
+  beam=ts2.effects.podBeams.find(b=>b.flareSize===32)??beam;
+  const frozenLights=JSON.stringify(ts2.effects.pointLights);
+  for(let i=0;i<5;i++)ts2.redrawHud();
+  if(JSON.stringify(ts2.effects.pointLights)!==frozenLights)throw Error('drawing aged impact lights');
+  console.log('ZPOD IMPACT CHARACTER LIGHT PASS');
   const viewer=ts2.viewer;
   let visible=false;
   for(const [x,y,z] of [[0,-1,0],[0,0,1],[1,0,0],[0,0,-1],[-1,0,0]]){

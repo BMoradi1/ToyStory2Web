@@ -191,7 +191,10 @@
  inner yellow / outer cyan candidates at the retail radial boundary; level 15
  path 0 uses red for point 2 and white elsewhere. Their distinct camera gates,
  transitions, live projectile/reset and selector cleanup pass unit/browser checks.
- NEXT: retail normals and other effect/beam light callers;
+ POD IMPACT LIGHTS (2026-09-14): regular ZPOD and level 9 boss endpoints
+ now allocate green RGB (0,192,0), life 16, owner -2 on the 32-tick gate.
+ Replaces unused light requests; shares pool attenuation and return blending.
+ NEXT: effect-death and other temporary-light callers, then retail normals;
  clear-colour/backdrop matching and sprite fog-enable comparison. Exact routines and gamma lookup
  findings are in docs/FRONTEND.md. Controller visor/target-lock and menu/
  cancel bindings still need corresponding input work. Do not claim full parity.

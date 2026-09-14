@@ -650,7 +650,7 @@ sprite-9 strip of half-width 32, with flare size 32 at its endpoint. Damage
 uses `0049f400`'s strict 25-step endpoint radius, each signed delta shifted
 eight before squaring, and reaction 3. Existing player invulnerability applies.
 Two-tick gates spawn kind 4/mode 4 sparks, four-tick gates kind 0x46/mode 2;
-the 32-tick gate requests green point light through the existing light system.
+the 32-tick gate emits the green character light described below.
 
 `stopAtFirstContact` is an opt-in collision query: beams stop instead of
 sliding along terrain. Ordinary movement keeps its previous behavior. The
@@ -659,8 +659,7 @@ cleared on respawn/exit; it does not occupy wrist-laser slots or retract.
 
 Limits: attachment posing uses the browser's floating animation matrices
 rather than the retail fixed-point routine; collision uses the browser hull
-and the green point-light request is still unrendered (the endpoint flare is
-rendered). Level 9's separate boss laser is connected by the follow-up below. Tests cover timer edges, drift/reset, muzzle transforms, first-hit
+and character shading retains the shared triangle-normal approximation. Level 9's separate boss laser is connected by the follow-up below. Tests cover timer edges, drift/reset, muzzle transforms, first-hit
 terrain clipping versus movement sliding, impact radius, a real level 4 pod,
 damage/invulnerability through the attack resolver, and pause/selector cleanup.
 
@@ -676,7 +675,7 @@ The same downward delta and first-contact terrain cast as ZPOD drive a
 sprite-9 beam with half-width 128 and a green size-64 endpoint flare.
 Impact sound is 0x87, damage radius 30 steps, reaction 3; a fresh hit raises
 0x84 and the 0xd7 voice with its 1200-tick cooldown. Existing spark gates
-apply; green point-light requests remain unrendered. The full arena regression
+apply; green impact lights now use the shared temporary pool (below). The full arena regression
 covers entrance, beam/flare, six helper waves, final phase, delayed death,
 victory movie/summary and clean selector return. See docs/LEVELS.md for
 remaining fight presentation differences; all sixteen recovered flare
@@ -847,3 +846,19 @@ colour groups and checks settled transitions and redraw independence. Its
 moving base source and resets the light pool. All three scenarios also verify
 additive flare pixels and clean exits to the level selector. Shared lighting
 probes and the full slime combat regression pass.
+
+### Pod beam impact character lights (2026-09-14)
+
+Regular ZPOD and level 9 boss beam endpoints now feed the temporary light
+pool directly. Calls at `0040685e` and `0042535d` both pass RGB (0,192,0),
+lifetime 16 and owner -2, gated by the global 32-tick divider. The previous
+host queued an unused RGB (0,128,0) request without lifetime or ownership.
+The new source uses the shared range culling, immediate temporary selection,
+attenuation and 64-tick reserved return; the endpoint flare stays separate.
+
+The pod-beam probe covers the emission gate, lifetime, owner, attenuated
+colour and expiry transition. Browser checks exercise both authored attacks,
+verify a live green source selected for Buzz, and ensure drawing does not age
+it. The boss check also covers six helper waves, orange burst competition,
+death and selector return. Effect-death and other temporary-light callers
+remain open, along with exact retail normal shading.

@@ -905,7 +905,9 @@
            level 14 inner-yellow/outer-cyan path-40 split, and level 15 path-0
            red/white lamps now complete the queued special sources. Range,
            transition, projectile/reset and selector cleanup checks pass.
-           Retail normal lighting and other light callers remain open;
+           Regular pod and level 9 boss beam impacts now supply green temporary
+           lights with the retail 32-tick gate, 16-tick life and shared owner.
+           Retail normal lighting and other temporary-light callers remain open;
            Follow camera correctly ignores script target height in retail;
            exact half-turn target steering corrected and regression tested.
            Also remaining:

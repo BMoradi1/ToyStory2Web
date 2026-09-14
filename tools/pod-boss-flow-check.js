@@ -52,9 +52,27 @@
     ts2.tickGame({},1);
     if(ts2.effects.podBeams.some(b=>b.flareSize===64))break;
   }
-  const beam=ts2.effects.podBeams.find(b=>b.flareSize===64);
+  let beam=ts2.effects.podBeams.find(b=>b.flareSize===64);
   if(!beam)throw Error('boss laser never fired: '+JSON.stringify(ts2.tasks));
   if(beam.width!==128)throw Error('boss beam width');
+  let impactLit=false;
+  for(let i=0;i<160;i++){
+    const previous=ts2.effects.podBeams.find(b=>b.flareSize===64);
+    if(previous){ts2.player.x=previous.to.x;ts2.player.y=previous.to.y+8192;ts2.player.z=previous.to.z;}
+    ts2.player.hitStun=1000;ts2.tickGame({},1);
+    const pool=ts2.effects.pointLights,selected=ts2.effects.lightTransition.selected;
+    const light=pool.find(l=>l.owner===-2&&l.life>0);
+    if(light){
+      if(light.r!==0||light.g!==192||light.b!==0||light.life>15)throw Error('wrong impact light');
+      if(selected>=0&&pool[selected].owner===-2&&ts2.effects.playerLight?.colour[1]>0){impactLit=true;break;}
+    }
+  }
+  if(!impactLit)throw Error('POD BOSS impact never lit Buzz');
+  beam=ts2.effects.podBeams.find(b=>b.flareSize===64)??beam;
+  const frozenLights=JSON.stringify(ts2.effects.pointLights);
+  for(let i=0;i<5;i++)ts2.redrawHud();
+  if(JSON.stringify(ts2.effects.pointLights)!==frozenLights)throw Error('drawing aged impact lights');
+  console.log('POD BOSS IMPACT CHARACTER LIGHT PASS');
   const viewer=ts2.viewer;let visible=false;
   for(const [x,y,z] of [[0,-1,0],[0,0,1],[1,0,0],[0,0,-1],[-1,0,0]]){
     viewer.camera.position.set(beam.to.x/8192+x,-beam.to.y/8192+y,-beam.to.z/8192+z);

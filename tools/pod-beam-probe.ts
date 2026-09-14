@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {buildCreature,createCreatureSim,CREATURE_HANDLERS,RandomStream,stepCreatures} from '../src/sim/creatures.ts';
-import {podMuzzle,podBeam,podImpactHits,podAttachment} from '../src/sim/pod-beam.ts';
+import {podMuzzle,podBeam,podImpactHits,podAttachment,podImpactLight} from '../src/sim/pod-beam.ts';
+import {createPointLights,addPointLight,stepPointLights} from '../src/sim/point-light.ts';
 import {sweepSphere,type CollisionWorld} from '../src/formats/collision.ts';
 const c=buildCreature({slot:0,x:0,y:0,z:0,type:20,script:0,turnRate:0,facing:0,health:3,respawn:0,flags:1,
   rangeX:1000,rangeZ:1000,rangeYaw:0,vulnerable:1,accel:0,accelSide:0,speedMax:0,speed:0},true);
@@ -36,3 +37,19 @@ assert(Math.abs(hit.to.y-9744)<1);assert(Math.abs(hit.to.z-65536*9744/96000)<1,'
 const slide=sweepSphere(floor,{x:0,y:0,z:0},{x:0,y:96000,z:65536},256,{scale:1,skin:0,passes:1});
 assert(slide.z>hit.to.z,'movement keeps its existing slide behavior');
 console.log('PASS: ZPOD firing window, drift, reset, lean, request expiry, muzzle, signed impact radius and first-contact beam casting.');
+const impact={x:0,y:0,z:8192},buzz={x:0,y:8192,z:0};
+assert.equal(podImpactLight(impact,false),null);
+assert.deepEqual(podImpactLight(impact,true),{...impact,r:0,g:192,b:0,life:16,owner:-2});
+const lights=createPointLights();
+addPointLight(lights,podImpactLight(impact,true)!);
+assert.deepEqual(stepPointLights(lights,buzz)!.colour,[0,189,0]);
+assert.equal(lights.remaining,0,'temporary beam light snaps in');
+for(let i=0;i<14;i++)stepPointLights(lights,buzz);
+assert.equal(lights.slots[0]!.life,1);
+stepPointLights(lights,buzz);
+assert.equal(lights.slots[0]!.life,0);
+assert.equal(lights.selected,-1);
+assert.equal(lights.remaining,63,'expired impact blends back to base');
+for(let i=0;i<64;i++)stepPointLights(lights,buzz);
+assert.equal(stepPointLights(lights,buzz),null);
+console.log('PASS: gated green impact light, retail lifetime/owner, attenuation, immediate selection and reserved return.');

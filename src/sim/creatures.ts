@@ -221,6 +221,8 @@ export interface CreatureSim {
   deaths: { x: number; y: number; z: number; burst: number }[];
   /** Bolts a handler fired this tick. The projectile itself is not ported. */
   shots: { x: number; y: number; z: number; heading: number }[];
+  /** Sustained ZPOD beams requested this tick; resolved against terrain by the host. */
+  beamCasters: Creature[];
   /**
    * `DAT_0052b7d8`: how many of the level's five lost things have been
    * brought home. One global for every level, counted by whichever creature
@@ -329,7 +331,7 @@ export function createCreatureSim(
   }
   return {
     creatures, world, rand, level,
-    sounds: [], sparks: [], dust: [], raceState: 0, carFront: 0, carRear: 0, shots: [], deaths: [], near: [],
+    sounds: [], sparks: [], dust: [], raceState: 0, carFront: 0, carRear: 0, shots: [], beamCasters: [], deaths: [], near: [],
     foundCount: 0, lastKilled: -1, models: null,
     bossLastHealth: -1, bossSlotEarned: false,
   };
@@ -875,6 +877,21 @@ export interface HandlerArgs {
 
 type CreatureHandler = (sim: CreatureSim, c: Creature, args: HandlerArgs) => void;
 
+/** ZPOD, 00406620: drift for 360 ticks, beam during the inclusive 100..280 window. */
+function laserPod(sim:CreatureSim,c:Creature,args:HandlerArgs):void{
+  const lean=Math.max(-0x200,Math.min(0x200,args.fwd));
+  c.hover-=idiv((c.hover+lean)*args.dt,16);
+  if(c.deathTimer>=0)sim.sounds.push({event:0x5b,x:c.x,y:c.y,z:c.z});
+  if(!args.chasing){c.timer=360;return;}
+  c.timer-=args.dt;
+  if(c.timer<0){
+    c.timer=360;
+    const turn=c.heading+(sim.rand.byte()<128?-0x200:0x200);
+    c.vx=sin(turn)>>4;c.vz=cos(turn)>>4;
+  }
+  if(c.timer>=100&&c.timer<=280)sim.beamCasters.push(c);
+}
+
 /**
  * The find-five collectable: the sheep, the troops, the ducklings and the
  * rest. Ten types have this handler, one per level, and they are the same
@@ -1060,6 +1077,7 @@ export const CREATURE_HANDLERS: Record<string, CreatureHandler> = {
   FUN_0042c150: collectable,
   FUN_0042d620: collectable,
   LAB_00406220: hoverBot,
+  LAB_00406620: laserPod,
   FUN_00416ab0: tinRobot,
   LAB_00406a60: raceCar,
 };
@@ -1080,6 +1098,7 @@ export function stepCreatures(
   sim.sounds.length = 0;
   sim.sparks.length = 0;
   sim.shots.length = 0;
+  sim.beamCasters.length = 0;
   const near: number[] = [];
 
   for (let i = 0; i < sim.creatures.length; i++) {

@@ -140,8 +140,11 @@
  LEVEL 4 FLICKER (2026-09-13): path 6 fades yellow-to-white with the retail
  60-tick initial timer, random 0..63 reversals and two intensity units/tick.
  Uses the creature simulation's shared random stream; redraws do not tick it.
- NEXT RENDER WORK: two remaining beam-impact flare callsites
- (00406880 in type 20 handler 00406620, 0042537d in level 9 boss laser),
+ ZPOD ATTACK (2026-09-13): type 20 handler 00406620 now drives its
+ 360-tick drift/beam cycle. Posed muzzle, downward terrain cast, green strip,
+ impact damage/sparks/sounds and flare 00406880 connected. Beam casts stop
+ at first contact; movement retains sliding. Paused beams freeze; exits clear.
+ NEXT RENDER WORK: remaining beam-impact flare 0042537d in level 9 boss laser,
  clear-colour/backdrop matching and sprite fog-enable comparison. Exact routines and gamma lookup
  findings are in docs/FRONTEND.md. Controller visor/target-lock and menu/
  cancel bindings still need corresponding input work. Do not claim full parity.

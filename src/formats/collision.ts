@@ -645,7 +645,7 @@ export function sweepSphere(
   from: { x: number; y: number; z: number },
   velocity: { x: number; y: number; z: number },
   radius: number,
-  options: { scale?: number; passes?: number; groundNormalY?: number; skin?: number } = {},
+  options: { scale?: number; passes?: number; groundNormalY?: number; skin?: number; stopAtFirstContact?: boolean } = {},
 ): SphereSweep {
   const scale = options.scale ?? 32;
   const groundY = options.groundNormalY ?? -0.5;
@@ -702,6 +702,8 @@ export function sweepSphere(
       y: position.y + remaining.y * travel,
       z: position.z + remaining.z * travel,
     };
+    // Beam casts end at contact rather than sliding along the surface.
+    if(options.stopAtFirstContact){remaining={x:0,y:0,z:0};break;}
     let rest: Vec3 = {
       x: remaining.x * (1 - travel),
       y: remaining.y * (1 - travel),
@@ -770,4 +772,3 @@ export function sweepSphere(
     onGround, touched, groundNormal, contacts,
   };
 }
-

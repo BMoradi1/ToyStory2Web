@@ -885,7 +885,9 @@
            Local-map probes and browser pixels/selector cleanup pass.
            Level 4 path 6 flicker now follows simulation time/shared randomness,
            with yellow-to-white fade and respawn reset.
-           Remaining: two beam-impact flare sources (type 20 and level 9 boss),
+           Type 20 ZPOD sustained beam attack and impact flare now connected,
+           including timing, terrain contact, damage, sounds and sparks.
+           Remaining: level 9 boss beam-impact flare and its attack integration,
            backdrop matching, conditional
            level 8/Shield texture scripts, plus visor/target-lock and menu/cancel
            binding support. Full controller/GFX feature parity is still open.

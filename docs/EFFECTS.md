@@ -570,9 +570,9 @@ batches and texture references. Nothing persists into the selector.
 The original lens-flare option is now first at y75, followed by detail,
 gamma and animated textures at y100/125/150. It supports preview, rollback
 and persistence under `ts2.lensFlare`, default on. This does not imply all
-sources are ported: after the path-light follow-up below, remaining calls
-are `00406880` and `0042537d`. Their creature/boss beam state still needs connecting; do not
-substitute unconditional lights for them.
+sources are ported: after the follow-ups below, the remaining call is
+`0042537d`. Its boss beam state still needs connecting; do not
+substitute an unconditional light for it.
 
 Validation: local table/art and visibility probe; actual arena source in
 Chromium with ten sprites; off preference persistence; looking away removes
@@ -627,8 +627,37 @@ The probe covers timer-zero behavior, random consumption, fade clamps,
 colours, darkness and the installed path. Browser `?flares=flicker` verifies
 timing and additive pixels, plus pause, respawn and selector cleanup.
 
-Remaining source dependencies: `00406880` belongs to type 20's handler
+Source dependencies (type 20 now ported below): `00406880` belongs to type 20's handler
 `00406620`, during its active beam interval (private timer 100..280).
 `0042537d` belongs to level 9's boss laser, gated by spin cooldown and
 player proximity (docs/LEVELS.md). Both are green beam-impact lights,
-size 32 and 64 respectively; their rays/attacks need porting together.
+size 32 and 64 respectively; their rays/attacks belong together.
+
+### ZPOD beam and impact (2026-09-13)
+
+Type 20 (`ZPOD`, handler `00406620`) now emits sustained beam requests during
+timer 100..280 inclusive. Outside its chase box it resets to 360. Below zero,
+it resets to 360 and chooses heading +/-0x200 using a random byte, setting
+X/Z drift to sine/cosine shifted right four. Hover lean clamps the handler's
+forward component to +/-512 and eases by `(hover+lean)*dt/16`. Sound 0x5b
+runs while not dying; each active beam raises impact sound 0x5c.
+
+The host poses part-zero's (0,0,-100) attachment, casts delta
+`(sin(heading)*4,96000,cos(heading)*4)` with radius 256, and draws a green
+sprite-9 strip of half-width 32, with flare size 32 at its endpoint. Damage
+uses `0049f400`'s strict 25-step endpoint radius, each signed delta shifted
+eight before squaring, and reaction 3. Existing player invulnerability applies.
+Two-tick gates spawn kind 4/mode 4 sparks, four-tick gates kind 0x46/mode 2;
+the 32-tick gate requests green point light through the existing light system.
+
+`stopAtFirstContact` is an opt-in collision query: beams stop instead of
+sliding along terrain. Ordinary movement keeps its previous behavior. The
+sustained beam list is rebuilt per simulation tick, frozen on pause and
+cleared on respawn/exit; it does not occupy wrist-laser slots or retract.
+
+Limits: attachment posing uses the browser's floating animation matrices
+rather than the retail fixed-point routine; collision uses the browser hull
+and existing point-light approximation. Level 9's separate boss laser remains
+unported. Tests cover timer edges, drift/reset, muzzle transforms, first-hit
+terrain clipping versus movement sliding, impact radius, a real level 4 pod,
+damage/invulnerability through the attack resolver, and pause/selector cleanup.

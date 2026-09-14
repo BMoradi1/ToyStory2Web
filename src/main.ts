@@ -1,5 +1,6 @@
 import { readLensFlareTable, buildLensFlares, flareRay, levelFlareSources, pathFlareSources, createFlareFlicker, stepFlareFlicker, type FlareEntry, type FlareSprite } from './sim/lens-flare.ts';
 import { getGamma, setGamma } from './render/gamma.ts';
+import {podMuzzle,podBeam,podImpactHits} from './sim/pod-beam.ts';
 import { createTextureAnimation, stepTextureAnimation, copyScrolledTexture } from './sim/texture-animation.ts';
 import { readSoundSequences, startSequence, stepSequence, type SoundSequences, type SequenceVoice } from './audio/sequences.ts';
 import { createGuideSparkles, stepGuideSparkles, spendGuide } from './sim/guide-sparkles.ts';
@@ -10,7 +11,7 @@ import { movieChoices } from './front/movies.ts';
 import { createSlimeBoss, slimeBossBar, slimeBlobTarget } from './sim/slime-boss.ts';
 import { GroupType, buildMeshData, parseAll, readHitShapes, type AllFile } from './formats/all.ts';
 import {
-  DEFAULT_ANIMATION_FPS, buildPosedMeshData, parseAnm,
+  DEFAULT_ANIMATION_FPS, buildPosedMeshData, parseAnm, poseBone,
   type AnmFile, type Animation,
 } from './formats/anm.ts';
 import * as THREE from 'three';
@@ -657,6 +658,8 @@ async function open(dir: GameDir): Promise<void> {
       get stompProps() { return stompProps; },
       redrawHud(){if(player)drawHud(levelNumber(levels[levelEl.selectedIndex]?.id??'')??0);return flareSprites;},
       get lensFlares(){return {enabled:lensFlare,sprites:flareSprites,flicker:{...flareFlicker}};},
+      /** Resolve the current attack requests without advancing the cast (collision/damage probes). */
+      resolveCreatureBeams(){stepPodBeams();drawEffects();drawHud(levelNumber(levels[levelEl.selectedIndex]?.id??'')??0);},
       get textureAnimation() {return { ...textureAnimation,enabled:animatedTextures };},
       texturePixels(page:number) {
         const texture=sceneTextures.get(page);
@@ -918,6 +921,7 @@ async function open(dir: GameDir): Promise<void> {
           lastHitAngle: effects.hits[0]?.angle ?? null,
           live: live.length,
           beams: laserBeams.map(b => ({ ...b })),
+          podBeams: podBeams.map(b => ({ ...b })),
           diskAmmo: pickups?.discs ?? 0,
           kinds: live.map((e) => e.kind),
           sprites: live.map((e) => e.sprite),
@@ -1315,6 +1319,7 @@ async function spawnPlayer(): Promise<void> {
     : null;
   viewer.setCardSheet(sceneTextures.get(SPRITE_SHEET) ?? null);
   laserBeams.length = 0;
+  podBeams.length = 0;
   hud = createHud();
   startHud(hud);
   hudWas = { lives: -1, health: -1, coins: -1, found: -1 };
@@ -1407,6 +1412,30 @@ function stepEffectsNow(): void {
  * What the creature tick raised, as effects: the shots a handler fired, the
  * sparks a blow struck, and the coins a dying creature spills.
  */
+function stepPodBeams():void{
+  podBeams.length=0;
+  if(!creatureSim||!player||!currentCollisionWorld)return;
+  for(const c of creatureSim.beamCasters){
+    if(c.health<=0||c.deathTimer<0)continue;
+    const art=creatureArt.get(c.type),animation=art?.anm?.animations[c.animState];
+    const pose=art?.anm&&animation?poseBone(art.anm,animation,(c.frame>>>16)%Math.max(1,animation.frameCount),0):null;
+    const beam=podBeam(podMuzzle(c,pose),c.heading,(from,delta)=>{
+      const hit=sweepSphere(currentCollisionWorld!,from,delta,0x100,{passes:1,skin:0,stopAtFirstContact:true});
+      return {x:hit.x,y:hit.y,z:hit.z};
+    });
+    podBeams.push(beam);
+    const p=beam.to;
+    playEvent(0x5c,p);
+    if(podImpactHits(player,p))applyCreatureTouch(yawOf(player.x-p.x,player.z-p.z),3);
+    if(effects){
+      const world=effectWorld();
+      for(let i=0;i<effects.gate.two;i++)spawnChild(effects,world,p.x,p.y,p.z,4,4);
+      if(effects.gate.four)spawnChild(effects,world,p.x,p.y,p.z,0x46,2);
+      if(effects.gate.thirtyTwo)effects.lights.push({...p,r:0,g:128,b:0,glow:false});
+    }
+  }
+}
+
 function spawnCreatureEffects(): void {
   if (!effects || !creatureSim || !player || !camera) return;
   const world = effectWorld();
@@ -1605,7 +1634,7 @@ function drawEffects(): void {
   // Sprite 9 is the beam strip. The engine tiles it every 400 level units,
   // with frame 2 at the tail and frame 1 along the remainder.
   const strip = spriteTable[9];
-  if (strip) for (const beam of laserBeams) {
+  if (strip) for (const beam of [...laserBeams,...podBeams]) {
     const dx = beam.to.x - beam.from.x, dy = beam.to.y - beam.from.y, dz = beam.to.z - beam.from.z;
     const length = Math.hypot(dx, dy, dz);
     for (let offset = 0; offset < length; offset += 400 * 32) {
@@ -1880,6 +1909,7 @@ function drawHud(level: number): void {
   const eye=viewer.camera.position;
   const eyeGame={x:eye.x*scale,y:-eye.y*scale,z:-eye.z*scale};
   const sources=[...levelFlareSources(level),
+    ...podBeams.map(b=>({...b.to,r:0,g:128,b:0,size:32})),
     ...(player?pathFlareSources(level,currentLevel?.level.paths??[],eyeGame,player,zones.camera,flareFlicker):[]),
     ...(effects?.lights.filter(l=>l.glow).map(l=>({...l,size:48}))??[])];
   flareSprites=lensFlare?buildLensFlares(sources,flareTable,source=>{
@@ -2238,6 +2268,7 @@ let camera: CameraState | null = null;
 /** The effect pool, or null before a level is up. */
 let effects: EffectSim | null = null;
 const laserBeams: LaserBeam[] = [];
+const podBeams: LaserBeam[] = [];
 /** This frame's effect cards, rebuilt each tick. */
 const effectCards: WorldSprite[] = [];
 const effectFlat: WorldSprite[] = [];
@@ -2577,6 +2608,7 @@ async function loadDioramaScene(): Promise<{ paths: DatLevel['paths']; placedOf:
   pickups = null;
   effects = null;
   laserBeams.length = 0;
+  podBeams.length = 0;
   pushBlocks = null;
   levelPoles = [];
   levelZipLines = [];
@@ -3237,6 +3269,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     }
   }
   stepEffectsNow();
+  stepPodBeams();
   tickSoundSequence();
 
   if (pickups) {

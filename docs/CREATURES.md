@@ -514,6 +514,15 @@ per-level work for whoever ports that level. The handlers share a
 convention: they read the placement to tune behaviour, use `+0x8a` as a
 private timer, and end a creature by calling `FUN_00405d20` themselves.
 
+### ZPOD handler (2026-09-13)
+
+`LAB_00406620` (type 20) is now ported: hover lean, random drift and the
+360-tick sustained-beam cycle. The handler raises per-tick beam requests;
+the host resolves its posed muzzle, terrain impact, damage and feedback.
+See docs/EFFECTS.md, "ZPOD beam and impact", for constants and limitations.
+`tools/pod-beam-probe.ts` covers the attack; level 4's 30 creatures also pass
+400-tick home-box and script regression runs.
+
 ## Not yet decoded
 
 - the other `.raw` record types (0x24 is the backdrop, docs/FORMATS.md)

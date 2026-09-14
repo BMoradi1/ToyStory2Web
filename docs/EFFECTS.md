@@ -570,12 +570,43 @@ batches and texture references. Nothing persists into the selector.
 The original lens-flare option is now first at y75, followed by detail,
 gamma and animated textures at y100/125/150. It supports preview, rollback
 and persistence under `ts2.lensFlare`, default on. This does not imply all
-sources are ported: remaining calls are `00406880`, `0041d9d0`, `0041fdc4`,
-`0042537d`, `00425ff0`, `0042addd`, `0042b443`, `0042d2c3`, `0042f1e6`
-and `004307d1`. Their prop/creature state and distance conditions still need
-connecting; do not substitute unconditional lights for them.
+sources are ported: after the path-light follow-up below, remaining calls
+are `00406880`, `0041d9d0` (level 4's flickering path 6 lights) and
+`0042537d`. Their prop/creature state still needs connecting; do not
+substitute unconditional lights for them.
 
 Validation: local table/art and visibility probe; actual arena source in
 Chromium with ten sprites; off preference persistence; looking away removes
 the source; additive framebuffer checks; real pause/summary/selector cleanup.
 Gamma and animated-texture navigation regressions and production build pass.
+
+### Path-light follow-up (2026-09-13)
+
+`pathFlareSources` connects seven level-tick calls using the DAT path table
+at `00559c70[tag]`. Points shift left five into game units. Camera-minus-light
+deltas each shift right eight with signed arithmetic before squaring; the
+distance cutoff is strict. Level numbers follow the dispatch table in
+docs/LEVELS.md, including Zurg as level 12.
+
+| Level | Call | Path tag | RGB | Size | Squared distance cutoff |
+|---|---|---|---|---|---|
+| 5 | `0041fdc4` | 17 | 64,48,32 | 128 | 1,000,000 |
+| 10 | `00425ff0` | 13 | 128,128,128 | 64 | 1,000,000 |
+| 11 | `0042addd` | 19 | 32,32,32 | 128 | 1,000,000 |
+| 12 | `0042b443` | 0 | 128,128,128 | 64 | 1,000,000 |
+| 13 | `0042d2c3` | 10 | 48,64,80 | 64 | 1,000,000 |
+| 14 | `0042f1e6` | 40 | yellow/cyan, faded | 128 | 262,144 |
+| 15 | `004307d1` | 0 | white, third point red | 128 | 1,048,576 |
+
+Level 11 skips these lights in camera zone 4. Level 14 selects points 0–15
+when `(player.x >> 8)^2 + (player.z >> 8)^2 < 0x8e5144`, otherwise points
+16 onward. Intensity is `128 - (trunc(sqrt(distanceSquared)) >> 2)`:
+inner points send (intensity,intensity,0), outer points (0,intensity,intensity).
+Level 15's zero-based point index 2 sends (128,0,0). Authored point order
+survives filtering, ahead of the renderer's visibility/eight-source cap.
+
+Validation: lens-flare-probe reads all seven installed DATs, verifies real
+source positions, strict/signed distance boundaries, room gate, airport
+band selection/fade and finale colours. Browser `?flares=paths` exercises
+an authored level 10 light, checks additive framebuffer pixels, and exits
+through pause/summary to a clean selector. Production build passes.

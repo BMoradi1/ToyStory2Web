@@ -880,7 +880,10 @@
            2026-09-13: level 14 fog gain and linear depth blending corrected.
            2026-09-13: lens-flare option and additive renderer for effect glows
            and Slime Boss arena light; visibility, pixels and cleanup tested.
-           Remaining: ten conditional flare sources, backdrop matching, conditional
+           Seven path-light calls now connected on levels 5, 10–15, including
+           distance/zone gates, airport bands/fade and finale red light.
+           Local-map probes and browser pixels/selector cleanup pass.
+           Remaining: three conditional flare sources, backdrop matching, conditional
            level 8/Shield texture scripts, plus visor/target-lock and menu/cancel
            binding support. Full controller/GFX feature parity is still open.
  [was]     Cutscenes: MPEG-1 in the browser (jsmpeg-style decoder or

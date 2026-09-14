@@ -1,4 +1,4 @@
-import { readLensFlareTable, buildLensFlares, flareRay, levelFlareSources, type FlareEntry, type FlareSprite } from './sim/lens-flare.ts';
+import { readLensFlareTable, buildLensFlares, flareRay, levelFlareSources, pathFlareSources, type FlareEntry, type FlareSprite } from './sim/lens-flare.ts';
 import { getGamma, setGamma } from './render/gamma.ts';
 import { createTextureAnimation, stepTextureAnimation, copyScrolledTexture } from './sim/texture-animation.ts';
 import { readSoundSequences, startSequence, stepSequence, type SoundSequences, type SequenceVoice } from './audio/sequences.ts';
@@ -1877,7 +1877,9 @@ function drawHud(level: number): void {
   viewer.camera.updateMatrixWorld();
   const eye=viewer.camera.position;
   const eyeGame={x:eye.x*scale,y:-eye.y*scale,z:-eye.z*scale};
-  const sources=[...levelFlareSources(level),...(effects?.lights.filter(l=>l.glow).map(l=>({...l,size:48}))??[])];
+  const sources=[...levelFlareSources(level),
+    ...(player?pathFlareSources(level,currentLevel?.level.paths??[],eyeGame,player,zones.camera):[]),
+    ...(effects?.lights.filter(l=>l.glow).map(l=>({...l,size:48}))??[])];
   flareSprites=lensFlare?buildLensFlares(sources,flareTable,source=>{
     const p=new THREE.Vector3(source.x/scale,-source.y/scale,-source.z/scale).project(viewer!.camera);
     return {x:(p.x+1)*256,y:(1-p.y)*128,depth:(p.z+1)/2};

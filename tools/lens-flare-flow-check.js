@@ -45,12 +45,20 @@
   await wait(() => ts2.front.inLevel, 'level did not start');
   ts2.viewer.stop();
   const selector=document.querySelector('#level');
-  selector.selectedIndex=[...selector.options].findIndex(o=>o.text==='level03/level');
+  const pathLight=location.search.includes('flares=paths');
+  const scene=pathLight?'level10/level':'level03/level';
+  selector.selectedIndex=[...selector.options].findIndex(o=>o.text===scene);
   selector.dispatchEvent(new Event('change'));
-  await wait(()=>document.querySelector('#status').textContent.includes('level03/level: ready'),'level 3');
+  await wait(()=>document.querySelector('#status').textContent.includes(scene+': ready'),scene);
   await ts2.spawnPlayer();ts2.viewer.stop();
   const viewer=ts2.viewer,enabled=!location.search.includes('flares=off');
-  const source={x:0x3889/8192,y:-(0xfffc9f67|0)/8192,z:-(0xffffe044|0)/8192};
+  let source={x:0x3889/8192,y:-(0xfffc9f67|0)/8192,z:-(0xffffe044|0)/8192};
+  if(pathLight){
+    const file=[...document.querySelector('#pickfile').files].find(f=>f.webkitRelativePath.endsWith('/data/'+scene+'.dat'));
+    const {parseDat}=await import('/src/formats/dat.ts');
+    const point=parseDat(await file.arrayBuffer()).paths.find(p=>p.id===13).points[0];
+    source={x:point.x/256,y:-point.y/256,z:-point.z/256};
+  }
   let visible=false;
   for(const [x,y,z] of [[0,0,1],[1,0,0],[0,0,-1],[-1,0,0],[0,-1,0]]){
     viewer.camera.position.set(source.x+x,source.y+y,source.z+z);
@@ -59,12 +67,12 @@
     if(sprites.length){visible=true;break;}
   }
   if(visible!==enabled)throw Error('real arena flare does not follow option: '+JSON.stringify(ts2.lensFlares));
-  if(enabled&&ts2.lensFlares.sprites.length!==10)throw Error('arena chain sprite count');
+  if(enabled&&(!ts2.lensFlares.sprites.length||ts2.lensFlares.sprites.length%10))throw Error('chain sprite count');
   console.log('FLARE BROWSER PASS',JSON.stringify({enabled,visible,sprites:ts2.lensFlares.sprites.length}));
   // Looking away must remove the source without leaving last frame's sprites.
   const eye=viewer.camera.position.clone();
   viewer.camera.lookAt(2*eye.x-source.x,2*eye.y-source.y,2*eye.z-source.z);
-  if(ts2.redrawHud().length)throw Error('behind-camera flare retained');
+  if(!pathLight&&ts2.redrawHud().length)throw Error('behind-camera flare retained');
   viewer.camera.lookAt(source.x,source.y,source.z);ts2.redrawHud();
   // Display this controlled camera view, keeping the simulation stopped.
   const tick=viewer.onTick;viewer.onTick=null;viewer.play=true;
@@ -80,7 +88,7 @@
     console.log('FLARE ADDITIVE PIXELS PASS',brightened);
   }
   viewer.onTick=tick;
-  if(!enabled||location.search.includes('cleanup')){
+  if(!enabled||pathLight||location.search.includes('cleanup')){
   ts2.tickGame({}, 10);
   window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));
   window.dispatchEvent(new KeyboardEvent('keyup',{key:'Escape'}));

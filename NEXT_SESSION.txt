@@ -133,7 +133,12 @@
  lights maximum. Additive WebGL pass sits below HUD; scene/respawn/stop
  clears sprites and texture references. Original option previews/rolls back/
  persists. Pixel tests verify that flares never darken the underlying world.
- NEXT RENDER WORK: ten remaining conditional prop/creature flare callsites,
+ PATH LIGHTS (2026-09-13): seven more flare callsites connected on levels
+ 5, 10, 11, 12, 13, 14 and 15. Original path tags, signed distance tests,
+ level 11 camera-zone gate, airport colour bands/fade and finale red light.
+ Local-map probes, build and level 10 Chromium pixels/selector cleanup pass.
+ NEXT RENDER WORK: three remaining conditional prop/creature flare callsites
+ (00406880, 0041d9d0 flicker, 0042537d),
  clear-colour/backdrop matching and sprite fog-enable comparison. Exact routines and gamma lookup
  findings are in docs/FRONTEND.md. Controller visor/target-lock and menu/
  cancel bindings still need corresponding input work. Do not claim full parity.

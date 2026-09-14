@@ -3,7 +3,9 @@ import {createEffects,spawnEffect,stepEffects,type EffectWorld} from '../src/sim
 import {RandomStream} from '../src/sim/creatures.ts';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {readLensFlareTable,buildLensFlares,flareRay,levelFlareSources} from '../src/sim/lens-flare.ts';
+import {readLensFlareTable,buildLensFlares,flareRay,levelFlareSources,pathFlareSources} from '../src/sim/lens-flare.ts';
+import {parseDat} from '../src/formats/dat.ts';
+import {sceneForLevel} from '../src/sim/level-data.ts';
 import {readSpriteTable} from '../src/formats/sprite-table.ts';
 import {createOptions,stepOptions} from '../src/front/options.ts';
 import {DEFAULT_KEYS} from '../src/sim/input.ts';
@@ -39,3 +41,28 @@ const effect=spawnEffect(coloured,world,0,0,0,0,0,0,0,0,0,kind)!;
 effect.mode=0x1a;effect.r=16;effect.g=32;effect.b=48;effect.life=4;
 stepEffects(coloured,world);assert(coloured.lights.some(l=>l.glow&&l.r===32&&l.g===32&&l.b===48));
 console.log('PASS: effect glow emission, deferred visibility cap and mode 0x1a colour channels.');
+
+const origin={x:0,y:0,z:0};
+const paths=[{id:17,points:[origin]}];
+assert.equal(pathFlareSources(5,paths,{x:256000,y:0,z:0},origin,0).length,0);
+assert.equal(pathFlareSources(5,paths,{x:255999,y:0,z:0},origin,0).length,1);
+assert.equal(pathFlareSources(5,paths,{x:-255745,y:0,z:0},origin,0).length,0,'negative distances use arithmetic shift');
+assert.equal(pathFlareSources(11,[{id:19,points:[origin]}],origin,origin,4).length,0);
+const airport=[{id:40,points:Array.from({length:18},()=>origin)}];
+const inner=pathFlareSources(14,airport,{x:256*256,y:0,z:0},origin,0);
+assert.equal(inner.length,16);assert.deepEqual([inner[0]!.r,inner[0]!.g,inner[0]!.b],[64,64,0]);
+const outer=pathFlareSources(14,airport,origin,{x:3054*256,y:0,z:0},0);
+assert.equal(outer.length,2);assert.deepEqual([outer[0]!.r,outer[0]!.g,outer[0]!.b],[0,128,128]);
+assert.equal(pathFlareSources(14,airport,{x:512*256,y:0,z:0},origin,0).length,0);
+assert.equal(pathFlareSources(14,[],origin,origin,0).length,0);
+const finale=pathFlareSources(15,[{id:0,points:[origin,origin,origin]}],origin,origin,0);
+assert.deepEqual(finale.map(s=>[s.r,s.g,s.b]),[[128,128,128],[128,128,128],[128,0,0]]);
+for(const [level,id] of [[5,17],[10,13],[11,19],[12,0],[13,10],[14,40],[15,0]] as const){
+  const dat=parseDat(readFileSync(`${process.argv[2]??'Toy Story 2'}/data/${sceneForLevel(level)}.dat`));
+  const point=dat.paths.find(p=>p.id===id)?.points[0];assert(point,`level ${level} path ${id}`);
+  const camera={x:point.x*32,y:point.y*32,z:point.z*32};
+  const sources=pathFlareSources(level,dat.paths,camera,origin,0);
+  assert(sources.some(s=>s.x===camera.x&&s.y===camera.y&&s.z===camera.z),`level ${level} authored source`);
+  console.log(`PASS: level ${level} path ${id}, ${sources.length} nearby sources`);
+}
+console.log('PASS: path source distance boundaries, signed rounding, zone gate, airport bands/fade and finale colours.');

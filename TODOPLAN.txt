@@ -1,3 +1,17 @@
+CURRENT UPDATE — 2026-09-14: first-person creature lock/cycling
+  Q/E or shoulder buttons acquire/cycle previous/next nearby enemy in laser view.
+  Held buttons do not repeat; manual steering breaks tracking, the next press
+  re-locks the selection, and missing/dead/out-of-range targets release it.
+  Uses animated hit-shape centres and quarter-error aim tracking; normal beam
+  and disk collision remains in force. Red reticle is the port's lock cue.
+  Retail creature order/range and steering release are decoded. Reverse cycling,
+  button mapping and the red center cue are port UI choices. The port near flag
+  replaces the retail two-bit eligibility check (bit 0 is not set here).
+  Verified: production build, lock/beam/aim probes and Chromium real-enemy lock,
+  physical E input, held edges, pause, manual release and death cleanup.
+  Remaining: retail world target-marker effects, disk/coin targets, acquisition
+  sounds and full automatic selection parity. This is creature locking only.
+
 CURRENT UPDATE — 2026-09-14: first-person model motion
   Ported the verified model tracking and sine sway from FUN_004038e0: independent
   part rotations, one-sixth shortest-angle tracking per game tick, half/full sway

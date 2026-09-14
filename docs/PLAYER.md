@@ -750,3 +750,30 @@ retail slowed phase branch while hurt is not used. Model rotation remains visual
 manual lasers and disks continue to use the camera ray. Pause freezes both phase
 and tracking; re-entry reseeds them. Browser checks verify changing vertex data;
 unit checks cover wraparound, integer settling and unchanged shot direction.
+
+## Creature targeting in laser view (2026-09-14)
+
+Q/E and the camera shoulder bindings acquire or cycle previous/next enemies in
+laser view. Holding a button never cycles repeatedly. Manual aim releases
+tracking, retaining the selection for a re-lock; a dead, missing, or out-of-range
+target clears it. Toggle, respawn, dialogue and scene exit reset targeting; pause
+freezes it. The center marker is red while locked (port UI, not retail marker art).
+
+`004039b3..00403a2b` builds the creature list in slot order, requiring a live
+vulnerable creature and an animated hit shape. `004037e0` transforms that shape's
+center; the range is squared coarse distance `< 0x1000000`, or 4096 level units.
+The port uses its near flag rather than the original `(flags & 3) == 3`, because
+its active creatures do not receive bit 0. `00403ad7..00403b44` cycles on a
+button edge; manual direction releases following at `00403d71`. The target
+angle error is multiplied by four then divided by sixteen, giving quarter-error
+tracking. The port retains its existing pitch limits and physical controls.
+Reverse cycling is an added convenience; retail uses one forward-cycle button.
+
+Locking steers the camera and player yaw. Laser and disk firing still take the
+camera ray through the existing collision path; a lock does not allow shooting
+through walls. Candidate selection itself does not test walls, as in the decoded
+range-only helper. The original also appends disk/coin targets (IDs 1000+) and
+uses world marker effects and sounds; those are not part of this creature-only
+pass. The explicit press-to-acquire flow also differs from retail's automatically
+selected candidate. `tools/aim-lock-probe.ts` exercises range, cycling, wrap,
+manual release, moving and removed targets, reset and beam wall collision.

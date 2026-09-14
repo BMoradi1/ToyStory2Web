@@ -1,3 +1,4 @@
+import {createAimLock,stepAimLock,type AimTarget} from './sim/aim-lock.ts';
 import {aimObjectIndices,buildAimModel} from './render/aim-model.ts';
 import {createAimView,stepAimView,aimCamera,aimModelAngles} from './sim/aim-view.ts';
 import {stepTokenSparkles} from './sim/token-sparkles.ts';
@@ -40,7 +41,7 @@ import {
 } from './loader/gamedir.ts';
 import { Viewer } from './render/viewer.ts';
 import { validBindingCode, InputSource } from './sim/input.ts';
-import { fireBeam, stepBeams, type LaserBeam, type LaserTarget } from './sim/laser.ts';
+import { laserTargetCentre, fireBeam, stepBeams, type LaserBeam, type LaserTarget } from './sim/laser.ts';
 import { GAME_UNITS_PER_LEVEL_UNIT } from './sim/player-constants.ts';
 import {
   createPlayer, createRuntime, groundFromCollision, stepPlayer,
@@ -852,7 +853,7 @@ async function open(dir: GameDir): Promise<void> {
         return hit ? { y: hit.y, normal: hit.normal } : null;
       },
       /** The follow camera's own state, in game units. */
-      get aimView() { return {...aimView}; },
+      get aimView() { return {...aimView,lock:{...aimLock}}; },
       get camera() {
         return camera ? { ...camera } : null;
       },
@@ -1357,6 +1358,7 @@ async function spawnPlayer(): Promise<void> {
   viewer.setCardSheet(sceneTextures.get(SPRITE_SHEET) ?? null);
   laserBeams.length = 0;
   aimView = createAimView();
+  aimLock = createAimLock();
   viewer?.setPlayerVisible(true);
   viewer?.setAimVisible(false);
   podBeams.length = 0;
@@ -1991,7 +1993,7 @@ function drawHud(level: number): void {
     return {x:(p.x+1)*256,y:(1-p.y)*128,depth:(p.z+1)/2};
   },source=>currentCollisionWorld?sweepSphere(currentCollisionWorld,eyeGame,flareRay(eyeGame,source),0,{passes:1,skin:0}).touched:false):[];
   viewer.setLensFlares(flareSprites,spriteTable,sceneTextures);
-  hudPainter.draw(hud, spriteTable, sceneSheets, r, talkDraw(), menuDraw(), aimView.active);
+  hudPainter.draw(hud, spriteTable, sceneSheets, r, talkDraw(), menuDraw(), aimView.active, aimLock.locked);
 }
 
 /**
@@ -2347,6 +2349,7 @@ let camera: CameraState | null = null;
 let effects: EffectSim | null = null;
 const laserBeams: LaserBeam[] = [];
 let aimView = createAimView();
+let aimLock = createAimLock();
 const podBeams: (LaserBeam&{flareSize:number})[] = [];
 let pointLights=createPointLights(),playerLight:PlayerLight|null=null;
 let tokenRevealProfile:TokenRevealProfile|null=null;
@@ -2693,6 +2696,7 @@ async function loadDioramaScene(): Promise<{ paths: DatLevel['paths']; placedOf:
   pointLights=createPointLights();playerLight=null;
   laserBeams.length = 0;
   aimView = createAimView();
+  aimLock = createAimLock();
   viewer?.setPlayerVisible(true);
   viewer?.setAimVisible(false);
   podBeams.length = 0;
@@ -3081,6 +3085,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
 
   if(talk || cut.noControl || player.dying){
     stepAimView(aimView,player,held,true);
+    aimLock=createAimLock();
     viewer.setPlayerVisible(true);
     viewer.setAimVisible(false);
   }
@@ -3172,7 +3177,18 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     return;
   }
 
+  const wasAiming=aimView.active;
   stepAimView(aimView,player,held,cut.noControl);
+  if(!wasAiming&&aimView.active)aimLock=createAimLock();
+  const aimTargets:AimTarget[]=[];
+  if(aimView.active)for(const c of creatureSim?.creatures??[]){
+    const shape=c.hitShapes?.[c.animState];
+    if(!shape||!c.record.vulnerable||c.health<=0||c.deathTimer<0||c.stun<0||(c.flags&CREATURE_FLAGS.near)===0)continue;
+    const centre=laserTargetCentre({creature:c,position:c,heading:c.heading,shape,vulnerable:c.record.vulnerable});
+    aimTargets.push({id:c.slot,...centre});
+  }
+  stepAimLock(aimLock,aimView,aimCamera(aimView,player).eye,held,aimTargets);
+  if(aimView.active)player.yaw=aimView.yaw;
   viewer.setPlayerVisible(!aimView.active);
   viewer.setAimVisible(aimView.active);
   if(aimView.active)viewer.setAimPose(aimModelAngles(aimView));

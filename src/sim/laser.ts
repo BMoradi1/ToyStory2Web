@@ -22,7 +22,7 @@ export interface LaserBeam {
 }
 export const LASER = { range: 0x20000, life: 32, slots: 4, retract: 0x800 } as const;
 
-function centre(t: LaserTarget): Point {
+export function laserTargetCentre(t: LaserTarget): Point {
   const s = sin(t.heading - 0x800) / 16384, c = sin(t.heading - 0x400) / 16384;
   return {
     x: t.position.x + t.shape.offset.x * c + t.shape.offset.z * s,
@@ -33,7 +33,7 @@ function centre(t: LaserTarget): Point {
 
 /** Segment/animated hit ellipsoid intersection, as used by FUN_004a5870. */
 export function laserHitFraction(from: Point, to: Point, t: LaserTarget): number | null {
-  const mid = centre(t), k = sin(t.heading - 0x400) / 16384, s = sin(t.heading - 0x800) / 16384;
+  const mid = laserTargetCentre(t), k = sin(t.heading - 0x400) / 16384, s = sin(t.heading - 0x800) / 16384;
   const transform = (p: Point) => {
     const x = p.x - mid.x, z = p.z - mid.z;
     return { x: (x * k + z * s) * t.shape.scale.x / 8192,
@@ -61,7 +61,7 @@ export function fireBeam(
   let yaw = facing, pitch = 0, closestAngle = Infinity, aim: Point | null = null;
   for (const t of manualPitch === undefined ? targets : []) {
     if ((t.vulnerable & 4) === 0) continue;
-    const at = centre(t), dx = at.x - origin.x, dy = at.y - origin.y, dz = at.z - origin.z;
+    const at = laserTargetCentre(t), dx = at.x - origin.x, dy = at.y - origin.y, dz = at.z - origin.z;
     if (dx * dx + dy * dy + dz * dz >= LASER.range ** 2 || Math.abs(dy) >= 0x300 * 32) continue;
     const angle = Math.abs(yawDelta(yawOf(dx, dz), facing));
     if (angle < 0x80 && angle < closestAngle) { closestAngle = angle; aim = at; }

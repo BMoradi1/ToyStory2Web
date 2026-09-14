@@ -330,6 +330,7 @@ export class HudPainter {
     talk?: TalkDraw | null,
     menu?: MenuDraw | null,
     aiming = false,
+    aimLocked = false,
   ): void {
     this.clear();
     const ctx = this.ctx;
@@ -351,7 +352,7 @@ export class HudPainter {
       // slots are not a global reticle (slot 59 is null in gameplay tables).
       this.queue.push(() => {
         ctx.save();ctx.translate(W/2,H/2);ctx.scale(px320,py);
-        ctx.strokeStyle='#70ff50';ctx.lineWidth=1;
+        ctx.strokeStyle=aimLocked?'#ff5050':'#70ff50';ctx.lineWidth=1;
         ctx.shadowColor='#000';ctx.shadowBlur=2;
         ctx.beginPath();ctx.arc(0,0,7,0,Math.PI*2);
         for(const [x,y] of [[1,0],[-1,0],[0,1],[0,-1]]) {

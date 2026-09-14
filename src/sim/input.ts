@@ -32,6 +32,11 @@ export const DEFAULT_KEYS: KeyBindings = {
   cameraRight: ['KeyE'],
 };
 
+/** Physical keys accepted by both rebinding and persisted-preference loading. */
+export function validBindingCode(code: unknown): code is string {
+  return typeof code === 'string' && /^(Key[A-Z]|Digit[0-9]|Numpad([0-9]|Add|Subtract|Multiply|Divide|Decimal|Equal)|F([1-9]|1[0-2])|Arrow(Up|Down|Left|Right)|Space|Shift(Left|Right)|Backspace|Delete|Insert|Home|End|PageUp|PageDown|CapsLock|Backquote|Minus|Equal|BracketLeft|BracketRight|Backslash|Semicolon|Quote|Comma|Period|Slash)$/.test(code);
+}
+
 /**
  * Standard-mapping gamepad button indices.
  *
@@ -39,14 +44,11 @@ export const DEFAULT_KEYS: KeyBindings = {
  * a PlayStation pad is cross and square. On the web's standard mapping those
  * are 0 and 2, with fire on circle.
  */
-export type PadBindings = {
-  jump: number[]; spin: number[]; fire: number[];
-  cameraLeft: number[]; cameraRight: number[];
-};
+export type PadBindings = Record<Action, number[]>;
 
 /** Shoulder buttons swing the camera, as the original's menu bindings do. */
 export const DEFAULT_PAD: PadBindings =
-  { jump: [0], spin: [2], fire: [1], cameraLeft: [4], cameraRight: [5] };
+  { up: [12], down: [13], left: [14], right: [15], jump: [0], spin: [2], fire: [1], cameraLeft: [4], cameraRight: [5] };
 
 /** Below this the stick is treated as centred, before the engine's own dead zone. */
 const PAD_NOISE = 0.06;
@@ -126,11 +128,11 @@ export class InputSource {
       const ay = -(pad.axes[1] ?? 0);
       if (Math.hypot(ax, ay) > PAD_NOISE) { moveX = ax; moveY = ay; }
       // The d-pad on a standard mapping, so either stick or pad works.
-      if (pad.buttons[12]?.pressed) moveY = 1;
-      if (pad.buttons[13]?.pressed) moveY = -1;
-      if (pad.buttons[14]?.pressed) moveX = -1;
-      if (pad.buttons[15]?.pressed) moveX = 1;
       const anyOf = (indices: number[]) => indices.some((i) => pad.buttons[i]?.pressed ?? false);
+      if (anyOf(this.pad.up)) moveY = 1;
+      if (anyOf(this.pad.down)) moveY = -1;
+      if (anyOf(this.pad.left)) moveX = -1;
+      if (anyOf(this.pad.right)) moveX = 1;
       jump ||= anyOf(this.pad.jump);
       spin ||= anyOf(this.pad.spin);
       fire ||= anyOf(this.pad.fire);

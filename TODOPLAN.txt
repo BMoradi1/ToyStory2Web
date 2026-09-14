@@ -867,9 +867,14 @@
            Keyboard/gamepad navigation; key rebinding/detail preferences;
            eight browser save slots and native-file import bridge. Tests:
            retail-menu-probe.ts, settings-flow-check.js, movie-viewer-flow-check.js.
-           Controller/GFX subpages expose supported features only; exact
-           helper parity and slot transition timing remain. Lens flare,
-           animated-texture and gamma settings need renderer support first.
+           2026-09-13: retail controller five-row scrolling/columns/prompts,
+           guarded keyboard/gamepad rebinding, duplicate swaps and persistence.
+           Supported graphics detail arrows/repeat; load/save 30-tick guards,
+           curved slot positions, 43-tick exit fade and save return to menu.
+           Failed browser saves remain retryable. menu-parity-probe.ts and
+           settings-flow-check.js pass. Remaining: lens flare, animated-texture
+           and gamma renderer support, plus visor/target-lock and menu/cancel
+           binding support. Full controller/GFX feature parity is still open.
  [was]     Cutscenes: MPEG-1 in the browser (jsmpeg-style decoder or
            WebCodecs), fed from the user's rtlibs files.
  [OPEN]    First-run flow explaining that users supply their own copy.

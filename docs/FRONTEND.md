@@ -368,16 +368,30 @@ Text uses sprite 67 from slot 10, at half scale for labels and 3/8 scale
 for prompts. Volume changes preview immediately; Cancel restores the
 subpage snapshot, Jump accepts, and leaving options commits the result.
 
-Controller and graphics subpages retain the original font/background but
-are adaptations to the current engine. Controller supports physical-key
-rebinding, duplicate-key swapping, active/passive camera and acceptance
-through Enter or the final row. Escape cancels capture or restores the
-subpage snapshot. The GFX page exposes the implemented three detail levels.
-Original lens flare, animated-texture and gamma controls are not exposed
-because those rendering features/settings remain unported. Bindings and
-detail use browser preference keys `ts2.controls` and `ts2.detail`;
-volume/camera remain in the game's save block. This is not a claim of
-complete parity for the controller/GFX helper routines.
+The controller page now uses `FUN_0049c420`'s five visible rows, y80–144
+with 16-pixel spacing, right-aligned action labels at x150, bindings at
+x160, and the original up/down glyphs and prompts. Fire precedes Spin as
+in the executable's table. Space opens capture, physical arrows navigate,
+and Return accepts independently of gameplay bindings. Capture has the
+30-tick input guard; Escape or gamepad Cancel closes capture without
+leaving the page. A separate Cancel restores the subpage snapshot.
+
+Keyboard and gamepad buttons can both be rebound; duplicates swap rather
+than silently removing another action. The gamepad changes drive actual
+player input, including digital movement, and persist under `ts2.pad`.
+Physical keys use `ts2.controls`; capture and preference loading share the
+same validation, including function and number-pad keys. Held capture
+buttons cannot immediately activate another row. Reserved browser keys,
+gamepad Cancel and Start remain available. The active/passive camera and
+Accept rows are browser additions; retail visor-toggle, target-lock and
+menu/cancel binding rows still depend on their corresponding input work.
+
+The supported graphics detail row now has the retail half-scale arrows,
+20-tick blinking, 15-tick repeat cooldown and y178/y186 prompts from
+`FUN_0049caa0`. Detail persists under `ts2.detail`; volume/camera remain in
+the game's save block. Lens flare, animated textures and gamma are still
+not exposed: their rendering paths remain unported. This is not full
+controller/graphics feature parity.
 
 `src/front/load-screen.ts` restores the PC load/save root and eight-slot
 pages from `FUN_0049b9e0`, using `level06/level1t3.ngn`'s Slinky picture
@@ -390,7 +404,19 @@ snapshots current progress. The only DOM control is a small Import save
 file button, needed to open the native picker in a trusted click. Its
 validated result fills slot eight for explicit selection; it does not
 replace progress until Jump loads it. `browser-menu.ts` now contains only
-that file-picker bridge. Original slot transition timing is not fully ported.
+that file-picker bridge.
+
+`FUN_0049b9e0` now supplies the 30-tick root/page confirmation guard, the
+20-tick blink, and the static curved slot centres
+`256 + trunc(cos(i * float32(0.6426990628242493) - 1) * 80)`. The bottom
+prompt is y228. Slot navigation can continue while confirmation is locked;
+Cancel returns to the previous root selection. Save, load and main-menu
+exit fade to black at speed 6 (three brightness units per simulation tick,
+43 ticks from full brightness), with only the backdrop during that fade.
+Saving now returns to the main menu, as in retail. Browser adaptations:
+confirmation requires a fresh press, and save/load side effects occur after
+the fade. Failed browser writes keep the slot page retryable with an error;
+an import finishing during an exit cannot replace the selected slot.
 
 All three front screens now use the normal keyboard/gamepad pad word.
 Triangle (standard gamepad button3) cancels; the existing directions and
@@ -426,6 +452,28 @@ menus. Options, load/save and movie screens were visually inspected.
 
 ## What is left
 
-1. Complete controller/GFX helper parity and load/save transition timing;
-   lens flare, texture animation and gamma need engine support first.
+1. Renderer support for the remaining graphics rows: lens flare, texture
+   animation and gamma; then expose those controls. Controller visor/target
+   lock and menu/cancel bindings also remain outside the current input set.
+   Load/save transition timing and the supported controller layout are ported.
 2. The level selector's per-level ambience and camera-flight comparison.
+
+
+### Menu follow-up validation (2026-09-13)
+
+`tools/menu-parity-probe.ts` checks scrolling, capture guards and cancellation,
+duplicate swaps, actual rebound gamepad input, graphics arrows/repeat,
+slot locks, empty slots, preserved root selection and the 43-tick fade.
+`tools/settings-flow-check.js` additionally checks real keyboard event
+routing (no double navigation), gamepad polling/persistence, import without
+premature progress replacement, failed-save recovery and save/load return.
+The controller page was visually checked in Chromium. The existing retail
+sprite/movie probe and 24 controller checks also pass.
+
+Further graphics research: `FUN_0049caa0` draws lens flare, detail, gamma,
+and animated textures at y75/100/125/150. Flags are bits 1 and 4 of
+`DAT_00508d70`. Gamma is 2.0/2.5/3.0; `FUN_004b3740` builds a clamped
+linear colour lookup, not a power-law display gamma. Animated textures
+route through `FUN_0049b260` / `FUN_004ce510` into texture-region copies;
+lens flare gates `FUN_0044f420` / `FUN_0044f580`. These findings are not
+substitutes for porting and validating the rendering routines.

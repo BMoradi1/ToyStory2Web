@@ -101,8 +101,18 @@
  Level/selector loads clear the sequence and guide state. Other unported
  props still need guide-retirement hooks. tools/prop-feedback-probe.ts plus
  stomp/paint and level-to-selector browser checks cover this follow-up.
- MENU QUEUE PRESERVED: complete controller/GFX parity and load/save transition timing;
- unported lens flare/texture animation/gamma need renderer support first.
+ MENU FOLLOW-UP (2026-09-13): controller now has retail five-row scrolling,
+ separate action/key columns, arrows/prompts and capture guard. Keyboard and
+ gamepad rebinding swaps duplicates and persists; capture Cancel stays on
+ the page. Physical arrows do not also navigate through mapped player input.
+ Supported graphics detail row has retail arrows/blink/repeat. Load/save has
+ 30-tick guards, curved slot positions, preserved root selection and 43-tick
+ backdrop-only exit fade. Save returns to menu; failed writes are retryable.
+ tools/menu-parity-probe.ts and settings-flow-check.js cover this milestone.
+ NEXT MENU WORK: renderer support for lens flare/texture animation/gamma,
+ then expose those original graphics rows. Exact routines and gamma lookup
+ findings are in docs/FRONTEND.md. Controller visor/target-lock and menu/
+ cancel bindings still need corresponding input work. Do not claim full parity.
  See docs/FRONTEND.md and tools/retail-menu-probe.ts for exact coverage.
  USER PREFERENCE: commit substantial completed changes as milestones, with
  a commit body explaining behavior, implementation and validation.

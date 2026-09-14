@@ -26,7 +26,7 @@ import {
   supportsDirectoryPicker, validateGameDir, type GameDir, type GameFile,
 } from './loader/gamedir.ts';
 import { Viewer } from './render/viewer.ts';
-import { InputSource } from './sim/input.ts';
+import { validBindingCode, InputSource } from './sim/input.ts';
 import { fireBeam, stepBeams, type LaserBeam, type LaserTarget } from './sim/laser.ts';
 import { GAME_UNITS_PER_LEVEL_UNIT } from './sim/player-constants.ts';
 import {
@@ -453,7 +453,9 @@ async function open(dir: GameDir): Promise<void> {
   progress = await loadProgress(dir);
   try {
     const keys=JSON.parse(localStorage.getItem('ts2.controls')??'null');
-    if(keys&&Object.keys(input.keys).every(k=>Array.isArray(keys[k])&&keys[k].length>0&&keys[k].every((c:unknown)=>typeof c==='string'&&/^(Key[A-Z]|Digit[0-9]|Arrow(Up|Down|Left|Right)|Space|Shift(Left|Right)|[A-Za-z]+)$/.test(c))))input.keys=keys;
+    if(keys&&Object.keys(input.keys).every(k=>Array.isArray(keys[k])&&keys[k].length>0&&keys[k].every(validBindingCode)))input.keys=keys;
+    const pad=JSON.parse(localStorage.getItem('ts2.pad')??'null');
+    if(pad&&Object.keys(input.pad).every(k=>Array.isArray(pad[k])&&pad[k].length>0&&pad[k].every((b:unknown)=>Number.isInteger(b)&&Number(b)>=0&&Number(b)<32)))input.pad=pad;
     const detail=localStorage.getItem('ts2.detail');
     if(detail!==null&&/^[012]$/.test(detail))detailOption=Number(detail);
   }catch{}
@@ -2374,17 +2376,19 @@ async function runFrontEnd(): Promise<void> {
     movieChoices: () => exeBytes && progress ? movieChoices(exeBytes, progress.p, strings.levelNames, index => movieFile(index) !== null) : [],
     moviePlay: index => playMovie(index),
     loadMovieArt: () => currentDir ? loadFrontArt(currentDir, 'level1t2', [0,1,2,3,4,5,6,7,17,31], [], 'level06') : Promise.resolve(null),
-    optionsValues: () => ({sfx:menu.sfx,bgm:menu.bgm,activeCamera:!cameraPassive,detail:detailOption??1,keys:structuredClone(input.keys)}),
+    optionsValues: () => ({sfx:menu.sfx,bgm:menu.bgm,activeCamera:!cameraPassive,detail:detailOption??1,keys:structuredClone(input.keys),pad:structuredClone(input.pad)}),
+    controlButtons: () => { const pad=[...(navigator.getGamepads?.()??[])].find(p=>p?.connected);return pad?.buttons.flatMap((b,i)=>b.pressed?[i]:[])??[]; },
     previewOptions(value) {
       menu.sfx=value.sfx;menu.bgm=value.bgm;cameraPassive=!value.activeCamera;
       input.keys=structuredClone(value.keys);
+      if(value.pad)input.pad=structuredClone(value.pad);
       detailOption=value.detail;
       if(sound)sound.volume=value.sfx/MENU.volumeSteps*0.6;
       if(music)music.volume=Math.round(value.bgm/MENU.volumeSteps*MUSIC_SLIDER_MAX);
     },
     commitOptions() {
       saveProgress();
-      try{localStorage.setItem('ts2.controls',JSON.stringify(input.keys));localStorage.setItem('ts2.detail',String(detailOption));}catch{}
+      try{localStorage.setItem('ts2.controls',JSON.stringify(input.keys));localStorage.setItem('ts2.pad',JSON.stringify(input.pad));localStorage.setItem('ts2.detail',String(detailOption));}catch{}
     },
     optionText(address) {
       if(!exeBytes)return '';
@@ -2413,7 +2417,7 @@ async function runFrontEnd(): Promise<void> {
     saveSlot(index) {
       if(!progress)return{name:'',progress:null};
       saveProgress();const bytes=exportProgress(progress);
-      try{localStorage.setItem(`ts2.slot.${index}`,JSON.stringify([...bytes]));}catch{}
+      localStorage.setItem(`ts2.slot.${index}`,JSON.stringify([...bytes]));
       return{name:'default.cfg',progress:importProgress(bytes)};
     },
     loadSaveArt: () => currentDir ? loadFrontArt(currentDir,'level1t3',[4,17,31],[],'level06') : Promise.resolve(null),
@@ -3316,7 +3320,7 @@ window.addEventListener('keyup', (ev) => {
 });
 window.addEventListener('keydown', (ev) => {
   if (!viewer) return;
-  if(frontEnd?.configureKey(ev.code)){ev.preventDefault();return;}
+  if(frontEnd?.configureKey(ev.code,ev.repeat)){ev.preventDefault();ev.stopImmediatePropagation();return;}
   // While a front-end screen is up it owns the keyboard: the pad reader
   // has the arrows and space, and these two are the rest of its word.
   if (frontEnd?.current) {

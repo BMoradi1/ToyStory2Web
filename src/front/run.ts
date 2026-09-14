@@ -1,5 +1,5 @@
-import { createLoadScreen, stepLoadScreen, type SaveSlot } from './load-screen.ts';
-import { createOptions, stepOptions, CONTROL_ACTIONS, type OptionsValues } from './options.ts';
+import { createLoadScreen, stepLoadScreen, enterSaveSlots, type SaveSlot } from './load-screen.ts';
+import { createOptions, stepOptions, configureOptionKey, configureOptionButton, type OptionsValues } from './options.ts';
 import { createMovieScreen, stepMovieScreen, type MovieChoice } from './movies.ts';
 /**
  * The game flow's front end, `FUN_0049d910` from the title on: title ->
@@ -66,6 +66,7 @@ export interface FrontHost {
   ending(): Promise<void>;
   resetLives(): void;
   optionsValues(): OptionsValues;
+  controlButtons?(): number[];
   previewOptions(value: OptionsValues): void;
   commitOptions(): void;
   optionText(address: number): string;
@@ -116,6 +117,7 @@ export class FrontEnd {
   private canvas: HTMLCanvasElement | null = null;
   private painter: HudPainter | null = null;
   private screen: Screen | null = null;
+  private previousButtons: number[] = [];
   private pad: PadWord = { now: 0, was: 0 };
   private raf = 0;
   private last = 0;
@@ -227,27 +229,14 @@ export class FrontEnd {
   }
 
   /** Controller configuration receives physical key codes, not mapped actions. */
-  configureKey(code: string): boolean {
+  configureKey(code: string, repeat = false): boolean {
     if(this.screen?.kind!=='options'||this.screen.state.page!==0)return false;
-    const s=this.screen.state;
-    if(s.capture){
-      if(code==='Escape'){s.capture=false;return true;}
-      if(code==='Enter'||code==='Tab'||code.startsWith('Meta')||code.startsWith('Control')||code.startsWith('Alt'))return true;
-      const action=CONTROL_ACTIONS[s.subrow];
-      if(action){
-        const old=s.value.keys[action][0]!;
-        for(const other of CONTROL_ACTIONS){
-          if(other===action||!s.value.keys[other].includes(code))continue;
-          s.value.keys[other]=s.value.keys[other].filter(key=>key!==code);
-          if(!s.value.keys[other].length)s.value.keys[other]=[old];
-        }
-        s.value.keys[action]=[code];this.host.previewOptions(s.value);
-      }
-      s.capture=false;return true;
-    }
-    if(code==='Enter'){s.page=-1;this.host.commitOptions();return true;}
-    return false;
+    if(repeat)return true;
+    const consumed=configureOptionKey(this.screen.state,code);
+    if(consumed){this.host.previewOptions(this.screen.state.value);if(Number(this.screen.state.page)===-1)this.host.commitOptions();}
+    return consumed;
   }
+
   private async runLoad(): Promise<boolean> {
     this.summaryArt=await this.host.loadSaveArt();
     const state=createLoadScreen(await this.host.loadSlots());
@@ -258,8 +247,9 @@ export class FrontEnd {
     const button=document.createElement('button');button.textContent='Import save file';
     button.style.cssText='position:fixed;bottom:8px;right:8px;z-index:41';
     button.onclick=async()=>{
+      if(state.pending!==null)return;
       button.disabled=true;
-      try{const slot=await this.host.importSave();if(slot&&active){state.slots[7]=slot;state.page='load';state.row=7;state.message='';}}
+      try{const slot=await this.host.importSave();if(slot&&active){if(state.pending===null){state.slots[7]=slot;enterSaveSlots(state,'load',7);}}}
       catch(error){state.message=(error as Error).message.slice(0,36);}
       finally{button.disabled=false;}
     };
@@ -270,7 +260,8 @@ export class FrontEnd {
         if(done==='exit')return false;
         const [action,index]=done.split(':');
         if(action==='load'){this.host.loadSlot(state.slots[Number(index)]!);return true;}
-        state.slots[Number(index)]=this.host.saveSlot(Number(index));state.message='game saved';
+        try{state.slots[Number(index)]=this.host.saveSlot(Number(index));return false;}
+        catch{state.pending=null;state.fade.target=128;state.fade.speed=12;state.lock=30;state.message='could not save game';}
       }
     }finally{active=false;button.remove();this.hide();this.summaryArt=null;}
   }
@@ -332,12 +323,18 @@ export class FrontEnd {
     const screen = this.screen;
     if (!screen) return null;
     this.pad = { now: this.host.pad(), was: this.pad.now };
+    const buttons=this.host.controlButtons?.()??[];
+    const newButtons=buttons.filter(button=>!this.previousButtons.includes(button));
+    this.previousButtons=buttons;
     let result;
     if (screen.kind === 'title') result = stepTitle(screen.state, this.pad, this.host.strings);
     else if (screen.kind === 'menu') result = stepListMenu(screen.state, this.pad, this.host.strings, this.inGame);
     else if (screen.kind === 'load') result=stepLoadScreen(screen.state,this.pad,this.host.optionText);
     else if (screen.kind === 'options') {
-      result=stepOptions(screen.state,this.pad,this.host.optionText);
+      const wasCapturing=screen.state.capture;
+      for(const button of newButtons)configureOptionButton(screen.state,button);
+      // The newly bound button must not also activate/navigate the menu.
+      result=stepOptions(screen.state,wasCapturing&&!screen.state.capture?{now:0,was:0}:this.pad,this.host.optionText);
       this.host.previewOptions(screen.state.value);
     }
     else if (screen.kind === 'movies') result = stepMovieScreen(screen.state, this.pad, this.host.strings.pressJumpToSelect);

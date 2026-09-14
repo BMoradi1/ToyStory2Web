@@ -1,3 +1,4 @@
+import { getGamma, setGamma } from './render/gamma.ts';
 import { createTextureAnimation, stepTextureAnimation, copyScrolledTexture } from './sim/texture-animation.ts';
 import { readSoundSequences, startSequence, stepSequence, type SoundSequences, type SequenceVoice } from './audio/sequences.ts';
 import { createGuideSparkles, stepGuideSparkles, spendGuide } from './sim/guide-sparkles.ts';
@@ -459,6 +460,7 @@ async function open(dir: GameDir): Promise<void> {
     const pad=JSON.parse(localStorage.getItem('ts2.pad')??'null');
     if(pad&&Object.keys(input.pad).every(k=>Array.isArray(pad[k])&&pad[k].length>0&&pad[k].every((b:unknown)=>Number.isInteger(b)&&Number(b)>=0&&Number(b)<32)))input.pad=pad;
     animatedTextures=localStorage.getItem('ts2.animatedTextures')!=='false';
+    setGamma(Number(localStorage.getItem('ts2.gamma')));
     const detail=localStorage.getItem('ts2.detail');
     if(detail!==null&&/^[012]$/.test(detail))detailOption=Number(detail);
   }catch{}
@@ -2386,19 +2388,19 @@ async function runFrontEnd(): Promise<void> {
     movieChoices: () => exeBytes && progress ? movieChoices(exeBytes, progress.p, strings.levelNames, index => movieFile(index) !== null) : [],
     moviePlay: index => playMovie(index),
     loadMovieArt: () => currentDir ? loadFrontArt(currentDir, 'level1t2', [0,1,2,3,4,5,6,7,17,31], [], 'level06') : Promise.resolve(null),
-    optionsValues: () => ({sfx:menu.sfx,bgm:menu.bgm,activeCamera:!cameraPassive,detail:detailOption??1,keys:structuredClone(input.keys),pad:structuredClone(input.pad),animatedTextures}),
+    optionsValues: () => ({sfx:menu.sfx,bgm:menu.bgm,activeCamera:!cameraPassive,detail:detailOption??1,keys:structuredClone(input.keys),pad:structuredClone(input.pad),animatedTextures,gamma:getGamma()}),
     controlButtons: () => { const pad=[...(navigator.getGamepads?.()??[])].find(p=>p?.connected);return pad?.buttons.flatMap((b,i)=>b.pressed?[i]:[])??[]; },
     previewOptions(value) {
       menu.sfx=value.sfx;menu.bgm=value.bgm;cameraPassive=!value.activeCamera;
       input.keys=structuredClone(value.keys);
       if(value.pad)input.pad=structuredClone(value.pad);
-      detailOption=value.detail;animatedTextures=value.animatedTextures??true;
+      detailOption=value.detail;animatedTextures=value.animatedTextures??true;setGamma(value.gamma??2);
       if(sound)sound.volume=value.sfx/MENU.volumeSteps*0.6;
       if(music)music.volume=Math.round(value.bgm/MENU.volumeSteps*MUSIC_SLIDER_MAX);
     },
     commitOptions() {
       saveProgress();
-      try{localStorage.setItem('ts2.controls',JSON.stringify(input.keys));localStorage.setItem('ts2.pad',JSON.stringify(input.pad));localStorage.setItem('ts2.detail',String(detailOption));localStorage.setItem('ts2.animatedTextures',String(animatedTextures));}catch{}
+      try{localStorage.setItem('ts2.controls',JSON.stringify(input.keys));localStorage.setItem('ts2.pad',JSON.stringify(input.pad));localStorage.setItem('ts2.detail',String(detailOption));localStorage.setItem('ts2.animatedTextures',String(animatedTextures));localStorage.setItem('ts2.gamma',String(getGamma()));}catch{}
     },
     optionText(address) {
       if(!exeBytes)return '';

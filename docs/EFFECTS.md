@@ -450,3 +450,43 @@ local sheets with unchanged pixels outside each destination. The browser
 `tools/texture-animation-flow-check.js` verifies enabled and disabled pixels,
 GPU upload versions, menu persistence and exact pixel restoration on respawn.
 Both browser cases and the menu probes pass, as does the production build.
+
+
+## Gamma colour gain (2026-09-13)
+
+`src/render/gamma.ts` implements the PC's linear RGB gain: `004b3740`
+constructs a 256-byte lookup by stepping a 16.16 accumulator; `004b37b0`
+substitutes RGB and preserves alpha. Gains are 2.0, 2.5 and 3.0. This is a
+clamped colour multiplier before texture modulation, not a display gamma
+power function or whole-screen filter. Channels above 127 at the default
+setting saturate before multiplying the texture. Earlier HUD documentation
+saying that colour 255 could double a texture was a PSX approximation and
+does not match this PC path.
+
+Immediate calls `004b8a30` (flat cards), `004b8e60` (billboards), and
+`004b8cc0` (screen quads, except its 0x80000000 bypass mode) use the lookup.
+The static loader also multiplies by the configured float at
+`004cbb33/5f/8b`, rather than an unconditional factor of two. The port applies
+gain to level, player and creature vertex attributes and both sprite
+renderers. Original float colour arrays remain available to rebuild GPU
+attributes when the option changes; disposed attributes are weakly held.
+The browser updates already-loaded geometry immediately for preview, while
+the PC applied static-geometry gain during loading. HUD tint caches clear
+when gamma changes, and neither sprite opacity nor texture alpha is changed.
+
+The renderer reconstructs byte modulation from its existing 0x80-neutral
+inputs. Level geometry still comes from DAT rather than NGN vertices;
+untextured DAT colours approximate NGN's conversion/halving and can differ
+by a byte. This milestone does not establish byte-exact DAT/NGN colour
+parity. Fog and clear-colour paths (`004b2cf0`, `004b2c80`) and the screen
+quad bypass mode still need comparison with the port's backdrop/fade paths.
+Lens flare remains a separate unported effect. Its recovered entry points
+are `0044f420` (candidate filtering/queue, up to eight) and `0044f580`
+(projection, attenuation and the 17-entry sprite chain at `004f72d8`). Do
+not expose its option until sources, visibility and rendering are connected.
+
+Validation: `tools/gamma-probe.ts` checks all 768 lookup entries and menu
+limits/labels/cancellation; `tools/gamma-flow-check.js` verifies real menu
+persistence, preview/rollback, canvas texels, existing geometry restoration,
+and world-sprite colours with unchanged alpha. The production build, menu
+probes and animated-texture disabled/reset browser regression also pass.

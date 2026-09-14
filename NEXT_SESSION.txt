@@ -116,7 +116,13 @@
  browser enabled/disabled/reset checks, menu probes and production build pass.
  Remaining conditional scripts: level 8 prop flag and Cosmic Shield; see
  docs/EFFECTS.md for exact coverage and source/destination semantics.
- NEXT MENU WORK: renderer support for lens flare/gamma,
+ GAMMA FOLLOW-UP (2026-09-13): original normal/medium/high graphics row
+ now previews, rolls back and persists. Clamped linear RGB gain applies to
+ level/model vertices, world sprites and HUD; source colours survive changes.
+ All 768 lookup entries and browser menu/pixel/geometry/alpha checks pass.
+ Static loader also uses gamma (004cbb33/5f/8b); earlier fixed-2x note corrected.
+ Fog/clear-colour matching and DAT-to-NGN colour quantization remain open.
+ NEXT MENU WORK: renderer support for lens flare,
  then expose those original graphics rows. Exact routines and gamma lookup
  findings are in docs/FRONTEND.md. Controller visor/target-lock and menu/
  cancel bindings still need corresponding input work. Do not claim full parity.

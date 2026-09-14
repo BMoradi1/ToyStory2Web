@@ -1,3 +1,4 @@
+import { gammaModulate } from './gamma.ts';
 /**
  * Camera-facing and floor-flat cards, which is how the engine draws coins,
  * their shadows, the signposts and every particle effect
@@ -190,7 +191,7 @@ export class SpriteBatch {
         uv[o + 6] = s.u0; uv[o + 7] = s.v1;
       }
 
-      const cr = s.r ?? 1, cg = s.g ?? 1, cb = s.b ?? 1;
+      const cr = gammaModulate(s.r ?? 1), cg = gammaModulate(s.g ?? 1), cb = gammaModulate(s.b ?? 1);
       o = i * 16;
       for (let v = 0; v < 4; v++) {
         c[o + v * 4] = cr; c[o + v * 4 + 1] = cg; c[o + v * 4 + 2] = cb; c[o + v * 4 + 3] = s.alpha;

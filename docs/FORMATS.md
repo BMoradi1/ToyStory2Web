@@ -957,8 +957,9 @@ and only bit-0x02 faces are `DoubleSide`.
 
 **Vertex colour scale, confirmed independently.** The `.ngn` stores textured
 faces' colours unchanged (ngn/dat ratio 0.97) and untextured faces' colours
-HALVED (0.44-0.49); the engine then doubles every vertex colour with a clamp
-(`FUN_004cb970`). Net effect: textured faces modulate at 0x80-neutral,
+HALVED (0.44-0.49); the engine then multiplies every vertex colour by
+the configured gamma with a clamp (`FUN_004cb970`, specifically
+`004cbb33/5f/8b`). The default gamma is 2.0, which doubles the channels. Net effect: textured faces modulate at 0x80-neutral,
 untextured faces draw at 0-255 — the rule already in use here. One anomaly to
 keep in view: faces on pages 7-0xb come out at ratio ~1.84, as if pconv
 doubled them; unexplained.

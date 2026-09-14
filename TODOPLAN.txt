@@ -875,7 +875,9 @@
            settings-flow-check.js pass. 2026-09-13: seven level texture-scroll
            scripts and original animated-texture option implemented; pixel
            bounds, browser toggle/persistence and respawn restoration verified.
-           Remaining: lens flare and gamma renderer support, conditional
+           2026-09-13: original gamma row and clamped vertex/sprite/HUD gain
+           implemented; preview, rollback, persistence and pixel tests pass.
+           Remaining: lens flare, gamma fog/clear-colour matching, conditional
            level 8/Shield texture scripts, plus visor/target-lock and menu/cancel
            binding support. Full controller/GFX feature parity is still open.
  [was]     Cutscenes: MPEG-1 in the browser (jsmpeg-style decoder or

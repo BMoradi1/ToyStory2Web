@@ -1,3 +1,4 @@
+import { gammaByte, getGamma } from './gamma.ts';
 /**
  * The HUD, drawn as a 2D overlay over the canvas.
  *
@@ -12,9 +13,9 @@
  * screen. So the 320-space draws come out 1.6x wider — that is the 4:3
  * correction, and it is why the icons are chunkier than the digits.
  *
- * **Colour is a modulate**, `texel * colour / 0x80`, so 0x80 leaves a sprite
- * alone and 0xff nearly doubles it. Icons only ever get a grey, which is a
- * brightness filter; the bars are the single solid texel of sprite 6 scaled
+ * **Colour is a modulate**, `texel * min(255, floor(colour * gamma)) / 255`.
+ * At default gamma 2, 0x80 and higher leave a sprite alone. Icons only ever
+ * get a grey, which is a brightness filter; the bars are the single solid texel of sprite 6 scaled
  * to size, which is a filled rectangle of the modulated colour.
  *
  * **Later calls draw BEHIND earlier ones.** `FUN_004b8cc0` fills its buffer
@@ -153,19 +154,16 @@ function rgbOf(c: Modulate): readonly [number, number, number] {
   return typeof c === 'number' ? [c, c, c] : c;
 }
 
-/** `texel * colour / 0x80`, the engine's modulate, for the bars' solid texel. */
+/** The solid texel uses the same PC colour lookup as textured sprite quads. */
 function barColour(r: number, g: number, b: number): string {
-  const c = (v: number) => Math.min(255, Math.round((SOLID_TEXEL * v) / NEUTRAL));
+  const c = (v: number) => Math.min(255, Math.round((SOLID_TEXEL * gammaByte(v)) / 255));
   return `rgb(${c(r)},${c(g)},${c(b)})`;
 }
 
 /**
- * The engine multiplies every texel by the draw's colour and halves it,
- * `texel * colour / 0x80`, so 0x80 leaves a sprite alone, 0xff nearly
- * doubles it and 0 kills a channel outright — which is how one yellow font
- * draws green highlights. A canvas cannot do that per channel while
- * blitting, so each sheet is multiplied once per colour it is asked for and
- * the result kept; there are only a handful of colours in a frame.
+ * The PC clamps the gamma-adjusted draw colour before texture modulation.
+ * A canvas cannot modulate channels while blitting, so cache a tinted sheet
+ * per adjusted RGB triple. Gamma changes invalidate those cached copies.
  */
 function tintSheet(sheet: Sheet, r: number, g: number, b: number): Sheet {
   const out = document.createElement('canvas');
@@ -179,7 +177,7 @@ function tintSheet(sheet: Sheet, r: number, g: number, b: number): Sheet {
   const mul = [r, g, b];
   for (let i = 0; i < px.length; i += 4) {
     if (px[i + 3] === 0) continue;
-    for (let k = 0; k < 3; k++) px[i + k] = Math.min(255, (px[i + k]! * mul[k]!) / NEUTRAL);
+    for (let k = 0; k < 3; k++) px[i + k] = Math.min(255, (px[i + k]! * mul[k]!) / 255);
   }
   ctx.putImageData(image, 0, 0);
   return out;
@@ -192,10 +190,13 @@ export class HudPainter {
   /** Modulated copies of each sheet, made once and kept. */
   private readonly tints = new Map<Sheet, Map<number, Sheet>>();
 
+  private tintGamma = getGamma();
+
   /** A sheet multiplied by a colour, from the cache. */
   private tinted(sheet: Sheet, colour: Modulate): Sheet {
-    const [r, g, b] = rgbOf(colour);
-    if (r === NEUTRAL && g === NEUTRAL && b === NEUTRAL) return sheet;
+    if(this.tintGamma!==getGamma()){this.tints.clear();this.tintGamma=getGamma();}
+    const [r, g, b] = rgbOf(colour).map(v=>gammaByte(v)) as [number,number,number];
+    if (r === 255 && g === 255 && b === 255) return sheet;
     let bySheet = this.tints.get(sheet);
     if (!bySheet) { bySheet = new Map(); this.tints.set(sheet, bySheet); }
     const key = (r << 16) | (g << 8) | b;

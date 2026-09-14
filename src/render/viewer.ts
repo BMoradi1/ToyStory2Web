@@ -1,3 +1,4 @@
+import { getGamma, gammaModulate } from './gamma.ts';
 /**
  * The 3D view.
  *
@@ -153,6 +154,29 @@ export class Viewer {
     return { ...this.frameRect };
   }
 
+  // Keep unmodified modulation values for live preview and exact rollback.
+  // Weak keys let disposed pose/scene buffers and their sources be collected.
+  private colourSources = new WeakMap<THREE.BufferAttribute, Float32Array>();
+  private colourGamma = getGamma();
+  private gammaColours(source: Float32Array): THREE.BufferAttribute {
+    const attribute = new THREE.BufferAttribute(source.map(v=>gammaModulate(v)),3);
+    this.colourSources.set(attribute,source);
+    return attribute;
+  }
+  private refreshGamma(): void {
+    if(this.colourGamma===getGamma())return;
+    this.colourGamma=getGamma();
+    this.scene.traverse(object=>{
+      if(!(object instanceof THREE.Mesh))return;
+      const attribute=object.geometry.getAttribute('color');
+      if(!(attribute instanceof THREE.BufferAttribute))return;
+      const source=this.colourSources.get(attribute);
+      if(!source)return;
+      for(let i=0;i<source.length;i++)attribute.array[i]=gammaModulate(source[i]!);
+      attribute.needsUpdate=true;
+    });
+  }
+
   constructor(canvas: HTMLCanvasElement) {
     this.view = canvas;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -203,7 +227,7 @@ export class Viewer {
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(mesh.positions, 3));
-    geometry.setAttribute('color', new THREE.BufferAttribute(mesh.colors, 3));
+    geometry.setAttribute('color', this.gammaColours(mesh.colors));
     geometry.setAttribute('uv', new THREE.BufferAttribute(mesh.uvs, 2));
     geometry.computeVertexNormals();
 
@@ -263,7 +287,7 @@ export class Viewer {
 
     const buffer = new THREE.BufferGeometry();
     buffer.setAttribute('position', new THREE.BufferAttribute(geometry.positions, 3));
-    buffer.setAttribute('color', new THREE.BufferAttribute(geometry.colors, 3));
+    buffer.setAttribute('color', this.gammaColours(geometry.colors));
     buffer.setAttribute('uv', new THREE.BufferAttribute(geometry.uvs, 2));
     buffer.computeVertexNormals();
 
@@ -490,7 +514,7 @@ export class Viewer {
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(mesh.positions, 3));
-    geometry.setAttribute('color', new THREE.BufferAttribute(mesh.colors, 3));
+    geometry.setAttribute('color', this.gammaColours(mesh.colors));
     geometry.setAttribute('uv', new THREE.BufferAttribute(mesh.uvs, 2));
     const materials: THREE.Material[] = [];
     for (const group of mesh.groups) {
@@ -516,7 +540,7 @@ export class Viewer {
     const { position, rotation } = this.player;
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(mesh.positions, 3));
-    geometry.setAttribute('color', new THREE.BufferAttribute(mesh.colors, 3));
+    geometry.setAttribute('color', this.gammaColours(mesh.colors));
     geometry.setAttribute('uv', new THREE.BufferAttribute(mesh.uvs, 2));
     const materials: THREE.Material[] = [];
     for (const group of mesh.groups) {
@@ -670,7 +694,7 @@ export class Viewer {
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(mesh.positions, 3));
-    geometry.setAttribute('color', new THREE.BufferAttribute(mesh.colors, 3));
+    geometry.setAttribute('color', this.gammaColours(mesh.colors));
     geometry.setAttribute('uv', new THREE.BufferAttribute(mesh.uvs, 2));
     const materials: THREE.Material[] = [];
     for (const group of mesh.groups) {
@@ -1039,6 +1063,7 @@ export class Viewer {
     if (!this.play) this.controls.update();
     // Cards face the camera, so they are built after it has settled and
     // before anything is drawn.
+    this.refreshGamma();
     this.camera.updateMatrixWorld();
     this.placeDetailPlanes();
     this.coinCards.update(this.cards, this.camera);

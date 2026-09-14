@@ -222,7 +222,11 @@
  hidden-item timer; collecting another restores the previous item immediately.
  Timed/replacement return restores visibility and nearby spread-50 amber burst.
  Unit and level 4 browser checks pass, including pause, recollection and reset.
- NEXT: remaining 00410410 level-script callers and standalone 004a0ea0, then seven
+ RESCUE BURSTS (2026-09-14): all ten find-five handlers now emit the shared
+ spread-50 burst at Y minus 0x2000 and use their individual pickup sound IDs.
+ Unit coverage includes all mapped types and one-shot counting/removal; browser
+ coverage uses an authored sheep. Idle chatter remains a shared approximation.
+ NEXT: standalone 004a0ea0 (last of fourteen shared burst callers), then seven
  untouched temporary-light sites in docs/EFFECTS.md. 004109f0 has no direct
  call references; trace indirect use before assigning a gameplay trigger.
  Retail normals remain open;

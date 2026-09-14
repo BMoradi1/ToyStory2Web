@@ -203,6 +203,8 @@ export interface CreatureSim {
   level: number;
   /** Drained by the caller each tick. */
   sounds: CreatureSound[];
+  /** Find-five rescue centres; the host drains these into FUN_00410410 bursts. */
+  rescues: { x: number; y: number; z: number }[];
   /** Hit sparks a damaging blow asked for, for the caller to draw. */
   sparks: { x: number; y: number; z: number }[];
   /** Skid dust the race car asked for: kind 0x2a from spawn mode 10, with its spin. */
@@ -332,7 +334,7 @@ export function createCreatureSim(
   }
   return {
     creatures, world, rand, level,
-    sounds: [], sparks: [], dust: [], raceState: 0, carFront: 0, carRear: 0, shots: [], beamCasters: [], deaths: [], near: [],
+    sounds: [], rescues: [], sparks: [], dust: [], raceState: 0, carFront: 0, carRear: 0, shots: [], beamCasters: [], deaths: [], near: [],
     foundCount: 0, lastKilled: -1, models: null,
     bossLastHealth: -1, bossSlotEarned: false,
   };
@@ -893,18 +895,26 @@ function laserPod(sim:CreatureSim,c:Creature,args:HandlerArgs):void{
   if(c.timer>=100&&c.timer<=280)sim.beamCasters.push(c);
 }
 
+/** Pickup cues from the ten retail rescue handlers. Idle chatter is still shared. */
+const RESCUE_SOUNDS: Readonly<Record<string, number>> = {
+  FUN_00416a60: 0x20, FUN_00418610: 0x49, FUN_0041bb80: 0x6c,
+  FUN_0041dec0: 0xa2, FUN_00420ed0: 0x77, FUN_00422c70: 0xb8,
+  FUN_004259b0: 0x8e, FUN_00428650: 0x96, FUN_0042c150: 0x6c,
+  FUN_0042d620: 0x1f,
+};
+
 /**
  * The find-five collectable: the sheep, the troops, the ducklings and the
- * rest. Ten types have this handler, one per level, and they are the same
- * function with different sound events (`FUN_00416a60`, `FUN_00418610`,
+ * rest. Ten level handlers share this implementation, one per level, with
+ * different sound events (`FUN_00416a60`, `FUN_00418610`,
  * `FUN_0041bb80` and so on).
  *
  * It chirps on a timer while it is alive, and touching it counts it toward
- * the level's find-five task and takes it away. The puff of smoke it leaves
- * (`FUN_00410410`) needs the effect system and is not ported.
+ * the level's find-five task and takes it away. The host emits its shared
+ * pickup burst (`FUN_00410410`) above the creature origin.
  *
  * The harmless health, 102, is what marks one as still to be collected: the
- * handlers all check it before counting.
+ * shared handler checks it before counting to prevent duplicate rescues.
  */
 function collectable(sim: CreatureSim, c: Creature, args: HandlerArgs): void {
   c.timer -= args.dt;
@@ -914,8 +924,9 @@ function collectable(sim: CreatureSim, c: Creature, args: HandlerArgs): void {
   }
   if ((c.flags & CREATURE_FLAGS.touched) === 0) return;
   if (c.health !== CREATURE_HEALTH.harmless) return;
+  sim.rescues.push({ x: c.x, y: c.y - 0x2000, z: c.z });
   sim.foundCount++;
-  sim.sounds.push({ event: 0x6c, x: c.x, y: c.y, z: c.z });
+  sim.sounds.push({ event: RESCUE_SOUNDS[c.handler!]!, x: c.x, y: c.y, z: c.z });
   killCreature(c, 2);
 }
 

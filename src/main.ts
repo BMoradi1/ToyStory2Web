@@ -1473,6 +1473,10 @@ function stepPodBeams():void{
 function spawnCreatureEffects(): void {
   if (!effects || !creatureSim || !player || !camera) return;
   const world = effectWorld();
+  for (const at of creatureSim.rescues) {
+    addPointLight(pointLights, spawnPickupBurst(effects, world, at, 50));
+  }
+  creatureSim.rescues.length = 0;
   for (const shot of creatureSim.shots) {
     // The hover bot fires from a gun on each side; the port has one heading
     // per shot, so the bolt leaves along it rather than across it.

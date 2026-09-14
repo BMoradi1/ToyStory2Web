@@ -913,8 +913,9 @@
            Ordinary positive-burst creature deaths now supply orange life-32
            light at the hit-shape centre. Seven of fifteen direct temporary-light
            calls fully connected. Shared pickup-burst helper now connects its
-           collection caller with particles and amber light; its other callers
-           and seven untouched sites remain listed in docs/EFFECTS.md.
+           collection, reusable-return and ten rescue callers with particles and
+           amber light; standalone helper and seven untouched sites remain listed
+           in docs/EFFECTS.md.
            Earned-token reveal sequence now uses its own 132-tick scale animation,
            16-particle ring and sound at tick 32. Quiet startup reveals preserved;
            this sequence does not request the amber pickup light.
@@ -925,6 +926,9 @@
            Reusable pickup categories 6/7/8 now share a 400-tick reappearance
            timer, restore the previous item when replaced, and emit nearby
            amber return bursts. Exact timer/visibility/recollection checks pass.
+           All ten find-five rescue handlers now emit spread-50 amber bursts
+           above the creature and use individual retail pickup cues; one-shot
+           counting/removal and authored sheep contact are regression covered.
            Retail normal lighting and other temporary-light callers remain open;
            Follow camera correctly ignores script target height in retail;
            exact half-turn target steering corrected and regression tested.

@@ -910,7 +910,8 @@ claim a fresh audit of every per-type death animation or burst mapping.
 Temporary-light call-site checklist: the local executable contains 15 direct
 calls to `0049ee50`. Seven are connected: `00405f57`, `0040685e`, `00410c4d`,
 `00410d13`, `00410e28`, `00424faf`, `0042535d`. `004104be` now has its pickup
-collection caller connected below; its other callers remain open. Seven still
+collection, reusable-return and ten rescue callers connected below; its standalone
+`004a0ea0` caller remains unresolved. Seven still
 need their trigger/position/owner paths traced and connected: `00410a70`,
 `00416c01`, `00420d12`, `00422885`, `00422a53`, `00422fc0`, `004271ae`.
 Similar colours do not establish equivalent callers. Reserved lights are
@@ -929,8 +930,8 @@ position shifted left five. X is the owner, matching the executable.
 Light selection now runs once after pickup processing so the collection frame
 includes the new light. Build and effect probes pass; the authored pickup
 browser check verifies particles, source selection, redraw independence and
-respawn reset. Other calls to this helper (pickup reappearance and level scripts)
-remain pending. Earned-token reveals use the separate sequence below. The
+respawn reset. Pickup reappearance and rescue callers are connected below.
+Earned-token reveals use the separate sequence below. The
 separate `004109f0` red-burst helper at `00410a70` has no
 direct call references in the disassembly; indirect use is not ruled out.
 
@@ -1019,3 +1020,35 @@ remains hidden through tick 399, returns with particles/light at tick 400,
 can be collected again and resets cleanly. The standalone `004a0ea0` helper
 has no direct calls found in this disassembly and remains unaudited; this
 does not claim the separate power-up activation routines are complete.
+
+### Find-five rescue bursts (2026-09-14)
+
+All ten rescue handlers now request `00410410` at creature X/Z and Y minus
+`0x2000`, with spread 50: five kind-0x29 particles and an amber life-16 light.
+The host drains a dedicated rescue queue once per tick; removal does not
+request an enemy-death burst or coin. Each rescue still increments the shared
+find-five counter once. The pickup cues now match their individual handlers:
+
+| Handler | Burst call | Pickup sound |
+| --- | --- | --- |
+| 00416a60 | 00416a95 | 0x20 |
+| 00418610 | 00418677 | 0x49 |
+| 0041bb80 | 0041bc02 | 0x6c |
+| 0041dec0 | 0041df4e | 0xa2 |
+| 00420ed0 | 00420f54 | 0x77 |
+| 00422c70 | 00422cf8 | 0xb8 |
+| 004259b0 | 00425a55 | 0x8e |
+| 00428650 | 004286d7 | 0x96 |
+| 0042c150 | 0042c1db | 0x6c |
+| 0042d620 | 0042d65c | 0x1f |
+
+Idle chatter remains the existing shared approximation. The rescue probe
+covers every mapped type, all ten handlers, sound IDs, source offset, dead/
+untouched guards and duplicate suppression. The browser check rescues an
+actual level 1 sheep through contact and checks particles, light position,
+one-shot emission, redraw independence and reset.
+
+Thirteen of fourteen direct calls to `00410410` are now connected: these ten,
+collection, timed reappearance and replacement. The remaining standalone
+`004a0ea0` routine calls it at `004a0f3d`, but has no direct callers found;
+its gameplay trigger is unresolved.

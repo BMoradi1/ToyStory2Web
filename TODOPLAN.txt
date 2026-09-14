@@ -918,6 +918,8 @@
            Earned-token reveal sequence now uses its own 132-tick scale animation,
            16-particle ring and sound at tick 32. Quiet startup reveals preserved;
            this sequence does not request the amber pickup light.
+           Idle token sparkles now use the shared 16-tick gate, saved-bit
+           suppression and strict camera range. Reveal camera framing remains.
            Retail normal lighting and other temporary-light callers remain open;
            Follow camera correctly ignores script target height in retail;
            exact half-turn target steering corrected and regression tested.

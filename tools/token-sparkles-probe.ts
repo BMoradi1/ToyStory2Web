@@ -1,0 +1,32 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {readEffectTable} from '../src/formats/effect-table.ts';
+import {createEffects,type EffectWorld} from '../src/sim/effects.ts';
+import {RandomStream} from '../src/sim/creatures.ts';
+import {stepTokenSparkles} from '../src/sim/token-sparkles.ts';
+const {kinds,modes}=readEffectTable(readFileSync('Toy Story 2/toy2.exe'));
+const world:EffectWorld={cameraX:0,cameraY:0,cameraZ:0,playerX:0,playerY:0,playerZ:0,
+ playerYaw:0,playerVx:0,playerVz:0,groundAt:()=>null,waterY:null};
+const item={x:0,y:0,z:0,tokenSlot:0,enabled:true,collected:false};
+const make=()=>createEffects(kinds,modes,new RandomStream(new Uint8Array([0])));
+const emit=(cameraX:number,change={},saved=0,gate=true)=>{
+ const sim=make();sim.gate.sixteen=gate;
+ stepTokenSparkles([{...item,...change}],saved,sim,world,{x:cameraX,y:0,z:0});
+ return sim.effects.filter(e=>e.life>0);
+};
+assert.equal(emit(0,{},0,false).length,0);
+assert.equal(emit(0,{enabled:false}).length,0);
+assert.equal(emit(0,{collected:true}).length,0);
+assert.equal(emit(0,{},1).length,0);
+assert.equal(emit(0,{tokenSlot:-1}).length,0);
+assert.equal(emit(768*256).length,0);
+assert.equal(emit(768*256-1).length,1);
+assert.equal(emit(-767*256-1).length,0,'signed negative boundary');
+const e=emit(0)[0]!;
+assert.equal(e.kind,0x29);assert.equal(e.life,24);assert.equal(e.spin,-128);
+assert.deepEqual([e.x,e.y,e.z],[0,0,0]);
+const sim=make();sim.gate.sixteen=true;
+stepTokenSparkles([{...item,tokenSlot:1,x:100},item],0,sim,world,{x:0,y:0,z:0});
+assert.equal(sim.effects[1]!.x,0);assert.equal(sim.effects[2]!.x,3200);
+assert.equal(sim.pointLights.length,0,'idle sparkles do not add character light');
+console.log('PASS: idle token gate, saved/collected/hidden exclusions, signed camera cutoff, slot order, spark kind/spin/life and no point light.');

@@ -1,3 +1,4 @@
+import {stepTokenSparkles} from './sim/token-sparkles.ts';
 import {readTokenReveal,type TokenRevealProfile} from './formats/token-reveal.ts';
 import {stepTokenReveal} from './sim/token-reveal.ts';
 import { readLensFlareTable, buildLensFlares, flareRay, levelFlareSources, pathFlareSources, createFlareFlicker, stepFlareFlicker, type FlareEntry, type FlareSprite } from './sim/lens-flare.ts';
@@ -3331,6 +3332,8 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   tickSoundSequence();
 
   if (pickups) {
+    if(effects)stepTokenSparkles(pickups.items,(progress?.p.tokens[levelNow]??0)|pickups.tokens,effects,effectWorld(),
+      {x:viewer.camera.position.x/GAME_TO_RENDER,y:-viewer.camera.position.y/GAME_TO_RENDER,z:-viewer.camera.position.z/GAME_TO_RENDER});
     if(tokenRevealProfile)for(let slot=0;slot<5;slot++){
       const old=pickups.revealTimers[slot]!;
       if(old===0)continue;

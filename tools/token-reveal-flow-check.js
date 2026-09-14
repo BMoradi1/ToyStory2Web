@@ -60,6 +60,20 @@
   ts2.pressMenu('select');ts2.tickGame({},1);
   advance(140);
   if(ts2.tokenReveals.timers[0]!==0)throw Error('reveal never finished');
+  const savedTokens=ts2.save.tokens[1];
+  ts2.save.tokens[1]=savedTokens|1;
+  advance(60);
+  if(ts2.effects.kinds.includes(0x29))throw Error('saved token emitted idle sparkles');
+  ts2.save.tokens[1]=savedTokens&~1;
+  let idleSeen=false;
+  for(let i=0;i<16;i++){advance(1);if(ts2.effects.kinds.includes(0x29)){idleSeen=true;break;}}
+  if(!idleSeen)throw Error('idle token sparkles missing '+JSON.stringify({token,camera:ts2.viewer.camera.position,player:ts2.player,pickups:ts2.pickups}));
+  const idle=JSON.stringify(ts2.effects.kinds);
+  for(let i=0;i<5;i++)ts2.redrawHud();
+  if(JSON.stringify(ts2.effects.kinds)!==idle)throw Error('drawing changes idle sparkles');
+  ts2.save.tokens[1]=savedTokens;
+  console.log('IDLE TOKEN SPARKLES/SAVED SUPPRESSION PASS');
+
   ts2.revealToken(0);if(ts2.tokenReveals.timers[0]!==0)throw Error('repeated reveal restarted');
   await ts2.spawnPlayer();ts2.viewer.stop();
   if(ts2.tokenReveals.timers.some(t=>t!==0))throw Error('reveal survived reset');

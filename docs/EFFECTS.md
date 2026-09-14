@@ -955,5 +955,22 @@ sequence. Simulation advances it once per gameplay tick; drawing only applies
 its current scale alongside the existing pickup rotation. The unit probe checks
 local data, sliced buffers, bounds, quiet/repeated reveals and timer crossings.
 The authored-token browser check observes sixteen particles at tick 32 and
-checks redraw independence, pause, completion and reset. Camera framing and
-the ongoing idle-token sparkle loop remain separate presentation work.
+checks redraw independence, pause, completion and reset. Camera framing remains
+separate presentation work; idle sparkles are connected below.
+
+### Idle-token sparkles (2026-09-14)
+
+`004a0fa3..004a1082` emits one kind-0x29 particle in mode 9 per eligible
+token on the shared 16-tick gate. It visits token slots 0..4 in order, skips
+unrevealed/collected tokens and tokens whose saved bit is set, and requires
+camera-minus-token deltas shifted right eight to have squared distance strictly
+below `0x90000`. The PC helper `004cd110` always returns one, so it adds no
+screen visibility gate. Existing effect rendering/culling still applies.
+
+Each sparkle starts at the token position with spin random-byte minus 128
+and lifetime `(random-byte & 15)*2+24`. It emits no point light. The host uses
+the saved level bits as well as this visit's collection bits, and simulation
+alone advances the gate. Tests cover signed range boundaries, slot ordering,
+saved/hidden/collected exclusions and particle parameters. The token browser
+check observes idle emission after the reveal finishes and verifies redraw
+independence alongside reveal pause/reset behavior.

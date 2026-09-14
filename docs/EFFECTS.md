@@ -955,8 +955,8 @@ sequence. Simulation advances it once per gameplay tick; drawing only applies
 its current scale alongside the existing pickup rotation. The unit probe checks
 local data, sliced buffers, bounds, quiet/repeated reveals and timer crossings.
 The authored-token browser check observes sixteen particles at tick 32 and
-checks redraw independence, pause, completion and reset. Camera framing remains
-separate presentation work; idle sparkles are connected below.
+checks redraw independence, pause, completion and reset. Camera framing and
+idle sparkles are connected below.
 
 ### Idle-token sparkles (2026-09-14)
 
@@ -974,3 +974,24 @@ alone advances the gate. Tests cover signed range boundaries, slot ordering,
 saved/hidden/collected exclusions and particle parameters. The token browser
 check observes idle emission after the reveal finishes and verifies redraw
 independence alongside reveal pause/reset behavior.
+
+### Earned-token camera framing (2026-09-14)
+
+Fresh nonquiet reveals now call the existing cut system as `004a0e16` does:
+token position in game units, 180 ticks and distance 16. This places the eye
+about 0x4000 game units from the token along the Buzz-to-token line and at
+the token's height. The cut locks player input and uses the existing 64-tick
+entry/return blending. The token's 132-tick animation completes during the
+camera hold. Quiet startup reveals and repeated/invalid rewards do not start
+or extend a cut. Dialogue, task and paint rewards share this path.
+
+The token probe verifies target position, distance, timing, input-lock release,
+return blending and quiet/repeated cases. Browser coverage checks target and
+pause, the complete return to follow, and the existing particle ring, idle
+sparkles and reset. The cut system's documented look-point easing approximation
+still applies; this connects the reward trigger rather than replacing that
+camera implementation.
+
+The browser test also exposed that the shared cut clock ran before the pause
+menu's early return. It now skips advancement while the menu is open, keeping
+the camera hold synchronized with the paused reveal animation.

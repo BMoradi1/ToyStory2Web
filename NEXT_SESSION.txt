@@ -213,7 +213,11 @@
  IDLE TOKEN SPARKLES (2026-09-14): one kind-0x29/mode-9 particle per eligible
  token every 16 ticks, in slot order, with strict camera range and saved-bit
  suppression. PC visibility helper is unconditional. Boundary/state probes and
- the token browser emission check cover this; camera framing remains open.
+ the token browser emission check cover this.
+ TOKEN REVEAL CAMERA (2026-09-14): fresh nonquiet rewards now start the
+ existing 180-tick cut at distance 16, aimed at the token. Quiet startup and
+ repeated reveals do not take the camera. Target, pause and full return to
+ follow are covered; existing camera easing approximation remains documented.
  NEXT: remaining 00410410 callers (pickup reappearance/level scripts), then seven
  untouched temporary-light sites in docs/EFFECTS.md. 004109f0 has no direct
  call references; trace indirect use before assigning a gameplay trigger.

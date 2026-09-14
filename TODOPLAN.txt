@@ -919,7 +919,9 @@
            16-particle ring and sound at tick 32. Quiet startup reveals preserved;
            this sequence does not request the amber pickup light.
            Idle token sparkles now use the shared 16-tick gate, saved-bit
-           suppression and strict camera range. Reveal camera framing remains.
+           suppression and strict camera range. Earned-token camera framing now
+           uses the 180-tick hold and shared 64-tick return blend; quiet startup
+           and repeated rewards do not restart it.
            Retail normal lighting and other temporary-light callers remain open;
            Follow camera correctly ignores script target height in retail;
            exact half-turn target steering corrected and regression tested.

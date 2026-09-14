@@ -1,7 +1,8 @@
+import {createCut,stepCutClock} from '../src/sim/camera-cut.ts';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {readTokenReveal} from '../src/formats/token-reveal.ts';
-import {stepTokenReveal} from '../src/sim/token-reveal.ts';
+import {stepTokenReveal,revealEarnedToken} from '../src/sim/token-reveal.ts';
 import {createPickups,revealToken} from '../src/sim/pickups.ts';
 import {parseDat} from '../src/formats/dat.ts';
 const exe=readFileSync('Toy Story 2/toy2.exe'),profile=readTokenReveal(exe);
@@ -25,3 +26,18 @@ assert.equal(timer,0);assert.equal(bursts,1);
 assert(stepTokenReveal(103,profile,5).burst);
 assert(!stepTokenReveal(100,profile).burst);
 console.log('PASS: local reveal vectors/scales, bounds/subarrays, quiet/idempotent reveal, 32-tick burst, large-dt crossing and finish.');
+
+const camera=createCut(),player={x:0,y:0,z:0};
+const token=state.items.find(i=>i.tokenSlot===2)!;
+revealEarnedToken(state,2,camera,player);
+assert.equal(camera.ticks,180);assert(camera.noControl);assert.equal(camera.blend,64);
+assert.deepEqual(camera.look,{x:token.x*32,y:token.y*32,z:token.z*32});
+assert.equal(camera.eye.y,camera.look.y);
+assert(Math.abs(Math.hypot(camera.eye.x-camera.look.x,camera.eye.z-camera.look.z)-16384)<32);
+stepCutClock(camera,32);assert.equal(camera.ticks,148);
+revealEarnedToken(state,2,camera,player);assert.equal(camera.ticks,148,'repeat does not restart cut');
+revealEarnedToken(state,0,camera,player);assert.equal(camera.ticks,148,'quiet already-visible token stays quiet');
+revealEarnedToken(state,-1,camera,player);assert.equal(camera.ticks,148,'invalid slot leaves camera alone');
+stepCutClock(camera,147);assert(camera.noControl);assert.equal(camera.ticks,1);
+stepCutClock(camera);assert.equal(camera.ticks,0);assert(!camera.noControl);assert.equal(camera.blend,64);
+console.log('PASS: fresh reward target, 180-tick input lock, retail distance, quiet/repeated/invalid no-op and return blend.');

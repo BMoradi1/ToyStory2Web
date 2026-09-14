@@ -1,6 +1,6 @@
 import {stepTokenSparkles} from './sim/token-sparkles.ts';
 import {readTokenReveal,type TokenRevealProfile} from './formats/token-reveal.ts';
-import {stepTokenReveal} from './sim/token-reveal.ts';
+import {stepTokenReveal,revealEarnedToken} from './sim/token-reveal.ts';
 import { readLensFlareTable, buildLensFlares, flareRay, levelFlareSources, pathFlareSources, createFlareFlicker, stepFlareFlicker, type FlareEntry, type FlareSprite } from './sim/lens-flare.ts';
 import { getGamma, setGamma } from './render/gamma.ts';
 import {podMuzzle,podBeam,podImpactHits,podBossAim,podAttachment,podImpactLight} from './sim/pod-beam.ts';
@@ -982,7 +982,7 @@ async function open(dir: GameDir): Promise<void> {
         return viewer?.playMode ?? false;
       },
       revealTokens: revealAllTokens,
-      revealToken(slot:number){if(pickups){revealToken(pickups,slot,false);drawPickups();}},
+      revealToken(slot:number){if(pickups&&player){revealEarnedToken(pickups,slot,cut,player);drawPickups();}},
       get tokenReveals(){return pickups?{timers:[...pickups.revealTimers],scales:[...pickups.revealScales]}:null;},
       drive(held: Partial<import('./sim/player.ts').PlayerInput>, ticks = 1) {
         if (!player || !playerRuntime || !currentCollisionWorld || !viewer) return null;
@@ -3031,7 +3031,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   if (player.dying) held = { ...held, moveX: 0, moveY: 0, jump: false, spin: false, fire: false };
   // The script tick feeds a running cut before anything moves, and a cut is
   // the engine's "no player control" bit as much as a talk is.
-  stepCutClock(cut);
+  if(!menu.open)stepCutClock(cut);
   if (cut.noControl) held = { ...held, moveX: 0, moveY: 0, jump: false, spin: false, fire: false };
 
   // A talk freezes Buzz and takes the camera: the engine sets its "no player
@@ -3094,7 +3094,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       if (talkSlot >= 0 && tasks && pickups) {
         markSlotDone(tasks, talkSlot);
         revealedSlots.add(talkSlot);
-        revealToken(pickups, talkSlot, false);
+        revealEarnedToken(pickups, talkSlot, cut, player);
         drawPickups();
         infoEl.textContent = `pizza planet token ${talkSlot + 1} of 5`;
       }
@@ -3135,7 +3135,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     for (const index of stompProps.guidesSpent) spendGuide(guideSparkles, effects, index, true);
     if (stompProps.sequence !== null) playEvent(stompProps.sequence, player);
     if (levelNow === 4 && stompProps.paint.solved === 7 && !stompProps.paint.reward && pickups) {
-      revealToken(pickups, 3, false); stompProps.paint.reward = true; drawPickups();
+      revealEarnedToken(pickups, 3, cut, player); stompProps.paint.reward = true; drawPickups();
     }
     drawStompProps(levelNow);
   }
@@ -3289,7 +3289,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       for (let slot = 0; slot < 5; slot++) {
         if (pickups && (tasks.done & (1 << slot)) !== 0 && !revealedSlots.has(slot)) {
           revealedSlots.add(slot);
-          revealToken(pickups, slot, false);
+          revealEarnedToken(pickups, slot, cut, player);
           drawPickups();
           infoEl.textContent = `pizza planet token ${slot + 1} of 5`;
         }

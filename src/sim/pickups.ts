@@ -206,12 +206,14 @@ export function pickupObjects(dat: DatLevel, level: number): Set<number> {
 }
 
 /** Make a token slot collectable, as its task would. */
-export function revealToken(state: PickupState, slot: number, quiet=true): void {
-  if(slot<0||slot>=5||!Number.isInteger(slot))return;
-  if(!quiet&&state.items.some(i=>i.tokenSlot===slot&&!i.enabled&&!i.collected)){
+export function revealToken(state: PickupState, slot: number, quiet=true): Pickup|null {
+  if(slot<0||slot>=5||!Number.isInteger(slot))return null;
+  const fresh=state.items.find(i=>i.tokenSlot===slot&&!i.enabled&&!i.collected)??null;
+  if(!quiet&&fresh){
     state.revealTimers[slot]=132;state.revealScales[slot]=0;
   }
   for (const item of state.items) if (item.tokenSlot === slot) item.enabled = true;
+  return fresh;
 }
 
 /**

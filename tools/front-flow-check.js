@@ -44,6 +44,7 @@
   ts2.frontDrive(0, 650);
   ts2.frontDrive(0x4000); ts2.frontDrive(0, 130);
   await wait(() => ts2.front.screen === 'select', 'did not return to selector');
+  if(ts2.viewer.backdrop.mesh.visible)throw Error('gameplay backdrop leaked into selector');
   const before = { scene:ts2.front.scene, player:ts2.player, creatures:ts2.creatures, effects:ts2.effects };
   await pause(2000);
   const after = { scene:ts2.front.scene, player:ts2.player, creatures:ts2.creatures, effects:ts2.effects };

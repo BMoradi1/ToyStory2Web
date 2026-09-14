@@ -509,3 +509,10 @@ Gamma and animated-texture browser checks cover their shifted navigation.
 Laser view is now an additional rebindable action in keyboard/gamepad options
 (default V / button 3). Stored maps from before this action was added retain
 their custom bindings and receive the new default on load.
+
+The gameplay launch path now uses `sceneForLevel`, including internal levels
+11-15 in `level01/level1` through `level05/level1`. Previously it constructed
+nonexistent `level11/level` through `level15/level` names and returned to select.
+`loadDioramaScene` clears gameplay backdrop and first-person meshes before its
+first await. `tools/late-level-flow-check.js` launches and exits all five late
+levels via the selector, asserting scene mapping, Buzz spawn and clean returns.

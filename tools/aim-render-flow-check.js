@@ -32,9 +32,12 @@
   }
   await wait(() => ts2.front.inLevel, 'level did not start');
   ts2.viewer.stop();
+  for(const index of [1,2,3])if(!ts2.viewer.hiddenObjects.has(index))throw Error('stored visor piece visible in room');
+  if(ts2.viewer.aimModel?.visible)throw Error('visor visible before aiming');
   ts2.player.hitStun=0;
   ts2.tickGame({aim:true},1);
   if(!ts2.aimView.active)throw Error('aim toggle did not enter');
+  if(!ts2.viewer.aimModel?.visible)throw Error('original visor not shown');
   const eye=ts2.viewer.camera.position;
   if(Math.abs(eye.y-(-(ts2.player.y-0x3000)/8192))>0.0001)throw Error('wrong first-person eye');
   const start={x:ts2.player.x,z:ts2.player.z};
@@ -50,7 +53,7 @@
   if(!fired)throw Error('aimed laser did not fire');
   if(ts2.viewer.player.visible)throw Error('Buzz blocks first person');
   ts2.tickGame({aim:true},1);
-  if(ts2.aimView.active||!ts2.viewer.player.visible)throw Error('toggle did not restore third person');
+  if(ts2.aimView.active||!ts2.viewer.player.visible||ts2.viewer.aimModel.visible)throw Error('toggle did not restore third person');
   ts2.tickGame({aim:false},1);ts2.tickGame({aim:true},1);
   await ts2.spawnPlayer();ts2.viewer.stop();
   if(ts2.aimView.active||!ts2.viewer.player.visible)throw Error('respawn did not clear aiming');
@@ -75,5 +78,7 @@
   if(geometry.billboards.length!==211)throw Error('authored sprite cards missing');
   if(!ts2.viewer.backdrop.mesh.visible)throw Error('level backdrop missing');
   ts2.viewer.frame(ts2.viewer.lastTime);
+  if(ts2.viewer.aimModel.position.distanceTo(ts2.viewer.camera.position)>1e-6)throw Error('visor does not follow eye');
+  if(ts2.viewer.aimModel.quaternion.angleTo(ts2.viewer.camera.quaternion)>1e-6)throw Error('visor does not follow aim');
   console.log('AIM AND RENDER GAPS BROWSER PASS',JSON.stringify({cards:geometry.billboards.length,objects:geometry.objectCount,backdrop:ts2.viewer.backdrop.mesh.visible}));
 })();

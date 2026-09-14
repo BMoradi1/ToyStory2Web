@@ -1,3 +1,16 @@
+CURRENT UPDATE — 2026-09-14: selector, late levels and original visor
+  Fixed the selector inheriting the previous gameplay backdrop. The selector now
+  clears both backdrop and visor meshes before awaiting scene loads.
+  Fixed front-end launches for levels 11-15: use sceneForLevel instead of looking
+  for nonexistent level11-level15 directories. Chromium entered and exited all
+  five through the real selector (including both late bosses).
+  The model left near the living-room launcher chair was the original aiming
+  geometry: scene IDs 0x2d/0x2e/0x2f. Hide the stored pieces in normal gameplay;
+  render a camera-local copy of the visor/chest/wrist at half scale in laser view.
+  All 15 scenes contain these pieces. Browser verifies visibility, camera follow,
+  toggle/respawn reset and cleanup on selector return. Build and asset probe pass.
+  Remaining visor parity: retail target lock/cycling, turn lag and firing motion.
+
 CURRENT UPDATE — 2026-09-14: first-person aiming and missing geometry
   Implemented V / gamepad Triangle-Y laser-view toggle (rebindable), eye-height
   camera, manual laser/disk pitch, centered aiming marker, pause preservation,

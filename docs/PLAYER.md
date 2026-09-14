@@ -724,3 +724,16 @@ Pause preserves aiming; spawn/scene exit, dialogue, cutscene control, damage,
 death and climbing cancel it. `tools/aim-view-probe.ts` checks the camera/ray
 contract; `tools/aim-render-flow-check.js` also checks physical V input and
 reticle pixels in Chromium.
+
+The first-person model is now restored from scene object IDs **0x2d, 0x2e,
+0x2f**. `0040426e..004042c2` sets them to 0x800 scale; `00404342..004043d7`
+places them at Buzz's eye, y - 0x3000, and the following calls rotate them with
+his aiming orientation. All fifteen gameplay scenes contain these three parts.
+Their authored storage position in Andy's house is near the launching chair;
+leaving them visible there was the stray model the user reported. The port
+hides those world groups and draws camera-local geometry for the visor, chest
+and wrist only while aiming. This preserves authored materials and removes
+world zone/detail clipping from the camera model. Retail turning lag and
+firing motion are still unported; this first pass rigidly follows the camera.
+`tools/aim-model-probe.ts` checks all fifteen scenes and keeps source placements
+unchanged. The browser aiming check covers world hiding and camera attachment.

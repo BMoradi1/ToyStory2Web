@@ -1,3 +1,4 @@
+import {aimObjectIndices,buildAimModel} from './render/aim-model.ts';
 import {createAimView,stepAimView,aimCamera} from './sim/aim-view.ts';
 import {stepTokenSparkles} from './sim/token-sparkles.ts';
 import {readTokenReveal,type TokenRevealProfile} from './formats/token-reveal.ts';
@@ -84,7 +85,7 @@ import {
 } from './sim/hud.ts';
 import { effectCardPlacement, type WorldSprite } from './render/world-sprites.ts';
 import {
-  exeString, HINT_SIGNS, levelNumber, PUSH_BLOCKS, SPAWN_TABLE, TALK_SCRIPTS, tokenSlotsAtStart,
+  exeString, HINT_SIGNS, levelNumber, sceneForLevel, PUSH_BLOCKS, SPAWN_TABLE, TALK_SCRIPTS, tokenSlotsAtStart,
 } from './sim/level-data.ts';
 import { readZipLines, type ZipLine } from './sim/zip-lines.ts';
 import { readPoles, type Pole } from './sim/poles.ts';
@@ -318,6 +319,7 @@ async function showLevel(index: number): Promise<void> {
   viewer?.setCollision(null);
   viewer?.setPlayer(null);
   viewer?.setBackdrop(null);
+  viewer?.setAimModel(null);
 
   let textureCount = 0;
   let gpuTextures = new Map<number, THREE.Texture>();
@@ -388,6 +390,8 @@ async function showLevel(index: number): Promise<void> {
         const index = parsed.objectIds[id];
         if (index !== undefined && index >= 0) separate.add(index);
       }
+      const aimObjects=levelNumber(level.id)!==null ? aimObjectIndices(parsed) : [];
+      for(const index of aimObjects)separate.add(index);
       const geometry = buildLevelGeometry(parsed, { zones, separate });
 
       setStatus(`${level.id}: uploading ${geometry.triangleCount} triangles\u2026`);
@@ -396,6 +400,8 @@ async function showLevel(index: number): Promise<void> {
       // .ngn carries one under that name (docs/FORMATS.md).
       const reflectionSlot = textureList.find((t) => t.tag === 'tex14')?.slot ?? null;
       viewer.setLevel(geometry, gpuTextures, reflectionSlot === null ? undefined : gpuTextures.get(reflectionSlot));
+      viewer.setHiddenObjects(new Set(aimObjects));
+      if(aimObjects.length)viewer.setAimModel(buildAimModel(parsed),gpuTextures);
       // The render pass's fog. Every shipped scene carries the slot-0x25
       // sheet that keeps the engine's general band off, so only level 14's
       // own 24,000-46,000 band ever shows; its colour is the clear colour
@@ -1352,6 +1358,7 @@ async function spawnPlayer(): Promise<void> {
   laserBeams.length = 0;
   aimView = createAimView();
   viewer?.setPlayerVisible(true);
+  viewer?.setAimVisible(false);
   podBeams.length = 0;
   hud = createHud();
   startHud(hud);
@@ -1396,7 +1403,7 @@ function drawPickups(): void {
   // one of the level's objects and the level mesh already draws it, so all
   // there is to do is take away the ones that should not be seen: collected
   // ones, hidden tokens, and the five spare token objects.
-  const hidden = new Set<number>();
+  const hidden = new Set<number>(currentLevel ? aimObjectIndices(currentLevel.level) : []);
   for (const item of pickups.items) {
     if (item.objectIndex < 0) continue;
     if (!item.enabled || item.collected) hidden.add(item.objectIndex);
@@ -2667,6 +2674,8 @@ async function loadDioramaScene(): Promise<{ paths: DatLevel['paths']; placedOf:
   // The diorama uses playMode for its scripted camera, too. Discard the
   // level simulation before any await so enabling that camera cannot resume
   // the old level and recreate its creatures, pickups, effects or HUD.
+  viewer.setBackdrop(null);
+  viewer.setAimModel(null);
   currentLevel = null;
   currentCollision = null;
   currentCollisionWorld = null;
@@ -2685,6 +2694,7 @@ async function loadDioramaScene(): Promise<{ paths: DatLevel['paths']; placedOf:
   laserBeams.length = 0;
   aimView = createAimView();
   viewer?.setPlayerVisible(true);
+  viewer?.setAimVisible(false);
   podBeams.length = 0;
   pushBlocks = null;
   levelPoles = [];
@@ -2757,7 +2767,7 @@ async function playLevelFromFront(position: number): Promise<'exit' | 'won' | 'g
   lastLifeLost = false;
   const level = LEVEL_SELECT_ORDER[position - 1];
   if (level === undefined) return 'exit';
-  const index = levels.findIndex((l) => l.id === `level${String(level).padStart(2, '0')}/level`);
+  const index = levels.findIndex((l) => l.id === sceneForLevel(level));
   if (index < 0) {
     infoEl.textContent = `level ${level} is not in this install`;
     return 'exit';
@@ -3072,6 +3082,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   if(talk || cut.noControl || player.dying){
     stepAimView(aimView,player,held,true);
     viewer.setPlayerVisible(true);
+    viewer.setAimVisible(false);
   }
   // A talk freezes Buzz and takes the camera: the engine sets its "no player
   // control" bit and drives the camera from the talk script rather than the
@@ -3163,6 +3174,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
 
   stepAimView(aimView,player,held,cut.noControl);
   viewer.setPlayerVisible(!aimView.active);
+  viewer.setAimVisible(aimView.active);
   if(aimView.active) held={...held,moveX:0,moveY:0,jump:false,spin:false,cameraLeft:false,cameraRight:false};
   const playerGround = groundFromCollision(currentCollisionWorld, levelPoles, levelZipLines);
   playerGround.beforeMove = () => tickPushBlocks(held);

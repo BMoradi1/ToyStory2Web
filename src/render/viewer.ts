@@ -79,6 +79,29 @@ export class Viewer {
   private collision: THREE.LineSegments | null = null;
   private readonly backdrop = new Backdrop();
   setBackdrop(texture: THREE.Texture | null): void { this.backdrop.set(texture); }
+  private aimModel: THREE.Mesh | null = null;
+  setAimModel(geometry: LevelGeometry | null, textures = new Map<number, THREE.Texture>()): void {
+    if(this.aimModel) {
+      this.scene.remove(this.aimModel);this.aimModel.geometry.dispose();
+      for(const m of this.aimModel.material as THREE.Material[])m.dispose();
+      this.aimModel=null;
+    }
+    if(!geometry?.triangleCount)return;
+    const buffer=new THREE.BufferGeometry();
+    buffer.setAttribute('position',new THREE.BufferAttribute(geometry.positions,3));
+    buffer.setAttribute('color',this.gammaColours(geometry.colors));
+    buffer.setAttribute('uv',new THREE.BufferAttribute(geometry.uvs,2));
+    const materials=geometry.groups.map((g,i)=>{
+      buffer.addGroup(g.start,g.count,i);
+      const m=this.materialFor(g,textures.get(g.page??-1));
+      m.clippingPlanes=[];(m as THREE.MeshBasicMaterial).fog=false;
+      return m;
+    });
+    this.aimModel=new THREE.Mesh(buffer,materials);
+    this.aimModel.frustumCulled=false;this.aimModel.visible=false;
+    this.scene.add(this.aimModel);
+  }
+  setAimVisible(visible:boolean):void {if(this.aimModel)this.aimModel.visible=visible;}
   private player: THREE.Mesh | null = null;
   setPlayerVisible(visible: boolean): void { if(this.player)this.player.visible=visible; }
   private playerBaseColours:Float32Array|null=null;
@@ -267,6 +290,7 @@ export class Viewer {
     this.clearModel();
     this.lastLevel = null;
     this.setBackdrop(null);
+    this.setAimModel(null);
     if (mesh.triangleCount === 0) return;
 
     const geometry = new THREE.BufferGeometry();
@@ -1123,6 +1147,10 @@ export class Viewer {
     this.refreshGamma();
     this.camera.updateMatrixWorld();
     this.backdrop.update(this.camera,getGamma());
+    if(this.aimModel?.visible){
+      this.aimModel.position.copy(this.camera.position);
+      this.aimModel.quaternion.copy(this.camera.quaternion);
+    }
     this.placeDetailPlanes();
     if (this.lastLevel?.geometry.billboards?.length && this.current) {
       const e = this.camera.matrixWorld.elements;

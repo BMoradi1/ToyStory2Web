@@ -894,7 +894,9 @@
            final-phase hurt alternates normal/double body and muzzle scale.
            Orange burst now lights Buzz through a four-slot temporary pool;
            character shading approximate. Owner-based 64-tick return blending
-           now verified in unit/framebuffer/full-encounter tests. Reserved lights,
+           now verified in unit/framebuffer/full-encounter tests. Reserved slot 0
+           reads authored per-level offset/RGB and survives respawn; scripted
+           slot-1 lights and slot-0 overrides,
            retail normal lighting and other light callers remain open;
            Follow camera correctly ignores script target height in retail;
            exact half-turn target steering corrected and regression tested.

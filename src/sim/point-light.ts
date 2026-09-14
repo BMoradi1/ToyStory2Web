@@ -1,4 +1,5 @@
 import type {Point} from './laser.ts';
+import type {CharacterLight} from '../formats/character-light.ts';
 
 interface LightSample extends Point { r:number; g:number; b:number }
 export interface PointLight extends LightSample { life:number; owner:number }
@@ -7,11 +8,15 @@ export interface PointLights {
   slots:PointLight[];
   /** -1 is the browser's base lighting, corresponding to reserved slot 0. */
   selected:number; remaining:number; from:LightSample; base:PointLight;
+  profile:CharacterLight|null;
 }
 const empty=():PointLight=>({x:0,y:0,z:0,r:0,g:0,b:0,life:0,owner:0});
 /** 0049ee50 allocates only temporary slots 2..5, replacing the least life. */
-export function createPointLights():PointLights{
-  return {slots:Array.from({length:4},empty),selected:-1,remaining:0,from:empty(),base:empty()};
+export function createPointLights(profile:CharacterLight|null=null):PointLights{
+  const base=empty();
+  if(profile)[base.r,base.g,base.b]=profile.colour;
+  return {slots:Array.from({length:4},empty),selected:-1,remaining:0,from:empty(),base,
+    profile:profile?{offset:{...profile.offset},colour:[...profile.colour]}:null};
 }
 export function addPointLight(state:PointLights,light:PointLight):void{
   const pool=state.slots;
@@ -25,12 +30,17 @@ function blend(from:LightSample,to:LightSample,remaining:number):LightSample{
   return {x:mix(from.x,to.x),y:mix(from.y,to.y),z:mix(from.z,to.z),
     r:mix(from.r,to.r),g:mix(from.g,to.g),b:mix(from.b,to.b)};
 }
-/** 0049eee0 temporary selection and owner transitions. Base RGB is zero
- * additive contribution: retail reserved lights/normal shading remain open. */
+/** 0049eee0 base/temporary selection and owner transitions. Slot 0 follows
+ * Buzz's lighting origin; its distance never competes with temporary lights. */
 export function stepPointLights(state:PointLights,player:Point):PlayerLight|null{
   let selected=-1,nearest=Infinity;
   const origin={x:player.x,y:player.y-8192,z:player.z};
   Object.assign(state.base,origin);
+  if(state.profile){
+    state.base.x+=state.profile.offset.x;
+    state.base.y+=state.profile.offset.y;
+    state.base.z+=state.profile.offset.z;
+  }
   for(let i=0;i<state.slots.length;i++){
     const light=state.slots[i]!;
     light.life=Math.max(0,light.life-1);

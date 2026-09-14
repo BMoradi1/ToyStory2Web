@@ -3,6 +3,7 @@ import { getGamma, setGamma } from './render/gamma.ts';
 import {podMuzzle,podBeam,podImpactHits,podBossAim,podAttachment} from './sim/pod-beam.ts';
 import {createPodBoss,readPodHelpers,podBossBar} from './sim/pod-boss.ts';
 import {createPointLights,addPointLight,stepPointLights,type PlayerLight} from './sim/point-light.ts';
+import {readCharacterLight} from './formats/character-light.ts';
 import { createTextureAnimation, stepTextureAnimation, copyScrolledTexture } from './sim/texture-animation.ts';
 import { readSoundSequences, startSequence, stepSequence, type SoundSequences, type SequenceVoice } from './audio/sequences.ts';
 import { createGuideSparkles, stepGuideSparkles, spendGuide } from './sim/guide-sparkles.ts';
@@ -1323,7 +1324,7 @@ async function spawnPlayer(): Promise<void> {
       return createEffects(table.kinds, table.modes, creatureSim!.rand);
     })()
     : null;
-  pointLights=createPointLights();playerLight=null;
+  pointLights=createPointLights(exeBytes&&level>=1&&level<=15?readCharacterLight(exeBytes,level):null);playerLight=null;
   viewer.setCardSheet(sceneTextures.get(SPRITE_SHEET) ?? null);
   laserBeams.length = 0;
   podBeams.length = 0;
@@ -3406,7 +3407,7 @@ async function respawn(): Promise<void> {
   const back = spawnPoint && !Number.isFinite(safe.x) ? spawnPoint : safe;
   const died = player.dying;
   Object.assign(player, createPlayer(back.x, back.y, back.z, safe.yaw));
-  pointLights=createPointLights();playerLight=null;
+  pointLights=createPointLights(pointLights.profile);playerLight=null;
   playerRuntime = createRuntime();
   // The engine's own player reset fills the health bar back up.
   if (pickups) pickups.health = PICKUP.healthMax;

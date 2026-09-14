@@ -44,6 +44,8 @@
   if(ts2.tasks.pod.phase!==1)throw Error('entrance trigger');
   ts2.tickGame({},365);
   if(ts2.tasks.pod.phase!==2)throw Error('entrance did not end');
+  const baseLight=JSON.stringify(ts2.effects.playerLight);
+  if(!ts2.effects.playerLight?.colour.some(c=>c>0))throw Error('reserved base light missing');
   for(let i=0;i<250;i++){
     const boss=ts2.creatures.find(c=>c.slot===0);
     ts2.player.x=boss.x;ts2.player.y=0;ts2.player.z=boss.z+10000;
@@ -69,7 +71,7 @@
       ts2.player.x=helper.x;ts2.player.y=helper.y+4096;ts2.player.z=helper.z;
     }
     ts2.tickGame({},1);
-    if(ts2.effects.playerLight?.colour[0]>0)litBursts++;
+    if(ts2.effects.lightTransition.selected>=0&&ts2.effects.playerLight?.colour[0]>0)litBursts++;
     if(ts2.effects.lightTransition.remaining===63)returnBlends++;
   }};
   for(let stage=1;stage<=6;stage++){
@@ -90,7 +92,7 @@
   if(ts2.effects.pointLights.some(l=>l.life>0))throw Error('burst light did not expire/cull');
   console.log('POD BOSS BURST LIGHTS PASS',litBursts);
   if(returnBlends<6)throw Error('missing burst return transitions: '+returnBlends);
-  if(ts2.effects.lightTransition.remaining!==0||ts2.effects.playerLight!==null)throw Error('return transition did not finish');
+  if(ts2.effects.lightTransition.remaining!==0||JSON.stringify(ts2.effects.playerLight)!==baseLight)throw Error('return transition did not restore reserved light');
   console.log('POD BOSS LIGHT TRANSITIONS PASS',returnBlends);
   for(let i=0;i<30&&ts2.tasks.pod.phase===3;i++){ts2.hurtCreature(0,1);advance(122);}
   if(ts2.tasks.pod.phase!==4&&ts2.tasks.pod.phase!==5)throw Error('death cut missing');

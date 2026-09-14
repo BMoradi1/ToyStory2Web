@@ -163,10 +163,13 @@
  verified. Triangle-normal shading is approximate. Retail targets Buzz, not
  map illumination; earlier scene-light requirement was incorrect.
  LIGHT TRANSITIONS (2026-09-13): owner-based selection now snaps to temporary
- lights and blends world position/RGB back over 64 ticks. Base-light destination
- still approximated as zero additive RGB. Interruption, owner retention,
+ lights and blends world position/RGB back over 64 ticks. Interruption, owner retention,
  framebuffer fade and all six boss-wave returns verified.
- NEXT: reserved character lights, retail normals and other effect/beam light callers;
+ BASE LIGHT (2026-09-13): slot 0 reads per-level offset/RGB from the user's
+ executable, follows Buzz and is restored after burst transitions/respawn.
+ All 15 records and framebuffer/full-encounter returns verified. Triangle-normal
+ shading is still approximate; zero-RGB fallback is now replaced in gameplay.
+ NEXT: scripted slot-1 lights and slot-0 overrides, retail normals and other effect/beam light callers;
  clear-colour/backdrop matching and sprite fog-enable comparison. Exact routines and gamma lookup
  findings are in docs/FRONTEND.md. Controller visor/target-lock and menu/
  cancel bindings still need corresponding input work. Do not claim full parity.

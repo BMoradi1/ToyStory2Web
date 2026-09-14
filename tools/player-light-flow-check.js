@@ -23,7 +23,7 @@
   if(reset.some((x,i)=>x!==base[i]))throw Error('light tint persists after reset');
   console.log('PLAYER LIGHT FRAMEBUFFER PASS',JSON.stringify({base,lit,back,reset}));
   const {createPointLights,addPointLight,stepPointLights}=await import('/src/sim/point-light.ts');
-  const lights=createPointLights(),buzz={x:0,y:8192,z:0};
+  let lights=createPointLights();const buzz={x:0,y:8192,z:0};
   addPointLight(lights,{x:0,y:0,z:16384,r:80,g:40,b:0,life:2,owner:1});
   const lightTick=()=>{
     const light=stepPointLights(lights,buzz);
@@ -39,5 +39,14 @@
   const faded=sample();
   if(faded.some((x,i)=>x!==base[i]))throw Error('return failed to restore base pixels');
   console.log('PLAYER LIGHT TRANSITION FRAMEBUFFER PASS',JSON.stringify({peak,firstReturn,midpoint,faded}));
+  lights=createPointLights({offset:{x:0,y:0,z:16384},colour:[16,32,48]});
+  const reserved=lightTick();
+  if(!(reserved[2]>reserved[1]&&reserved[1]>reserved[0]&&reserved[0]>base[0]))throw Error('reserved colour missing');
+  addPointLight(lights,{x:0,y:0,z:16384,r:80,g:40,b:0,life:2,owner:1});
+  lightTick();lightTick();
+  for(let i=0;i<64;i++)lightTick();
+  const restored=sample();
+  if(restored.some((x,i)=>x!==reserved[i]))throw Error('return failed to restore reserved pixels');
+  console.log('RESERVED LIGHT FRAMEBUFFER PASS',JSON.stringify({reserved,restored}));
   v.setPlayer(null);for(const [o,visible] of visibility)o.visible=visible;
 })();

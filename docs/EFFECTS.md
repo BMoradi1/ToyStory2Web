@@ -697,7 +697,7 @@ spawn, respawn and level exit reset it.
 Buzz's renderer adds directional colour to the posed triangles before gamma
 and texture modulation. This is explicitly a shading approximation: it derives
 face normals from triangles and retains the existing base colours. Retail's
-normal lighting, reserved light slots and the other effect/beam light callers
+normal lighting, scripted reserved-light overrides and the other effect/beam light callers
 remain open. Owner-based transitions are connected by the follow-up below.
 The light does not tint the map or create another lens flare.
 
@@ -719,12 +719,35 @@ the counter decreases after producing the sample. Distance attenuation follows
 interpolation. A new temporary light interrupts a return immediately.
 
 The pod burst uses its retail boss owner identity. The browser now runs this
-transition state, with its existing base shading represented by zero additive
-RGB at Buzz's lighting origin. That destination remains an approximation until
-reserved lights and retail normal shading are ported. Resetting the light pool
+transition state. Its initial zero-additive-RGB destination has been replaced
+by the authored base light in the follow-up below. Retail normal shading is
+still approximate. Resetting the light pool
 also resets the owner, snapshot and counter. Rendering alone never ages it.
 
 The light probe verifies first/mid/final samples, interruption and owner retention.
 Chromium verifies peak/first-return pixels match, midpoint dims, and completion
 restores base pixels. The full encounter verifies six return transitions finish
 before the final phase, then passes victory and selector cleanup.
+
+### Authored base character light (2026-09-13)
+
+Reserved slot 0 now reads the user's executable at `0050387c + level*20`
+for levels 1..15. The first three signed words become X/Y/Z offsets after
+shifting left four; packed RGB comes from +16. The +12 word is not consumed
+by this path. At each tick the offset is added to (Buzz.x, Buzz.y-8192, Buzz.z).
+`0049f350` initializes RGB and owner 0; `0049eee0` moves the source with Buzz.
+Unlike temporary lights, the base light is a fallback rather than a distance
+candidate. It still receives the final distance attenuation.
+
+The host loads the profile on spawn and preserves it when resetting temporary
+lights on respawn. Level exit removes the profile. The 64-tick burst return now
+restores the authored offset and colour. The parser validates level/buffer
+bounds and supports sliced byte arrays; no table or assets ship in the build.
+All 15 records were read from the local executable. The character-light probe
+checks signed direction, colour, tracking and reset; Chromium checks reserved
+RGB pixels and the full six-wave return to level 9's base light.
+
+Remaining: level scripts' slot-1 sources, dynamic slot-0 overrides (including
+level 3), retail normal shading and the other temporary-light callers. The
+renderer still adds light to existing vertex colours using posed triangle
+normals, so this is not a claim of complete retail lighting parity.

@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {readCharacterLight} from '../src/formats/character-light.ts';
+import {createPointLights,addPointLight,stepPointLights} from '../src/sim/point-light.ts';
+const exe=readFileSync(`${process.argv[2]??'Toy Story 2'}/toy2.exe`);
+for(let level=1;level<=15;level++){
+  const light=readCharacterLight(exe,level);
+  assert(Object.values(light.offset).every(n=>Number.isInteger(n)&&Math.abs(n)<=16384));
+  assert(light.colour.every(n=>n>=0&&n<=255));
+}
+const profile=readCharacterLight(exe,9);
+assert.deepEqual(profile,{offset:{x:16384,y:-16384,z:16384},colour:[96,128,144]});
+assert.deepEqual(readCharacterLight(exe,11).offset,{x:0,y:-16384,z:-16384});
+for(const level of [0,16,1.5,NaN])assert.throws(()=>readCharacterLight(exe,level));
+assert.throws(()=>readCharacterLight(new Uint8Array(),1));
+const padded=new Uint8Array(exe.length+17);padded.set(exe,17);
+assert.deepEqual(readCharacterLight(padded.subarray(17),9),profile,'respect the byte offset');
+const player={x:1000,y:8192,z:-2000};
+let state=createPointLights(profile);
+const base=stepPointLights(state,player)!;
+assert.deepEqual(base,{direction:{x:64,y:-64,z:64},colour:[78,104,117]});
+assert.deepEqual(stepPointLights(state,{x:99999,y:-55555,z:123456}),base,'base offset follows Buzz');
+addPointLight(state,{x:player.x,y:0,z:player.z+256,r:240,g:128,b:0,owner:1,life:2});
+const burst=stepPointLights(state,player)!;
+assert.notDeepEqual(burst,base);
+assert.deepEqual(stepPointLights(state,player),burst,'return starts at burst sample');
+for(let i=0;i<64;i++)stepPointLights(state,player);
+assert.deepEqual(stepPointLights(state,player),base,'return restores authored RGB and offset');
+addPointLight(state,{x:player.x,y:0,z:player.z,r:240,g:0,b:0,owner:1,life:32});stepPointLights(state,player);
+state=createPointLights(state.profile);
+assert.equal(state.remaining,0);assert(state.slots.every(l=>l.life===0));
+assert.deepEqual(stepPointLights(state,player),base,'respawn retains profile without old effects');
+assert.equal(stepPointLights(createPointLights(),player),null,'exit clears level profile');
+console.log('PASS: all 15 base-light records, signed offsets, RGB, bounds/subarrays, following Buzz, burst return and respawn/exit reset.');

@@ -1145,7 +1145,8 @@ The attachment follow-up below restores animated BUB points, release
 particles and helper cut framing. Follow-camera selection and final-phase
 hurt scaling are also connected. The orange burst now supplies a 32-tick
 temporary light for Buzz when each helper pod opens. Character shading is
-approximate, with reserved lights still open; the 64-tick return blend is now
+approximate; reserved slot 0 now uses the authored per-level offset/RGB, while
+scripted light overrides remain open. The 64-tick return blend is now
 connected. This
 retail light targets Buzz rather than scene geometry. Beam posing and collision retain the browser
 approximations documented in docs/EFFECTS.md.

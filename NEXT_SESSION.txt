@@ -199,7 +199,12 @@
  origin with X as owner, matching the executable. Dedicated requests drain
  into the shared pool. Unit, framebuffer and full pod encounter checks pass.
  Hook 5 has no supplied template; its regression invokes the hook explicitly.
- NEXT: creature-death and other temporary-light callers, then retail normals;
+ CREATURE-DEATH LIGHTS (2026-09-14): positive bursts now emit orange life-32
+ light at the hit-shape centre with stable entity-slot ownership. Direct pool
+ allocation survives effect-output clearing. Unit and authored pod death checks
+ pass, including pause/selector cleanup and the full boss encounter.
+ NEXT: eight remaining temporary-light calls listed in docs/EFFECTS.md
+ (start with 004104be / 00410a70), then retail normals;
  clear-colour/backdrop matching and sprite fog-enable comparison. Exact routines and gamma lookup
  findings are in docs/FRONTEND.md. Controller visor/target-lock and menu/
  cancel bindings still need corresponding input work. Do not claim full parity.

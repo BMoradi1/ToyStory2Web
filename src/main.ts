@@ -1488,6 +1488,7 @@ function spawnCreatureEffects(): void {
   // floor is asked for at once so it lands instead of falling through, which
   // is what the original does at the same spot.
   for (const at of creatureSim.deaths) {
+    if(at.light)addPointLight(pointLights,at.light);
     const coin = spawnEffect(effects, world,
       at.x, at.y - 0x1000, at.z, 0, -0x800, 0, 0x80, 0, 0, EFFECT_KIND.coin);
     if (coin) coin.floor = world.groundAt(coin.x, coin.y, coin.z) ?? coin.y;
@@ -1498,7 +1499,6 @@ function spawnCreatureEffects(): void {
         const bit = spawnChild(effects, world, at.x, at.y, at.z, 0x23, 0xe);
         if (bit) bit.spin = effects.rand.byte() - 0x80;
       }
-      effects.lights.push({ x: at.x, y: at.y, z: at.z, r: 0xf0, g: 0x80, b: 0, glow: false });
     } else if (at.burst < 0) {
       for (let i = 0; i < -at.burst; i++) {
         const spark = spawnChild(effects, world, at.x, at.y, at.z, 99, (i & 1) * 10 + 4);

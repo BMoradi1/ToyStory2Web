@@ -24,6 +24,7 @@
 
 import type { CreaturePlacement } from '../formats/creatures.ts';
 import type { HitShape } from '../formats/all.ts';
+import type { PointLight } from './point-light.ts';
 import { AI_SCRIPTS, ANIM_SCRIPTS, CREATURE_TYPES, DAMAGE_KINDS } from './creature-data.ts';
 import { cos, idiv, sin, YAW_MASK, yawOf } from './trig.ts';
 
@@ -218,7 +219,7 @@ export interface CreatureSim {
    * is that many of effect 0x23, a negative one is that many PAIRS of 99 and
    * 0x11 and a bang. The caller spawns them (docs/EFFECTS.md).
    */
-  deaths: { x: number; y: number; z: number; burst: number }[];
+  deaths: { x: number; y: number; z: number; burst: number; light: PointLight|null }[];
   /** Bolts a handler fired this tick. The projectile itself is not ported. */
   shots: { x: number; y: number; z: number; heading: number }[];
   /** Sustained ZPOD beams requested this tick; resolved against terrain by the host. */
@@ -1184,7 +1185,12 @@ export function killCreature(c: Creature, what: number, sim?: CreatureSim): void
     // 0x1000 above the body and thrown upward, and asks for the ground under
     // it at once so it lands rather than falling through.
     if (sim && (c.flags & CREATURE_FLAGS.diedOnce) === 0) {
-      sim.deaths.push({ x: c.x, y: c.y, z: c.z, burst: DEATH_BURST[c.type] ?? 0 });
+      const burst=DEATH_BURST[c.type]??0;
+      // 00405ee1..00405f57: positive bursts light the hit-shape centre,
+      // with the entity record as owner (64 records, stride 0x9c).
+      const light=burst>0?{x:c.x+c.offsetX,y:c.y+c.offsetY,z:c.z+c.offsetZ,
+        r:240,g:128,b:0,life:32,owner:0x52c840+c.slot*0x9c}:null;
+      sim.deaths.push({ x: c.x, y: c.y, z: c.z, burst, light });
     }
     if ((c.flags & CREATURE_FLAGS.diedOnce) === 0) {
       c.flags |= CREATURE_FLAGS.diedOnce;

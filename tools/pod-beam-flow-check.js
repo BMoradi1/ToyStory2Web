@@ -90,11 +90,26 @@
   ts2.resolveCreatureBeams();
   if(ts2.pickups.health!==health-1)throw Error('impact bypassed hit invulnerability');
   console.log('ZPOD IMPACT DAMAGE PASS');
+  const dyingPod=ts2.creatures.find(c=>c.slot===pod.slot);
+  const centre={x:dyingPod.x+dyingPod.offsetX,y:dyingPod.y+dyingPod.offsetY,z:dyingPod.z+dyingPod.offsetZ};
+  ts2.killCreature(pod.slot);
+  ts2.player.x=centre.x;ts2.player.y=centre.y+8192;ts2.player.z=centre.z-8192;
+  ts2.player.hitStun=1000;ts2.tickGame({},1);
+  const deathLight=ts2.effects.pointLights.find(l=>l.owner===0x52c840+pod.slot*0x9c);
+  if(!deathLight||deathLight.life!==31||deathLight.r!==240||deathLight.g!==128||deathLight.b!==0||
+    deathLight.x!==centre.x||deathLight.y!==centre.y||deathLight.z!==centre.z)throw Error('creature death flash missing or misplaced');
+  const selected=ts2.effects.lightTransition.selected;
+  if(selected<0||ts2.effects.pointLights[selected].owner!==deathLight.owner||!ts2.effects.playerLight?.colour[0])throw Error('death flash did not light Buzz');
+  const frozenDeath=JSON.stringify(ts2.effects.pointLights);
+  for(let i=0;i<5;i++)ts2.redrawHud();
+  if(JSON.stringify(ts2.effects.pointLights)!==frozenDeath)throw Error('drawing aged death flash');
+  console.log('CREATURE DEATH CHARACTER LIGHT PASS',JSON.stringify(deathLight));
   const frozen=JSON.stringify(ts2.effects.podBeams);
   window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));
   window.dispatchEvent(new KeyboardEvent('keyup',{key:'Escape'}));
   ts2.tickGame({},10);
   if(JSON.stringify(ts2.effects.podBeams)!==frozen)throw Error('pause changed beam');
+  if(JSON.stringify(ts2.effects.pointLights)!==frozenDeath)throw Error('pause aged death flash');
   // Exit using the real pause/summary path.
   for(let i=0;i<3;i++){ts2.pressMenu('down');ts2.tickGame({},1);}
   ts2.pressMenu('select');ts2.tickGame({},1);ts2.pressMenu('down');ts2.tickGame({},1);ts2.pressMenu('select');ts2.tickGame({},1);

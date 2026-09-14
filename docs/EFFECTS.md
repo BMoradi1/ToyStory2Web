@@ -887,3 +887,30 @@ and verifies red/amber pixels and full fade-back on a synthetic triangle.
 Disk/flare regressions and the full pod-boss browser encounter also pass.
 Creature-death and other temporary-light call sites still need auditing;
 exact retail normal shading remains open.
+
+### Ordinary creature-death flashes (2026-09-14)
+
+The positive-burst branch of `00405d20`, calling `0049ee50` at `00405f57`,
+now carries RGB (240,128,0), life 32 and stable entity ownership with the
+death event. The source is the creature position plus its hit-shape X/Y/Z
+offsets (`00405ee1..00405f03`), not the model origin. Slot identity uses the
+retail record base `0x52c840` and stride `0x9c`. The host allocates directly
+into the temporary pool before processing effect updates, replacing a request
+that previously vanished when the effect output list cleared.
+
+The existing positive-burst type mapping controls emission. Spark-only and
+nonburst deaths emit no orange light; repeated death notifications and removal
+without the death-effect bit do not replay it. The unit probe covers these
+branches, distinct owners, offsets, attenuation and expiry. The level 4 pod
+browser check kills an authored creature and verifies the source, selection,
+redraw/pause stability and selector cleanup. The full six-wave pod-boss
+encounter passes with helper-death flashes enabled. This change does not
+claim a fresh audit of every per-type death animation or burst mapping.
+
+Temporary-light call-site checklist: the local executable contains 15 direct
+calls to `0049ee50`. Seven are connected: `00405f57`, `0040685e`, `00410c4d`,
+`00410d13`, `00410e28`, `00424faf`, `0042535d`. Eight still need their complete
+trigger/position/owner paths traced and connected: `004104be`, `00410a70`,
+`00416c01`, `00420d12`, `00422885`, `00422a53`, `00422fc0`, `004271ae`.
+Similar colours do not establish equivalent callers. Reserved lights are
+updated separately and are not part of this count.

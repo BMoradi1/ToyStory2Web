@@ -910,6 +910,9 @@
            Effect-death hooks 3/8 and 5 now emit red/amber character lights with
            recovered positions, lifetimes and owner rules. Unit/framebuffer
            checks pass; hook 5 is tested explicitly (no authored template).
+           Ordinary positive-burst creature deaths now supply orange life-32
+           light at the hit-shape centre. Seven of fifteen direct temporary-light
+           calls connected; eight pending sites are listed in docs/EFFECTS.md.
            Retail normal lighting and other temporary-light callers remain open;
            Follow camera correctly ignores script target height in retail;
            exact half-turn target steering corrected and regression tested.

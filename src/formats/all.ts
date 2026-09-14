@@ -46,6 +46,8 @@ export enum GroupType {
 export interface AllGroup {
   index: number;
   type: GroupType;
+  /** Two joint-ring IDs used by a mesh with no animation track (+0x3a). */
+  bridgeRings?: readonly [number, number];
   /** Model-space offset applied to every vertex in this group. */
   position: { x: number; y: number; z: number };
   /**
@@ -191,6 +193,7 @@ export function parseAll(buffer: ArrayBuffer | Uint8Array): AllFile {
 
     groups.push({
       index: i,
+      bridgeRings: [view.getUint8(entry + 0x3a), view.getUint8(entry + 0x3b)],
       type: view.getUint32(entry + 0x10, true) as GroupType,
       position: {
         x: view.getInt32(entry + 0x04, true),
@@ -312,6 +315,9 @@ export function parseGfxMesh(group: AllGroup): MeshFace[] {
 const JOINT_MAGIC = 0x12345678;
 
 export interface JointRing {
+  /** Header encodes (source bone + 1)*100 + ring ID (0043c797). */
+  bone: number;
+  id: number;
   /** `side` selects which of the two bridged parts a point belongs to. */
   points: { x: number; y: number; z: number; side: number }[];
   closed: boolean;
@@ -350,7 +356,8 @@ export function parseGfxJoint(group: AllGroup): JointRing {
     points.length > 1 && !!first && !!last &&
     first.x === last.x && first.y === last.y && first.z === last.z;
 
-  return { points, closed };
+  const code = view.getUint16(6, true);
+  return { points, closed, bone: Math.floor(code / 100) - 1, id: code % 100 };
 }
 
 // --- Renderable output ------------------------------------------------------

@@ -1,3 +1,4 @@
+import {Backdrop} from './backdrop.ts';
 import type { FlareSprite } from '../sim/lens-flare.ts';
 import type { SpriteHeader } from '../formats/sprite-table.ts';
 import { GameMaterial } from './game-material.ts';
@@ -21,7 +22,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { MeshData } from '../formats/all.ts';
 import {
-  OBJECT_ANGLE_UNITS, WORLD_SCALE, objectRotationMatrix,
+  OBJECT_ANGLE_UNITS, WORLD_SCALE, objectRotationMatrix, orientLevelSprites,
   type GeometryGroup, type LevelGeometry,
 } from '../formats/dat.ts';
 import { isWalkable, type CollisionGroup } from '../formats/collision.ts';
@@ -76,7 +77,10 @@ export class Viewer {
 
   private current: THREE.Mesh | null = null;
   private collision: THREE.LineSegments | null = null;
+  private readonly backdrop = new Backdrop();
+  setBackdrop(texture: THREE.Texture | null): void { this.backdrop.set(texture); }
   private player: THREE.Mesh | null = null;
+  setPlayerVisible(visible: boolean): void { if(this.player)this.player.visible=visible; }
   private playerBaseColours:Float32Array|null=null;
 
   /**
@@ -227,6 +231,7 @@ export class Viewer {
     this.renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
 
     this.scene.background = new THREE.Color(0x14161a);
+    this.scene.add(this.backdrop.mesh);
     this.camera = new THREE.PerspectiveCamera(60, NATIVE_ASPECT, 0.1, 10_000);
     this.camera.position.set(6, 5, 8);
 
@@ -260,6 +265,8 @@ export class Viewer {
    */
   setModel(mesh: MeshData, textures?: Map<number, THREE.Texture>): void {
     this.clearModel();
+    this.lastLevel = null;
+    this.setBackdrop(null);
     if (mesh.triangleCount === 0) return;
 
     const geometry = new THREE.BufferGeometry();
@@ -1115,7 +1122,15 @@ export class Viewer {
     // before anything is drawn.
     this.refreshGamma();
     this.camera.updateMatrixWorld();
+    this.backdrop.update(this.camera,getGamma());
     this.placeDetailPlanes();
+    if (this.lastLevel?.geometry.billboards?.length && this.current) {
+      const e = this.camera.matrixWorld.elements;
+      const attr = this.current.geometry.getAttribute('position') as THREE.BufferAttribute;
+      orientLevelSprites(attr.array as Float32Array, this.lastLevel.geometry.billboards,
+        [e[0]!,e[1]!,e[2]!], [e[4]!,e[5]!,e[6]!]);
+      attr.needsUpdate = true;
+    }
     this.coinCards.update(this.cards, this.camera);
     this.coinShadows.update(this.shadows, this.camera);
     this.effectCards.update(this.effects, this.camera);

@@ -83,11 +83,14 @@ use physical key capture; Enter accepts the controller page.
 
 While playing: **WASD** or a gamepad stick to move, **space** to jump (again at
 the top for a double jump), **J** to spin (**J** or **Shift** during a jump
-for ground pound), **K** for the laser, **Q**/**E** or
+for ground pound), **K** for the laser, **V** (gamepad Triangle/Y) to toggle
+first-person laser aiming, **Q**/**E** or
 the shoulder buttons to swing the camera, **M** to mute. The normal laser is a
 red beam; holding K to full charge and releasing fires a wider yellow beam.
 Disk ammunition switches firing to homing disks, consuming one round per shot;
-when it runs out, firing returns to the laser. Movement is
+when it runs out, firing returns to the laser. In laser view, WASD/arrows or
+the left stick aim the reticle; K fires along it and V returns to third person.
+The laser-view binding can be changed in Options. Movement is
 camera-relative, as the original's is, and Buzz is animated from the game's own
 animation state machine. Walls stop Buzz, and reachable ledges can be caught
 while descending from a jump. Falling out of the level returns him to his

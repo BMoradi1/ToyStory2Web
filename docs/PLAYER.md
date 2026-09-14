@@ -711,3 +711,16 @@ dive damage, interruption, the real chair/control collision surfaces, both
 orders of every paint mixture, duplicate colors, and bucket rail endpoints.
 The browser test tools/stomp-flow-check.js uses real controller inputs for
 stomps and pushing; only travel between test interactions is teleported.
+
+## Manual laser view (2026-09-14)
+
+`V` or gamepad Triangle/Y toggles a first-person camera; controls are rebindable.
+WASD/stick turn and pitch the view while Buzz stays in place; Fire uses the
+center ray, including disks, without third-person automatic target selection.
+The eye is 0x3000 game units above Buzz, following `FUN_004038e0`. Pitch clamps
+and turn speeds are port tuning; the centered vector marker is a port UI, not
+recovered retail art. Retail target cycling/lock-on remains a separate parity gap.
+Pause preserves aiming; spawn/scene exit, dialogue, cutscene control, damage,
+death and climbing cancel it. `tools/aim-view-probe.ts` checks the camera/ray
+contract; `tools/aim-render-flow-check.js` also checks physical V input and
+reticle pixels in Chromium.

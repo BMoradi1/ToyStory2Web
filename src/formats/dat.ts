@@ -745,7 +745,33 @@ export interface GeometryGroup {
   rotation: readonly [number, number, number] | null;
 }
 
+export interface LevelBillboard {
+  start: number;
+  centre: readonly [number, number, number];
+  corners: readonly (readonly [number, number])[];
+  upright: boolean;
+  depthOffset: number;
+}
+
+/** Reorient authored cards without changing their UVs, material or visibility groups. */
+export function orientLevelSprites(positions: Float32Array, cards: readonly LevelBillboard[],
+  right: readonly number[], up: readonly number[]): void {
+  const forward=[right[2]!*up[1]!-right[1]!*up[2]!,
+    right[0]!*up[2]!-right[2]!*up[0]!,right[1]!*up[0]!-right[0]!*up[1]!];
+  for (const card of cards) {
+    const length = Math.hypot(right[0]!, right[2]!) || 1;
+    const r = card.upright ? [right[0]! / length, 0, right[2]! / length] : right;
+    const u = card.upright ? [0, 1, 0] : up;
+    for (let k = 0; k < 6; k++) {
+      const [x, y] = card.corners[k]!;
+      for (let axis = 0; axis < 3; axis++) positions[(card.start + k)*3 + axis] =
+        card.centre[axis]! + r[axis]! * x + u[axis]! * y + forward[axis]!*card.depthOffset;
+    }
+  }
+}
+
 export interface LevelGeometry {
+  billboards?: LevelBillboard[];
   positions: Float32Array;
   colors: Float32Array;
   uvs: Float32Array;
@@ -901,12 +927,12 @@ export function buildLevelGeometry(level: DatLevel, options: GeometryOptions = {
   // blend mode and cull mode. A page alone is not enough — a wall and the
   // glass in front of it can share a texture and still need different states.
   // `null` collects untextured faces.
-  interface Bucket { pos: number[]; col: number[]; uv: number[]; group: Omit<GeometryGroup, 'start' | 'count'> }
+  interface Bucket { pos: number[]; col: number[]; uv: number[]; cards: LevelBillboard[]; group: Omit<GeometryGroup, 'start' | 'count'> }
   const buckets = new Map<string, Bucket>();
   const bucketFor = (group: Omit<GeometryGroup, 'start' | 'count'>) => {
     const key = `${group.page}|${group.blend}|${group.doubleSided}|${group.zone}|${group.object}|${group.list}`;
     let bucket = buckets.get(key);
-    if (!bucket) { bucket = { pos: [], col: [], uv: [], group }; buckets.set(key, bucket); }
+    if (!bucket) { bucket = { pos: [], col: [], uv: [], cards: [], group }; buckets.set(key, bucket); }
     return bucket;
   };
 
@@ -914,7 +940,8 @@ export function buildLevelGeometry(level: DatLevel, options: GeometryOptions = {
 
   for (const [index, object] of level.objects.entries()) {
     const mesh = level.meshes.get(object.meshOffset);
-    if (!mesh) continue;
+    const sprite = level.sprites.get(object.meshOffset);
+    if (!mesh && !sprite) continue;
     objectCount++;
     const zone = options.zones?.[index] ?? null;
 
@@ -930,7 +957,41 @@ export function buildLevelGeometry(level: DatLevel, options: GeometryOptions = {
     const px = object.position.x * u, py = object.position.y * u, pz = object.position.z * u;
     const separate = options.separate?.has(index) ?? false;
 
-    for (const face of mesh.faces) {
+    if (sprite) {
+      const placement = level.placements.find(p => p.objectIndex === index);
+      const upright = ((placement?.flags ?? 0) & 1) !== 0;
+      for (let n = 0; n < sprite.nodes.length; n++) {
+        const node = sprite.nodes[n]!;
+        const x = node.x*sc.x, y = node.y*sc.y, z = node.z*sc.z;
+        const centre: [number,number,number] = [
+          (m[0]!*x+m[1]!*y+m[2]!*z+px)/WORLD_SCALE,
+          -(m[3]!*x+m[4]!*y+m[5]!*z+py)/WORLD_SCALE,
+          -(m[6]!*x+m[7]!*y+m[8]!*z+pz)/WORLD_SCALE];
+        for (const face of sprite.faces[n]!) {
+          const blend: BlendMode = (face.mode & 0x60) === 0x60 ? 'opaque'
+            : (face.mode & 0x60) === 0x20 ? 'additive'
+            : (face.mode & 0x60) === 0x40 ? 'subtractive' : 'normal';
+          const bucket = bucketFor({page: face.mode & 31, blend, doubleSided: true,
+            list: u === 4 ? 1 : 0, alpha: blend === 'opaque' ? 1 : 0.5,
+            reflect: false, zone, object: separate ? index : null,
+            origin: separate ? [px/WORLD_SCALE,-py/WORLD_SCALE,-pz/WORLD_SCALE] : null,
+            rotation: separate ? [object.rotation.x,object.rotation.y,object.rotation.z] : null});
+          const corners: [number,number][] = [];
+          const start = bucket.pos.length/3;
+          for (const k of [0,1,2,0,2,3]) {
+            const corner = face.corners[k]!, colour = face.colours[k]!, uv = face.uvs[k]!;
+            const cx = corner.x*sc.x/WORLD_SCALE*(upright ? 1 : 0x1999/0x1000);
+            const cy = -corner.y*sc.y/WORLD_SCALE;
+            corners.push([cx,cy]);
+            bucket.pos.push(centre[0]+cx,centre[1]+cy,centre[2]);
+            bucket.col.push(colour.r/128,colour.g/128,colour.b/128);
+            bucket.uv.push(uv.u/255,uv.v/255);
+          }
+          bucket.cards.push({start,centre,corners,upright,depthOffset:face.depthOffset*u/WORLD_SCALE});
+        }
+      }
+    }
+    for (const face of mesh?.faces ?? []) {
       const bucket = bucketFor({
         page: face.textured ? texturePage(face.mode) : null,
         blend: blendMode(face.mode),
@@ -956,7 +1017,7 @@ export function buildLevelGeometry(level: DatLevel, options: GeometryOptions = {
       const colourScale = face.textured ? PSX_NEUTRAL : 255;
 
       const corner = (k: number) => {
-        const v = mesh.vertices[face.indices[k]!];
+        const v = mesh!.vertices[face.indices[k]!];
         if (v) {
           const x = v.x * sc.x, y = v.y * sc.y, z = v.z * sc.z;
           bucket.pos.push(
@@ -999,10 +1060,12 @@ export function buildLevelGeometry(level: DatLevel, options: GeometryOptions = {
   const colors = new Float32Array(totalPos);
   const uvs = new Float32Array(totalUv);
   const groups: GeometryGroup[] = [];
+  const billboards: LevelBillboard[] = [];
 
   let posOffset = 0, uvOffset = 0;
   for (const bucket of order) {
     if (bucket.pos.length === 0) continue;
+    billboards.push(...bucket.cards.map(c => ({...c,start:c.start+posOffset/3})));
     positions.set(bucket.pos, posOffset);
     colors.set(bucket.col, posOffset);
     uvs.set(bucket.uv, uvOffset);
@@ -1012,7 +1075,7 @@ export function buildLevelGeometry(level: DatLevel, options: GeometryOptions = {
   }
 
   return {
-    positions, colors, uvs, groups,
+    positions, colors, uvs, groups, billboards,
     triangleCount: totalPos / 9,
     objectCount,
   };

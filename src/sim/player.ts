@@ -83,6 +83,8 @@ export interface PlayerInput {
   /** Swing the camera by hand. The original's "camera left"/"camera right". */
   cameraLeft: boolean;
   cameraRight: boolean;
+  /** Toggle the first-person laser view. */
+  aim?: boolean;
 }
 
 export const NO_INPUT: PlayerInput = {

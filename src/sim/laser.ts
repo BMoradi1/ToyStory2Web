@@ -56,9 +56,10 @@ export function fireBeam(
   pool: LaserBeam[], origin: Point, facing: number, mode: 0 | 1 | 2,
   targets: readonly LaserTarget[],
   wallFraction: (from: Point, delta: Point) => number,
+  manualPitch?: number,
 ): { beam: LaserBeam; hit: LaserTarget | null; damageKind: number; yaw: number; wall: boolean } {
   let yaw = facing, pitch = 0, closestAngle = Infinity, aim: Point | null = null;
-  for (const t of targets) {
+  for (const t of manualPitch === undefined ? targets : []) {
     if ((t.vulnerable & 4) === 0) continue;
     const at = centre(t), dx = at.x - origin.x, dy = at.y - origin.y, dz = at.z - origin.z;
     if (dx * dx + dy * dy + dz * dz >= LASER.range ** 2 || Math.abs(dy) >= 0x300 * 32) continue;
@@ -70,6 +71,7 @@ export function fireBeam(
     pitch = Math.max(-0x40, Math.min(0x40,
       yawDelta(yawOf(Math.hypot(aim.x - origin.x, aim.z - origin.z), aim.y - origin.y) - 0x400, 0)));
   }
+  if (manualPitch !== undefined) pitch = manualPitch;
   const flat = cos(pitch) / 16384;
   const delta = { x: sin(yaw) / 16384 * flat * LASER.range,
     y: -sin(pitch) / 16384 * LASER.range, z: cos(yaw) / 16384 * flat * LASER.range };

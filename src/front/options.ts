@@ -3,7 +3,7 @@ import type { Gamma } from '../render/gamma.ts';
 import { PAD, setFade, stepFade, type FrontItem, type PadWord, type StepResult } from './screens.ts';
 import { DEFAULT_PAD, validBindingCode, type PadBindings, type KeyBindings, type Action } from '../sim/input.ts';
 export interface OptionsValues { sfx: number; bgm: number; activeCamera: boolean; detail: number; keys: KeyBindings; pad?: PadBindings; animatedTextures?: boolean; gamma?: Gamma; lensFlare?: boolean }
-export const CONTROL_ACTIONS: Action[] = ['up','down','left','right','jump','fire','spin','cameraLeft','cameraRight'];
+export const CONTROL_ACTIONS: Action[] = ['up','down','left','right','jump','fire','spin','aim','cameraLeft','cameraRight'];
 export function createOptions(value: OptionsValues) {
   const values={...structuredClone(value),pad:structuredClone(value.pad??DEFAULT_PAD),animatedTextures:value.animatedTextures??true,gamma:value.gamma??2,lensFlare:value.lensFlare??true};
   return { value: structuredClone(values), snapshot: structuredClone(values), page: -1, row: 0, subrow: 0,
@@ -92,7 +92,7 @@ export function stepOptions(s: ReturnType<typeof createOptions>, pad: PadWord, t
     for(let i=s.controlTop;i<=Math.min(s.controlTop+4,CONTROL_ACTIONS.length+1);i++) {
       const y=80+(i-s.controlTop)*16, action=CONTROL_ACTIONS[i];
       if(action) {
-        const label=action.replace('cameraLeft','camera left').replace('cameraRight','camera right');
+        const label=action.replace('aim','laser view').replace('cameraLeft','camera left').replace('cameraRight','camera right');
         if(i!==s.subrow||s.capture||blink)optionText(items,label,y,2048,150,'right');
         if(i!==s.subrow||!s.capture||blink)optionText(items,s.controlDevice==='gamepad'?`button ${(s.value.pad[action][0]??0)+1}`:keyName(s.value.keys[action][0]??''),y,2048,160,'left');
       }else if(i!==s.subrow||blink)optionText(items,i===CONTROL_ACTIONS.length

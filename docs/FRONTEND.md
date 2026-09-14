@@ -505,3 +505,7 @@ option rollback. `tools/lens-flare-flow-check.js` checks the real Slime Boss
 source, off preference persistence, behind-camera rejection and scene cleanup.
 Framebuffer comparisons confirm additive blending never darkens the world.
 Gamma and animated-texture browser checks cover their shifted navigation.
+
+Laser view is now an additional rebindable action in keyboard/gamepad options
+(default V / button 3). Stored maps from before this action was added retain
+their custom bindings and receive the new default on load.

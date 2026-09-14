@@ -1,3 +1,19 @@
+CURRENT UPDATE — 2026-09-14: first-person aiming and missing geometry
+  Implemented V / gamepad Triangle-Y laser-view toggle (rebindable), eye-height
+  camera, manual laser/disk pitch, centered aiming marker, pause preservation,
+  and reset on spawn/scene exit or loss of control. Existing saved bindings merge
+  with the new default. Aim speeds, marker artwork and retail target-lock behavior
+  are not a complete reproduction of the original visor UI.
+  Restored authored DAT sprite cards (211 cards; all 1126 Andy-room objects) and
+  joint-ring driven -2 animation surfaces, including Slinky's body and tail spring.
+  Added bgr36 backdrops with dedicated linear filtering and flat horizontal
+  scrolling. Corrected excessive spherical magnification and vertical orientation.
+  Sources are 192x128; exact retail backdrop scale/phase still needs calibration.
+  Verification: build; aim-view, render-gaps and beam probes; animation validation;
+  browser aiming/pause/reticle, Slinky visual check and backdrop framebuffer checks.
+  Next previously parked work: Tin Robot intro/fight handoff. Preserve the broader
+  roadmap; these user-reported features took priority over that task.
+
 ================================================================================
  NEXT SESSION - what to hand to which model, and how to pick the work back up
  Written 2026-09-03 at the end of Phase 1; updated 2026-09-04, after the

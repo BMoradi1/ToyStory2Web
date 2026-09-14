@@ -1,3 +1,4 @@
+import {createAimView,stepAimView,aimCamera} from './sim/aim-view.ts';
 import {stepTokenSparkles} from './sim/token-sparkles.ts';
 import {readTokenReveal,type TokenRevealProfile} from './formats/token-reveal.ts';
 import {stepTokenReveal,revealEarnedToken} from './sim/token-reveal.ts';
@@ -316,6 +317,7 @@ async function showLevel(index: number): Promise<void> {
   currentTerrainFile = level.terrain;
   viewer?.setCollision(null);
   viewer?.setPlayer(null);
+  viewer?.setBackdrop(null);
 
   let textureCount = 0;
   let gpuTextures = new Map<number, THREE.Texture>();
@@ -334,6 +336,8 @@ async function showLevel(index: number): Promise<void> {
     await yieldToBrowser();
     gpuTextures = await loadTextures(textures);
     sceneTextures = gpuTextures;
+    const backdrop = textures.find(t=>t.tag.toLowerCase()==="bgr36" && t.width===192 && t.height===128);
+    viewer?.setBackdrop(backdrop ? gpuTextures.get(backdrop.slot!) ?? null : null);
     setStatus(`${level.id}: building geometry\u2026`);
     await yieldToBrowser();
   }
@@ -468,9 +472,11 @@ async function open(dir: GameDir): Promise<void> {
   // and the two sliders come from it, as the original's options do.
   progress = await loadProgress(dir);
   try {
-    const keys=JSON.parse(localStorage.getItem('ts2.controls')??'null');
+    const savedKeys=JSON.parse(localStorage.getItem('ts2.controls')??'null');
+    const keys=savedKeys ? {...input.keys,...savedKeys} : null;
     if(keys&&Object.keys(input.keys).every(k=>Array.isArray(keys[k])&&keys[k].length>0&&keys[k].every(validBindingCode)))input.keys=keys;
-    const pad=JSON.parse(localStorage.getItem('ts2.pad')??'null');
+    const savedPad=JSON.parse(localStorage.getItem('ts2.pad')??'null');
+    const pad=savedPad ? {...input.pad,...savedPad} : null;
     if(pad&&Object.keys(input.pad).every(k=>Array.isArray(pad[k])&&pad[k].length>0&&pad[k].every((b:unknown)=>Number.isInteger(b)&&Number(b)>=0&&Number(b)<32)))input.pad=pad;
     animatedTextures=localStorage.getItem('ts2.animatedTextures')!=='false';
     setGamma(Number(localStorage.getItem('ts2.gamma')));
@@ -840,6 +846,7 @@ async function open(dir: GameDir): Promise<void> {
         return hit ? { y: hit.y, normal: hit.normal } : null;
       },
       /** The follow camera's own state, in game units. */
+      get aimView() { return {...aimView}; },
       get camera() {
         return camera ? { ...camera } : null;
       },
@@ -1343,6 +1350,8 @@ async function spawnPlayer(): Promise<void> {
   pointLights=createPointLights(exeBytes&&level>=1&&level<=15?readCharacterLight(exeBytes,level):null);playerLight=null;
   viewer.setCardSheet(sceneTextures.get(SPRITE_SHEET) ?? null);
   laserBeams.length = 0;
+  aimView = createAimView();
+  viewer?.setPlayerVisible(true);
   podBeams.length = 0;
   hud = createHud();
   startHud(hud);
@@ -1577,11 +1586,12 @@ function fireDisk(): void {
   // The original keeps six disk permits (DAT_00882968), distinct from ammo.
   if (liveEffects(effects).filter(e => e.kind === EFFECT_KIND.diskHoming || e.kind === EFFECT_KIND.diskStraight).length >= 6) return;
   const world = effectWorld();
-  const x = player.x, y = player.y - 0x1cc0, z = player.z;
+  const {x,y,z} = aimView.active ? aimCamera(aimView,player).eye
+    : {x:player.x,y:player.y-0x1cc0,z:player.z};
 
   let best: typeof creatureSim extends null ? never : NonNullable<typeof creatureSim>['creatures'][number] | null = null;
   let least = Infinity;
-  if (creatureSim) {
+  if (creatureSim && !aimView.active) {
     for (const c of creatureSim.creatures) {
       if (c.record.vulnerable === 0 || c.deathTimer < 0 || c.health <= 0) continue;
       // The original wants flags 0x1 and 0x2 together. 0x2 is "in this
@@ -1621,7 +1631,7 @@ function fireDisk(): void {
       bolt.target = target;
     }
   } else {
-    if (!spawnStraightDisk(effects, world, { x, y, z }, player.yaw)) return;
+    if (!spawnStraightDisk(effects, world, { x, y, z }, player.yaw, aimView.active ? aimView.pitch : 0)) return;
   }
   pickups.discs--;
   showHud(hud, HudElement.Laser, HUD.laserTicks);
@@ -1632,7 +1642,8 @@ function fireDisk(): void {
 function fireLaser(): void {
   if (!player || !camera) return;
   if (pickups && pickups.discs > 0) { fireDisk(); return; }
-  const origin = { x: player.x, y: player.y - 0x2c00, z: player.z };
+  const origin = aimView.active ? aimCamera(aimView,player).eye
+    : { x: player.x, y: player.y - 0x2c00, z: player.z };
   const targets: LaserTarget[] = [];
   for (const c of creatureSim?.creatures ?? []) {
     const shape = c.hitShapes?.[c.animState];
@@ -1647,7 +1658,7 @@ function fireLaser(): void {
     if (!currentCollisionWorld) return 1;
     const swept = sweepSphere(currentCollisionWorld, from, delta, 0x100, { passes: 1, skin: 0 });
     return swept.touched ? Math.min(1, Math.hypot(swept.x - from.x, swept.y - from.y, swept.z - from.z) / Math.hypot(delta.x, delta.y, delta.z)) : 1;
-  });
+  }, aimView.active ? aimView.pitch : undefined);
   if (shot.hit && creatureSim) {
     const c = creatureSim.creatures.find(c => c === shot.hit!.creature);
     if (c) damageCreature(creatureSim, c, shot.yaw, shot.damageKind);
@@ -1973,7 +1984,7 @@ function drawHud(level: number): void {
     return {x:(p.x+1)*256,y:(1-p.y)*128,depth:(p.z+1)/2};
   },source=>currentCollisionWorld?sweepSphere(currentCollisionWorld,eyeGame,flareRay(eyeGame,source),0,{passes:1,skin:0}).touched:false):[];
   viewer.setLensFlares(flareSprites,spriteTable,sceneTextures);
-  hudPainter.draw(hud, spriteTable, sceneSheets, r, talkDraw(), menuDraw());
+  hudPainter.draw(hud, spriteTable, sceneSheets, r, talkDraw(), menuDraw(), aimView.active);
 }
 
 /**
@@ -2328,6 +2339,7 @@ let camera: CameraState | null = null;
 /** The effect pool, or null before a level is up. */
 let effects: EffectSim | null = null;
 const laserBeams: LaserBeam[] = [];
+let aimView = createAimView();
 const podBeams: (LaserBeam&{flareSize:number})[] = [];
 let pointLights=createPointLights(),playerLight:PlayerLight|null=null;
 let tokenRevealProfile:TokenRevealProfile|null=null;
@@ -2671,6 +2683,8 @@ async function loadDioramaScene(): Promise<{ paths: DatLevel['paths']; placedOf:
   effects = null;
   pointLights=createPointLights();playerLight=null;
   laserBeams.length = 0;
+  aimView = createAimView();
+  viewer?.setPlayerVisible(true);
   podBeams.length = 0;
   pushBlocks = null;
   levelPoles = [];
@@ -3055,6 +3069,10 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   if(!menu.open)stepCutClock(cut);
   if (cut.noControl) held = { ...held, moveX: 0, moveY: 0, jump: false, spin: false, fire: false };
 
+  if(talk || cut.noControl || player.dying){
+    stepAimView(aimView,player,held,true);
+    viewer.setPlayerVisible(true);
+  }
   // A talk freezes Buzz and takes the camera: the engine sets its "no player
   // control" bit and drives the camera from the talk script rather than the
   // follow camera (docs/LEVELS.md). Everything else still ticks.
@@ -3143,6 +3161,9 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     return;
   }
 
+  stepAimView(aimView,player,held,cut.noControl);
+  viewer.setPlayerVisible(!aimView.active);
+  if(aimView.active) held={...held,moveX:0,moveY:0,jump:false,spin:false,cameraLeft:false,cameraRight:false};
   const playerGround = groundFromCollision(currentCollisionWorld, levelPoles, levelZipLines);
   playerGround.beforeMove = () => tickPushBlocks(held);
   stepPlayer(player, held, playerRuntime, playerGround, cameraYaw);
@@ -3192,7 +3213,8 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     // camera's zone outward, and only draws what comes back.
     const followLook = cameraTarget(player, camera);
     // A running cut, or the ease back after one, is what the renderer sees.
-    const shown = stepCutCamera(cut, { eye: camera, look: followLook }, null);
+    const shown = aimView.active ? aimCamera(aimView,player)
+      : stepCutCamera(cut, { eye: camera, look: followLook }, null);
     const look = shown.look;
     if (currentLevel && zoneCulling && zones.camera < 0 && walkKey !== 'all') {
       // Over no floor at all: the engine has no room to start from, so draw
@@ -3501,7 +3523,7 @@ async function togglePlay(): Promise<void> {
   if (position > 0) await playLevelMovie(position, false);
   setPlaying(true);
   infoEl.textContent =
-    'playing — WASD or stick to move, space to jump, J spin, K fire, M mutes';
+    'playing — WASD or stick to move, space to jump, J spin, K fire, V laser view, M mutes';
 }
 
 /** `k`: show or hide the collision hull, reading TERRAIN.ALL the first time. */

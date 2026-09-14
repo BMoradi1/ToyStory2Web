@@ -329,6 +329,7 @@ export class HudPainter {
     r: HudReadout,
     talk?: TalkDraw | null,
     menu?: MenuDraw | null,
+    aiming = false,
   ): void {
     this.clear();
     const ctx = this.ctx;
@@ -345,6 +346,20 @@ export class HudPainter {
       index: number, frame: number, x: number, y: number,
       colour: Modulate, sx: number, scaleX = 0x1000, scaleY = 0x1000,
     ) => this.blitSprite(table, sheets, index, frame, x, y, colour, sx, py, scaleX, scaleY);
+    if(aiming && !talk && !menu) {
+      // The aiming marker must exist in every level; level-specific sprite
+      // slots are not a global reticle (slot 59 is null in gameplay tables).
+      this.queue.push(() => {
+        ctx.save();ctx.translate(W/2,H/2);ctx.scale(px320,py);
+        ctx.strokeStyle='#70ff50';ctx.lineWidth=1;
+        ctx.shadowColor='#000';ctx.shadowBlur=2;
+        ctx.beginPath();ctx.arc(0,0,7,0,Math.PI*2);
+        for(const [x,y] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+          ctx.moveTo(x!*4,y!*4);ctx.lineTo(x!*11,y!*11);
+        }
+        ctx.stroke();ctx.restore();
+      });
+    }
     /** A bar: sprite 6's solid texel stretched to `w` x `ht` virtual pixels. */
     const bar = (
       x: number, y: number, w: number, ht: number,

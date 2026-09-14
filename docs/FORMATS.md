@@ -1277,3 +1277,33 @@ its I and P frames each held for three; the timing and the sound are
 whole. Verified: all 22 files remux to whole packets in node, and in the
 browser the logo movie decodes at full rate from half a second after the
 call and the smallest boss movie plays its 304 pictures to the end.
+
+## Restored render paths (2026-09-14)
+
+The DAT geometry builder now emits the sprite nodes described above and keeps
+per-card metadata for camera-facing updates. Material page, blend, UV, vertex
+colour, zone and near/far list remain attached to each card. Andy's room now
+builds all 1126 objects, including 211 cards (33525 triangles); the crib bars
+are visible in the browser. This uses the documented PSX orientation rules;
+it does not decode pconv's converted PC quads.
+
+Joint headers carry `(sourceBone + 1) * 100 + ringID` as a u16 at payload +6
+(`0043c797..0043c7f5`). A 76-byte ALL metadata entry names its two bridge rings
+at +0x3a/+0x3b. For an ANM -2 mesh track, each mesh vertex is attached to the
+source bone of its matching ring point. The retail loader matches within one
+unit per axis (`0043c8ec`); the port uses the nearest ring point for exporter
+mismatches. Slinky's main spring vertices match exactly; some other bridge
+corners differ, so the fallback is an approximation. All 368 Slinky triangles
+remain present at frames 0, 5 and 11 (`tools/render-gaps-probe.ts`).
+
+World backdrops use the 192x128 `bgr36` image, independently of loading-screen
+images. `0048f230` / `0048f410` establish scrolling flat quads, horizontal repeat,
+and first/last pixel fill outside the strip; the backdrop is not an
+equirectangular panorama. The browser now draws a flat strip at one image per
+native 4:3 viewport, with camera yaw/pitch scrolling and no translation.
+Scale and phase are port tuning pending an exact retail comparison. A private
+texture clone uses linear filtering, horizontal repeat and vertical clamp;
+world/HUD texture sampling is unaffected. Decoded images have top-down rows:
+UV v=0 is the top. Original 192x128 detail remains limited at large resolutions.
+`tools/backdrop-flow-check.js` checks framebuffer translation invariance,
+rotation response and interpolated colours beyond the source palette.

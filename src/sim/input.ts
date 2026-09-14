@@ -14,7 +14,7 @@ import type { PlayerInput } from './player.ts';
 /** What a binding can drive. */
 export type Action =
   | 'up' | 'down' | 'left' | 'right' | 'jump' | 'spin' | 'fire'
-  | 'cameraLeft' | 'cameraRight';
+  | 'cameraLeft' | 'cameraRight' | 'aim';
 
 /** `KeyboardEvent.code` values per action. Codes, not keys, so layout does not matter. */
 export type KeyBindings = Record<Action, string[]>;
@@ -30,6 +30,7 @@ export const DEFAULT_KEYS: KeyBindings = {
   fire: ['KeyK'],
   cameraLeft: ['KeyQ'],
   cameraRight: ['KeyE'],
+  aim: ['KeyV'],
 };
 
 /** Physical keys accepted by both rebinding and persisted-preference loading. */
@@ -48,7 +49,7 @@ export type PadBindings = Record<Action, number[]>;
 
 /** Shoulder buttons swing the camera, as the original's menu bindings do. */
 export const DEFAULT_PAD: PadBindings =
-  { up: [12], down: [13], left: [14], right: [15], jump: [0], spin: [2], fire: [1], cameraLeft: [4], cameraRight: [5] };
+  { up: [12], down: [13], left: [14], right: [15], jump: [0], spin: [2], fire: [1], cameraLeft: [4], cameraRight: [5], aim: [3] };
 
 /** Below this the stick is treated as centred, before the engine's own dead zone. */
 const PAD_NOISE = 0.06;
@@ -120,6 +121,7 @@ export class InputSource {
     let fire = this.keyDown('fire');
     let cameraLeft = this.keyDown('cameraLeft');
     let cameraRight = this.keyDown('cameraRight');
+    let aim = this.keyDown('aim');
 
     const pad = this.gamepad();
     if (pad) {
@@ -138,6 +140,7 @@ export class InputSource {
       fire ||= anyOf(this.pad.fire);
       cameraLeft ||= anyOf(this.pad.cameraLeft);
       cameraRight ||= anyOf(this.pad.cameraRight);
+      aim ||= anyOf(this.pad.aim);
     }
 
     // A diagonal on the keyboard would otherwise be 1.41 long and read as
@@ -145,6 +148,6 @@ export class InputSource {
     const size = Math.hypot(moveX, moveY);
     if (size > 1) { moveX /= size; moveY /= size; }
 
-    return { moveX, moveY, jump, spin, fire, cameraLeft, cameraRight };
+    return { moveX, moveY, jump, spin, fire, cameraLeft, cameraRight, aim };
   }
 }

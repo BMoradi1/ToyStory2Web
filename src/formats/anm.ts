@@ -34,7 +34,7 @@
  */
 
 import {
-  GroupType, MODEL_SCALE, PSX_NEUTRAL, characterTexturePage, parseGfxMesh,
+  GroupType, MODEL_SCALE, PSX_NEUTRAL, characterTexturePage, parseGfxMesh, parseGfxJoint,
   type AllFile, type MeshData, type MeshGroup, type MeshVertex,
 } from './all.ts';
 
@@ -214,10 +214,9 @@ export function poseMatrix(pose: BonePose): number[] {
  * `buildMeshData` adds it, and doing both tears apart every character whose
  * group positions are non-zero.
  *
- * Bones with no track are skipped. Two cases produce that: seam-bridge meshes
- * absent from every animation, which the original skins at runtime from the
- * joint rings, and layered animations where the track lives in a paired
- * animation (Buzz has upper-body-only and legs-only sets).
+ * Seam meshes with -2 tracks take each corner from its authored joint-ring
+ * owner. Layered -3 tracks are supplied by the paired animation; unresolved
+ * layers remain absent.
  */
 export function buildPosedMeshData(
   model: AllFile, file: AnmFile, animation: Animation, frame: number,
@@ -244,25 +243,49 @@ export function buildPosedMeshData(
     return bucket;
   };
 
+  const rings = new Map(model.groups.filter(g=>g.type===GroupType.GfxJoint)
+    .map(g=>{const ring=parseGfxJoint(g);return [ring.id,ring] as const;}));
+  const poses = new Map<number, BonePose | null>();
+  const bonePose = (index:number): BonePose | null => {
+    if(poses.has(index))return poses.get(index)!;
+    let pose=poseBone(file,animation,frame,index)
+      ?? (layer ? poseBone(file,layer.animation,layer.frame,index) : null);
+    const spin=partSpin?.[index];
+    if(pose && spin!==undefined)pose={...pose,rotation:{x:spin,y:0,z:0}};
+    poses.set(index,pose);
+    return pose;
+  };
   let bone = -1;
   for (const group of model.groups) {
     if (group.type !== GroupType.GfxMesh) continue;
     bone++;
 
-    let pose = poseBone(file, animation, frame, bone)
-      ?? (layer ? poseBone(file, layer.animation, layer.frame, bone) : null);
-    if (!pose) continue;
-    const spin = partSpin?.[bone];
-    if (spin !== undefined) pose = { ...pose, rotation: { x: spin, y: 0, z: 0 } };
-    const m = poseMatrix(pose);
-    const t = pose.translation;
+    const pose = bonePose(bone);
+    const bridges = !pose && animation.trackOffsets[bone] === -2
+      ? group.bridgeRings?.map(id=>rings.get(id)).filter(r=>r!==undefined) ?? [] : [];
+    if (!pose && (bridges.length === 0 || bridges.some(r=>!bonePose(r.bone)))) continue;
+    const m = pose ? poseMatrix(pose) : null;
+    const t = pose?.translation;
 
     for (const face of parseGfxMesh(group)) {
       const bucket = bucketFor(characterTexturePage(face.material));
       const push = (v: MeshVertex) => {
-        const x = m[0]! * v.x + m[1]! * v.y + m[2]! * v.z + t.x;
-        const y = m[3]! * v.x + m[4]! * v.y + m[5]! * v.z + t.y;
-        const z = m[6]! * v.x + m[7]! * v.y + m[8]! * v.z + t.z;
+        let matrix=m, translation=t;
+        if(!matrix || !translation) {
+          // The loader matches mesh corners to ring points within one unit.
+          // A nearest-point fallback covers mismatched exporter coordinates.
+          let best=Infinity, owner=-1;
+          for(const ring of bridges) for(const p of ring.points) {
+            const distance=(p.x-v.x)**2+(p.y-v.y)**2+(p.z-v.z)**2;
+            if(distance<best){best=distance;owner=ring.bone;}
+          }
+          const linked=owner>=0?bonePose(owner):null;
+          if(!linked) return;
+          matrix=poseMatrix(linked);translation=linked.translation;
+        }
+        const x = matrix[0]! * v.x + matrix[1]! * v.y + matrix[2]! * v.z + translation.x;
+        const y = matrix[3]! * v.x + matrix[4]! * v.y + matrix[5]! * v.z + translation.y;
+        const z = matrix[6]! * v.x + matrix[7]! * v.y + matrix[8]! * v.z + translation.z;
         // PSX +Y is down and +Z into the screen.
         bucket.pos.push(x / MODEL_SCALE, -y / MODEL_SCALE, -z / MODEL_SCALE);
         bucket.col.push(v.r / PSX_NEUTRAL, v.g / PSX_NEUTRAL, v.b / PSX_NEUTRAL);

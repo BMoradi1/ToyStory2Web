@@ -124,6 +124,8 @@ export interface Pickup {
 }
 
 export interface PickupState {
+  revealTimers:number[];
+  revealScales:number[];
   /** Category-9 objects collected: the find-five counter on some levels. */
   itemsFound: number;
   items: Pickup[];
@@ -183,6 +185,7 @@ export function createPickups(dat: DatLevel, level: number): PickupState {
   }
 
   return {
+    revealTimers:Array(5).fill(0),revealScales:Array(5).fill(1),
     items, coins: 0, health: PICKUP.healthMax, lives: 0, tokens: 0, taken: 0,
     itemsFound: 0, pieces: 0, discs: 0, powerTimer: 0,
   };
@@ -203,7 +206,11 @@ export function pickupObjects(dat: DatLevel, level: number): Set<number> {
 }
 
 /** Make a token slot collectable, as its task would. */
-export function revealToken(state: PickupState, slot: number): void {
+export function revealToken(state: PickupState, slot: number, quiet=true): void {
+  if(slot<0||slot>=5||!Number.isInteger(slot))return;
+  if(!quiet&&state.items.some(i=>i.tokenSlot===slot&&!i.enabled&&!i.collected)){
+    state.revealTimers[slot]=132;state.revealScales[slot]=0;
+  }
   for (const item of state.items) if (item.tokenSlot === slot) item.enabled = true;
 }
 

@@ -915,6 +915,9 @@
            calls fully connected. Shared pickup-burst helper now connects its
            collection caller with particles and amber light; its other callers
            and seven untouched sites remain listed in docs/EFFECTS.md.
+           Earned-token reveal sequence now uses its own 132-tick scale animation,
+           16-particle ring and sound at tick 32. Quiet startup reveals preserved;
+           this sequence does not request the amber pickup light.
            Retail normal lighting and other temporary-light callers remain open;
            Follow camera correctly ignores script target height in retail;
            exact half-turn target steering corrected and regression tested.

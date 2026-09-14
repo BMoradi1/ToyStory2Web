@@ -929,6 +929,31 @@ position shifted left five. X is the owner, matching the executable.
 Light selection now runs once after pickup processing so the collection frame
 includes the new light. Build and effect probes pass; the authored pickup
 browser check verifies particles, source selection, redraw independence and
-respawn reset. Other calls to this helper (token reveals and level scripts)
-remain pending. The separate `004109f0` red-burst helper at `00410a70` has no
+respawn reset. Other calls to this helper (pickup reappearance and level scripts)
+remain pending. Earned-token reveals use the separate sequence below. The
+separate `004109f0` red-burst helper at `00410a70` has no
 direct call references in the disassembly; indirect use is not ruled out.
+
+### Earned-token reveal sequence (2026-09-14)
+
+Tracing `004a0db0` corrects the earlier assumption that earned-token reveals
+use the amber pickup burst. Nonquiet reveals start a 132-tick timer. Crossing
+100 emits sound 0x33 and sixteen kind-0x2b particles (`004a16e1..004a1776`).
+Their signed directions come from sixteen triples at `005039c4`, divided by
+four with truncation before the shared effect spawner; gravity is 32, rotation
+zero and spin is a random byte minus 128. No character light is requested.
+
+The object's uniform scale reads the old timer: hidden above 96, a table-driven
+growth segment at 96..88 and a damped oscillation below 88. The last tick leaves
+scale 4052/4096, matching the executable rather than rounding to one. The
+profile reads the user's local executable, including the signed scale lookups
+used by `004a1778..004a17e2`; it ships no table data. Quiet startup reveals stay
+full-size and produce no ring. Repeated reveals do not restart the timer.
+
+Dialogue rewards, task rewards and the paint reward now request the animated
+sequence. Simulation advances it once per gameplay tick; drawing only applies
+its current scale alongside the existing pickup rotation. The unit probe checks
+local data, sliced buffers, bounds, quiet/repeated reveals and timer crossings.
+The authored-token browser check observes sixteen particles at tick 32 and
+checks redraw independence, pause, completion and reset. Camera framing and
+the ongoing idle-token sparkle loop remain separate presentation work.

@@ -1,3 +1,5 @@
+import {readTokenReveal,type TokenRevealProfile} from './formats/token-reveal.ts';
+import {stepTokenReveal} from './sim/token-reveal.ts';
 import { readLensFlareTable, buildLensFlares, flareRay, levelFlareSources, pathFlareSources, createFlareFlicker, stepFlareFlicker, type FlareEntry, type FlareSprite } from './sim/lens-flare.ts';
 import { getGamma, setGamma } from './render/gamma.ts';
 import {podMuzzle,podBeam,podImpactHits,podBossAim,podAttachment,podImpactLight} from './sim/pod-beam.ts';
@@ -979,6 +981,8 @@ async function open(dir: GameDir): Promise<void> {
         return viewer?.playMode ?? false;
       },
       revealTokens: revealAllTokens,
+      revealToken(slot:number){if(pickups){revealToken(pickups,slot,false);drawPickups();}},
+      get tokenReveals(){return pickups?{timers:[...pickups.revealTimers],scales:[...pickups.revealScales]}:null;},
       drive(held: Partial<import('./sim/player.ts').PlayerInput>, ticks = 1) {
         if (!player || !playerRuntime || !currentCollisionWorld || !viewer) return null;
         const ground = groundFromCollision(currentCollisionWorld, levelPoles, levelZipLines);
@@ -1343,6 +1347,7 @@ async function spawnPlayer(): Promise<void> {
   startBossFight(level);
   revealedSlots = new Set();
   pickups = createPickups(currentLevel.level, level);
+  tokenRevealProfile=exeBytes?readTokenReveal(exeBytes):null;
   // Lives and health carry over from the record, as `FUN_004a2cc0` copies
   // them in. Whether a token already held shows up in the level again is
   // not established, so the level's tokens are left as it places them.
@@ -1731,7 +1736,8 @@ function drawCoins(): void {
       a[0] = (a[0] + 10) % OBJECT_ANGLE_UNITS;
       a[1] = (a[1] + (((i >> 2) & 3) * 3 + 7) * 2) % OBJECT_ANGLE_UNITS;
       a[2] = (a[2] + ((i & 7) + 4) * 2) % OBJECT_ANGLE_UNITS;
-      pickupAngleMap.set(item.objectIndex, a);
+      const scale=item.tokenSlot>=0?pickups.revealScales[item.tokenSlot]??1:1;
+      pickupAngleMap.set(item.objectIndex, {angles:a,scale:[scale,scale,scale]});
       continue;
     }
     // Every coin in the list advances the phase, taken or not, so collecting
@@ -1756,7 +1762,7 @@ function drawCoins(): void {
     }
   }
   viewer.setWorldCards(coinCards, coinShadows);
-  viewer.setObjectAngles(pickupAngleMap);
+  viewer.setObjectTransforms(pickupAngleMap);
 }
 
 /**
@@ -2302,6 +2308,7 @@ let effects: EffectSim | null = null;
 const laserBeams: LaserBeam[] = [];
 const podBeams: (LaserBeam&{flareSize:number})[] = [];
 let pointLights=createPointLights(),playerLight:PlayerLight|null=null;
+let tokenRevealProfile:TokenRevealProfile|null=null;
 /** This frame's effect cards, rebuilt each tick. */
 const effectCards: WorldSprite[] = [];
 const effectFlat: WorldSprite[] = [];
@@ -2927,7 +2934,7 @@ let hudPainter: HudPainter | null = null;
 let pickupFloor: number[] = [];
 /** How far each class object has turned, in the engine's 4,096-per-turn angles. */
 let pickupAngles: [number, number, number][] = [];
-const pickupAngleMap = new Map<number, readonly [number, number, number]>();
+const pickupAngleMap = new Map<number, ObjectTransform>();
 /** Rebuilt every tick: the coins and the shadows under them. */
 const coinCards: WorldSprite[] = [];
 const coinShadows: WorldSprite[] = [];
@@ -3086,7 +3093,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       if (talkSlot >= 0 && tasks && pickups) {
         markSlotDone(tasks, talkSlot);
         revealedSlots.add(talkSlot);
-        revealToken(pickups, talkSlot);
+        revealToken(pickups, talkSlot, false);
         drawPickups();
         infoEl.textContent = `pizza planet token ${talkSlot + 1} of 5`;
       }
@@ -3127,7 +3134,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     for (const index of stompProps.guidesSpent) spendGuide(guideSparkles, effects, index, true);
     if (stompProps.sequence !== null) playEvent(stompProps.sequence, player);
     if (levelNow === 4 && stompProps.paint.solved === 7 && !stompProps.paint.reward && pickups) {
-      revealToken(pickups, 3); stompProps.paint.reward = true; drawPickups();
+      revealToken(pickups, 3, false); stompProps.paint.reward = true; drawPickups();
     }
     drawStompProps(levelNow);
   }
@@ -3281,7 +3288,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       for (let slot = 0; slot < 5; slot++) {
         if (pickups && (tasks.done & (1 << slot)) !== 0 && !revealedSlots.has(slot)) {
           revealedSlots.add(slot);
-          revealToken(pickups, slot);
+          revealToken(pickups, slot, false);
           drawPickups();
           infoEl.textContent = `pizza planet token ${slot + 1} of 5`;
         }
@@ -3324,6 +3331,21 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   tickSoundSequence();
 
   if (pickups) {
+    if(tokenRevealProfile)for(let slot=0;slot<5;slot++){
+      const old=pickups.revealTimers[slot]!;
+      if(old===0)continue;
+      const reveal=stepTokenReveal(old,tokenRevealProfile);
+      pickups.revealTimers[slot]=reveal.timer;pickups.revealScales[slot]=reveal.scale;
+      if(reveal.burst){
+        const item=pickups.items.find(i=>i.tokenSlot===slot&&!i.collected);
+        if(item){
+          const at={x:item.x*32,y:item.y*32,z:item.z*32};
+          playEvent(0x33,at);
+          if(effects)for(const v of tokenRevealProfile.velocities)
+            spawnEffect(effects,effectWorld(),at.x,at.y,at.z,v.x,v.y,v.z,32,0,effects.rand.byte()-128,0x2b);
+        }
+      }
+    }
     const taken = stepPickups(pickups, player);
     if(effects)for(const event of taken){
       const item=pickups.items[event.index]!;

@@ -206,7 +206,11 @@
  PICKUP BURSTS (2026-09-14): shared 00410410 helper now emits five particles
  and amber life-16 light on pickup contact (004a1252), including hint triggers.
  Authored pickup selection/redraw/reset browser check and effect probe pass.
- NEXT: remaining 00410410 callers (token reveals/level scripts), then seven
+ TOKEN REVEALS (2026-09-14): earned rewards actually use a separate 132-tick
+ sequence, now connected: 16 kind-0x2b particles and sound at tick 32, then
+ authored growth/wobble. Quiet startup and repeated reveals stay quiet. Local
+ executable supplies vectors/scales; unit and browser timing/pause/reset pass.
+ NEXT: remaining 00410410 callers (pickup reappearance/level scripts), then seven
  untouched temporary-light sites in docs/EFFECTS.md. 004109f0 has no direct
  call references; trace indirect use before assigning a gameplay trigger.
  Retail normals remain open;

@@ -61,7 +61,7 @@
   }
   if(!visible)throw Error('boss impact flare missing');
   console.log('POD BOSS LASER PASS',JSON.stringify(beam));
-  let litBursts=0;
+  let litBursts=0,returnBlends=0;
   const advance=n=>{for(let i=0;i<n;i++){
     ts2.player.x=0;ts2.player.y=0;ts2.player.z=-110000;ts2.player.hitStun=1000;
     if(ts2.tasks.pod.phase===2&&ts2.tasks.pod.cutTicks===60){
@@ -70,6 +70,7 @@
     }
     ts2.tickGame({},1);
     if(ts2.effects.playerLight?.colour[0]>0)litBursts++;
+    if(ts2.effects.lightTransition.remaining===63)returnBlends++;
   }};
   for(let stage=1;stage<=6;stage++){
     ts2.hurtCreature(0,1);advance(1);
@@ -88,6 +89,9 @@
   if(litBursts<6)throw Error('orange bursts did not light Buzz: '+litBursts);
   if(ts2.effects.pointLights.some(l=>l.life>0))throw Error('burst light did not expire/cull');
   console.log('POD BOSS BURST LIGHTS PASS',litBursts);
+  if(returnBlends<6)throw Error('missing burst return transitions: '+returnBlends);
+  if(ts2.effects.lightTransition.remaining!==0||ts2.effects.playerLight!==null)throw Error('return transition did not finish');
+  console.log('POD BOSS LIGHT TRANSITIONS PASS',returnBlends);
   for(let i=0;i<30&&ts2.tasks.pod.phase===3;i++){ts2.hurtCreature(0,1);advance(122);}
   if(ts2.tasks.pod.phase!==4&&ts2.tasks.pod.phase!==5)throw Error('death cut missing');
   console.log('POD BOSS DEATH PASS');

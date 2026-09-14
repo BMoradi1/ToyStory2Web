@@ -925,7 +925,8 @@ async function open(dir: GameDir): Promise<void> {
           live: live.length,
           beams: laserBeams.map(b => ({ ...b })),
           podBeams: podBeams.map(b => ({ ...b })),
-          pointLights:pointLights.map(l=>({...l})),
+          pointLights:pointLights.slots.map(l=>({...l})),
+          lightTransition:{selected:pointLights.selected,remaining:pointLights.remaining},
           playerLight,
           diskAmmo: pickups?.discs ?? 0,
           kinds: live.map((e) => e.kind),
@@ -3217,7 +3218,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
           releaseGate:effects?.gate,
           cameraEye:{x:viewer.camera.position.x/GAME_TO_RENDER,y:-viewer.camera.position.y/GAME_TO_RENDER,z:-viewer.camera.position.z/GAME_TO_RENDER},
           lookAt:(point)=>{if(camera)camera.lookAt=point;},
-          burstLight:(point)=>addPointLight(pointLights,{...point,r:0xf0,g:0x80,b:0,life:32}),
+          burstLight:(point)=>addPointLight(pointLights,{...point,r:0xf0,g:0x80,b:0,life:32,owner:0x52c840}),
           attachment:(c,part,point)=>{
             const art=creatureArt.get(c.type),animation=art?.anm?.animations[c.animState];
             const pose=art?.anm&&animation?poseBone(art.anm,animation,(c.frame>>>16)%Math.max(1,animation.frameCount),part):null;

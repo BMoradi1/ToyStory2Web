@@ -893,7 +893,8 @@
            framing restored. Follow-camera targets now select every 30 ticks;
            final-phase hurt alternates normal/double body and muzzle scale.
            Orange burst now lights Buzz through a four-slot temporary pool;
-           character shading approximate. Reserved lights, transition blending,
+           character shading approximate. Owner-based 64-tick return blending
+           now verified in unit/framebuffer/full-encounter tests. Reserved lights,
            retail normal lighting and other light callers remain open;
            Follow camera correctly ignores script target height in retail;
            exact half-turn target steering corrected and regression tested.

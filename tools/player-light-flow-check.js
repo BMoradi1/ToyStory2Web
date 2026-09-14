@@ -22,5 +22,22 @@
   v.setPlayerLight([0,0,0],[0,0,0]);const reset=sample();
   if(reset.some((x,i)=>x!==base[i]))throw Error('light tint persists after reset');
   console.log('PLAYER LIGHT FRAMEBUFFER PASS',JSON.stringify({base,lit,back,reset}));
+  const {createPointLights,addPointLight,stepPointLights}=await import('/src/sim/point-light.ts');
+  const lights=createPointLights(),buzz={x:0,y:8192,z:0};
+  addPointLight(lights,{x:0,y:0,z:16384,r:80,g:40,b:0,life:2,owner:1});
+  const lightTick=()=>{
+    const light=stepPointLights(lights,buzz);
+    v.setPlayerLight(light?[light.direction.x,light.direction.y,light.direction.z]:[0,0,0],light?.colour??[0,0,0]);
+    return sample();
+  };
+  const peak=lightTick(),firstReturn=lightTick();
+  if(peak.some((x,i)=>x!==firstReturn[i]))throw Error('return starts with a visible snap');
+  let midpoint;
+  for(let i=0;i<32;i++)midpoint=lightTick();
+  if(!(midpoint[0]>base[0]&&midpoint[0]<peak[0]))throw Error('return blend not visible '+JSON.stringify({peak,midpoint,base}));
+  for(let i=0;i<32;i++)lightTick();
+  const faded=sample();
+  if(faded.some((x,i)=>x!==base[i]))throw Error('return failed to restore base pixels');
+  console.log('PLAYER LIGHT TRANSITION FRAMEBUFFER PASS',JSON.stringify({peak,firstReturn,midpoint,faded}));
   v.setPlayer(null);for(const [o,visible] of visibility)o.visible=visible;
 })();

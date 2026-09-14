@@ -697,12 +697,34 @@ spawn, respawn and level exit reset it.
 Buzz's renderer adds directional colour to the posed triangles before gamma
 and texture modulation. This is explicitly a shading approximation: it derives
 face normals from triangles and retains the existing base colours. Retail's
-normal lighting, reserved light slots, owner-based 64-tick transition blending,
-and the other effect/beam light callers remain open. The light does not tint
-the map or create another lens flare. An expired light restores the base colours.
+normal lighting, reserved light slots and the other effect/beam light callers
+remain open. Owner-based transitions are connected by the follow-up below.
+The light does not tint the map or create another lens flare.
 
 `tools/point-light-probe.ts` checks allocation, lifetime, range, attenuation
 and directional colour. `tools/player-light-flow-check.js` checks actual
 framebuffer RGB and reset. The full pod browser test positions Buzz near each
 opening and verifies orange light selection across all six waves, expiry and
 victory/selector cleanup.
+
+### Temporary-light return transitions (2026-09-13)
+
+`0049f026..0049f2bb` compares the selected records' owners, not just their
+slot numbers. Equal owners retain the previous slot, including if that record
+has expired while another record with the same owner is closer. A new temporary
+owner takes effect immediately. Returning to a reserved light captures the
+outgoing interpolated world position and RGB and begins a 64-tick transition.
+Each component is `destination + trunc((snapshot-destination)*remaining/64)`;
+the counter decreases after producing the sample. Distance attenuation follows
+interpolation. A new temporary light interrupts a return immediately.
+
+The pod burst uses its retail boss owner identity. The browser now runs this
+transition state, with its existing base shading represented by zero additive
+RGB at Buzz's lighting origin. That destination remains an approximation until
+reserved lights and retail normal shading are ported. Resetting the light pool
+also resets the owner, snapshot and counter. Rendering alone never ages it.
+
+The light probe verifies first/mid/final samples, interruption and owner retention.
+Chromium verifies peak/first-return pixels match, midpoint dims, and completion
+restores base pixels. The full encounter verifies six return transitions finish
+before the final phase, then passes victory and selector cleanup.

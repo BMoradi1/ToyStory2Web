@@ -162,8 +162,11 @@
  opening; four temporary slots, nearest selection, expiry/range/attenuation
  verified. Triangle-normal shading is approximate. Retail targets Buzz, not
  map illumination; earlier scene-light requirement was incorrect.
- NEXT: reserved character lights, owner-based
- transition blending, retail normals and other effect/beam light callers;
+ LIGHT TRANSITIONS (2026-09-13): owner-based selection now snaps to temporary
+ lights and blends world position/RGB back over 64 ticks. Base-light destination
+ still approximated as zero additive RGB. Interruption, owner retention,
+ framebuffer fade and all six boss-wave returns verified.
+ NEXT: reserved character lights, retail normals and other effect/beam light callers;
  clear-colour/backdrop matching and sprite fog-enable comparison. Exact routines and gamma lookup
  findings are in docs/FRONTEND.md. Controller visor/target-lock and menu/
  cancel bindings still need corresponding input work. Do not claim full parity.

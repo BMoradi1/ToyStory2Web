@@ -92,7 +92,8 @@ when it runs out, firing returns to the laser. In laser view, WASD/arrows or
 the left stick aim the reticle; K fires along it and V returns to third person.
 In laser view, **Q/E** or the shoulder buttons lock onto and cycle nearby enemies
 (previous/next). The reticle turns red while tracking; manual steering releases
-the lock.
+the lock. With disk ammunition, a locked shot homes on that enemy; an unlocked
+shot flies along your aim.
 The laser-view binding can be changed in Options. Movement is
 camera-relative, as the original's is, and Buzz is animated from the game's own
 animation state machine. Walls stop Buzz, and reachable ledges can be caught

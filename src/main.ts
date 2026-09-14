@@ -1,3 +1,4 @@
+import {createAimMarker,stepAimMarker} from './sim/aim-marker.ts';
 import {createAimLock,stepAimLock,type AimTarget} from './sim/aim-lock.ts';
 import {aimObjectIndices,buildAimModel} from './render/aim-model.ts';
 import {createAimView,stepAimView,aimCamera,aimModelAngles} from './sim/aim-view.ts';
@@ -958,6 +959,11 @@ async function open(dir: GameDir): Promise<void> {
           baseLight:{...pointLights.base},
           playerLight,
           diskAmmo: pickups?.discs ?? 0,
+          disks:live.filter(e=>e.kind===EFFECT_KIND.diskHoming||e.kind===EFFECT_KIND.diskStraight)
+            .map(e=>({kind:e.kind,target:creatureSim?.creatures.find(c=>c===e.target?.creature)?.slot??null})),
+          aimMarker:aimMarker.effect&&aimMarker.effect.life>0?{target:aimMarker.target,
+            sprite:aimMarker.effect.sprite,width:aimMarker.effect.width,rotation:aimMarker.effect.rotation,
+            r:aimMarker.effect.r,g:aimMarker.effect.g}:null,
           kinds: live.map((e) => e.kind),
           sprites: live.map((e) => e.sprite),
           first: live[0]
@@ -1359,6 +1365,7 @@ async function spawnPlayer(): Promise<void> {
   laserBeams.length = 0;
   aimView = createAimView();
   aimLock = createAimLock();
+  aimMarker = createAimMarker();
   viewer?.setPlayerVisible(true);
   viewer?.setAimVisible(false);
   podBeams.length = 0;
@@ -1600,6 +1607,12 @@ function fireDisk(): void {
 
   let best: typeof creatureSim extends null ? never : NonNullable<typeof creatureSim>['creatures'][number] | null = null;
   let least = Infinity;
+  if(aimView.active&&aimLock.locked&&aimLock.target!==null){
+    const selected=creatureSim?.creatures.find(c=>c.slot===aimLock.target);
+    if(selected&&selected.health>0&&selected.deathTimer>=0&&selected.record.vulnerable){
+      best=selected;least=0;
+    }
+  }
   if (creatureSim && !aimView.active) {
     for (const c of creatureSim.creatures) {
       if (c.record.vulnerable === 0 || c.deathTimer < 0 || c.health <= 0) continue;
@@ -1619,7 +1632,12 @@ function fireDisk(): void {
     if (!bolt) return;
     if (bolt) {
       const at = best;
-      const tx = at.x + at.offsetX, ty = at.y + at.offsetY, tz = at.z + at.offsetZ;
+      const targetCentre=()=>{
+        const shape=at.hitShapes?.[at.animState];
+        return shape ? laserTargetCentre({creature:at,position:at,heading:at.heading,shape,vulnerable:at.record.vulnerable})
+          : {x:at.x+at.offsetX,y:at.y+at.offsetY,z:at.z+at.offsetZ};
+      };
+      const {x:tx,y:ty,z:tz}=targetCentre();
       // The original passes an aim into `FUN_004a4960` and keeps it as the
       // bolt's pitch. Where that number comes from inside `FUN_00434990` was
       // not read; starting level, the pitch's 20-tick lag leaves the bolt
@@ -1630,9 +1648,7 @@ function fireDisk(): void {
         x: tx, y: ty, z: tz,
         alive: true, vulnerable: at.record.vulnerable, creature: at,
         follow: () => {
-          target.x = at.x + at.offsetX;
-          target.y = at.y + at.offsetY;
-          target.z = at.z + at.offsetZ;
+          Object.assign(target,targetCentre());
           target.vulnerable = at.record.vulnerable;
           target.alive = at.deathTimer >= 0 && at.health > 0;
         },
@@ -2350,6 +2366,7 @@ let effects: EffectSim | null = null;
 const laserBeams: LaserBeam[] = [];
 let aimView = createAimView();
 let aimLock = createAimLock();
+let aimMarker = createAimMarker();
 const podBeams: (LaserBeam&{flareSize:number})[] = [];
 let pointLights=createPointLights(),playerLight:PlayerLight|null=null;
 let tokenRevealProfile:TokenRevealProfile|null=null;
@@ -2697,6 +2714,7 @@ async function loadDioramaScene(): Promise<{ paths: DatLevel['paths']; placedOf:
   laserBeams.length = 0;
   aimView = createAimView();
   aimLock = createAimLock();
+  aimMarker = createAimMarker();
   viewer?.setPlayerVisible(true);
   viewer?.setAimVisible(false);
   podBeams.length = 0;
@@ -3086,6 +3104,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   if(talk || cut.noControl || player.dying){
     stepAimView(aimView,player,held,true);
     aimLock=createAimLock();
+    if(effects){stepAimMarker(aimMarker,effects,effectWorld(),null,false);drawEffects();}
     viewer.setPlayerVisible(true);
     viewer.setAimVisible(false);
   }
@@ -3187,7 +3206,11 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     const centre=laserTargetCentre({creature:c,position:c,heading:c.heading,shape,vulnerable:c.record.vulnerable});
     aimTargets.push({id:c.slot,...centre});
   }
+  const previousTarget=aimLock.target;
   stepAimLock(aimLock,aimView,aimCamera(aimView,player).eye,held,aimTargets);
+  if(aimLock.target!==null&&aimLock.target!==previousTarget)playEvent(0x29,player);
+  if(effects)stepAimMarker(aimMarker,effects,effectWorld(),
+    aimView.active ? aimTargets.find(t=>t.id===aimLock.target)??null : null,aimLock.locked);
   if(aimView.active)player.yaw=aimView.yaw;
   viewer.setPlayerVisible(!aimView.active);
   viewer.setAimVisible(aimView.active);

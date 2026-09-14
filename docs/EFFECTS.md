@@ -1078,3 +1078,11 @@ intro-to-fight handoff is still unported: without that bypass the authored
 robot remains at word 8; word 40 isolates its open-state health transition
 from the unfinished fight flow. This verifies the defeat effect, not a complete
 playable encounter. The missing intro transition is now the next gameplay task.
+
+The first-person launcher now honors the actively locked creature for kind 0x47;
+manual unlocked aiming uses kind 0x48. The live homing target follows the animated
+hit-shape center. The original targeting marker (kind 0x30, sprite 23, behavior
+0x16) is maintained in the existing effect pool with a refreshed lifetime and
+selection-dependent colour/rotation. `tools/aim-marker-probe.ts` covers growth,
+tracking, selection changes, cleanup and pool reuse; the marker/disk browser
+check collects real ammunition in construction and verifies both firing paths.

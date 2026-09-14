@@ -1,3 +1,18 @@
+CURRENT UPDATE — 2026-09-14: original target marker and locked disks
+  Restored persistent effect kind 0x30 / sprite 23 at the selected enemy's
+  animated hit center. Installed effect behavior grows it from 8 to 320 units;
+  locked is red/rotated 0x200, released selection is green. Target changes reset
+  its growth and play event 0x29. Clear it on exit, loss of control and reset.
+  First-person disks now home on the locked creature; unlocked aiming still fires
+  straight. Homing follows the animated hit center rather than a static offset.
+  Validation: build, marker and disk probes (4096 headings), and real browser
+  pickup, homing/straight firing, marker colour and scene-cleanup checks pass.
+  CORRECTION: the IDs 1000+ list was previously called disk/coin targets without
+  evidence. DAT_00559d5c is a separate world-point list with sprite-30 markers,
+  not the ordinary coins. Its full source/interaction remains to be decoded.
+  Remaining aiming parity: automatic candidate selection and that world-point
+  targeting path. Do not add coin targeting based on the earlier wording.
+
 CURRENT UPDATE — 2026-09-14: first-person creature lock/cycling
   Q/E or shoulder buttons acquire/cycle previous/next nearby enemy in laser view.
   Held buttons do not repeat; manual steering breaks tracking, the next press

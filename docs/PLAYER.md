@@ -772,8 +772,31 @@ Reverse cycling is an added convenience; retail uses one forward-cycle button.
 Locking steers the camera and player yaw. Laser and disk firing still take the
 camera ray through the existing collision path; a lock does not allow shooting
 through walls. Candidate selection itself does not test walls, as in the decoded
-range-only helper. The original also appends disk/coin targets (IDs 1000+) and
+range-only helper. The original also appends a separate world-point target list (IDs 1000+) and
 uses world marker effects and sounds; those are not part of this creature-only
 pass. The explicit press-to-acquire flow also differs from retail's automatically
 selected candidate. `tools/aim-lock-probe.ts` exercises range, cycling, wrap,
 manual release, moving and removed targets, reset and beam wall collision.
+
+## Original target marker and selected-target disks (2026-09-14)
+
+`00403bc2..00403c08` spawns and maintains kind 0x30 using spawn mode 2 at the
+selected hit center. Its installed template uses sprite 23, initially 8x8,
+behavior 0x16 (grow by 32 to 320), and one frame. The targeting routine refreshes
+life to 10000; locked creature feedback is red at rotation 0x200, while a
+released selection remains green at rotation zero. The port now uses this
+persistent effect, resets growth when the selected creature changes, and plays
+target-selection event 0x29. It clears the effect on missing targets, aim exit,
+dialogue, death and scene/respawn reset; pause does not tick it.
+
+The disk launcher now uses the selected creature while first-person tracking
+is active, spawning homing kind 0x47. Without an active lock it uses straight
+kind 0x48 and the manual pitch. Both preserve the six-disk permit limit and ammo
+consumption. Homing refreshes the target's animated, rotated hit-shape center.
+The existing disk damage, bounce and lifetime behavior is unchanged.
+
+Correction to earlier handoff notes: DAT_00559d5c is a separate 12-byte world-point
+list drawn with sprite 30, not the ordinary coin marker list. Its entries are
+added as IDs 1000+ under DAT_00882938 (the category-6 pieces counter). The point
+source and complete interaction are still unresolved; ordinary coins are not
+made aim targets. See docs/HUD.md for the decoded point-list draw path.

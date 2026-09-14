@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {buildCreature,createCreatureSim,CREATURE_HANDLERS,RandomStream,stepCreatures} from '../src/sim/creatures.ts';
-import {podMuzzle,podBeam,podImpactHits} from '../src/sim/pod-beam.ts';
+import {podMuzzle,podBeam,podImpactHits,podAttachment} from '../src/sim/pod-beam.ts';
 import {sweepSphere,type CollisionWorld} from '../src/formats/collision.ts';
 const c=buildCreature({slot:0,x:0,y:0,z:0,type:20,script:0,turnRate:0,facing:0,health:3,respawn:0,flags:1,
   rangeX:1000,rangeZ:1000,rangeYaw:0,vulnerable:1,accel:0,accelSide:0,speedMax:0,speed:0},true);
@@ -19,6 +19,8 @@ c.hover=0;
 assert.deepEqual(podMuzzle(c,null),{x:0,y:0,z:3200});
 assert.deepEqual(podMuzzle({...c,heading:1024},null),{x:3200,y:0,z:0});
 assert.deepEqual(podMuzzle(c,{translation:{x:10,y:20,z:30},rotation:{x:0,y:0,z:0},scale:{x:1,y:1,z:1}}),{x:-320,y:640,z:2240});
+const attached=podAttachment(c,{translation:{x:10,y:20,z:30},rotation:{x:0,y:0,z:Math.PI/2},scale:{x:2,y:3,z:1}},{x:4,y:5,z:6});
+assert(Math.abs(attached.x-160)<1&&Math.abs(attached.y-896)<1&&attached.z===-1152,'attachment rotates/scales all local axes before translation');
 assert(podImpactHits({x:6399,y:0,z:0},{x:0,y:0,z:0}));
 assert(!podImpactHits({x:6400,y:0,z:0},{x:0,y:0,z:0}));
 assert(!podImpactHits({x:-6145,y:0,z:0},{x:0,y:0,z:0}),'signed shift boundary');

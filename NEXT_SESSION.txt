@@ -148,8 +148,11 @@
  Entrance, six helper waves, shell health limits, final phase and delayed
  death/win pass unit and real-arena browser tests (synthetic damage).
  Victory/movie/summary/selector cleanup passes. All 16 flare calls connected.
- NEXT: pod presentation refinements (animated BUB attachments, release
- particles/light, helper cut/follow framing, final-phase hurt flash),
+ POD ATTACHMENTS (2026-09-13): animated part 1 now supplies helper ground
+ points and release-camera framing. Part 4 emits the timed release stream;
+ two/four-tick gates and strict 185..300 cut window decoded and tested.
+ NEXT: pod orange burst light, alternating follow-camera targets and
+ final-phase hurt flash,
  clear-colour/backdrop matching and sprite fog-enable comparison. Exact routines and gamma lookup
  findings are in docs/FRONTEND.md. Controller visor/target-lock and menu/
  cancel bindings still need corresponding input work. Do not claim full parity.

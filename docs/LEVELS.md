@@ -1105,7 +1105,7 @@ animState 0 it is put on animState 1 / script 0x17, the pair are reset
 from their placements (`FUN_00406cd0`), given flags 0xaf0, their draw
 scale zeroed with `+0x32 = 0x8000` as a "grow" marker, and sound 0x86
 plays at the first. Between 0xb9 and 300 ticks of cut, an effect (0x11
-mode 2, or kind 4 mode 4 without detail) is thrown from (0, 400, 0x4b0)
+mode 2 on the four-tick gate, otherwise kind 4 mode 4; requires the two-tick gate) is thrown from (0, 400, 0x4b0)
 ahead of that BUB. Once the BUB's health is 1 the pair are parked at its
 ground point plus 0x1000 in Y with velocity zero and `+0x8a = 0x1cc` unless in
 animState 0xe; and under 0x3c ticks of cut with the BUB in animState 1,
@@ -1141,12 +1141,26 @@ against the machine code during implementation.
 `tools/pod-boss-probe.ts` exercises all six waves and death; Chromium's
 `tools/pod-boss-flow-check.js` drives the real arena with synthetic hits,
 including helper death animations, laser gating and the victory exit.
-This is not complete retail visual parity: BUB ground points use radial
-approximations rather than animated part-one attachments; the release
-particle stream and orange burst light still need matching. Helper cut
-framing and alternating follow-camera targets need refinement. Final-phase
-hurt flashing is unfinished. Beam posing and collision retain the browser
+The attachment follow-up below restores animated BUB points, release
+particles and helper cut framing. The orange burst light, alternating
+follow-camera targets and final-phase hurt flashing remain unfinished. Beam posing and collision retain the browser
 approximations documented in docs/EFFECTS.md.
+
+**Attachment follow-up (2026-09-13).** Ground points now transform local
+(0,150,1450) through animated part 1 before the ground query. Helpers,
+contact pushback and the release camera share that point. The camera eye
+is `(point.x + 3*sin(yaw+1024), point.y, point.z + 3*sin(yaw-2048))`,
+matching `00424ca0..00424ce5` in game units.
+
+While cut ticks are strictly between 185 and 300 and the two-tick gate
+is active, a particle emits from part 4 at local (0,400,1200). The
+four-tick gate chooses kind 0x11/mode 2; other emitting ticks use kind
+4/mode 4. These are timing gates, not a graphics-detail branch. Attachment
+math shares the beam's floating animation matrices, with an unposed local
+fallback if animation data is absent; fixed-point equivalence is not claimed.
+Focused probes cover transforms, selected parts, terrain query origin,
+helper/camera placement and both gate boundaries. The full browser fight
+regression is rerun for all six waves and victory cleanup.
 
 ## Zurg, internal level 12 — DECODED, not ported
 

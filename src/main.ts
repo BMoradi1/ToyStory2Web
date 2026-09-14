@@ -1,6 +1,6 @@
 import { readLensFlareTable, buildLensFlares, flareRay, levelFlareSources, pathFlareSources, createFlareFlicker, stepFlareFlicker, type FlareEntry, type FlareSprite } from './sim/lens-flare.ts';
 import { getGamma, setGamma } from './render/gamma.ts';
-import {podMuzzle,podBeam,podImpactHits,podBossAim} from './sim/pod-beam.ts';
+import {podMuzzle,podBeam,podImpactHits,podBossAim,podAttachment} from './sim/pod-beam.ts';
 import {createPodBoss,readPodHelpers,podBossBar} from './sim/pod-boss.ts';
 import { createTextureAnimation, stepTextureAnimation, copyScrolledTexture } from './sim/texture-animation.ts';
 import { readSoundSequences, startSequence, stepSequence, type SoundSequences, type SequenceVoice } from './audio/sequences.ts';
@@ -3200,6 +3200,12 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
           pathPoints: (tag) => currentLevel?.level.paths.find((p) => p.id === tag)?.points ?? null,
           cameraYaw: camera?.yaw ?? 0,
           cut: cutHandle,
+          releaseGate:effects?.gate,
+          attachment:(c,part,point)=>{
+            const art=creatureArt.get(c.type),animation=art?.anm?.animations[c.animState];
+            const pose=art?.anm&&animation?poseBone(art.anm,animation,(c.frame>>>16)%Math.max(1,animation.frameCount),part):null;
+            return podAttachment(c,pose,point);
+          },
           touch: applyCreatureTouch,
           shake: (ticks) => { if (camera) camera.shake = ticks; },
           spit: (boss) => {

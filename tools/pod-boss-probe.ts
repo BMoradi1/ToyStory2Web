@@ -39,3 +39,26 @@ assert.equal(podBossAim({x:0,y:0,z:0},{x:100,y:0,z:0},0),512);
 assert.equal(podBossAim({x:0,y:0,z:0},{x:-100,y:0,z:0},0),3584);
 assert(!podRange({x:400*256,y:0,z:0},{x:0,y:0,z:0},400));
 console.log('PASS: retail helper table, intro/laser gates, six releases, shell health clamp, final phase, death/win, aim and range.');
+
+boss.health=26;boss.deathTimer=0;
+for(const c of creatures.slice(1,7)){c.health=1;c.animState=0;}
+const visual=createPodBoss(at,helpers);visual.phase=2;
+const calls:{part:number;point:{x:number;y:number;z:number}}[]=[],emits:number[][]=[];
+const camera={ticks:299,eye:{x:0,y:0,z:0},look:{x:0,y:0,z:0},start:()=>{}};
+const vw={...world,cut:camera,releaseGate:{two:1,four:true},
+  attachment:(_c:typeof boss,part:number,point:{x:number;y:number;z:number})=>{calls.push({part,point});return part===1?{x:100,y:200,z:300}:{x:400,y:500,z:600};},
+  groundAt:(_x:number,_z:number,y:number)=>{assert.equal(y,200);return 700;},
+  effect:(...args:number[])=>emits.push(args)};
+visual.stun=600;visual.pair=[8];stepPodBoss(visual,at,vw);
+assert(calls.some(c=>c.part===1&&c.point.y===150&&c.point.z===1450));
+assert(calls.some(c=>c.part===4&&c.point.y===400&&c.point.z===1200));
+assert.deepEqual(emits,[[400,500,600,17,2]]);
+assert.deepEqual(camera.look,{x:100,y:700,z:300});assert.equal(camera.eye.y,700);
+assert.equal(at(8)!.x,100);assert.equal(at(8)!.y,700+4096);assert.equal(at(8)!.z,300);
+camera.ticks=298;vw.releaseGate.four=false;stepPodBoss(visual,at,vw);
+assert.deepEqual(emits.at(-1),[400,500,600,4,4]);
+const count=emits.length;
+for(const ticks of [185,300]){camera.ticks=ticks;stepPodBoss(visual,at,vw);}
+camera.ticks=250;vw.releaseGate.two=0;stepPodBoss(visual,at,vw);
+assert.equal(emits.length,count,'stream requires strict cut window and two-tick gate');
+console.log('PASS: animated attachment parts, terrain sampling, helper placement, release camera, particle modes and strict timing gates.');

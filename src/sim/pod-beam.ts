@@ -5,10 +5,15 @@ import type {LaserBeam,Point} from './laser.ts';
 
 /** Part-zero attachment (0,0,-100), posed before entity yaw and hover roll. */
 export function podMuzzle(c:Point&{heading:number;hover:number;drawScale:number},pose:BonePose|null,offset=-100):Point{
+  return podAttachment(c,pose,{x:0,y:0,z:offset});
+}
+
+/** FUN_0043c1c0: a local attachment follows its animated part and entity transform. */
+export function podAttachment(c:Point&{heading:number;hover:number;drawScale:number},pose:BonePose|null,point:Point):Point{
   const m=pose?poseMatrix(pose):null;
-  const x=pose?pose.translation.x+offset*m![2]!:0;
-  const y=pose?pose.translation.y+offset*m![5]!:0;
-  const z=pose?pose.translation.z+offset*m![8]!:offset;
+  const x=pose?pose.translation.x+point.x*m![0]!+point.y*m![1]!+point.z*m![2]!:point.x;
+  const y=pose?pose.translation.y+point.x*m![3]!+point.y*m![4]!+point.z*m![5]!:point.y;
+  const z=pose?pose.translation.z+point.x*m![6]!+point.y*m![7]!+point.z*m![8]!:point.z;
   const roll=sin(c.hover)/16384,cr=cos(c.hover)/16384;
   const rx=x*cr-y*roll,ry=x*roll+y*cr;
   const s=sin(c.heading)/16384,k=cos(c.heading)/16384,scale=32*c.drawScale;

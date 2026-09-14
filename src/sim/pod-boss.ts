@@ -4,6 +4,7 @@ import {ANIM_SCRIPTS} from './creature-data.ts';
 import {sin,cos,yawOf} from './trig.ts';
 import type {CutHandle} from './tasks.ts';
 import type {Point} from './laser.ts';
+import {podAttachment} from './pod-beam.ts';
 export interface PodBoss {
   helpers:readonly number[];
   phase:number; stage:number; health:number; base:number; bob:number; ring:number; frame:number;
@@ -17,6 +18,8 @@ export interface PodWorld extends Point {
   touch?:(angle:number,reaction:number)=>void;
   groundAt?:(x:number,z:number,y:number)=>number|null;
   effect?:(x:number,y:number,z:number,kind:number,mode:number)=>void;
+  attachment?:(creature:Creature,part:number,point:Point)=>Point;
+  releaseGate?:{two:number;four:boolean};
 }
 /** The leading -1 is a sentinel; the six pairs begin at 004f2f5c. */
 export function readPodHelpers(exe:Uint8Array):number[]{
@@ -61,8 +64,9 @@ export function stepPodBoss(s:PodBoss,at:(slot:number)=>Creature|undefined,w:Pod
     const bub=at(i);if(!bub)continue;
     bub.x=boss.x;bub.y=height;bub.z=boss.z;bub.heading=(s.ring+(i-1)*0x2ab)&4095;
     if(bub.animState===0)bub.frame=((s.frame-1)*0x4000+(i-1)*0xc0000)%0x180000;
-    const x=boss.x-((sin(bub.heading)*0x5aa)>>9),z=boss.z-((cos(bub.heading)*0x5aa)>>9);
-    const y=w.groundAt?.(x,z,height-0x96*32)??height;
+    const local={x:0,y:0x96,z:0x5aa};
+    const attached=w.attachment?.(bub,1,local)??podAttachment(bub,null,local);
+    const {x,z}=attached,y=w.groundAt?.(x,z,attached.y)??attached.y;
     points[i]={x,y,z};
     if(bub.health===1&&podRange(w,points[i]!,75))w.touch?.(yawOf(w.x-x,w.z-z),1);
   }
@@ -91,11 +95,19 @@ export function stepPodBoss(s:PodBoss,at:(slot:number)=>Creature|undefined,w:Pod
     const bub=at(s.stage),p=points[s.stage]??boss;
     if(s.cutTicks>0){
       s.cooldown=200;
-      if(w.cut)Object.assign(w.cut.look,p);
+      if(w.cut){
+        Object.assign(w.cut.look,p);
+        if(bub)Object.assign(w.cut.eye,{x:p.x+3*sin(bub.heading+0x400),y:p.y,z:p.z+3*sin(bub.heading-0x800)});
+      }
       if(s.cutTicks<300&&!s.released){
         s.released=true;if(bub)animate(bub,1,0x17);
         for(const id of s.pair){const c=at(id);if(!c)continue;Object.assign(c,buildCreature(c.record,false,c));c.flags=0xaf0;c.drawScale=0;s.growing.push(id);}
         w.sound?.(0x86,p);
+      }
+      if(bub&&s.cutTicks>185&&s.cutTicks<300&&(w.releaseGate?.two??0)>0){
+        const local={x:0,y:400,z:1200};
+        const emit=w.attachment?.(bub,4,local)??podAttachment(bub,null,local);
+        w.effect?.(emit.x,emit.y,emit.z,w.releaseGate?.four?0x11:4,w.releaseGate?.four?2:4);
       }
       if(s.released&&bub?.health===1){
         for(const id of s.pair){const c=at(id);if(c){c.x=p.x;c.y=p.y+0x1000;c.z=p.z;c.vx=c.vy=c.vz=0;c.timer=460;}}

@@ -18,7 +18,7 @@ import { HAMM_COINS, POTATO_PARTS, TASK_TEXT, type LevelTasks } from './level-da
 import type { RandomStream } from './creatures.ts';
 import { cos, sin } from './trig.ts';
 import { stepSlimeBoss, type SlimeBoss, type SlimeWorld } from './slime-boss.ts';
-import {stepPodBoss,type PodBoss} from './pod-boss.ts';
+import {stepPodBoss,type PodBoss,type PodWorld} from './pod-boss.ts';
 
 /** A dialogue the level wants opened, as `FUN_004027f0` takes it. */
 export interface DialogueRequest {
@@ -455,6 +455,8 @@ export function stepTasks(
   level: LevelTasks,
   creatureAt: (index: number) => Creature | undefined,
   world: {
+    attachment?:PodWorld['attachment'];
+    releaseGate?:PodWorld['releaseGate'];
     spit?: SlimeWorld['spit'];
     burstBlobs?: SlimeWorld['burstBlobs'];
     touch?: SlimeWorld['touch'];

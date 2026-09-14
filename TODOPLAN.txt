@@ -889,7 +889,9 @@
            including timing, terrain contact, damage, sounds and sparks.
            Level 9 pod fight and final flare connected: entrance, six helper
            waves, health limits, laser, final phase and victory exit verified.
-           Remaining: pod presentation details listed in docs/LEVELS.md,
+           Animated BUB attachment points, release particles and helper-cut
+           framing restored; remaining pod details are orange burst light,
+           follow-camera targets and final-phase hurt flashing,
            backdrop matching, conditional
            level 8/Shield texture scripts, plus visor/target-lock and menu/cancel
            binding support. Full controller/GFX feature parity is still open.

@@ -1155,8 +1155,9 @@ signed, shifted X/Z distance from the camera; ties select the second member.
 It retains that slot between selections, including after death, while updating
 the target position each tick. With both helpers dead it targets the boss.
 Target Y offsets are -8192 for helpers and -16384 for the boss. The browser
-feeds this into the shared follow camera's yaw steering; that camera does not
-yet consume target height. Outside phases 2/3 no new follow request is issued.
+feeds this into the shared follow camera's yaw steering. Retail's consumers at
+00404a50 and 00405357 also ignore target Y; this is not missing height support.
+Outside phases 2/3 no new follow request is issued.
 At 00424abb non-shell stun alternates normal and double body scale each tick,
 resetting when stun expires. The beam muzzle uses the same appearance scale.
 The pod probe covers selection ties, timing, death retention and scale reset.

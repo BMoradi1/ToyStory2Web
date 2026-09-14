@@ -519,11 +519,14 @@ function ease(camera: CameraState, want: number, step: number): boolean {
   return true;
 }
 
-/** A script asked the view to turn toward a point: take an eighth of it. */
+/** 00404a50 / 00405357 consume X/Z only, even though scripts also write Y.
+ * The signed wrap uses >= 0x800; an exact half-turn must become -2048. */
 function takeLookAt(camera: CameraState, p: PlayerState): void {
   if (!camera.lookAt) return;
   const want = yawOf(camera.lookAt.x - p.x, camera.lookAt.z - p.z);
-  camera.yaw = (camera.yaw - (yawDelta(camera.yaw, want) >> 3)) & YAW_MASK;
+  let delta=(camera.yaw-want)&YAW_MASK;
+  if(delta>=0x800)delta-=0x1000;
+  camera.yaw = (camera.yaw - (delta >> 3)) & YAW_MASK;
   camera.lookAt = null;
 }
 

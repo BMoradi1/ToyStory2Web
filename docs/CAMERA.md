@@ -113,6 +113,16 @@ grappling (`DAT_0053c660 == 0`), grounded; or hovering (`DAT_0053c668 >
   0x300; neither → eases to 0x40 at 8 a tick.
 - `lookAt` as above.
 
+**Script-target verification (2026-09-13).** Both consumers (`00404a50`
+standing, `00405357` moving) read only target X/Z. The Y value written by
+boss scripts is not consumed; earlier roadmap entries calling for target-height
+support were incorrect. They wrap `(yaw - want) & 4095` with `>= 2048`,
+then arithmetic-shift right three and subtract. The port now handles exactly
+opposite targets with that negative half-turn, instead of the shared angle
+helper's positive half-turn. `tools/camera-target-probe.ts` covers both motion
+branches in active/passive mode, wrap/rounding, height independence and
+consumption of each request once.
+
 **Place.** Wanted position: `r = C(pitch) * distance >> 14`; `x = bx -
 S(yaw) * r >> 9`, `z = bz - C(yaw) * r >> 9`, `y = h2 - 0x2000 + S(pitch
 - 0x800) * distance >> 9` (so pitch 0x40 lifts it a little, and the >> 9

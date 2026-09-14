@@ -154,12 +154,15 @@
  POD CAMERA/HURT (2026-09-13): nearest living helper selected every 30 ticks
  (X/Z distance, second wins ties), boss fallback and moving target requests.
  Final-phase hurt alternates normal/double scale, including beam attachment.
- Shared follow camera currently consumes target yaw only, not target height.
+ RETAIL CAMERA CHECK: 00404a50/00405357 deliberately consume X/Z only;
+ target-height support was an incorrect TODO. Fixed exact half-turn steering
+ to wrap +2048 to -2048 before the arithmetic shift; dedicated probe covers
+ active/passive, standing/moving, target height and one-shot consumption.
  POD BURST LIGHT (2026-09-13): 32-tick orange light now affects Buzz at each
  opening; four temporary slots, nearest selection, expiry/range/attenuation
  verified. Triangle-normal shading is approximate. Retail targets Buzz, not
  map illumination; earlier scene-light requirement was incorrect.
- NEXT: camera target-height support; reserved character lights, owner-based
+ NEXT: reserved character lights, owner-based
  transition blending, retail normals and other effect/beam light callers;
  clear-colour/backdrop matching and sprite fog-enable comparison. Exact routines and gamma lookup
  findings are in docs/FRONTEND.md. Controller visor/target-lock and menu/

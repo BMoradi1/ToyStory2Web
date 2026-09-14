@@ -895,7 +895,9 @@
            Orange burst now lights Buzz through a four-slot temporary pool;
            character shading approximate. Reserved lights, transition blending,
            retail normal lighting and other light callers remain open;
-           shared follow camera still ignores target height. Also remaining:
+           Follow camera correctly ignores script target height in retail;
+           exact half-turn target steering corrected and regression tested.
+           Also remaining:
            backdrop matching, conditional
            level 8/Shield texture scripts, plus visor/target-lock and menu/cancel
            binding support. Full controller/GFX feature parity is still open.

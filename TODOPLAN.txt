@@ -901,8 +901,11 @@
            including level 11's zone-4 retention rule. Level 12 path-0 white and
            level 13 path-10 cool-tinted lights connected. Level 4 path-6 character
            light shares flicker intensity and retains its last source at zero.
-           Other slot-1 sources, slot-0 overrides,
-           retail normal lighting and other light callers remain open;
+           Level 3 yellow base direction and first-live-blob green source,
+           level 14 inner-yellow/outer-cyan path-40 split, and level 15 path-0
+           red/white lamps now complete the queued special sources. Range,
+           transition, projectile/reset and selector cleanup checks pass.
+           Retail normal lighting and other light callers remain open;
            Follow camera correctly ignores script target height in retail;
            exact half-turn target steering corrected and regression tested.
            Also remaining:

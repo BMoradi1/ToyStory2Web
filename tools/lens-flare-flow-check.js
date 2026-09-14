@@ -55,6 +55,26 @@
   selector.dispatchEvent(new Event('change'));
   await wait(()=>document.querySelector('#status').textContent.includes(scene+': ready'),scene);
   await ts2.spawnPlayer();ts2.viewer.stop();
+  if(location.search.includes('slimeLight')){
+    const {slimeBaseLight}=await import('/src/sim/scripted-light.ts');
+    const height=ts2.player.y;
+    let seen=false;
+    for(let i=0;i<1600;i++){
+      const boss=ts2.creatures.find(c=>c.slot===0);
+      ts2.player.x=boss.x;ts2.player.z=boss.z+20000;ts2.player.y=height;ts2.player.hitStun=1000;
+      ts2.tickGame({},1);
+      const light=ts2.effects.scriptedLight,profile=slimeBaseLight(ts2.player),base=ts2.effects.baseLight;
+      if(base.x!==ts2.player.x+profile.offset.x||base.y!==ts2.player.y-8192+profile.offset.y||base.z!==ts2.player.z+profile.offset.z)throw Error('slime base direction is stale');
+      if(light.life&&light.owner===-3){
+        if(light.r!==0||light.g!==255||light.b!==0||!ts2.effects.kinds.includes(0x3f))throw Error('slime blob light missing');
+        seen=true;break;
+      }
+    }
+    if(!seen)throw Error('slime never produced a lit projectile');
+    await ts2.spawnPlayer();ts2.viewer.stop();
+    if(ts2.effects.scriptedLight.life||ts2.effects.lightTransition.remaining)throw Error('slime light survived reset');
+    console.log('SLIME SPECIAL LIGHT PASS');
+  }
   if(flickering){
     const initial=ts2.lensFlares.flicker;
     if(initial.intensity!==0||initial.timer!==60)throw Error('flicker did not reset at spawn');
@@ -70,7 +90,8 @@
   if(pathLight){
     const file=[...document.querySelector('#pickfile').files].find(f=>f.webkitRelativePath.endsWith('/data/'+scene+'.dat'));
     const {parseDat}=await import('/src/formats/dat.ts');
-    const point=parseDat(await file.arrayBuffer()).paths.find(p=>p.id===(flickering?6:({5:17,10:13,11:19,12:0,13:10}[lightLevel]))).points[0];
+    const pathPoints=parseDat(await file.arrayBuffer()).paths.find(p=>p.id===(flickering?6:({5:17,10:13,11:19,12:0,13:10,14:40,15:0}[lightLevel]))).points;
+    const point=pathPoints[0];
     source={x:point.x/256,y:-point.y/256,z:-point.z/256};
     if(flickering){
       const colours=new Set();
@@ -88,19 +109,24 @@
       console.log('FLICKERING CHARACTER LIGHT PASS',colours.size);
     }
     if(!flickering){
-      for(let i=0;i<240;i++){
-        ts2.player.x=point.x*32;ts2.player.y=point.y*32+8192;ts2.player.z=point.z*32;
-        ts2.player.hitStun=1000;ts2.tickGame({},1);
-        if(ts2.effects.lightTransition.selected===-2&&ts2.effects.lightTransition.remaining===0)break;
+      for(const index of lightLevel===14?[0,16]:lightLevel===15?[0,2]:[0]){
+        const point=pathPoints[index];
+        if(!point)throw Error('missing special lamp '+index);
+        source={x:point.x/256,y:-point.y/256,z:-point.z/256};
+        for(let i=0;i<240;i++){
+          ts2.player.x=point.x*32;ts2.player.y=point.y*32+8192;ts2.player.z=point.z*32;
+          ts2.player.hitStun=1000;ts2.tickGame({},1);
+          if(ts2.effects.scriptedLight.owner===-1000-index&&ts2.effects.lightTransition.selected===-2&&ts2.effects.lightTransition.remaining===0)break;
+        }
+        const light=ts2.effects.scriptedLight;
+        const rgb=lightLevel===14?(index<16?[255,255,0]:[0,255,255]):lightLevel===15?(index===2?[255,0,0]:[255,255,255]):{5:[128,96,64],10:[255,255,255],11:[127,127,127],12:[255,255,255],13:[111,127,143]}[lightLevel];
+        if(light.life!==1||light.r!==rgb[0]||light.g!==rgb[1]||light.b!==rgb[2])throw Error('scripted light missing in level '+lightLevel);
+        if(ts2.effects.lightTransition.selected!==-2||ts2.effects.lightTransition.remaining!==0)throw Error('scripted light transition did not settle '+JSON.stringify({light:ts2.effects.lightTransition,talk:ts2.talk,cut:ts2.cut}));
+        const frozen=JSON.stringify(ts2.effects.lightTransition);
+        for(let i=0;i<5;i++)ts2.redrawHud();
+        if(JSON.stringify(ts2.effects.lightTransition)!==frozen)throw Error('rendering advances scripted light');
+        console.log('SCRIPTED LIGHT PASS',lightLevel,JSON.stringify(light));
       }
-      const light=ts2.effects.scriptedLight;
-      const rgb={5:[128,96,64],10:[255,255,255],11:[127,127,127],12:[255,255,255],13:[111,127,143]}[lightLevel];
-      if(light.life!==1||light.r!==rgb[0]||light.g!==rgb[1]||light.b!==rgb[2])throw Error('scripted light missing in level '+lightLevel);
-      if(ts2.effects.lightTransition.selected!==-2||ts2.effects.lightTransition.remaining!==0)throw Error('scripted light transition did not settle '+JSON.stringify({light:ts2.effects.lightTransition,talk:ts2.talk,cut:ts2.cut}));
-      const frozen=JSON.stringify(ts2.effects.lightTransition);
-      for(let i=0;i<5;i++)ts2.redrawHud();
-      if(JSON.stringify(ts2.effects.lightTransition)!==frozen)throw Error('rendering advances scripted light');
-      console.log('SCRIPTED LIGHT PASS',lightLevel,JSON.stringify(light));
     }
   }
   let visible=false;

@@ -3,7 +3,7 @@ import { getGamma, setGamma } from './render/gamma.ts';
 import {podMuzzle,podBeam,podImpactHits,podBossAim,podAttachment} from './sim/pod-beam.ts';
 import {createPodBoss,readPodHelpers,podBossBar} from './sim/pod-boss.ts';
 import {createPointLights,addPointLight,setScriptedLight,stepPointLights,type PlayerLight} from './sim/point-light.ts';
-import {scriptedPathLight} from './sim/scripted-light.ts';
+import {scriptedPathLight,slimeBaseLight,slimeBlobLight} from './sim/scripted-light.ts';
 import {readCharacterLight} from './formats/character-light.ts';
 import { createTextureAnimation, stepTextureAnimation, copyScrolledTexture } from './sim/texture-animation.ts';
 import { readSoundSequences, startSequence, stepSequence, type SoundSequences, type SequenceVoice } from './audio/sequences.ts';
@@ -930,6 +930,7 @@ async function open(dir: GameDir): Promise<void> {
           pointLights:pointLights.slots.map(l=>({...l})),
           lightTransition:{selected:pointLights.selected,remaining:pointLights.remaining},
           scriptedLight:{...pointLights.scripted},
+          baseLight:{...pointLights.base},
           playerLight,
           diskAmmo: pickups?.discs ?? 0,
           kinds: live.map((e) => e.kind),
@@ -3314,7 +3315,8 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   }
   stepEffectsNow();
   stepPodBeams();
-  const scriptedLight=scriptedPathLight(levelNow,currentLevel?.level.paths??[],
+  if(levelNow===3)pointLights.profile=slimeBaseLight(player);
+  const scriptedLight=levelNow===3?slimeBlobLight(effects?.effects??[]):scriptedPathLight(levelNow,currentLevel?.level.paths??[],
     {x:viewer.camera.position.x/GAME_TO_RENDER,y:-viewer.camera.position.y/GAME_TO_RENDER,z:-viewer.camera.position.z/GAME_TO_RENDER},player,zones.camera,flareFlicker.intensity);
   if(scriptedLight!==undefined)setScriptedLight(pointLights,scriptedLight);
   playerLight=stepPointLights(pointLights,player);

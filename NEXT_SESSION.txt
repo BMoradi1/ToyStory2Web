@@ -180,12 +180,18 @@
  that zone disable normally. Shared scene mapping used by browser lamp checks.
  SCRIPTED LAMPS (2026-09-14): level 12 path 0 white RGB (255,255,255)
  and level 13 path 10 RGB (111,127,143) connected through the shared selector.
- Source/range checks cover both; special sources in levels 3/4/14/15 remain.
+ Source/range checks cover both; subsequent special sources are covered below.
  LEVEL 4 CHARACTER FLICKER (2026-09-14): path-6 reserved light now uses the
  existing simulation intensity, yellow-to-white RGB, and retail zero-intensity
- retention. Nonzero missing/rejected points disable normally. Remaining special
- sources: levels 3/14/15; retail normal shading remains approximate.
- NEXT: other scripted slot-1 lights and slot-0 overrides, retail normals and other effect/beam light callers;
+ retention. Nonzero missing/rejected points disable normally. Retail normal
+ shading remains approximate; the last three special sources are covered below.
+ SPECIAL LIGHTS COMPLETE (2026-09-14): all three queued levels done together.
+ Level 3 updates its yellow base direction toward the authored lamp and takes
+ green slot-1 light from the first live slime blob. Level 14 path 40 switches
+ inner yellow / outer cyan candidates at the retail radial boundary; level 15
+ path 0 uses red for point 2 and white elsewhere. Their distinct camera gates,
+ transitions, live projectile/reset and selector cleanup pass unit/browser checks.
+ NEXT: retail normals and other effect/beam light callers;
  clear-colour/backdrop matching and sprite fog-enable comparison. Exact routines and gamma lookup
  findings are in docs/FRONTEND.md. Controller visor/target-lock and menu/
  cancel bindings still need corresponding input work. Do not claim full parity.

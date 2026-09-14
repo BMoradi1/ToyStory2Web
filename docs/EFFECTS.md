@@ -747,8 +747,8 @@ All 15 records were read from the local executable. The character-light probe
 checks signed direction, colour, tracking and reset; Chromium checks reserved
 RGB pixels and the full six-wave return to level 9's base light.
 
-Remaining: level scripts' slot-1 sources except levels 4/5/10/11/12/13 below, dynamic slot-0 overrides (including
-level 3), retail normal shading and the other temporary-light callers. The
+The queued level-script sources and level 3's dynamic slot-0 override are now
+connected below. Remaining: retail normal shading and the other temporary-light callers. The
 renderer still adds light to existing vertex colours using posed triangle
 normals, so this is not a claim of complete retail lighting parity.
 
@@ -773,7 +773,7 @@ The lens flare remains a separate source with its own visibility rules.
 reserved lifetime and temporary competition. The path variant of
 `tools/lens-flare-flow-check.js` visits an authored level 10 lamp, checks the
 settled character-light state and redraw independence, verifies additive flare
-pixels and exits cleanly to the selector. Other scripted sources remain queued.
+pixels and exits cleanly to the selector. Subsequent scripted sources are covered below.
 
 ### Level 5 and 11 scripted lamps (2026-09-13)
 
@@ -801,7 +801,7 @@ signed component shifts, and the first point on equal distances. Missing or
 rejected points disable the source. Level 13's character tint is distinct from
 its flare colour (48,64,80). Scene mapping is `level02/level1` for level 12
 and `level03/level1` for level 13. The probe and browser lamp harness cover
-both mappings; the remaining special sources include levels 3, 4, 14 and 15.
+both mappings; the other special sources are covered below.
 
 ### Level 4 flickering character lamps (2026-09-14)
 
@@ -816,4 +816,34 @@ No second timer or random stream is introduced.
 The scripted-light probe covers ramp boundaries, zero retention and rejected
 points. The flicker browser check visits an authored lamp and checks colour
 synchronization, respawn reset, pause and selector cleanup. Shading remains the
-documented approximation; special sources in levels 3, 14 and 15 remain open.
+documented approximation.
+
+### Level 3, 14 and 15 special character lights (2026-09-14)
+
+All three remaining queued sources are connected. Level 14's path 40
+(`0042f0e7..0042f2ff`) selects points 0..15 inside a squared X/Z radius of
+`0x8e5144`, using Buzz's coordinates shifted right eight. At or outside that
+boundary it selects points 16 onward. Inner lamps are RGB (255,255,0); outer
+lamps are (0,255,255). Camera squared distance must be strictly below
+`0x40000`. Level 15 path 0 (`00430736..00430908`) instead uses a strict
+`0x100000` camera gate and RGB (255,0,0) for point 2, white for every other
+point. Both retain the shared strict head-distance gate of 65536, first-point
+ties, stable original point identities and reserved-slot transitions.
+
+Level 3 (`0041b4ae..0041b5c2`) supplies green RGB (0,255,0) from the first
+live kind-0x3f projectile in pool order, including life 1. Its owner is -3;
+no live blob disables slot 1. The base light retains authored RGB (192,192,0)
+while its direction updates toward game point (13453,-210651,-12501), distinct
+from the fixed flare position. The vector from Buzz's feet shifts right seven,
+normalizes to 4096 with truncation (`00451fd0`), shifts right two and then left
+four for the shared base-light host. Floating-point normalization and posed
+triangle-normal shading remain approximations of the retail renderer.
+
+`tools/special-light-probe.ts` checks radial/index boundaries, colours, strict
+camera gates, normalization, first-live-blob selection and return blending.
+The browser harness with `flares=paths&lightLevel=14` or `15` visits both
+colour groups and checks settled transitions and redraw independence. Its
+`slimeLight&cleanup` variant observes a natural boss projectile, verifies the
+moving base source and resets the light pool. All three scenarios also verify
+additive flare pixels and clean exits to the level selector. Shared lighting
+probes and the full slime combat regression pass.

@@ -1,0 +1,37 @@
+import assert from 'node:assert/strict';
+import {scriptedPathLight,slimeBaseLight,slimeBlobLight} from '../src/sim/scripted-light.ts';
+import {createPointLights,setScriptedLight,stepPointLights} from '../src/sim/point-light.ts';
+const rgb=(l:ReturnType<typeof scriptedPathLight>)=>l?[l.r,l.g,l.b]:null;
+const at={x:3054*256,y:8192,z:0},camera={...at,y:0};
+const points=Array.from({length:17},()=>({x:at.x/32,y:0,z:0}));
+assert.deepEqual(rgb(scriptedPathLight(14,[{id:40,points}],camera,at,0)),[0,255,255]);
+assert.equal(scriptedPathLight(14,[{id:40,points}],camera,at,0)!.owner,-1016);
+assert.deepEqual(rgb(scriptedPathLight(14,[{id:40,points}],camera,{...at,x:at.x-1},0)),[255,255,0]);
+assert.equal(scriptedPathLight(14,[{id:40,points:points.slice(0,16)}],camera,at,0),null);
+assert.equal(scriptedPathLight(14,[{id:40,points}],{...camera,x:at.x+512*256},at,0),null);
+assert(scriptedPathLight(14,[{id:40,points}],{...camera,x:at.x+512*256-1},at,0));
+const lamps=[{x:0,y:0,z:0},{x:10000,y:0,z:0},{x:20000,y:0,z:0}];
+for(const i of [0,1,2]){
+ const p={x:lamps[i]!.x*32,y:8192,z:0};
+ assert.deepEqual(rgb(scriptedPathLight(15,[{id:0,points:lamps}],{...p,y:0},p,0)),i===2?[255,0,0]:[255,255,255]);
+}
+const player={x:0,y:8192,z:0},one=[{id:0,points:[lamps[0]!]}];
+assert.equal(scriptedPathLight(15,one,{x:1024*256,y:0,z:0},player,0),null);
+assert(scriptedPathLight(15,one,{x:1024*256-1,y:0,z:0},player,0));
+const lamp={x:0x348d,y:0xfffcc925|0,z:0xffffcf2b|0};
+assert.deepEqual(slimeBaseLight({...lamp,x:lamp.x-128}),{offset:{x:16384,y:0,z:0},colour:[192,192,0]});
+assert.deepEqual(slimeBaseLight({...lamp,x:lamp.x+128}).offset,{x:-16384,y:0,z:0});
+assert.deepEqual(slimeBaseLight({x:lamp.x-128,y:lamp.y-128,z:lamp.z-128}).offset,{x:9456,y:9456,z:9456});
+assert.deepEqual(slimeBaseLight(lamp).offset,{x:0,y:0,z:0});
+const blobs=[{x:1,y:2,z:3,kind:0x3f,life:0},{x:4,y:5,z:6,kind:1,life:10},{x:7,y:8,z:9,kind:0x3f,life:1},{x:10,y:11,z:12,kind:0x3f,life:20}];
+assert.deepEqual(slimeBlobLight(blobs),{x:7,y:8,z:9,r:0,g:255,b:0,life:1,owner:-3});
+blobs[2]!.life=0;assert.equal(slimeBlobLight(blobs)!.x,10);
+blobs[3]!.life=0;assert.equal(slimeBlobLight(blobs),null);
+const pool=createPointLights(slimeBaseLight(player));
+setScriptedLight(pool,slimeBlobLight([{...player,y:0,kind:0x3f,life:1}]));
+for(let i=0;i<65;i++)stepPointLights(pool,player);
+assert.equal(pool.selected,-2);
+setScriptedLight(pool,null);stepPointLights(pool,player);assert.equal(pool.remaining,63);
+for(let i=0;i<64;i++)stepPointLights(pool,player);
+assert.equal(pool.selected,-1);
+console.log('PASS: level 14 radial split/index/colours/camera cutoff; level 15 red lamp/cutoff; slime base normalization, first live blob and return transition.');

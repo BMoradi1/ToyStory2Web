@@ -28,7 +28,7 @@ assert.equal(stepPointLights(pool,player),null,'disabled reserved light returns 
 assert.equal(createPointLights().scripted.life,0,'fresh level has no stale scripted source');
 console.log('PASS: level 10 path source, stable owner/ties, strict camera/player cutoffs, reserved lifetime, temporary competition and return transitions.');
 
-for(const [level,path,r,g,b] of [[5,17,128,96,64],[10,13,255,255,255],[11,19,127,127,127]] as const){
+for(const [level,path,r,g,b] of [[5,17,128,96,64],[10,13,255,255,255],[11,19,127,127,127],[12,0,255,255,255],[13,10,111,127,143]] as const){
   const paths=[{id:path,points}];
   const source=scriptedPathLight(level,paths,camera,player,0)!;
   assert.deepEqual([source.r,source.g,source.b],[r,g,b]);
@@ -45,4 +45,4 @@ assert.deepEqual(retained.scripted,before);
 const disabled=scriptedPathLight(11,[],camera,player,0);
 setScriptedLight(retained,disabled!);assert.equal(retained.scripted.life,0);
 assert.equal(scriptedPathLight(1,[],camera,player,0),null);
-console.log('PASS: levels 5/10/11 path and RGB selection, missing/rejected paths, level 11 zone-4 retention and disable on leaving it.');
+console.log('PASS: levels 5/10/11/12/13 path and RGB selection, missing/rejected paths, level 11 zone-4 retention and disable on leaving it.');

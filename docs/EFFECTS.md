@@ -747,7 +747,7 @@ All 15 records were read from the local executable. The character-light probe
 checks signed direction, colour, tracking and reset; Chromium checks reserved
 RGB pixels and the full six-wave return to level 9's base light.
 
-Remaining: level scripts' slot-1 sources except levels 5/10/11 below, dynamic slot-0 overrides (including
+Remaining: level scripts' slot-1 sources except levels 5/10/11/12/13 below, dynamic slot-0 overrides (including
 level 3), retail normal shading and the other temporary-light callers. The
 renderer still adds light to existing vertex colours using posed triangle
 normals, so this is not a claim of complete retail lighting parity.
@@ -790,3 +790,15 @@ out-of-range path points disable the source normally. The probe covers this
 distinction and each level's path/RGB mapping. The browser lamp check accepts
 `lightLevel=5` or `11` with `flares=paths`, using the shared scene mapping
 (level 11 is `level01/level1`). Character shading remains approximate.
+
+### Level 12 and 13 scripted lamps (2026-09-14)
+
+Level 12 path 0 supplies white RGB (255,255,255), from
+`0042b3b1..0042b528`. Level 13 path 10 supplies RGB (111,127,143), from
+`0042d241..0042d3ae`. Both now use the shared reserved-slot selector: camera
+distance strictly below 1,000,000, Buzz-head distance strictly below 65536,
+signed component shifts, and the first point on equal distances. Missing or
+rejected points disable the source. Level 13's character tint is distinct from
+its flare colour (48,64,80). Scene mapping is `level02/level1` for level 12
+and `level03/level1` for level 13. The probe and browser lamp harness cover
+both mappings; the remaining special sources include levels 3, 4, 14 and 15.

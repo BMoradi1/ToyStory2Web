@@ -70,7 +70,7 @@
   if(pathLight){
     const file=[...document.querySelector('#pickfile').files].find(f=>f.webkitRelativePath.endsWith('/data/'+scene+'.dat'));
     const {parseDat}=await import('/src/formats/dat.ts');
-    const point=parseDat(await file.arrayBuffer()).paths.find(p=>p.id===(flickering?6:({5:17,10:13,11:19}[lightLevel]))).points[0];
+    const point=parseDat(await file.arrayBuffer()).paths.find(p=>p.id===(flickering?6:({5:17,10:13,11:19,12:0,13:10}[lightLevel]))).points[0];
     source={x:point.x/256,y:-point.y/256,z:-point.z/256};
     if(!flickering){
       for(let i=0;i<240;i++){
@@ -79,7 +79,7 @@
         if(ts2.effects.lightTransition.selected===-2&&ts2.effects.lightTransition.remaining===0)break;
       }
       const light=ts2.effects.scriptedLight;
-      const rgb={5:[128,96,64],10:[255,255,255],11:[127,127,127]}[lightLevel];
+      const rgb={5:[128,96,64],10:[255,255,255],11:[127,127,127],12:[255,255,255],13:[111,127,143]}[lightLevel];
       if(light.life!==1||light.r!==rgb[0]||light.g!==rgb[1]||light.b!==rgb[2])throw Error('scripted light missing in level '+lightLevel);
       if(ts2.effects.lightTransition.selected!==-2||ts2.effects.lightTransition.remaining!==0)throw Error('scripted light transition did not settle '+JSON.stringify({light:ts2.effects.lightTransition,talk:ts2.talk,cut:ts2.cut}));
       const frozen=JSON.stringify(ts2.effects.lightTransition);

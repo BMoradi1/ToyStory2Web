@@ -10,6 +10,8 @@ export function scriptedPathLight(level:number,paths:readonly {id:number;points:
     5:[17,128,96,64], // 0041fd41..0041fea3
     10:[13,255,255,255], // 00425f60..004260d0
     11:[19,127,127,127], // 0042ad4d..0042aeb9
+    12:[0,255,255,255], // 0042b3b5..0042b528
+    13:[10,111,127,143], // 0042d241..0042d3ae
   };
   const config=settings[level];if(!config)return null;
   const [path,r,g,b]=config;

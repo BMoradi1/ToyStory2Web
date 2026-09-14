@@ -178,6 +178,9 @@
  retains the old character light while skipping flare output, matching the
  executable's jump past assignment/disable. Missing/out-of-range paths outside
  that zone disable normally. Shared scene mapping used by browser lamp checks.
+ SCRIPTED LAMPS (2026-09-14): level 12 path 0 white RGB (255,255,255)
+ and level 13 path 10 RGB (111,127,143) connected through the shared selector.
+ Source/range checks cover both; special sources in levels 3/4/14/15 remain.
  NEXT: other scripted slot-1 lights and slot-0 overrides, retail normals and other effect/beam light callers;
  clear-colour/backdrop matching and sprite fog-enable comparison. Exact routines and gamma lookup
  findings are in docs/FRONTEND.md. Controller visor/target-lock and menu/

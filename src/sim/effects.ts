@@ -20,6 +20,7 @@ import {
 } from '../formats/effect-table.ts';
 import { cos, idiv, sin, YAW_MASK, yawDelta, yawOf } from './trig.ts';
 import type { RandomStream } from './creatures.ts';
+import type { PointLight } from './point-light.ts';
 
 /** What a homing effect is chasing: a creature, kept live by the caller. */
 export interface EffectTarget {
@@ -112,6 +113,8 @@ export interface EffectSim {
   /** Drained by the caller each tick. */
   marks: GroundMark[];
   lights: EffectLight[];
+  /** Temporary character lights, drained by the host after the effect tick. */
+  pointLights: PointLight[];
   sounds: { event: number; x: number; y: number; z: number }[];
   /** Coins picked up by touch this tick, and whether the fiftieth was one. */
   coins: number;
@@ -142,7 +145,7 @@ export function createEffects(
   return {
     effects: Array.from({ length: EFFECT.slots }, dead),
     cursor: 0, rand, templates, modes,
-    marks: [], lights: [], sounds: [], coins: 0, spinning: false, hurt: null,
+    marks: [], lights: [], pointLights: [], sounds: [], coins: 0, spinning: false, hurt: null,
     gate: { two: 0, three: 0, four: false, five: false, six: false, seven: false, eight: false, sixteen: false, thirtyTwo: false },
     counter16: 0,
     hits: [],
@@ -279,11 +282,6 @@ function glow(sim: EffectSim, e: Effect, r: number, g: number, b: number): void 
   sim.lights.push({ x: e.x, y: e.y, z: e.z, r, g, b, glow: true });
 }
 
-/** A point light (`FUN_0049ee50`). */
-function light(sim: EffectSim, e: Effect, r: number, g: number, b: number): void {
-  sim.lights.push({ x: e.x, y: e.y, z: e.z, r, g, b, glow: false });
-}
-
 function mark(sim: EffectSim, e: Effect, y: number): void {
   if (sim.marks.length >= EFFECT.groundMarks) return;
   sim.marks.push({ x: e.x, y, z: e.z, size: e.width });
@@ -293,6 +291,7 @@ function mark(sim: EffectSim, e: Effect, y: number): void {
 export function stepEffects(sim: EffectSim, world: EffectWorld, dt = 1): void {
   sim.marks.length = 0;
   sim.lights.length = 0;
+  sim.pointLights.length = 0;
   sim.hits.length = 0;
   stepEffectGates(sim, dt);
 
@@ -881,6 +880,11 @@ function applyFade(sim: EffectSim, e: Effect, which: number): void {
 function die(sim: EffectSim, world: EffectWorld, e: Effect, code: number): void {
   if (code < 0) { spawnChild(sim, world, e.x, e.y, e.z, -code, 2); return; }
   const top = e.y + e.height * 32;
+  // 00410c4d / 00410e28 use the effect record as owner; 00410d13
+  // deliberately passes X instead, after replacing ESI with that coordinate.
+  if(code===3||code===8)sim.pointLights.push({x:e.x,y:top,z:e.z,r:160,g:0,b:0,
+    life:24,owner:0x529e58+sim.effects.indexOf(e)*0x3c});
+  else if(code===5)sim.pointLights.push({x:e.x,y:e.y,z:e.z,r:96,g:64,b:0,life:16,owner:e.x});
   const burst = (kind: number, count: number, mode: number, at = top) => {
     for (let i = 0; i < count; i++) {
       const child = spawnChild(sim, world, e.x, at, e.z, kind, mode);
@@ -907,7 +911,6 @@ function die(sim: EffectSim, world: EffectWorld, e: Effect, code: number): void 
         if (child) child.life = (sim.rand.byte() & 7) * 2 + 0x20;
       }
       if (code === 3) spawnChild(sim, world, e.x, top, e.z, 0x28, 2);
-      light(sim, e, 0xa0, 0, 0);
       sound(sim, 0xb, e);
       return;
     }
@@ -920,7 +923,6 @@ function die(sim: EffectSim, world: EffectWorld, e: Effect, code: number): void 
           child.life = (sim.rand.byte() & 0xf) * 2 + 0x18;
         }
       }
-      light(sim, e, 0x60, 0x40, 0);
       return;
     case 6:
       for (let i = 0; i < 5; i++) {

@@ -862,3 +862,28 @@ verify a live green source selected for Buzz, and ensure drawing does not age
 it. The boss check also covers six helper waves, orange burst competition,
 death and selector return. Effect-death and other temporary-light callers
 remain open, along with exact retail normal shading.
+
+### Effect-death character lights (2026-09-14)
+
+Death hooks 3 and 8 (`00410c4d`, `00410e28`) now emit RGB (160,0,0)
+for 24 ticks at `(x, y + height*32, z)`. Their owner is the effect's stable
+pool-record identity. Hook 5 (`00410d13`) emits RGB (96,64,0) for 16 ticks
+at the effect origin. Its owner is deliberately the X coordinate: the retail
+routine overwrites ESI with X before passing it as the owner. This preserves
+the shared selector's same-owner behavior, including coordinate collisions.
+
+Previously these hooks produced unused requests without lifetime/owner, and
+the red requests used the wrong height. A separate temporary-light queue now
+captures each request and the host drains it after the effect tick. It uses
+the existing four-slot allocation, attenuation and reserved return blending.
+Screen glows remain on their existing rendering path. Range culling suppresses
+death lights just as it suppresses the rest of the death hook.
+
+The effect-light probe checks all three hooks, positions, identities, colours,
+lifetimes, one-shot emission, range removal and fade-back. Hooks 3 and 8 use
+authored templates; no supplied template selects hook 5, so that hook is
+invoked explicitly in tests. The framebuffer check runs the effect simulation
+and verifies red/amber pixels and full fade-back on a synthetic triangle.
+Disk/flare regressions and the full pod-boss browser encounter also pass.
+Creature-death and other temporary-light call sites still need auditing;
+exact retail normal shading remains open.

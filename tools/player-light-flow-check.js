@@ -48,5 +48,30 @@
   const restored=sample();
   if(restored.some((x,i)=>x!==reserved[i]))throw Error('return failed to restore reserved pixels');
   console.log('RESERVED LIGHT FRAMEBUFFER PASS',JSON.stringify({reserved,restored}));
+  const [{readEffectTable,EFFECT_FLAGS},{createEffects,spawnEffect,stepEffects},{RandomStream}]=await Promise.all([
+    import('/src/formats/effect-table.ts'),import('/src/sim/effects.ts'),import('/src/sim/creatures.ts')]);
+  const file=[...document.querySelector('#pickfile').files].find(f=>f.name.toLowerCase()==='toy2.exe');
+  const {kinds,modes}=readEffectTable(new Uint8Array(await file.arrayBuffer()));
+  const world={cameraX:0,cameraY:0,cameraZ:0,playerX:0,playerY:8192,playerZ:0,
+    playerYaw:0,playerVx:0,playerVz:0,groundAt:()=>null,waterY:null};
+  buzz.x=512;
+  for(const code of [3,5,8]){
+    const sim=createEffects(kinds,modes,new RandomStream(new Uint8Array([0])));
+    const kind=kinds.findIndex(t=>t?.death===(code===5?3:code));
+    const e=spawnEffect(sim,world,512,0,8192,0,0,0,0,0,0,kind);
+    Object.assign(e,{life:1,death:code,mode:0,flags:EFFECT_FLAGS.keep,frames:1});
+    e.y=code===5?0:-e.height*32;
+    stepEffects(sim,world);
+    if(sim.pointLights.length!==1)throw Error('missing death light '+code);
+    lights=createPointLights();
+    for(const light of sim.pointLights.splice(0))addPointLight(lights,light);
+    const flash=lightTick();
+    if(!(flash[0]>base[0]+30&&flash[2]===base[2]))throw Error('death flash missing '+code);
+    if(code===5?!(flash[1]>base[1]&&flash[0]>flash[1]):flash[1]!==base[1])throw Error('wrong death tint '+code);
+    for(let i=0;i<90;i++)lightTick();
+    const returned=sample();
+    if(returned.some((x,i)=>x!==base[i]))throw Error('death light did not fade '+code);
+    console.log('EFFECT DEATH LIGHT FRAMEBUFFER PASS',code,JSON.stringify({flash,returned}));
+  }
   v.setPlayer(null);for(const [o,visible] of visibility)o.visible=visible;
 })();

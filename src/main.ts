@@ -1395,6 +1395,7 @@ function stepEffectsNow(): void {
   stepEffects(effects, world);
   stepGuideSparkles(guideSparkles, effects, world);
   touchPlayer(effects, world);
+  for(const light of effects.pointLights.splice(0))addPointLight(pointLights,light);
 
   // Damage the laser landed. The creature port already knows what kind 4 is.
   if (creatureSim) {

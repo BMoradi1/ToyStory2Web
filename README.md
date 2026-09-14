@@ -14,6 +14,8 @@ Lightyear to the Rescue** (Traveller's Tales, 1999), running in the browser.
 <img width="1351" height="881" alt="image" src="https://github.com/user-attachments/assets/26728f2a-0acb-4eb9-bcd6-a8d6b3a316ba" />
 
 #### Gameplay
+<img width="1400" height="966" alt="image" src="https://github.com/user-attachments/assets/ea5f022e-2fab-422c-ae24-bb0898cfaed9" />
+
 <img width="700" height="513" alt="chrome-capture-2026-09-13" src="https://github.com/user-attachments/assets/354f9704-5c75-4c60-af8d-99002ce4eb07" />
 
 

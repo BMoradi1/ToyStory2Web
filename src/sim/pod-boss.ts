@@ -23,6 +23,7 @@ export interface PodWorld extends Point {
   releaseGate?:{two:number;four:boolean};
   cameraEye?:Point;
   lookAt?:(point:Point)=>void;
+  burstLight?:(point:Point)=>void;
 }
 /** The leading -1 is a sentinel; the six pairs begin at 004f2f5c. */
 export function readPodHelpers(exe:Uint8Array):number[]{
@@ -116,7 +117,7 @@ export function stepPodBoss(s:PodBoss,at:(slot:number)=>Creature|undefined,w:Pod
       }
       if(s.released&&bub?.health===1){
         for(const id of s.pair){const c=at(id);if(c){c.x=p.x;c.y=p.y+0x1000;c.z=p.z;c.vx=c.vy=c.vz=0;c.timer=460;}}
-        if(s.cutTicks<60&&!s.opened){s.opened=true;for(let i=0;i<4;i++)w.effect?.(p.x,p.y,p.z,0x23,14);w.sound?.(0x85,p);w.sound?.(0xd6,null);killCreature(bub,1);}
+        if(s.cutTicks<60&&!s.opened){s.opened=true;for(let i=0;i<4;i++)w.effect?.(p.x,p.y,p.z,0x23,14);w.sound?.(0x85,p);w.sound?.(0xd6,null);w.burstLight?.(p);killCreature(bub,1);}
       }
     }else if(s.released&&s.pair.every(id=>(at(id)?.health??0)<=0)){
       s.stun=120;s.stage++;s.released=false;boss.record.speed=16;

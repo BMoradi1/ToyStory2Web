@@ -1143,8 +1143,10 @@ against the machine code during implementation.
 including helper death animations, laser gating and the victory exit.
 The attachment follow-up below restores animated BUB points, release
 particles and helper cut framing. Follow-camera selection and final-phase
-hurt scaling are also connected. The orange burst light remains unfinished:
-effect light records currently do not illuminate scene geometry. Beam posing and collision retain the browser
+hurt scaling are also connected. The orange burst now supplies a 32-tick
+temporary light for Buzz when each helper pod opens. Character shading is
+approximate, with reserved lights and transition blending still open; this
+retail light targets Buzz rather than scene geometry. Beam posing and collision retain the browser
 approximations documented in docs/EFFECTS.md.
 
 **Camera/hurt follow-up (2026-09-13).** At 004254eb the camera selects the

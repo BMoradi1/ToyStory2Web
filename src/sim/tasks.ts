@@ -459,6 +459,7 @@ export function stepTasks(
     releaseGate?:PodWorld['releaseGate'];
     cameraEye?:PodWorld['cameraEye'];
     lookAt?:PodWorld['lookAt'];
+    burstLight?:PodWorld['burstLight'];
     spit?: SlimeWorld['spit'];
     burstBlobs?: SlimeWorld['burstBlobs'];
     touch?: SlimeWorld['touch'];

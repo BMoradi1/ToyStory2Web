@@ -2,6 +2,7 @@ import { readLensFlareTable, buildLensFlares, flareRay, levelFlareSources, pathF
 import { getGamma, setGamma } from './render/gamma.ts';
 import {podMuzzle,podBeam,podImpactHits,podBossAim,podAttachment} from './sim/pod-beam.ts';
 import {createPodBoss,readPodHelpers,podBossBar} from './sim/pod-boss.ts';
+import {createPointLights,addPointLight,stepPointLights,type PlayerLight} from './sim/point-light.ts';
 import { createTextureAnimation, stepTextureAnimation, copyScrolledTexture } from './sim/texture-animation.ts';
 import { readSoundSequences, startSequence, stepSequence, type SoundSequences, type SequenceVoice } from './audio/sequences.ts';
 import { createGuideSparkles, stepGuideSparkles, spendGuide } from './sim/guide-sparkles.ts';
@@ -924,6 +925,8 @@ async function open(dir: GameDir): Promise<void> {
           live: live.length,
           beams: laserBeams.map(b => ({ ...b })),
           podBeams: podBeams.map(b => ({ ...b })),
+          pointLights:pointLights.map(l=>({...l})),
+          playerLight,
           diskAmmo: pickups?.discs ?? 0,
           kinds: live.map((e) => e.kind),
           sprites: live.map((e) => e.sprite),
@@ -1319,6 +1322,7 @@ async function spawnPlayer(): Promise<void> {
       return createEffects(table.kinds, table.modes, creatureSim!.rand);
     })()
     : null;
+  pointLights=createPointLights();playerLight=null;
   viewer.setCardSheet(sceneTextures.get(SPRITE_SHEET) ?? null);
   laserBeams.length = 0;
   podBeams.length = 0;
@@ -2290,6 +2294,7 @@ let camera: CameraState | null = null;
 let effects: EffectSim | null = null;
 const laserBeams: LaserBeam[] = [];
 const podBeams: (LaserBeam&{flareSize:number})[] = [];
+let pointLights=createPointLights(),playerLight:PlayerLight|null=null;
 /** This frame's effect cards, rebuilt each tick. */
 const effectCards: WorldSprite[] = [];
 const effectFlat: WorldSprite[] = [];
@@ -2628,6 +2633,7 @@ async function loadDioramaScene(): Promise<{ paths: DatLevel['paths']; placedOf:
   camera = null;
   pickups = null;
   effects = null;
+  pointLights=createPointLights();playerLight=null;
   laserBeams.length = 0;
   podBeams.length = 0;
   pushBlocks = null;
@@ -3211,6 +3217,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
           releaseGate:effects?.gate,
           cameraEye:{x:viewer.camera.position.x/GAME_TO_RENDER,y:-viewer.camera.position.y/GAME_TO_RENDER,z:-viewer.camera.position.z/GAME_TO_RENDER},
           lookAt:(point)=>{if(camera)camera.lookAt=point;},
+          burstLight:(point)=>addPointLight(pointLights,{...point,r:0xf0,g:0x80,b:0,life:32}),
           attachment:(c,part,point)=>{
             const art=creatureArt.get(c.type),animation=art?.anm?.animations[c.animState];
             const pose=art?.anm&&animation?poseBone(art.anm,animation,(c.frame>>>16)%Math.max(1,animation.frameCount),part):null;
@@ -3303,6 +3310,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   }
   stepEffectsNow();
   stepPodBeams();
+  playerLight=stepPointLights(pointLights,player);
   tickSoundSequence();
 
   if (pickups) {
@@ -3344,6 +3352,10 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   drawEffects();
   drawHud(levelNow);
   poseAnimation(Math.hypot(held.moveX, held.moveY) > 0);
+  if(playerLight){
+    const {direction:d,colour}=playerLight;
+    viewer.setPlayerLight([d.x,-d.y,-d.z],colour);
+  }else viewer.setPlayerLight([0,0,0],[0,0,0]);
 }
 
 /**
@@ -3393,6 +3405,7 @@ async function respawn(): Promise<void> {
   const back = spawnPoint && !Number.isFinite(safe.x) ? spawnPoint : safe;
   const died = player.dying;
   Object.assign(player, createPlayer(back.x, back.y, back.z, safe.yaw));
+  pointLights=createPointLights();playerLight=null;
   playerRuntime = createRuntime();
   // The engine's own player reset fills the health bar back up.
   if (pickups) pickups.health = PICKUP.healthMax;

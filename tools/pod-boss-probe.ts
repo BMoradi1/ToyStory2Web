@@ -95,3 +95,12 @@ follow.phase=4;follow.cutTicks=200;
 const last=target;stepPodBoss(follow,at,fw);assert.equal(target,last,'death cut stops follow requests');
 assert.equal(visual.flashScale,1,'shell stretching does not also double the body');
 console.log('PASS: camera distance/ties, 30-tick retention, moving/dead targets, boss fallback and hurt scale reset.');
+
+let bursts=0;
+visual.opened=false;visual.released=true;visual.stun=600;visual.stage=1;
+at(1)!.health=1;
+const bw={...vw,burstLight:(p:typeof target)=>{bursts++;assert.deepEqual(p,{x:100,y:700,z:300});}};
+camera.ticks=60;stepPodBoss(visual,at,bw);assert.equal(bursts,0);
+camera.ticks=59;stepPodBoss(visual,at,bw);assert.equal(bursts,1);
+camera.ticks=58;stepPodBoss(visual,at,bw);assert.equal(bursts,1,'one light per opening');
+console.log('PASS: burst light ground attachment, strict cut threshold and one-shot emission.');

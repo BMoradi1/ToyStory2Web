@@ -238,10 +238,12 @@ scattered ±0x20 x 0x3c with random spin and life, a point light. 6: five
 10: one 0x78 in 2 at the top of the card. 11: one 0x75 in 0x1c with random
 spin. Negative: one kind `-code` in mode 2.
 
-The **point light** is `FUN_0049ee50(x, y, z, colour, radius 0x18 or
-0x10, owner)`: an 8-slot list at `DAT_00830d60` (slot 0 is Buzz's own
-light) that `FUN_0049eee0` reads to find the nearest light within range and
-blend the character lighting toward it.
+The **point light** is `FUN_0049ee50(x, y, z, colour, lifetime, owner)`.
+Rechecking the allocator corrects the earlier radius/8-slot interpretation:
+records at `DAT_00830d60` are 24 bytes, with temporary slots 2..5, reserved
+slots 0/1 and a transition record at slot 6. It replaces the temporary slot
+with least remaining lifetime (first wins ties). `FUN_0049eee0` selects a
+nearby light for Buzz's character lighting, not map illumination.
 
 ## Drawing (`FUN_00445980`)
 
@@ -657,7 +659,8 @@ cleared on respawn/exit; it does not occupy wrist-laser slots or retract.
 
 Limits: attachment posing uses the browser's floating animation matrices
 rather than the retail fixed-point routine; collision uses the browser hull
-and existing point-light approximation. Level 9's separate boss laser is connected by the follow-up below. Tests cover timer edges, drift/reset, muzzle transforms, first-hit
+and the green point-light request is still unrendered (the endpoint flare is
+rendered). Level 9's separate boss laser is connected by the follow-up below. Tests cover timer edges, drift/reset, muzzle transforms, first-hit
 terrain clipping versus movement sliding, impact radius, a real level 4 pod,
 damage/invulnerability through the attack resolver, and pause/selector cleanup.
 
@@ -673,8 +676,33 @@ The same downward delta and first-contact terrain cast as ZPOD drive a
 sprite-9 beam with half-width 128 and a green size-64 endpoint flare.
 Impact sound is 0x87, damage radius 30 steps, reaction 3; a fresh hit raises
 0x84 and the 0xd7 voice with its 1200-tick cooldown. Existing spark gates
-and the shared point-light approximation apply. The full arena regression
+apply; green point-light requests remain unrendered. The full arena regression
 covers entrance, beam/flare, six helper waves, final phase, delayed death,
 victory movie/summary and clean selector return. See docs/LEVELS.md for
 remaining fight presentation differences; all sixteen recovered flare
 calls being connected does not imply complete renderer parity.
+
+### Pod burst character lighting (2026-09-13)
+
+`00424faf` requests RGB (240,128,0), lifetime 32 at the BUB's ground point
+once the release cut is strictly below 60 ticks. The host now retains this
+request in the four temporary slots instead of losing it when effect outputs
+clear. Each simulation tick decrements life before selection. Distances use
+signed deltas shifted eight from (Buzz.x, Buzz.y-8192, Buzz.z); squared
+distance above 0x8000 immediately expires the slot. The nearest living source
+wins, with the first slot winning ties. RGB is attenuated by
+`(channel * (65536 - squaredDistance)) >> 16`. Pause does not age the pool;
+spawn, respawn and level exit reset it.
+
+Buzz's renderer adds directional colour to the posed triangles before gamma
+and texture modulation. This is explicitly a shading approximation: it derives
+face normals from triangles and retains the existing base colours. Retail's
+normal lighting, reserved light slots, owner-based 64-tick transition blending,
+and the other effect/beam light callers remain open. The light does not tint
+the map or create another lens flare. An expired light restores the base colours.
+
+`tools/point-light-probe.ts` checks allocation, lifetime, range, attenuation
+and directional colour. `tools/player-light-flow-check.js` checks actual
+framebuffer RGB and reset. The full pod browser test positions Buzz near each
+opening and verifies orange light selection across all six waves, expiry and
+victory/selector cleanup.

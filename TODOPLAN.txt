@@ -892,7 +892,9 @@
            Animated BUB attachment points, release particles and helper-cut
            framing restored. Follow-camera targets now select every 30 ticks;
            final-phase hurt alternates normal/double body and muzzle scale.
-           Remaining: orange burst light needs scene point-light rendering;
+           Orange burst now lights Buzz through a four-slot temporary pool;
+           character shading approximate. Reserved lights, transition blending,
+           retail normal lighting and other light callers remain open;
            shared follow camera still ignores target height. Also remaining:
            backdrop matching, conditional
            level 8/Shield texture scripts, plus visor/target-lock and menu/cancel

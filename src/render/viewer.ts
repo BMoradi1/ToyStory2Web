@@ -1,6 +1,7 @@
 import type { FlareSprite } from '../sim/lens-flare.ts';
 import type { SpriteHeader } from '../formats/sprite-table.ts';
 import { GameMaterial } from './game-material.ts';
+import { lightPlayerColours } from './player-light.ts';
 import { getGamma, gammaModulate, gammaRGB } from './gamma.ts';
 /**
  * The 3D view.
@@ -76,6 +77,7 @@ export class Viewer {
   private current: THREE.Mesh | null = null;
   private collision: THREE.LineSegments | null = null;
   private player: THREE.Mesh | null = null;
+  private playerBaseColours:Float32Array|null=null;
 
   /**
    * Cull override, for diagnosis. `null` means each face group decides.
@@ -539,6 +541,7 @@ export class Viewer {
    * feet, so the position is where it stands.
    */
   setPlayer(mesh: MeshData | null, textures?: Map<number, THREE.Texture>): void {
+    this.playerBaseColours=mesh?.colors??null;
     if (this.player) {
       this.scene.remove(this.player);
       this.player.geometry.dispose();
@@ -572,6 +575,7 @@ export class Viewer {
    */
   setPlayerPose(mesh: MeshData, textures?: Map<number, THREE.Texture>): void {
     if (!this.player || mesh.triangleCount === 0) return;
+    this.playerBaseColours=mesh.colors;
     const { position, rotation } = this.player;
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(mesh.positions, 3));
@@ -593,6 +597,15 @@ export class Viewer {
     this.player.material = materials;
     this.player.position.copy(position);
     this.player.rotation.copy(rotation);
+  }
+
+  /** Temporary light on Buzz only; world direction uses renderer axes. */
+  setPlayerLight(direction:readonly [number,number,number],colour:readonly [number,number,number]):void{
+    if(!this.player||!this.playerBaseColours)return;
+    const local=new THREE.Vector3(...direction).applyQuaternion(this.player.quaternion.clone().invert());
+    const positions=this.player.geometry.getAttribute('position').array as Float32Array;
+    const lit=lightPlayerColours(positions,this.playerBaseColours,[local.x,local.y,local.z],colour);
+    this.player.geometry.setAttribute('color',this.gammaColours(lit));
   }
 
   /** Move the character. Renderer units. */

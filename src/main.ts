@@ -1,3 +1,4 @@
+import { readLensFlareTable, buildLensFlares, flareRay, levelFlareSources, type FlareEntry, type FlareSprite } from './sim/lens-flare.ts';
 import { getGamma, setGamma } from './render/gamma.ts';
 import { createTextureAnimation, stepTextureAnimation, copyScrolledTexture } from './sim/texture-animation.ts';
 import { readSoundSequences, startSequence, stepSequence, type SoundSequences, type SequenceVoice } from './audio/sequences.ts';
@@ -294,6 +295,8 @@ async function showLevel(index: number): Promise<void> {
   levelZipLines = [];
   stompProps = createStompProps();
   resetTextureAnimations();
+  flareSprites=[];
+  viewer?.setLensFlares([]);
   guideSparkles = createGuideSparkles([]);
   sequenceVoice = null;
   tasks = null;
@@ -442,6 +445,7 @@ async function open(dir: GameDir): Promise<void> {
   // user's own copy at run time rather than kept in this repository.
   const exe = dir.get('toy2.exe');
   exeBytes = exe ? await exe.read() : null;
+  flareTable=exeBytes?readLensFlareTable(exeBytes):[];
   creatureModelPaths = cfg ? parseCreatureModels(new TextDecoder('latin1').decode(await cfg.read())) : new Map();
   creatureModels.clear();
   sound = new SoundBank(dir);
@@ -461,6 +465,7 @@ async function open(dir: GameDir): Promise<void> {
     if(pad&&Object.keys(input.pad).every(k=>Array.isArray(pad[k])&&pad[k].length>0&&pad[k].every((b:unknown)=>Number.isInteger(b)&&Number(b)>=0&&Number(b)<32)))input.pad=pad;
     animatedTextures=localStorage.getItem('ts2.animatedTextures')!=='false';
     setGamma(Number(localStorage.getItem('ts2.gamma')));
+    lensFlare=localStorage.getItem('ts2.lensFlare')!=='false';
     const detail=localStorage.getItem('ts2.detail');
     if(detail!==null&&/^[012]$/.test(detail))detailOption=Number(detail);
   }catch{}
@@ -649,6 +654,8 @@ async function open(dir: GameDir): Promise<void> {
         return { index: which, yaw: b.segYaw, block: { x: b.x, y: b.y, z: b.z }, player: { x: player.x, y: player.y, z: player.z } };
       },
       get stompProps() { return stompProps; },
+      redrawHud(){if(player)drawHud(levelNumber(levels[levelEl.selectedIndex]?.id??'')??0);return flareSprites;},
+      get lensFlares(){return {enabled:lensFlare,sprites:flareSprites};},
       get textureAnimation() {return { ...textureAnimation,enabled:animatedTextures };},
       texturePixels(page:number) {
         const texture=sceneTextures.get(page);
@@ -1222,6 +1229,8 @@ async function spawnPlayer(): Promise<void> {
   const level = levelNumber(sceneId) ?? 0;
   stompProps = createStompProps();
   resetTextureAnimations();
+  flareSprites=[];
+  viewer?.setLensFlares([]);
   guideSparkles = createGuideSparkles([]);
   sequenceVoice = null;
   drawStompProps(level);
@@ -1864,6 +1873,16 @@ function drawHud(level: number): void {
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   if (!hudPainter) hudPainter = new HudPainter(hudEl);
   hudPainter.resize(Math.round(rect.width * dpr), Math.round(rect.height * dpr));
+  const scale=GAME_UNITS_PER_LEVEL_UNIT*WORLD_SCALE;
+  viewer.camera.updateMatrixWorld();
+  const eye=viewer.camera.position;
+  const eyeGame={x:eye.x*scale,y:-eye.y*scale,z:-eye.z*scale};
+  const sources=[...levelFlareSources(level),...(effects?.lights.filter(l=>l.glow).map(l=>({...l,size:48}))??[])];
+  flareSprites=lensFlare?buildLensFlares(sources,flareTable,source=>{
+    const p=new THREE.Vector3(source.x/scale,-source.y/scale,-source.z/scale).project(viewer!.camera);
+    return {x:(p.x+1)*256,y:(1-p.y)*128,depth:(p.z+1)/2};
+  },source=>currentCollisionWorld?sweepSphere(currentCollisionWorld,eyeGame,flareRay(eyeGame,source),0,{passes:1,skin:0}).touched:false):[];
+  viewer.setLensFlares(flareSprites,spriteTable,sceneTextures);
   hudPainter.draw(hud, spriteTable, sceneSheets, r, talkDraw(), menuDraw());
 }
 
@@ -2388,19 +2407,19 @@ async function runFrontEnd(): Promise<void> {
     movieChoices: () => exeBytes && progress ? movieChoices(exeBytes, progress.p, strings.levelNames, index => movieFile(index) !== null) : [],
     moviePlay: index => playMovie(index),
     loadMovieArt: () => currentDir ? loadFrontArt(currentDir, 'level1t2', [0,1,2,3,4,5,6,7,17,31], [], 'level06') : Promise.resolve(null),
-    optionsValues: () => ({sfx:menu.sfx,bgm:menu.bgm,activeCamera:!cameraPassive,detail:detailOption??1,keys:structuredClone(input.keys),pad:structuredClone(input.pad),animatedTextures,gamma:getGamma()}),
+    optionsValues: () => ({sfx:menu.sfx,bgm:menu.bgm,activeCamera:!cameraPassive,detail:detailOption??1,keys:structuredClone(input.keys),pad:structuredClone(input.pad),animatedTextures,gamma:getGamma(),lensFlare}),
     controlButtons: () => { const pad=[...(navigator.getGamepads?.()??[])].find(p=>p?.connected);return pad?.buttons.flatMap((b,i)=>b.pressed?[i]:[])??[]; },
     previewOptions(value) {
       menu.sfx=value.sfx;menu.bgm=value.bgm;cameraPassive=!value.activeCamera;
       input.keys=structuredClone(value.keys);
       if(value.pad)input.pad=structuredClone(value.pad);
-      detailOption=value.detail;animatedTextures=value.animatedTextures??true;setGamma(value.gamma??2);
+      detailOption=value.detail;animatedTextures=value.animatedTextures??true;setGamma(value.gamma??2);lensFlare=value.lensFlare??true;
       if(sound)sound.volume=value.sfx/MENU.volumeSteps*0.6;
       if(music)music.volume=Math.round(value.bgm/MENU.volumeSteps*MUSIC_SLIDER_MAX);
     },
     commitOptions() {
       saveProgress();
-      try{localStorage.setItem('ts2.controls',JSON.stringify(input.keys));localStorage.setItem('ts2.pad',JSON.stringify(input.pad));localStorage.setItem('ts2.detail',String(detailOption));localStorage.setItem('ts2.animatedTextures',String(animatedTextures));localStorage.setItem('ts2.gamma',String(getGamma()));}catch{}
+      try{localStorage.setItem('ts2.controls',JSON.stringify(input.keys));localStorage.setItem('ts2.pad',JSON.stringify(input.pad));localStorage.setItem('ts2.detail',String(detailOption));localStorage.setItem('ts2.animatedTextures',String(animatedTextures));localStorage.setItem('ts2.gamma',String(getGamma()));localStorage.setItem('ts2.lensFlare',String(lensFlare));}catch{}
     },
     optionText(address) {
       if(!exeBytes)return '';
@@ -2559,6 +2578,8 @@ async function loadDioramaScene(): Promise<{ paths: DatLevel['paths']; placedOf:
   levelZipLines = [];
   stompProps = createStompProps();
   resetTextureAnimations();
+  flareSprites=[];
+  viewer?.setLensFlares([]);
   guideSparkles = createGuideSparkles([]);
   sequenceVoice = null;
   tasks = null;
@@ -2790,6 +2811,9 @@ function resetTextureAnimations(): void {
   animatedTextureOriginals.clear();textureAnimation=createTextureAnimation();
 }
 let animatedTextures = true;
+let lensFlare = true;
+let flareTable: FlareEntry[] = [];
+let flareSprites: FlareSprite[] = [];
 let guideSparkles = createGuideSparkles([]);
 let sequenceTable: SoundSequences | null = null;
 let sequenceVoice: SequenceVoice | null = null;
@@ -2868,6 +2892,7 @@ function setPlaying(on: boolean): void {
     // Nothing drives the HUD outside play, so take it off the screen.
     hudPainter?.clear();
     viewer.setWorldCards([], []);
+    flareSprites=[];viewer.setLensFlares([]);
   }
 }
 

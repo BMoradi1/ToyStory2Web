@@ -481,10 +481,11 @@ by a byte. This milestone does not establish byte-exact DAT/NGN colour
 parity. Fog is now covered by the follow-up below. The clear-colour path
 (`004b2c80`) and screen quad bypass mode still need comparison with the
 port's backdrop/fade paths.
-Lens flare remains a separate unported effect. Its recovered entry points
+The lens-flare follow-up below now covers the renderer and six callsites.
+Its entry points
 are `0044f420` (candidate filtering/queue, up to eight) and `0044f580`
 (projection, attenuation and the 17-entry sprite chain at `004f72d8`). Do
-not expose its option until sources, visibility and rendering are connected.
+not claim full source parity until the remaining conditional calls are ported.
 
 Validation: `tools/gamma-probe.ts` checks all 768 lookup entries and menu
 limits/labels/cancellation; `tools/gamma-flow-check.js` verifies real menu
@@ -519,7 +520,7 @@ Lens-flare source research: `0044f200` takes position, RGB and a size term.
 Before queuing, it tests a segment from camera `0052adc0/c4/c8` extending
 90 percent toward the source through `0048c860`, then rejects off-screen
 and out-of-depth-range projections. Sixteen calls exist in level/creature
-scripts; the next pass should port their conditions before enabling the row.
+scripts; six are now connected by the follow-up below.
 
 
 `tools/fog-flow-check.js` loads the actual level 14 fog band, checks all
@@ -530,3 +531,51 @@ summary → selector flow, including changing gamma after fog is cleared.
 Those checks, the gamma lookup/menu browser regressions and production
 build pass. Browser probes reuse loaded Vite module URLs so HMR query
 strings cannot create a second gamma state or Three.js instance.
+
+
+## Lens-flare renderer (2026-09-13)
+
+`src/sim/lens-flare.ts` reads the 17 six-short records at `004f72d8` from
+the user-supplied executable: sprite index, X/Y scales and RGB multipliers.
+Ten entries draw sprite 4, 5 or 7; zero entries still advance the chain.
+`0044f580` steps from source to screen centre and beyond in eighths. Its
+strength is `0x103ff - min(0xffff, dx*dx + dy*dy)`; scale adds the source's
+size to strength divided by half of the remapped depth plus one. RGB uses
+signed integer products shifted by 23. The draw helper's flag 0x20 selects
+additive blending at full alpha.
+
+The host projects with the active browser camera into 512x256 space and
+maps normalized depth to `50 + 47950*z`. It rejects sources outside the
+screen/depth range and tests a zero-radius collision sweep from camera to
+90 percent of the source displacement. Eight visible sources are accepted.
+This uses the port's existing collision sweep; exact parity with the PC
+`0048c860` mask/filter and its double-buffered projection timing remains
+unverified. The browser uses its current camera clip planes rather than
+reconstructing a separate retail projection matrix.
+
+Connected sources are the five effect glow calls (behaviours 7, 0xe, 0x1a,
+0x27 and 0x2e, size 48) and level 3's unconditional fixed light at `0041b418`
+(size 128, RGB 128). Behaviour 0x1a sends green for both red and green, as
+`00411ab8/ab9` do. Glow collection no longer shares an early cap with point
+lights: visibility rejection occurs before the renderer's eight-source cap.
+
+`Viewer.setLensFlares` builds screen-space additive batches on a separate
+orthographic scene, rendered after the world and before the DOM HUD. It
+uses the original atlas frames and gamma modulation. Drawing additively
+inside the transparent HUD canvas is insufficient: black texels would still
+cover the world when that canvas is composited. The WebGL pass adds directly
+to the world framebuffer. Scene changes, respawn and leaving play clear the
+batches and texture references. Nothing persists into the selector.
+
+The original lens-flare option is now first at y75, followed by detail,
+gamma and animated textures at y100/125/150. It supports preview, rollback
+and persistence under `ts2.lensFlare`, default on. This does not imply all
+sources are ported: remaining calls are `00406880`, `0041d9d0`, `0041fdc4`,
+`0042537d`, `00425ff0`, `0042addd`, `0042b443`, `0042d2c3`, `0042f1e6`
+and `004307d1`. Their prop/creature state and distance conditions still need
+connecting; do not substitute unconditional lights for them.
+
+Validation: local table/art and visibility probe; actual arena source in
+Chromium with ten sprites; off preference persistence; looking away removes
+the source; additive framebuffer checks; real pause/summary/selector cleanup.
+Gamma and animated-texture navigation regressions and production build pass.

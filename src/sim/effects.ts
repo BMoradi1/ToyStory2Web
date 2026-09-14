@@ -276,7 +276,6 @@ function sound(sim: EffectSim, event: number, e: Effect): void {
 
 /** A screen glow at a record (`FUN_0044f200`), capped per frame by the caller. */
 function glow(sim: EffectSim, e: Effect, r: number, g: number, b: number): void {
-  if (sim.lights.length >= EFFECT.glows) return;
   sim.lights.push({ x: e.x, y: e.y, z: e.z, r, g, b, glow: true });
 }
 
@@ -513,7 +512,7 @@ function behave(sim: EffectSim, world: EffectWorld, e: Effect, dt: number): numb
         const off = (sim.rand.byte() - 0x80) * 0x20;
         spawnChild(sim, world, e.x + off, e.y + off, e.z + off, 0x40, 2);
       }
-      glow(sim, e, e.r, e.g, e.b);
+      glow(sim, e, e.g, e.g, e.b); // 00411ab8/ab9 push the green byte twice.
       return 1;
     case 0x1b: {
       const by = e.period * dt;

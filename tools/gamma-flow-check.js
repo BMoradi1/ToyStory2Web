@@ -26,7 +26,7 @@
   };
   await choose(1);
   for(let i=0;i<3;i++){ts2.frontDrive(64);ts2.frontDrive(0,35);}
-  ts2.frontDrive(0x4000);ts2.frontDrive(0);ts2.frontDrive(64);ts2.frontDrive(0);
+  ts2.frontDrive(0x4000);ts2.frontDrive(0);ts2.frontDrive(64);ts2.frontDrive(0);ts2.frontDrive(64);ts2.frontDrive(0);
   const gammaURL=performance.getEntriesByType('resource').find(e=>/\/src\/render\/gamma\.ts(?:\?|$)/.test(e.name))?.name;
   if(!gammaURL)throw Error('loaded gamma module not found');
   const gamma=await import(gammaURL);
@@ -34,7 +34,7 @@
   step();if(gamma.getGamma()!==2.5)throw Error('gamma preview');
   ts2.frontDrive(0x1000);ts2.frontDrive(0);
   if(gamma.getGamma()!==2)throw Error('gamma cancel rollback');
-  ts2.frontDrive(0x4000);ts2.frontDrive(0);ts2.frontDrive(64);ts2.frontDrive(0);
+  ts2.frontDrive(0x4000);ts2.frontDrive(0);ts2.frontDrive(64);ts2.frontDrive(0);ts2.frontDrive(64);ts2.frontDrive(0);
   step();step();step();if(gamma.getGamma()!==3)throw Error('gamma high clamp');
   ts2.frontDrive(0x4000);ts2.frontDrive(0);
   ts2.frontDrive(0x1000);ts2.frontDrive(0,45);

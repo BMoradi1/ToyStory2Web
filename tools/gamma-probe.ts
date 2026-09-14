@@ -20,7 +20,7 @@ assert.equal(gammaRGB(0x101010,2.5),0x282828,'level 14 medium fog');
 assert.equal(gammaRGB(0x101010,3),0x303030,'level 14 high fog');
 assert.equal(gammaRGB(0x018040,2.5),0x02ffa0,'independent RGB channels and saturation');
 const s=createOptions({sfx:8,bgm:6,activeCamera:true,detail:1,keys:DEFAULT_KEYS});
-s.page=3;s.subrow=1;
+s.page=3;s.subrow=2;
 const labels=new Set<string>();
 const text=(a:number)=>{const t=exeString(exe,a<0?exe.readUInt32LE(-a-0x400000):a);labels.add(t);return t;};
 const tick=(now=0)=>stepOptions(s,{now,was:0},text);

@@ -24,7 +24,7 @@
     await wait(()=>ts2.front.screen==='options','options');
     ts2.frontDrive(0,70);
     for(let i=0;i<3;i++){ts2.frontDrive(64);ts2.frontDrive(0,35);}
-    ts2.frontDrive(0x4000);ts2.frontDrive(0);ts2.frontDrive(64);ts2.frontDrive(0);ts2.frontDrive(64);ts2.frontDrive(0);ts2.frontDrive(32);ts2.frontDrive(0);
+    ts2.frontDrive(0x4000);ts2.frontDrive(0);ts2.frontDrive(64);ts2.frontDrive(0);ts2.frontDrive(64);ts2.frontDrive(0);ts2.frontDrive(64);ts2.frontDrive(0);ts2.frontDrive(32);ts2.frontDrive(0);
     if(ts2.front.state.value.animatedTextures!==false)throw Error('animation toggle failed');
     ts2.frontDrive(0x4000);ts2.frontDrive(0);ts2.frontDrive(0x1000);ts2.frontDrive(0,45);
     await wait(()=>ts2.front.screen==='menu','options exit');

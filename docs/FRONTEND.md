@@ -386,16 +386,17 @@ gamepad Cancel and Start remain available. The active/passive camera and
 Accept rows are browser additions; retail visor-toggle, target-lock and
 menu/cancel binding rows still depend on their corresponding input work.
 
-The supported graphics detail, gamma and animated-texture rows have retail
-half-scale arrows,
+All four graphics rows (lens flare, detail, gamma and animated textures)
+use the retail half-scale arrows,
 20-tick blinking, 15-tick repeat cooldown and y178/y186 prompts from
 `FUN_0049caa0`. Detail persists under `ts2.detail`, animated textures under
 `ts2.animatedTextures` (default on); volume/camera remain in the game's save
 block. Gamma uses the original normal/medium/high labels at y125, with
 values 2/2.5/3 and preference `ts2.gamma`. Animated textures use the original
 on/off labels at y150 and support preview, cancellation rollback and
-persistence. Lens flare remains unexposed because its rendering path is
-unported.
+persistence. Lens flare uses the original on/off labels at y75, defaults on
+and persists under `ts2.lensFlare`; it renders effect glows and the Slime Boss
+arena light. Ten conditional prop/creature sources remain unported.
 Gamma covers geometry, world sprites, HUD and the level 14 fog colour;
 clear-colour/backdrop matching remains open (see docs/EFFECTS.md). This is not full
 controller/graphics feature parity.
@@ -459,8 +460,7 @@ menus. Options, load/save and movie screens were visually inspected.
 
 ## What is left
 
-1. Renderer support for the remaining graphics row: lens flare;
-   then expose that control. Clear-colour/backdrop matching and two
+1. Remaining conditional lens-flare sources, clear-colour/backdrop matching and two
    conditional texture scripts also remain
    (see docs/EFFECTS.md). Controller visor/target
    lock and menu/cancel bindings also remain outside the current input set.
@@ -495,3 +495,13 @@ checks the real menu's preview/rollback/persistence, canvas texel output,
 existing geometry restoration and world-sprite RGB with unchanged alpha.
 The graphics page was visually checked in Chromium; menu probes and the
 animated-texture disabled/reset browser flow pass after the row insertion.
+
+### Lens-flare validation (2026-09-13)
+
+The four graphics rows now retain their original ordering and y positions.
+`tools/lens-flare-probe.ts` checks the local table and sprite references,
+clipping, blocked lights, the eight-visible-source cap, chain spacing and
+option rollback. `tools/lens-flare-flow-check.js` checks the real Slime Boss
+source, off preference persistence, behind-camera rejection and scene cleanup.
+Framebuffer comparisons confirm additive blending never darkens the world.
+Gamma and animated-texture browser checks cover their shifted navigation.

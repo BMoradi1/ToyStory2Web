@@ -127,8 +127,14 @@
  samples and real level-to-selector cleanup pass (fog-flow-check.js).
  Clear-colour/backdrop matching, sprite fog-enable comparison and DAT-to-NGN
  colour quantization remain open; see docs/EFFECTS.md for recovered calls.
- NEXT MENU WORK: renderer support for lens flare,
- then expose the original lens-flare row. Exact routines and gamma lookup
+ LENS-FLARE FOLLOW-UP (2026-09-13): effect glows and the fixed Slime Boss
+ source render through the original 17-entry chain (10 active sprites).
+ Visibility uses projection and a 90-percent collision ray; eight visible
+ lights maximum. Additive WebGL pass sits below HUD; scene/respawn/stop
+ clears sprites and texture references. Original option previews/rolls back/
+ persists. Pixel tests verify that flares never darken the underlying world.
+ NEXT RENDER WORK: ten remaining conditional prop/creature flare callsites,
+ clear-colour/backdrop matching and sprite fog-enable comparison. Exact routines and gamma lookup
  findings are in docs/FRONTEND.md. Controller visor/target-lock and menu/
  cancel bindings still need corresponding input work. Do not claim full parity.
  See docs/FRONTEND.md and tools/retail-menu-probe.ts for exact coverage.

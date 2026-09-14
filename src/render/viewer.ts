@@ -1,3 +1,5 @@
+import type { FlareSprite } from '../sim/lens-flare.ts';
+import type { SpriteHeader } from '../formats/sprite-table.ts';
 import { GameMaterial } from './game-material.ts';
 import { getGamma, gammaModulate, gammaRGB } from './gamma.ts';
 /**
@@ -160,6 +162,36 @@ export class Viewer {
   private colourSources = new WeakMap<THREE.BufferAttribute, Float32Array>();
   private colourGamma = getGamma();
   private fogSource: number | null = null;
+  private readonly flareScene = new THREE.Scene();
+  private readonly flareCamera = new THREE.OrthographicCamera(0,512,256,0,0.1,10);
+  private readonly flareBatches = new Map<number,{batch:SpriteBatch;texture:THREE.Texture|null}>();
+  setLensFlares(flares:readonly FlareSprite[],table:readonly (SpriteHeader|null)[]=[],textures:ReadonlyMap<number,THREE.Texture>=new Map()):void {
+    const pages=new Map<number,WorldSprite[]>();
+    for(const flare of flares){
+      const h=table[flare.sprite],uv=h?.frames[0],texture=h&&textures.get(h.texture);
+      if(!h||!uv||!texture)continue;
+      const width=(h.width*flare.scaleX)>>12,height=(h.height*flare.scaleY)>>12;
+      if(width<=0||height<=0)continue;
+      const image=texture.image as {width:number;height:number};
+      const list=pages.get(h.texture)??[];pages.set(h.texture,list);
+      list.push({x:flare.x+width/2,y:256-flare.y-height/2,z:0,width,height,
+        u0:uv.u/image.width,v0:uv.v/image.height,u1:(uv.u+h.width)/image.width,v1:(uv.v+h.height)/image.height,
+        r:flare.colour[0]/128,g:flare.colour[1]/128,b:flare.colour[2]/128,alpha:1});
+    }
+    this.flareCamera.position.z=1;this.flareCamera.updateMatrixWorld();
+    for(const [page,list] of pages){
+      let entry=this.flareBatches.get(page);
+      if(!entry){entry={batch:new SpriteBatch(false,'add'),texture:null};this.flareBatches.set(page,entry);this.flareScene.add(entry.batch.mesh);}
+      const texture=textures.get(page)!;
+      if(entry.texture!==texture){entry.batch.setSheet(texture);entry.texture=texture;}
+      entry.batch.update(list,this.flareCamera);
+    }
+    for(const [page,entry] of this.flareBatches)if(!pages.has(page)){
+      entry.batch.update([],this.flareCamera);
+      if(entry.texture){entry.batch.setSheet(null);entry.texture=null;}
+    }
+  }
+
   private gammaColours(source: Float32Array): THREE.BufferAttribute {
     const attribute = new THREE.BufferAttribute(source.map(v=>gammaModulate(v)),3);
     this.colourSources.set(attribute,source);
@@ -1092,5 +1124,7 @@ export class Viewer {
     this.renderer.setScissorTest(true);
     void pixels;
     this.renderer.render(this.scene, this.camera);
+    this.renderer.clearDepth();
+    this.renderer.render(this.flareScene,this.flareCamera);
   }
 }

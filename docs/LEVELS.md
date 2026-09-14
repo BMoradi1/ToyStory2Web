@@ -1091,7 +1091,7 @@ token byte.
 stage 7 in phase 2, phase 3 begins. While it runs in phase 2 the boss
 stretches vertically: X/Z stay 0x1000, Y pulses from 0x1000 to 0x1f80
 through the draw triple +0x24/26/28 under mode `+0x34 = 1`; in other phases it
-alternates 0x2000 and off.
+alternates uniform 0x2000 scale and normal drawing (mode 0), not invisibility.
 
 **Releasing the helpers** (phase 2, stun running; the stun is capped at
 600). Once the cut ends: the first time the stun is above 0x1a4, the
@@ -1142,9 +1142,22 @@ against the machine code during implementation.
 `tools/pod-boss-flow-check.js` drives the real arena with synthetic hits,
 including helper death animations, laser gating and the victory exit.
 The attachment follow-up below restores animated BUB points, release
-particles and helper cut framing. The orange burst light, alternating
-follow-camera targets and final-phase hurt flashing remain unfinished. Beam posing and collision retain the browser
+particles and helper cut framing. Follow-camera selection and final-phase
+hurt scaling are also connected. The orange burst light remains unfinished:
+effect light records currently do not illuminate scene geometry. Beam posing and collision retain the browser
 approximations documented in docs/EFFECTS.md.
+
+**Camera/hurt follow-up (2026-09-13).** At 004254eb the camera selects the
+nearest living member of the released pair every 30 simulation ticks using
+signed, shifted X/Z distance from the camera; ties select the second member.
+It retains that slot between selections, including after death, while updating
+the target position each tick. With both helpers dead it targets the boss.
+Target Y offsets are -8192 for helpers and -16384 for the boss. The browser
+feeds this into the shared follow camera's yaw steering; that camera does not
+yet consume target height. Outside phases 2/3 no new follow request is issued.
+At 00424abb non-shell stun alternates normal and double body scale each tick,
+resetting when stun expires. The beam muzzle uses the same appearance scale.
+The pod probe covers selection ties, timing, death retention and scale reset.
 
 **Attachment follow-up (2026-09-13).** Ground points now transform local
 (0,150,1450) through animated part 1 before the ground query. Helpers,

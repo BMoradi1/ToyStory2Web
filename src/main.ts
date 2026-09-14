@@ -1425,7 +1425,12 @@ function stepPodBeams():void{
     const art=creatureArt.get(c.type),animation=art?.anm?.animations[c.animState];
     const pose=art?.anm&&animation?poseBone(art.anm,animation,(c.frame>>>16)%Math.max(1,animation.frameCount),0):null;
     const isBoss=c===boss,from=podMuzzle(c,pose,isBoss?-400:-100);
-    if(isBoss&&tasks?.pod)from.y=c.y+(from.y-c.y)*tasks.pod.stretch;
+    if(isBoss&&tasks?.pod){
+      const {stretch,flashScale}=tasks.pod;
+      from.x=c.x+(from.x-c.x)*flashScale;
+      from.y=c.y+(from.y-c.y)*stretch*flashScale;
+      from.z=c.z+(from.z-c.z)*flashScale;
+    }
     const beam=podBeam(from,isBoss?podBossAim(from,player,c.heading):c.heading,(from,delta)=>{
       const hit=sweepSphere(currentCollisionWorld!,from,delta,0x100,{passes:1,skin:0,stopAtFirstContact:true});
       return {x:hit.x,y:hit.y,z:hit.z};
@@ -2002,7 +2007,10 @@ function drawCreatures(): void {
         sceneTextures,
       );
     }
-    if(tasks?.pod)viewer.setCreatureAppearance(0,[1,tasks.pod.stretch,1],[1,1,1]);
+    if(tasks?.pod){
+      const {stretch,flashScale}=tasks.pod;
+      viewer.setCreatureAppearance(0,[flashScale,stretch*flashScale,flashScale],[1,1,1]);
+    }
     // The trailer's PAINT creature is the liquid inside pushable object 0.
     // Place it after the generic creature pass, which otherwise treats it as a static actor.
     if ((levelNumber(levels[levelEl.selectedIndex]?.id ?? '') ?? 0) === 4) {
@@ -3201,6 +3209,8 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
           cameraYaw: camera?.yaw ?? 0,
           cut: cutHandle,
           releaseGate:effects?.gate,
+          cameraEye:{x:viewer.camera.position.x/GAME_TO_RENDER,y:-viewer.camera.position.y/GAME_TO_RENDER,z:-viewer.camera.position.z/GAME_TO_RENDER},
+          lookAt:(point)=>{if(camera)camera.lookAt=point;},
           attachment:(c,part,point)=>{
             const art=creatureArt.get(c.type),animation=art?.anm?.animations[c.animState];
             const pose=art?.anm&&animation?poseBone(art.anm,animation,(c.frame>>>16)%Math.max(1,animation.frameCount),part):null;

@@ -9,6 +9,7 @@ export interface PodBoss {
   helpers:readonly number[];
   phase:number; stage:number; health:number; base:number; bob:number; ring:number; frame:number;
   cutTicks:number; stun:number; cooldown:number; voice:number; introVoice:number; stretch:number;
+  flashScale:number; lookSlot:number; lookTimer:number;
   pair:number[]; released:boolean; opened:boolean; growing:number[];
   laserReady:boolean; beaten:boolean; won:boolean; finished:boolean;
 }
@@ -20,6 +21,8 @@ export interface PodWorld extends Point {
   effect?:(x:number,y:number,z:number,kind:number,mode:number)=>void;
   attachment?:(creature:Creature,part:number,point:Point)=>Point;
   releaseGate?:{two:number;four:boolean};
+  cameraEye?:Point;
+  lookAt?:(point:Point)=>void;
 }
 /** The leading -1 is a sentinel; the six pairs begin at 004f2f5c. */
 export function readPodHelpers(exe:Uint8Array):number[]{
@@ -37,7 +40,7 @@ export function createPodBoss(at:(slot:number)=>Creature|undefined,helpers:reado
       if(boss){c.record.rangeX=boss.record.rangeX;c.record.rangeZ=boss.record.rangeZ;}}
   }
   return {helpers,phase:0,stage:1,health:boss?.health??26,base:-0x58000,bob:0,ring:0,frame:0,
-    cutTicks:0,stun:0,cooldown:200,voice:0,introVoice:120,stretch:1,pair:[],released:false,opened:false,growing:[],laserReady:false,beaten:false,won:false,finished:false};
+    cutTicks:0,stun:0,cooldown:200,voice:0,introVoice:120,stretch:1,flashScale:1,lookSlot:0,lookTimer:0,pair:[],released:false,opened:false,growing:[],laserReady:false,beaten:false,won:false,finished:false};
 }
 function animate(c:Creature,state:number,script:number){
   c.animState=state;c.animScript=ANIM_SCRIPTS[script]!;c.animIndex=0;c.frame=c.animScript[0]!*65536;
@@ -82,6 +85,8 @@ export function stepPodBoss(s:PodBoss,at:(slot:number)=>Creature|undefined,w:Pod
     }
   }
   s.stun=Math.max(0,s.stun-1);
+  // 00424abb: draw mode alternates between a 2x triple and normal drawing.
+  s.flashScale=s.stun>0&&s.phase!==2&&(s.frame&1)?2:1;
   if(s.stun===0){boss.record.vulnerable=7;boss.drawScale=1;s.stretch=1;if(s.phase===2&&s.stage===7){s.phase=3;boss.record.turnRate=2;boss.record.speed=20;}}
   if(s.phase===0&&w.z>-0x1bb58){s.phase=1;s.base=-0x38000;cut(360);if(w.cut)Object.assign(w.cut.eye,{x:w.x,y:w.y-0x8000,z:w.z});}
   if(s.phase===1){
@@ -125,4 +130,19 @@ export function stepPodBoss(s:PodBoss,at:(slot:number)=>Creature|undefined,w:Pod
   if(s.phase===5&&s.cutTicks===0&&!s.finished){s.won=true;s.finished=true;}
   if(s.phase>=2&&s.phase<4&&s.cutTicks===0)s.cooldown=Math.max(0,s.cooldown-1);
   s.laserReady=s.phase>=2&&s.phase<4&&s.cooldown===0&&podRange(w,boss,400);
+  if(s.phase===2||s.phase===3){
+    // 004254eb: retain the selected slot for 30 ticks, even if it dies.
+    if(--s.lookTimer<=0){
+      s.lookTimer=30;s.lookSlot=0;
+      const eye=w.cameraEye??w;
+      let nearest=Infinity;
+      for(const id of s.pair){
+        const c=at(id);if(!c||c.health<=0)continue;
+        const distance=((eye.x-c.x)>>8)**2+((eye.z-c.z)>>8)**2;
+        if(distance<=nearest){nearest=distance;s.lookSlot=id;}
+      }
+    }
+    const target=at(s.lookSlot)??boss;
+    w.lookAt?.({x:target.x,y:target.y-(s.lookSlot===0?0x4000:0x2000),z:target.z});
+  }
 }

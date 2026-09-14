@@ -890,8 +890,10 @@
            Level 9 pod fight and final flare connected: entrance, six helper
            waves, health limits, laser, final phase and victory exit verified.
            Animated BUB attachment points, release particles and helper-cut
-           framing restored; remaining pod details are orange burst light,
-           follow-camera targets and final-phase hurt flashing,
+           framing restored. Follow-camera targets now select every 30 ticks;
+           final-phase hurt alternates normal/double body and muzzle scale.
+           Remaining: orange burst light needs scene point-light rendering;
+           shared follow camera still ignores target height. Also remaining:
            backdrop matching, conditional
            level 8/Shield texture scripts, plus visor/target-lock and menu/cancel
            binding support. Full controller/GFX feature parity is still open.

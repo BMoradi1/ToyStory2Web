@@ -457,6 +457,8 @@ export function stepTasks(
   world: {
     attachment?:PodWorld['attachment'];
     releaseGate?:PodWorld['releaseGate'];
+    cameraEye?:PodWorld['cameraEye'];
+    lookAt?:PodWorld['lookAt'];
     spit?: SlimeWorld['spit'];
     burstBlobs?: SlimeWorld['burstBlobs'];
     touch?: SlimeWorld['touch'];

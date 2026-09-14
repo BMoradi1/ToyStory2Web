@@ -151,8 +151,11 @@
  POD ATTACHMENTS (2026-09-13): animated part 1 now supplies helper ground
  points and release-camera framing. Part 4 emits the timed release stream;
  two/four-tick gates and strict 185..300 cut window decoded and tested.
- NEXT: pod orange burst light, alternating follow-camera targets and
- final-phase hurt flash,
+ POD CAMERA/HURT (2026-09-13): nearest living helper selected every 30 ticks
+ (X/Z distance, second wins ties), boss fallback and moving target requests.
+ Final-phase hurt alternates normal/double scale, including beam attachment.
+ Shared follow camera currently consumes target yaw only, not target height.
+ NEXT: pod orange burst light (requires actual scene point-light rendering),
  clear-colour/backdrop matching and sprite fog-enable comparison. Exact routines and gamma lookup
  findings are in docs/FRONTEND.md. Controller visor/target-lock and menu/
  cancel bindings still need corresponding input work. Do not claim full parity.

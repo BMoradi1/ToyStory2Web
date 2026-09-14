@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {readEffectTable,EFFECT_FLAGS} from '../src/formats/effect-table.ts';
-import {createEffects,spawnEffect,stepEffects,type EffectWorld} from '../src/sim/effects.ts';
+import {createEffects,spawnEffect,spawnPickupBurst,stepEffects,type EffectWorld} from '../src/sim/effects.ts';
 import {RandomStream} from '../src/sim/creatures.ts';
 import {createPointLights,addPointLight,stepPointLights} from '../src/sim/point-light.ts';
 const {kinds,modes}=readEffectTable(readFileSync(`${process.argv[2]??'Toy Story 2'}/toy2.exe`));
@@ -36,3 +36,15 @@ const culled=createEffects(kinds,modes,new RandomStream(new Uint8Array([0])));
 const e=spawnEffect(culled,world,0,0,0,0,0,0,0,0,0,kinds.findIndex(t=>t?.death===3))!;
 e.x=10000000;stepEffects(culled,world);assert.equal(culled.pointLights.length,0);
 console.log('PASS: death 3/5/8 positions, RGB, lifetime, record/X owners, one-shot emission, cull suppression and light return.');
+
+const pickup=createEffects(kinds,modes,new RandomStream(new Uint8Array([0])));
+const flash=spawnPickupBurst(pickup,world,{x:512,y:0,z:8192},31);
+assert.deepEqual(flash,{x:512,y:0,z:8192,r:96,g:64,b:0,life:16,owner:512});
+const sparks=pickup.effects.filter(e=>e.life>0);
+assert.equal(sparks.length,5);
+for(const spark of sparks){
+ assert.equal(spark.kind,0x29);assert.equal(spark.x,512-32*31);
+ assert.equal(spark.y,-32*31);assert.equal(spark.z,8192-32*31);
+ assert.equal(spark.spin,-128);assert.equal(spark.life,24);
+}
+console.log('PASS: pickup burst light and five scattered sparks with retail spin/lifetime.');

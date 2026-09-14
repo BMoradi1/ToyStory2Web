@@ -271,6 +271,19 @@ export function spawnChild(
   return spawnEffect(sim, world, x, y, z, vx, vy, vz, g, m.rotation, m.spin, kind);
 }
 
+/** 00410410: five scattered pickup sparks and an amber light, owned by X.
+ * The spread draw advances the retail random cursor by three bytes. */
+export function spawnPickupBurst(sim:EffectSim,world:EffectWorld,at:{x:number;y:number;z:number},spread:number):PointLight{
+  for(let i=0;i<5;i++){
+    const offset=((sim.rand.byte()&63)-32)*spread;
+    sim.rand.byte();sim.rand.byte();
+    const child=spawnChild(sim,world,at.x+offset,at.y+offset,at.z+offset,0x29,15);
+    const spin=sim.rand.byte()-128,life=(sim.rand.byte()&15)*2+24;
+    if(child){child.spin=spin;child.life=life;}
+  }
+  return {...at,r:96,g:64,b:0,life:16,owner:at.x};
+}
+
 /** A sound event at a record. Negative numbers are sequences, not events. */
 function sound(sim: EffectSim, event: number, e: Effect): void {
   if (event < 0) return;

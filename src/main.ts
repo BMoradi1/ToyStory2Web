@@ -51,7 +51,7 @@ import {
   type MenuInput, type MenuState,
 } from './sim/menu.ts';
 import {
-  createEffects, liveEffects, spawnChild, spawnEffect, spawnStraightDisk, stepEffects, touchPlayer,
+  createEffects, liveEffects, spawnChild, spawnEffect, spawnStraightDisk, stepEffects, touchPlayer, spawnPickupBurst,
   type EffectSim, type EffectWorld,
 } from './sim/effects.ts';
 import { EFFECT_FLAGS, EFFECT_KIND, readEffectTable } from './formats/effect-table.ts';
@@ -3321,11 +3321,15 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   const scriptedLight=levelNow===3?slimeBlobLight(effects?.effects??[]):scriptedPathLight(levelNow,currentLevel?.level.paths??[],
     {x:viewer.camera.position.x/GAME_TO_RENDER,y:-viewer.camera.position.y/GAME_TO_RENDER,z:-viewer.camera.position.z/GAME_TO_RENDER},player,zones.camera,flareFlicker.intensity);
   if(scriptedLight!==undefined)setScriptedLight(pointLights,scriptedLight);
-  playerLight=stepPointLights(pointLights,player);
   tickSoundSequence();
 
   if (pickups) {
     const taken = stepPickups(pickups, player);
+    if(effects)for(const event of taken){
+      const item=pickups.items[event.index]!;
+      addPointLight(pointLights,spawnPickupBurst(effects,effectWorld(),
+        {x:item.x*32,y:item.y*32,z:item.z*32},(item.reach&127)+14));
+    }
     // PICKUP1 is the engine's own name for a collect; which of PICKUP1 and
     // PICKUP5 belongs to which collectible is in the sound EVENT table, which
     // is not ported (docs/PLAYER.md).
@@ -3359,6 +3363,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       infoEl.textContent = `coins ${pickups.coins}  health ${pickups.health}/14  lives ${pickups.lives}  tokens ${slots}/5`;
     }
   }
+  playerLight=stepPointLights(pointLights,player);
   drawCoins();
   drawEffects();
   drawHud(levelNow);

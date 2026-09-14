@@ -909,8 +909,26 @@ claim a fresh audit of every per-type death animation or burst mapping.
 
 Temporary-light call-site checklist: the local executable contains 15 direct
 calls to `0049ee50`. Seven are connected: `00405f57`, `0040685e`, `00410c4d`,
-`00410d13`, `00410e28`, `00424faf`, `0042535d`. Eight still need their complete
-trigger/position/owner paths traced and connected: `004104be`, `00410a70`,
+`00410d13`, `00410e28`, `00424faf`, `0042535d`. `004104be` now has its pickup
+collection caller connected below; its other callers remain open. Seven still
+need their trigger/position/owner paths traced and connected: `00410a70`,
 `00416c01`, `00420d12`, `00422885`, `00422a53`, `00422fc0`, `004271ae`.
 Similar colours do not establish equivalent callers. Reserved lights are
 updated separately and are not part of this count.
+
+### Pickup collection burst (2026-09-14)
+
+`004a1252` calls the shared `00410410` burst before dispatching a touched
+pickup's category, including hint signs. The host now does the same for pickup
+events: five kind-0x29 particles in mode 15, scattered equally on X/Y/Z by
+`((random & 63)-32) * ((reach & 127)+14)`. That spread draw advances three
+random bytes; each particle then receives signed random spin and life 24..54.
+The helper's `004104be` call emits RGB (96,64,0), life 16, at the pickup's
+position shifted left five. X is the owner, matching the executable.
+
+Light selection now runs once after pickup processing so the collection frame
+includes the new light. Build and effect probes pass; the authored pickup
+browser check verifies particles, source selection, redraw independence and
+respawn reset. Other calls to this helper (token reveals and level scripts)
+remain pending. The separate `004109f0` red-burst helper at `00410a70` has no
+direct call references in the disassembly; indirect use is not ruled out.

@@ -124,6 +124,10 @@ export interface Pickup {
 }
 
 export interface PickupState {
+  /** Shared 004a10a2 timer; collecting another reusable pickup restores this one. */
+  reappearIndex:number;
+  reappearTicks:number;
+  reappeared:number[];
   revealTimers:number[];
   revealScales:number[];
   /** Category-9 objects collected: the find-five counter on some levels. */
@@ -185,6 +189,7 @@ export function createPickups(dat: DatLevel, level: number): PickupState {
   }
 
   return {
+    reappearIndex:-1,reappearTicks:0,reappeared:[],
     revealTimers:Array(5).fill(0),revealScales:Array(5).fill(1),
     items, coins: 0, health: PICKUP.healthMax, lives: 0, tokens: 0, taken: 0,
     itemsFound: 0, pieces: 0, discs: 0, powerTimer: 0,
@@ -221,6 +226,16 @@ export function revealToken(state: PickupState, slot: number, quiet=true): Picku
  * caller can play a sound and stop drawing it.
  */
 export function stepPickups(state: PickupState, p: PlayerState, dt = 1): PickupEvent[] {
+  state.reappeared.length=0;
+  const restore=()=>{
+    const item=state.items[state.reappearIndex];
+    if(item){item.collected=false;state.reappeared.push(state.reappearIndex);}
+    state.reappearIndex=-1;state.reappearTicks=0;
+  };
+  if(state.reappearTicks>0){
+    state.reappearTicks=Math.max(0,state.reappearTicks-dt);
+    if(state.reappearTicks===0)restore();
+  }
   // The power-up runs down whether or not anything is collected.
   if (state.powerTimer > 0) {
     state.powerTimer = Math.max(0, state.powerTimer - PICKUP.powerRate * dt);
@@ -276,6 +291,10 @@ export function stepPickups(state: PickupState, p: PlayerState, dt = 1): PickupE
       default:
         // Power-ups and the unknown kinds: consumed, effect not ported.
         break;
+    }
+    if(item.kind===PickupKind.Kind6||item.kind===PickupKind.Kind7||item.kind===PickupKind.HoverBoots){
+      if(state.reappearTicks>0)restore();
+      state.reappearIndex=i;state.reappearTicks=400;
     }
     item.collected = true;
     state.taken++;

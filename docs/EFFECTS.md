@@ -995,3 +995,27 @@ camera implementation.
 The browser test also exposed that the shared cut clock ran before the pause
 menu's early return. It now skips advancement while the menu is open, keeping
 the camera hold synchronized with the paused reveal animation.
+
+### Reusable pickup reappearance (2026-09-14)
+
+Pickup categories 6, 7 and 8 share one hidden-item record and a 400-tick
+timer (`004a1389..004a1614`, `004a10a2..004a1161`). Taking another restores
+the previous item immediately before replacing the record. Expiry restores
+the current item before contact testing, so Buzz can collect it again on
+the same tick. Coins and ordinary consumed pickups do not use this timer.
+Pause freezes it and a new level/player spawn clears it.
+
+Both replacement and timed restoration now update pickup visibility and
+request the shared five-particle amber burst with spread 50 when signed
+camera deltas shifted right eight have squared distance below `0x90000`.
+This connects the helper calls at `004a1159` and `004a15e0`. The source uses
+the preserved pickup coordinates, not Buzz's position. No additional reward
+is granted merely because the pickup reappeared.
+
+The probe checks all three categories, exact expiry, replacement, large time
+steps, one-shot notifications, recollection and ordinary-coin exclusion.
+The level 4 browser check verifies an authored ammo pickup disappears,
+remains hidden through tick 399, returns with particles/light at tick 400,
+can be collected again and resets cleanly. The standalone `004a0ea0` helper
+has no direct calls found in this disassembly and remains unaudited; this
+does not claim the separate power-up activation routines are complete.

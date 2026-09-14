@@ -519,6 +519,7 @@ async function open(dir: GameDir): Promise<void> {
       get pickups() {
         return pickups ? {
           total: pickups.items.length, taken: pickups.taken, coins: pickups.coins,
+          reappearing:{index:pickups.reappearIndex,ticks:pickups.reappearTicks},
           health: pickups.health, lives: pickups.lives, tokens: pickups.tokens,
           kinds: pickups.items.reduce<Record<string, number>>((acc, it) => {
             const k = PickupKind[it.kind] ?? String(it.kind); acc[k] = (acc[k] ?? 0) + 1; return acc;
@@ -3350,6 +3351,12 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       }
     }
     const taken = stepPickups(pickups, player);
+    if(effects)for(const index of pickups.reappeared){
+      const item=pickups.items[index]!,at={x:item.x*32,y:item.y*32,z:item.z*32};
+      const eye=viewer.camera.position;
+      const distance=((eye.x/GAME_TO_RENDER-at.x)>>8)**2+((-eye.y/GAME_TO_RENDER-at.y)>>8)**2+((-eye.z/GAME_TO_RENDER-at.z)>>8)**2;
+      if(distance<0x90000)addPointLight(pointLights,spawnPickupBurst(effects,effectWorld(),at,50));
+    }
     if(effects)for(const event of taken){
       const item=pickups.items[event.index]!;
       addPointLight(pointLights,spawnPickupBurst(effects,effectWorld(),
@@ -3378,7 +3385,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     if (sign && !talk) startHintTalk(pickups.items[sign.index]!.id);
     if (taken.some((t) => t.kind !== PickupKind.HintSign)) sound?.play('PICKUP1');
     // Anything consumed stops being drawn by the level mesh.
-    if (taken.some((t) => t.kind !== PickupKind.HintSign)) drawPickups();
+    if (pickups.reappeared.length||taken.some((t) => t.kind !== PickupKind.HintSign)) drawPickups();
     // The status line still carries the counters until there is a real
     // pause screen; the HUD shows them too, but only for a few seconds.
     const hurt = pickups.health !== lastShown.health || pickups.lives !== lastShown.lives;

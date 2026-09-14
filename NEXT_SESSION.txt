@@ -218,7 +218,11 @@
  existing 180-tick cut at distance 16, aimed at the token. Quiet startup and
  repeated reveals do not take the camera. Target, pause and full return to
  follow are covered; existing camera easing approximation remains documented.
- NEXT: remaining 00410410 callers (pickup reappearance/level scripts), then seven
+ PICKUP REAPPEARANCE (2026-09-14): categories 6/7/8 share the retail 400-tick
+ hidden-item timer; collecting another restores the previous item immediately.
+ Timed/replacement return restores visibility and nearby spread-50 amber burst.
+ Unit and level 4 browser checks pass, including pause, recollection and reset.
+ NEXT: remaining 00410410 level-script callers and standalone 004a0ea0, then seven
  untouched temporary-light sites in docs/EFFECTS.md. 004109f0 has no direct
  call references; trace indirect use before assigning a gameplay trigger.
  Retail normals remain open;

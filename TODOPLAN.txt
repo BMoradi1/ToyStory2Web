@@ -922,6 +922,9 @@
            suppression and strict camera range. Earned-token camera framing now
            uses the 180-tick hold and shared 64-tick return blend; quiet startup
            and repeated rewards do not restart it.
+           Reusable pickup categories 6/7/8 now share a 400-tick reappearance
+           timer, restore the previous item when replaced, and emit nearby
+           amber return bursts. Exact timer/visibility/recollection checks pass.
            Retail normal lighting and other temporary-light callers remain open;
            Follow camera correctly ignores script target height in retail;
            exact half-turn target steering corrected and regression tested.

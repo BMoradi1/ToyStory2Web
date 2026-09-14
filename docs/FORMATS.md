@@ -758,7 +758,8 @@ level 11 with the camera in zone 5 or 7. Ported 2026-09-07 as
 
 **Fog.** The same pass would set a linear fog from 24,000 to 48,000 level
 units (`FUN_004b2cf0`: Direct3D table fog, start, end, colour) in the
-clear colour halved — `DAT_00559e84..8c` is 0x20 a channel, so 0x10 —
+clear colour halved and then gamma-adjusted — `DAT_00559e84..8c` is
+0x20 a channel, so the input is 0x10 and the default output is 0x20 —
 but only when neither backdrop flag is up, and `FUN_0044ff50` raises one
 of them for any scene holding a texture in slots 0x24, 0x25, 0x28-0x2f or
 0x58-0x5f. Every shipped scene has `tex37` in slot 0x25, so that band
@@ -766,7 +767,10 @@ never shows. What does is level 14's own `case 0xe`: 24,000 to 46,000 in
 the same colour. Fog is only ever cleared by the renderer's start-up
 (`FUN_004b3630`), so in the original it stays on from level 14 through
 whatever is played after it in the same session; the port turns it on
-for level 14 alone (`Viewer.setFog`, 2026-09-07). Level 7's init also
+for level 14 alone (`Viewer.setFog`, 2026-09-07). The 2026-09-13 fog
+follow-up applies gamma to its colour (0x20/0x28/0x30 per channel at
+normal/medium/high) and replaces Three.js's smoothstep with the original
+linear view-depth band (`004b2da4` requests fog mode 3). Level 7's init also
 replaces the clear colour with its backdrop's top-left pixel, which the
 port does not read.
 

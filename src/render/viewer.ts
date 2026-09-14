@@ -1,4 +1,5 @@
-import { getGamma, gammaModulate } from './gamma.ts';
+import { GameMaterial } from './game-material.ts';
+import { getGamma, gammaModulate, gammaRGB } from './gamma.ts';
 /**
  * The 3D view.
  *
@@ -158,6 +159,7 @@ export class Viewer {
   // Weak keys let disposed pose/scene buffers and their sources be collected.
   private colourSources = new WeakMap<THREE.BufferAttribute, Float32Array>();
   private colourGamma = getGamma();
+  private fogSource: number | null = null;
   private gammaColours(source: Float32Array): THREE.BufferAttribute {
     const attribute = new THREE.BufferAttribute(source.map(v=>gammaModulate(v)),3);
     this.colourSources.set(attribute,source);
@@ -166,6 +168,7 @@ export class Viewer {
   private refreshGamma(): void {
     if(this.colourGamma===getGamma())return;
     this.colourGamma=getGamma();
+    if(this.scene.fog && this.fogSource!==null)this.scene.fog.color.setHex(gammaRGB(this.fogSource));
     this.scene.traverse(object=>{
       if(!(object instanceof THREE.Mesh))return;
       const attribute=object.geometry.getAttribute('color');
@@ -247,7 +250,7 @@ export class Viewer {
       // conventions punch holes through 13-15% of Buzz's silhouette, so his
       // parts are not closed shells. Their own material bits are not decoded
       // yet — the `.ngn` creature chunk is the place to look.
-      materials.push(new THREE.MeshBasicMaterial({
+      materials.push(new GameMaterial({
         map: texture ?? null,
         vertexColors: true,
         side: this.sideOverride ?? THREE.DoubleSide,
@@ -292,7 +295,7 @@ export class Viewer {
     buffer.computeVertexNormals();
 
     if (this.singleMaterial) {
-      this.current = new THREE.Mesh(buffer, new THREE.MeshBasicMaterial({
+      this.current = new THREE.Mesh(buffer, new GameMaterial({
         vertexColors: true, side: this.sideOverride ?? THREE.FrontSide, wireframe: false,
       }));
       this.scene.add(this.current);
@@ -519,7 +522,7 @@ export class Viewer {
     const materials: THREE.Material[] = [];
     for (const group of mesh.groups) {
       geometry.addGroup(group.start, group.count, materials.length);
-      materials.push(new THREE.MeshBasicMaterial({
+      materials.push(new GameMaterial({
         map: (group.page === null ? undefined : textures?.get(group.page)) ?? null,
         vertexColors: true,
         side: THREE.DoubleSide,
@@ -545,7 +548,7 @@ export class Viewer {
     const materials: THREE.Material[] = [];
     for (const group of mesh.groups) {
       geometry.addGroup(group.start, group.count, materials.length);
-      materials.push(new THREE.MeshBasicMaterial({
+      materials.push(new GameMaterial({
         map: (group.page === null ? undefined : textures?.get(group.page)) ?? null,
         vertexColors: true,
         side: THREE.DoubleSide,
@@ -651,7 +654,7 @@ export class Viewer {
     if (boxes.length === 0) return;
     const mesh = new THREE.InstancedMesh(
       new THREE.BoxGeometry(1, 1, 1),
-      new THREE.MeshBasicMaterial({ color: 0xffc46b, transparent: true, opacity: 0.45, depthWrite: false }),
+      new GameMaterial({ color: 0xffc46b, transparent: true, opacity: 0.45, depthWrite: false }),
       boxes.length,
     );
     mesh.frustumCulled = false;
@@ -699,7 +702,7 @@ export class Viewer {
     const materials: THREE.Material[] = [];
     for (const group of mesh.groups) {
       geometry.addGroup(group.start, group.count, materials.length);
-      materials.push(new THREE.MeshBasicMaterial({
+      materials.push(new GameMaterial({
         map: (group.page === null ? undefined : textures?.get(group.page)) ?? null,
         vertexColors: true,
         side: THREE.DoubleSide,
@@ -757,7 +760,7 @@ export class Viewer {
     const geometry = new THREE.ConeGeometry(0.2, 0.6, 8);
     // Lay the cone on its side so its point is the facing direction.
     geometry.rotateX(Math.PI / 2);
-    const mesh = new THREE.InstancedMesh(geometry, new THREE.MeshBasicMaterial({ color: 0xffffff }), placements.length);
+    const mesh = new THREE.InstancedMesh(geometry, new GameMaterial({ color: 0xffffff }), placements.length);
     mesh.frustumCulled = false;
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
@@ -922,7 +925,7 @@ export class Viewer {
       clippingPlanes: [group.list === 1 ? this.farListPlane : this.nearListPlane],
     };
     if (group.blend === 'opaque') {
-      return new THREE.MeshBasicMaterial({ ...common, alphaTest: 0.5 });
+      return new GameMaterial({ ...common, alphaTest: 0.5 });
     }
     const blended = {
       ...common,
@@ -931,27 +934,29 @@ export class Viewer {
       depthWrite: false,
     };
     if (group.blend === 'additive') {
-      return new THREE.MeshBasicMaterial({ ...blended, blending: THREE.AdditiveBlending });
+      return new GameMaterial({ ...blended, blending: THREE.AdditiveBlending });
     }
     if (group.blend === 'subtractive') {
       // ZERO / INVSRCCOLOR: the frame buffer is darkened by the face colour.
-      return new THREE.MeshBasicMaterial({
+      return new GameMaterial({
         ...blended,
         blending: THREE.CustomBlending,
         blendSrc: THREE.ZeroFactor,
         blendDst: THREE.OneMinusSrcColorFactor,
       });
     }
-    return new THREE.MeshBasicMaterial({ ...blended, blending: THREE.NormalBlending });
+    return new GameMaterial({ ...blended, blending: THREE.NormalBlending });
   }
 
   /**
    * The scene's fog (`FUN_004b2cf0`): a linear band in level units, in the
-   * clear colour halved, or none. Only level 14 sets one in the shipped game
+   * clear colour halved then passed through gamma, or none. Only level 14
+   * sets one in the shipped game
    * (docs/FORMATS.md "The two detail lists").
    */
   setFog(colour: number | null, start = 0, end = 1): void {
-    this.scene.fog = colour === null ? null : new THREE.Fog(colour, start / WORLD_SCALE, end / WORLD_SCALE);
+    this.fogSource = colour;
+    this.scene.fog = colour === null ? null : new THREE.Fog(gammaRGB(colour), start / WORLD_SCALE, end / WORLD_SCALE);
   }
 
   /**

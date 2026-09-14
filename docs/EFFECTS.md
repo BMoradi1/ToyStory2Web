@@ -478,8 +478,9 @@ The renderer reconstructs byte modulation from its existing 0x80-neutral
 inputs. Level geometry still comes from DAT rather than NGN vertices;
 untextured DAT colours approximate NGN's conversion/halving and can differ
 by a byte. This milestone does not establish byte-exact DAT/NGN colour
-parity. Fog and clear-colour paths (`004b2cf0`, `004b2c80`) and the screen
-quad bypass mode still need comparison with the port's backdrop/fade paths.
+parity. Fog is now covered by the follow-up below. The clear-colour path
+(`004b2c80`) and screen quad bypass mode still need comparison with the
+port's backdrop/fade paths.
 Lens flare remains a separate unported effect. Its recovered entry points
 are `0044f420` (candidate filtering/queue, up to eight) and `0044f580`
 (projection, attenuation and the 17-entry sprite chain at `004f72d8`). Do
@@ -490,3 +491,42 @@ limits/labels/cancellation; `tools/gamma-flow-check.js` verifies real menu
 persistence, preview/rollback, canvas texels, existing geometry restoration,
 and world-sprite colours with unchanged alpha. The production build, menu
 probes and animated-texture disabled/reset browser regression also pass.
+
+
+### Fog follow-up (2026-09-13)
+
+`004b2cf0` passes the packed fog RGB through `004b37b0` before storing it.
+Level 14 supplies 0x101010 and a 24000–46000 level-unit band; its rendered
+fog colour is therefore 0x202020, 0x282828 or 0x303030 across the three gamma
+settings. `Viewer.setFog` keeps the unadjusted source so changes and rollback
+do not compound the gain. Clearing fog also clears that source.
+
+`004b2d80` submits mode 3 (linear) at `004b2da4`. Three.js r169's built-in
+fog chunk uses smoothstep instead. `GameMaterial` replaces only that factor
+with a clamped linear view-depth fraction. This covers the viewer's basic
+mesh materials, including textured, alpha-tested and blended geometry;
+world-sprite ShaderMaterials still use their existing unfogged path.
+The latter needs a separate retail fog-enable comparison.
+
+Clear-colour research: `00440f70` packs the same halved source, but chooses
+clear flags 2 when a backdrop flag is set (depth only), and flags 3 otherwise
+(colour plus depth). Every shipped scene enables a backdrop flag. Applying
+an arbitrary gamma multiplier to the port's fallback scene background would
+not reproduce that draw sequence. The unported backdrop/clear path and the
+screen-quad bypass remain open.
+
+Lens-flare source research: `0044f200` takes position, RGB and a size term.
+Before queuing, it tests a segment from camera `0052adc0/c4/c8` extending
+90 percent toward the source through `0048c860`, then rejects off-screen
+and out-of-depth-range projections. Sixteen calls exist in level/creature
+scripts; the next pass should port their conditions before enabling the row.
+
+
+`tools/fog-flow-check.js` loads the actual level 14 fog band, checks all
+three gamma colours and rollback, and reads GPU pixels from `GameMaterial`
+at seven depths, including quarter points that distinguish linear fog from
+smoothstep. It also checks fog-disabled rendering and the real pause →
+summary → selector flow, including changing gamma after fog is cleared.
+Those checks, the gamma lookup/menu browser regressions and production
+build pass. Browser probes reuse loaded Vite module URLs so HMR query
+strings cannot create a second gamma state or Three.js instance.

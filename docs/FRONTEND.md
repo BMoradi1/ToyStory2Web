@@ -396,8 +396,8 @@ values 2/2.5/3 and preference `ts2.gamma`. Animated textures use the original
 on/off labels at y150 and support preview, cancellation rollback and
 persistence. Lens flare remains unexposed because its rendering path is
 unported.
-Gamma covers geometry, world sprites and HUD; fog/clear-colour matching
-remains open (see docs/EFFECTS.md). This is not full
+Gamma covers geometry, world sprites, HUD and the level 14 fog colour;
+clear-colour/backdrop matching remains open (see docs/EFFECTS.md). This is not full
 controller/graphics feature parity.
 
 `src/front/load-screen.ts` restores the PC load/save root and eight-slot
@@ -460,7 +460,7 @@ menus. Options, load/save and movie screens were visually inspected.
 ## What is left
 
 1. Renderer support for the remaining graphics row: lens flare;
-   then expose that control. Gamma fog/clear-colour matching and two
+   then expose that control. Clear-colour/backdrop matching and two
    conditional texture scripts also remain
    (see docs/EFFECTS.md). Controller visor/target
    lock and menu/cancel bindings also remain outside the current input set.

@@ -121,9 +121,14 @@
  level/model vertices, world sprites and HUD; source colours survive changes.
  All 768 lookup entries and browser menu/pixel/geometry/alpha checks pass.
  Static loader also uses gamma (004cbb33/5f/8b); earlier fixed-2x note corrected.
- Fog/clear-colour matching and DAT-to-NGN colour quantization remain open.
+ FOG FOLLOW-UP (2026-09-13): level 14 fog now follows gamma and uses
+ linear view depth instead of Three.js smoothstep. Original source RGB is
+ retained for preview/rollback and cleared on scene transitions. GPU depth
+ samples and real level-to-selector cleanup pass (fog-flow-check.js).
+ Clear-colour/backdrop matching, sprite fog-enable comparison and DAT-to-NGN
+ colour quantization remain open; see docs/EFFECTS.md for recovered calls.
  NEXT MENU WORK: renderer support for lens flare,
- then expose those original graphics rows. Exact routines and gamma lookup
+ then expose the original lens-flare row. Exact routines and gamma lookup
  findings are in docs/FRONTEND.md. Controller visor/target-lock and menu/
  cancel bindings still need corresponding input work. Do not claim full parity.
  See docs/FRONTEND.md and tools/retail-menu-probe.ts for exact coverage.

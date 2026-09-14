@@ -1,7 +1,7 @@
 /** Compare the PC fixed-point lookup and original menu labels/limits. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { gammaByte, gammaModulate, getGamma, setGamma } from '../src/render/gamma.ts';
+import { gammaByte, gammaModulate, gammaRGB, getGamma, setGamma } from '../src/render/gamma.ts';
 import { createOptions, stepOptions } from '../src/front/options.ts';
 import { DEFAULT_KEYS } from '../src/sim/input.ts';
 import { exeString } from '../src/sim/level-data.ts';
@@ -15,6 +15,10 @@ for(const gain of [2,2.5,3] as const){
  assert.equal(gammaModulate(0,gain),0);
 }
 for(const invalid of [NaN,Infinity,0,2.7,4]){setGamma(invalid);assert.equal(getGamma(),2);}
+assert.equal(gammaRGB(0x101010,2),0x202020,'level 14 normal fog');
+assert.equal(gammaRGB(0x101010,2.5),0x282828,'level 14 medium fog');
+assert.equal(gammaRGB(0x101010,3),0x303030,'level 14 high fog');
+assert.equal(gammaRGB(0x018040,2.5),0x02ffa0,'independent RGB channels and saturation');
 const s=createOptions({sfx:8,bgm:6,activeCamera:true,detail:1,keys:DEFAULT_KEYS});
 s.page=3;s.subrow=1;
 const labels=new Set<string>();

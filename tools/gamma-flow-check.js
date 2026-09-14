@@ -27,7 +27,9 @@
   await choose(1);
   for(let i=0;i<3;i++){ts2.frontDrive(64);ts2.frontDrive(0,35);}
   ts2.frontDrive(0x4000);ts2.frontDrive(0);ts2.frontDrive(64);ts2.frontDrive(0);
-  const gamma=await import('/src/render/gamma.ts');
+  const gammaURL=performance.getEntriesByType('resource').find(e=>/\/src\/render\/gamma\.ts(?:\?|$)/.test(e.name))?.name;
+  if(!gammaURL)throw Error('loaded gamma module not found');
+  const gamma=await import(gammaURL);
   const step=()=>{ts2.frontDrive(32);ts2.frontDrive(0,16);};
   step();if(gamma.getGamma()!==2.5)throw Error('gamma preview');
   ts2.frontDrive(0x1000);ts2.frontDrive(0);

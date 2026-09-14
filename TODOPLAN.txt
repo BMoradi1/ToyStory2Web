@@ -877,7 +877,8 @@
            bounds, browser toggle/persistence and respawn restoration verified.
            2026-09-13: original gamma row and clamped vertex/sprite/HUD gain
            implemented; preview, rollback, persistence and pixel tests pass.
-           Remaining: lens flare, gamma fog/clear-colour matching, conditional
+           2026-09-13: level 14 fog gain and linear depth blending corrected.
+           Remaining: lens flare, clear-colour/backdrop matching, conditional
            level 8/Shield texture scripts, plus visor/target-lock and menu/cancel
            binding support. Full controller/GFX feature parity is still open.
  [was]     Cutscenes: MPEG-1 in the browser (jsmpeg-style decoder or

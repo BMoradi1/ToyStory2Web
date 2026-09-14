@@ -383,7 +383,7 @@ async function showLevel(index: number): Promise<void> {
       // The render pass's fog. Every shipped scene carries the slot-0x25
       // sheet that keeps the engine's general band off, so only level 14's
       // own 24,000-46,000 band ever shows; its colour is the clear colour
-      // halved, 0x20 a channel to 0x10 (docs/FORMATS.md).
+      // halved, 0x20 a channel to 0x10, then gamma-adjusted by setFog.
       const fog = FOG_BY_LEVEL[levelNumber(level.id) ?? 0];
       viewer.setFog(fog ? FOG_COLOUR : null, fog?.[0], fog?.[1]);
 

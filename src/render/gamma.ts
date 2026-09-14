@@ -9,6 +9,12 @@ export function setGamma(value: number): void {
 export function gammaByte(value: number, gain: Gamma = gamma): number {
   return Math.min(255, Math.floor(Math.max(0, value) * gain));
 }
+/** Packed RGB used by the PC fog and clear-colour entry points. */
+export function gammaRGB(colour: number, gain: Gamma = gamma): number {
+  return (gammaByte((colour >>> 16) & 255, gain) << 16)
+    | (gammaByte((colour >>> 8) & 255, gain) << 8)
+    | gammaByte(colour & 255, gain);
+}
 /** Renderer inputs use the port's 0x80-neutral modulation convention. */
 export function gammaModulate(value: number, gain: Gamma = gamma): number {
   return gammaByte(Math.round(value * 128), gain) / 255;

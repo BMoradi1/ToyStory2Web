@@ -793,6 +793,13 @@ async function open(dir: GameDir): Promise<void> {
         }
         return true;
       },
+      /** Harness: enter an existing script after an unported intro or cutscene. */
+      seekCreatureScript(slot: number, word: number) {
+        const c = creatureSim?.creatures.find(q => q.slot === slot);
+        if (!c || !Number.isInteger(word) || word < 0 || word >= c.script.length) return false;
+        c.pc = word; c.wait = 0;
+        return true;
+      },
       hurtCreature(slot: number, kind = 1) {
         if (!creatureSim || !player) return null;
         const c = creatureSim.creatures.find((q) => q.slot === slot);
@@ -1477,6 +1484,15 @@ function spawnCreatureEffects(): void {
     addPointLight(pointLights, spawnPickupBurst(effects, world, at, 50));
   }
   creatureSim.rescues.length = 0;
+  for (const at of creatureSim.defeatBursts) {
+    for (let i = 0; i < 5; i++) {
+      const bit = spawnChild(effects, world, at.x, at.y, at.z, 0x23, 14);
+      const spin = effects.rand.byte() - 128;
+      if (bit) bit.spin = spin;
+    }
+    addPointLight(pointLights, at.light);
+  }
+  creatureSim.defeatBursts.length = 0;
   for (const shot of creatureSim.shots) {
     // The hover bot fires from a gun on each side; the port has one heading
     // per shot, so the bolt leaves along it rather than across it.

@@ -911,10 +911,10 @@
            recovered positions, lifetimes and owner rules. Unit/framebuffer
            checks pass; hook 5 is tested explicitly (no authored template).
            Ordinary positive-burst creature deaths now supply orange life-32
-           light at the hit-shape centre. Seven of fifteen direct temporary-light
+           light at the hit-shape centre. Eight of fifteen direct temporary-light
            calls fully connected. Shared pickup-burst helper now connects its
            collection, reusable-return and ten rescue callers with particles and
-           amber light; standalone helper and seven untouched sites remain listed
+           amber light; standalone helper and six untouched sites remain listed
            in docs/EFFECTS.md.
            Earned-token reveal sequence now uses its own 132-tick scale animation,
            16-particle ring and sound at tick 32. Quiet startup reveals preserved;
@@ -929,6 +929,10 @@
            All ten find-five rescue handlers now emit spread-50 amber bursts
            above the creature and use individual retail pickup cues; one-shot
            counting/removal and authored sheep contact are regression covered.
+           Tin Robot defeat now emits five explosion particles and orange
+           light at its hit centre, once on the open-state death transition.
+           NEXT gameplay fix: Tin Robot intro/fight handoff; browser effect check
+           requires explicit script seeking and does not validate a full fight.
            Retail normal lighting and other temporary-light callers remain open;
            Follow camera correctly ignores script target height in retail;
            exact half-turn target steering corrected and regression tested.

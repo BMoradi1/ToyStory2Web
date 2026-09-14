@@ -222,6 +222,8 @@ export interface CreatureSim {
    * 0x11 and a bang. The caller spawns them (docs/EFFECTS.md).
    */
   deaths: { x: number; y: number; z: number; burst: number; light: PointLight|null }[];
+  /** Scripted defeat explosions, separate from enemy deaths that spill coins. */
+  defeatBursts: { x: number; y: number; z: number; light: PointLight }[];
   /** Bolts a handler fired this tick. The projectile itself is not ported. */
   shots: { x: number; y: number; z: number; heading: number }[];
   /** Sustained ZPOD beams requested this tick; resolved against terrain by the host. */
@@ -334,7 +336,7 @@ export function createCreatureSim(
   }
   return {
     creatures, world, rand, level,
-    sounds: [], rescues: [], sparks: [], dust: [], raceState: 0, carFront: 0, carRear: 0, shots: [], beamCasters: [], deaths: [], near: [],
+    sounds: [], rescues: [], sparks: [], dust: [], raceState: 0, carFront: 0, carRear: 0, shots: [], beamCasters: [], deaths: [], defeatBursts: [], near: [],
     foundCount: 0, lastKilled: -1, models: null,
     bossLastHealth: -1, bossSlotEarned: false,
   };
@@ -986,8 +988,8 @@ function hoverBot(sim: CreatureSim, c: Creature, args: HandlerArgs): void {
  * twelve, the boss token is earned.
  *
  * Not ported: the taunt dialogue it opens when Buzz reaches its platform,
- * its hover wobble, and the sparks and explosion it throws off, which need
- * the effect system (NEXT_SESSION.txt).
+ * its hover wobble and ongoing sparks. Its defeat explosion is queued for
+ * the effect system at the hit-shape centre (00416bbb..00416c01).
  */
 function tinRobot(sim: CreatureSim, c: Creature): void {
   const rec = c.record;
@@ -998,11 +1000,14 @@ function tinRobot(sim: CreatureSim, c: Creature): void {
   rec.vulnerable = c.animState === 3 || c.animState === 5 ? 7 : 4;
 
   if (sim.bossLastHealth === -1) sim.bossLastHealth = c.health;
-  if (c.health !== sim.bossLastHealth) {
+  if ((c.animState === 3 || c.animState === 5) && c.health !== sim.bossLastHealth) {
     if (c.health < 10) {
       // Dying: the script's own death entry, and the shell closes again.
       c.pc = 101;
       rec.vulnerable = 4;
+      const at = { x: c.x + c.offsetX, y: c.y + c.offsetY, z: c.z + c.offsetZ };
+      sim.defeatBursts.push({ ...at, light: { ...at,
+        r: 240, g: 128, b: 0, life: 32, owner: 0x52c840 + c.slot * 0x9c } });
     } else {
       c.pc = 90;
     }

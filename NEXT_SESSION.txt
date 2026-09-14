@@ -226,8 +226,16 @@
  spread-50 burst at Y minus 0x2000 and use their individual pickup sound IDs.
  Unit coverage includes all mapped types and one-shot counting/removal; browser
  coverage uses an authored sheep. Idle chatter remains a shared approximation.
- NEXT: standalone 004a0ea0 (last of fourteen shared burst callers), then seven
- untouched temporary-light sites in docs/EFFECTS.md. 004109f0 has no direct
+ TIN ROBOT DEFEAT (2026-09-14): restored five mode-14 explosion particles
+ and orange life-32 light at the model hit centre. Health transitions now wait
+ for open states 3/5, matching retail. Unit and authored-robot browser probes
+ cover the transition, one-shot emission and reset; token timing is preserved.
+ NEXT: Tin Robot intro-to-fight handoff is missing: authored robot waits at
+ script word 8. Browser defeat test seeks words 10/40 to isolate the effect.
+ Trace the taunt close/start path before claiming a playable full encounter.
+ Then six untouched temporary-light sites (start with 00420d12)
+ in docs/EFFECTS.md; standalone 004a0ea0 still has no direct caller found.
+ 004109f0 has no direct
  call references; trace indirect use before assigning a gameplay trigger.
  Retail normals remain open;
  clear-colour/backdrop matching and sprite fog-enable comparison. Exact routines and gamma lookup

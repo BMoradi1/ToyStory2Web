@@ -908,12 +908,12 @@ encounter passes with helper-death flashes enabled. This change does not
 claim a fresh audit of every per-type death animation or burst mapping.
 
 Temporary-light call-site checklist: the local executable contains 15 direct
-calls to `0049ee50`. Seven are connected: `00405f57`, `0040685e`, `00410c4d`,
-`00410d13`, `00410e28`, `00424faf`, `0042535d`. `004104be` now has its pickup
+calls to `0049ee50`. Eight are connected: `00405f57`, `0040685e`, `00410c4d`,
+`00410d13`, `00410e28`, `00416c01`, `00424faf`, `0042535d`. `004104be` now has its pickup
 collection, reusable-return and ten rescue callers connected below; its standalone
-`004a0ea0` caller remains unresolved. Seven still
+`004a0ea0` caller remains unresolved. Six still
 need their trigger/position/owner paths traced and connected: `00410a70`,
-`00416c01`, `00420d12`, `00422885`, `00422a53`, `00422fc0`, `004271ae`.
+`00420d12`, `00422885`, `00422a53`, `00422fc0`, `004271ae`.
 Similar colours do not establish equivalent callers. Reserved lights are
 updated separately and are not part of this count.
 
@@ -1052,3 +1052,29 @@ Thirteen of fourteen direct calls to `00410410` are now connected: these ten,
 collection, timed reappearance and replacement. The remaining standalone
 `004a0ea0` routine calls it at `004a0f3d`, but has no direct callers found;
 its gameplay trigger is unresolved.
+
+### Tin Robot defeat explosion (2026-09-14)
+
+`00416b24..00416c38` processes a changed health value only in animation
+states 3 or 5. Health 10 or above enters the hit script; below 10 enters
+word 101 of the death script and closes the shell. That transition now
+requests five kind-0x23 particles in mode 14 with random-byte-minus-128
+spin, plus the `00416c01` orange RGB (240,128,0) life-32 point light.
+Both use creature origin plus the model hit-shape centre offset. The owner
+is the entity record (`0x52c840 + slot*0x9c`). A dedicated host-drained
+queue keeps this explosion separate from ordinary deaths that spill coins.
+Unchanged health does not replay it; the token still waits for death state
+7 to pass frame 12. The nearby sound-stop and other robot cosmetics remain
+outside this change.
+
+`tools/tin-defeat-probe.ts` covers both open states, the health threshold,
+closed-state deferral, one-shot emission, exact centre/light/owner, no coin,
+token timing and reset. `tools/tin-defeat-flow-check.js` exercises the
+installed level 1 robot through its vulnerable states and checks the five
+particles, light source, redraw independence, one-shot emission and reset.
+
+The browser harness explicitly seeks to script words 10 and 40 because the robot's
+intro-to-fight handoff is still unported: without that bypass the authored
+robot remains at word 8; word 40 isolates its open-state health transition
+from the unfinished fight flow. This verifies the defeat effect, not a complete
+playable encounter. The missing intro transition is now the next gameplay task.

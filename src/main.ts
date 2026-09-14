@@ -3315,7 +3315,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   stepEffectsNow();
   stepPodBeams();
   const scriptedLight=scriptedPathLight(levelNow,currentLevel?.level.paths??[],
-    {x:viewer.camera.position.x/GAME_TO_RENDER,y:-viewer.camera.position.y/GAME_TO_RENDER,z:-viewer.camera.position.z/GAME_TO_RENDER},player,zones.camera);
+    {x:viewer.camera.position.x/GAME_TO_RENDER,y:-viewer.camera.position.y/GAME_TO_RENDER,z:-viewer.camera.position.z/GAME_TO_RENDER},player,zones.camera,flareFlicker.intensity);
   if(scriptedLight!==undefined)setScriptedLight(pointLights,scriptedLight);
   playerLight=stepPointLights(pointLights,player);
   tickSoundSequence();

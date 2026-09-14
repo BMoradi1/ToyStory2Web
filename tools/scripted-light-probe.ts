@@ -46,3 +46,19 @@ const disabled=scriptedPathLight(11,[],camera,player,0);
 setScriptedLight(retained,disabled!);assert.equal(retained.scripted.life,0);
 assert.equal(scriptedPathLight(1,[],camera,player,0),null);
 console.log('PASS: levels 5/10/11/12/13 path and RGB selection, missing/rejected paths, level 11 zone-4 retention and disable on leaving it.');
+
+const lamps=[{id:6,points}];
+for(const [intensity,r,g,b] of [[1,2,2,0],[32,64,64,0],[64,128,128,0],[65,128,128,2],[128,128,128,128]] as const){
+ const source=scriptedPathLight(4,lamps,camera,player,0,intensity)!;
+ assert.deepEqual([source.r,source.g,source.b],[r,g,b]);
+}
+const flickerPool=createPointLights();
+setScriptedLight(flickerPool,scriptedPathLight(4,lamps,camera,player,0,1)!);
+const last={...flickerPool.scripted};
+const dark=scriptedPathLight(4,[],{x:300000,y:0,z:0},player,0,0);
+assert.equal(dark,undefined,'zero intensity skips source updates');
+if(dark!==undefined)setScriptedLight(flickerPool,dark);
+assert.deepEqual(flickerPool.scripted,last,'zero retains the last dim source');
+assert.equal(scriptedPathLight(4,[],camera,player,0,1),null,'nonzero with no lamps disables');
+assert.equal(scriptedPathLight(4,lamps,{x:300000,y:0,z:0},player,0,1),null);
+console.log('PASS: level 4 yellow/white intensity ramp, zero-intensity retention, and nonzero missing/rejected sources.');

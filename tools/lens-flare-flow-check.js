@@ -72,6 +72,21 @@
     const {parseDat}=await import('/src/formats/dat.ts');
     const point=parseDat(await file.arrayBuffer()).paths.find(p=>p.id===(flickering?6:({5:17,10:13,11:19,12:0,13:10}[lightLevel]))).points[0];
     source={x:point.x/256,y:-point.y/256,z:-point.z/256};
+    if(flickering){
+      const colours=new Set();
+      for(let i=0;i<180;i++){
+        ts2.player.x=point.x*32;ts2.player.y=point.y*32+8192;ts2.player.z=point.z*32;
+        ts2.player.hitStun=1000;ts2.tickGame({},1);
+        const intensity=ts2.lensFlares.flicker.intensity,light=ts2.effects.scriptedLight;
+        if(intensity>0&&light.life){
+          const yellow=Math.min(128,intensity*2),blue=Math.max(0,intensity*2-128);
+          if(light.r!==yellow||light.g!==yellow||light.b!==blue)throw Error('character light lost flicker synchronization');
+          colours.add([light.r,light.g,light.b].join(','));
+        }
+      }
+      if(colours.size<2)throw Error('flickering character lamp never changed colour');
+      console.log('FLICKERING CHARACTER LIGHT PASS',colours.size);
+    }
     if(!flickering){
       for(let i=0;i<240;i++){
         ts2.player.x=point.x*32;ts2.player.y=point.y*32+8192;ts2.player.z=point.z*32;
@@ -120,6 +135,7 @@
   if(flickering){
     await ts2.spawnPlayer();viewer.stop();
     if(JSON.stringify(ts2.lensFlares.flicker)!==JSON.stringify({timer:60,target:128,intensity:0}))throw Error('respawn retained flicker');
+    if(ts2.effects.scriptedLight.life!==0||ts2.effects.lightTransition.remaining!==0)throw Error('respawn retained scripted light');
   }
   if(!enabled||pathLight||location.search.includes('cleanup')){
   ts2.tickGame({}, 10);
@@ -128,8 +144,10 @@
   await pause(100);
   if(flickering){
     const frozen=JSON.stringify(ts2.lensFlares.flicker);
+    const lightFrozen=JSON.stringify([ts2.effects.scriptedLight,ts2.effects.lightTransition]);
     ts2.tickGame({},20);
     if(JSON.stringify(ts2.lensFlares.flicker)!==frozen)throw Error('pause advanced flicker');
+    if(JSON.stringify([ts2.effects.scriptedLight,ts2.effects.lightTransition])!==lightFrozen)throw Error('pause advanced scripted light');
     console.log('FLARE FLICKER RESPAWN/PAUSE PASS');
   }
   // Pause menu: continue, camera, volume, exit; then confirm yes.

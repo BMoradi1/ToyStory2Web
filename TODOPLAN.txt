@@ -899,7 +899,9 @@
            slot 1 now supports level 10 path-13 lamps with verified range gates
            and temporary-light competition. Level 5/11 path lamps also connected,
            including level 11's zone-4 retention rule. Level 12 path-0 white and
-           level 13 path-10 cool-tinted lights connected. Other slot-1 sources, slot-0 overrides,
+           level 13 path-10 cool-tinted lights connected. Level 4 path-6 character
+           light shares flicker intensity and retains its last source at zero.
+           Other slot-1 sources, slot-0 overrides,
            retail normal lighting and other light callers remain open;
            Follow camera correctly ignores script target height in retail;
            exact half-turn target steering corrected and regression tested.

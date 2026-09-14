@@ -3,9 +3,15 @@ import type {PointLight} from './point-light.ts';
 
 /** Undefined means the retail script skips updating the existing slot. */
 export function scriptedPathLight(level:number,paths:readonly {id:number;points:readonly Point[]}[],
-  camera:Point,player:Point,cameraZone:number):PointLight|null|undefined{
+  camera:Point,player:Point,cameraZone:number,flickerIntensity=0):PointLight|null|undefined{
   // 0042ad4d jumps past both assignment and disabling in camera zone 4.
   if(level===11&&cameraZone===4)return undefined;
+  if(level===4){
+    // 0041d916 skips assignment AND disabling at zero intensity.
+    if(flickerIntensity===0)return undefined;
+    const yellow=Math.min(128,flickerIntensity*2),blue=Math.max(0,flickerIntensity*2-128);
+    return nearestPathLight(paths.find(p=>p.id===6)?.points??[],camera,player,[yellow,yellow,blue]);
+  }
   const settings:Record<number,readonly [number,number,number,number]>={
     5:[17,128,96,64], // 0041fd41..0041fea3
     10:[13,255,255,255], // 00425f60..004260d0

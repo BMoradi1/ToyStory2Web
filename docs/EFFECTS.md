@@ -747,7 +747,7 @@ All 15 records were read from the local executable. The character-light probe
 checks signed direction, colour, tracking and reset; Chromium checks reserved
 RGB pixels and the full six-wave return to level 9's base light.
 
-Remaining: level scripts' slot-1 sources except levels 5/10/11/12/13 below, dynamic slot-0 overrides (including
+Remaining: level scripts' slot-1 sources except levels 4/5/10/11/12/13 below, dynamic slot-0 overrides (including
 level 3), retail normal shading and the other temporary-light callers. The
 renderer still adds light to existing vertex colours using posed triangle
 normals, so this is not a claim of complete retail lighting parity.
@@ -802,3 +802,18 @@ rejected points disable the source. Level 13's character tint is distinct from
 its flare colour (48,64,80). Scene mapping is `level02/level1` for level 12
 and `level03/level1` for level 13. The probe and browser lamp harness cover
 both mappings; the remaining special sources include levels 3, 4, 14 and 15.
+
+### Level 4 flickering character lamps (2026-09-14)
+
+The path-6 source now shares the existing simulation flicker intensity with
+the character-light selector (`0041d916..0041dab6`). For intensity 1..64,
+RGB is (2i,2i,0); for 65..128 it is (128,128,2i-128). Camera/player range
+gates and nearest selection match the other path lamps. At intensity zero,
+`0041d918` jumps past both assignment and disabling, retaining the previous
+reserved light. Nonzero intensity with no eligible point disables it normally.
+No second timer or random stream is introduced.
+
+The scripted-light probe covers ramp boundaries, zero retention and rejected
+points. The flicker browser check visits an authored lamp and checks colour
+synchronization, respawn reset, pause and selector cleanup. Shading remains the
+documented approximation; special sources in levels 3, 14 and 15 remain open.

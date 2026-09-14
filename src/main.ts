@@ -2,7 +2,8 @@ import { readLensFlareTable, buildLensFlares, flareRay, levelFlareSources, pathF
 import { getGamma, setGamma } from './render/gamma.ts';
 import {podMuzzle,podBeam,podImpactHits,podBossAim,podAttachment} from './sim/pod-beam.ts';
 import {createPodBoss,readPodHelpers,podBossBar} from './sim/pod-boss.ts';
-import {createPointLights,addPointLight,stepPointLights,type PlayerLight} from './sim/point-light.ts';
+import {createPointLights,addPointLight,setScriptedLight,stepPointLights,type PlayerLight} from './sim/point-light.ts';
+import {level10Light} from './sim/scripted-light.ts';
 import {readCharacterLight} from './formats/character-light.ts';
 import { createTextureAnimation, stepTextureAnimation, copyScrolledTexture } from './sim/texture-animation.ts';
 import { readSoundSequences, startSequence, stepSequence, type SoundSequences, type SequenceVoice } from './audio/sequences.ts';
@@ -928,6 +929,7 @@ async function open(dir: GameDir): Promise<void> {
           podBeams: podBeams.map(b => ({ ...b })),
           pointLights:pointLights.slots.map(l=>({...l})),
           lightTransition:{selected:pointLights.selected,remaining:pointLights.remaining},
+          scriptedLight:{...pointLights.scripted},
           playerLight,
           diskAmmo: pickups?.discs ?? 0,
           kinds: live.map((e) => e.kind),
@@ -3312,6 +3314,9 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   }
   stepEffectsNow();
   stepPodBeams();
+  setScriptedLight(pointLights,levelNow===10?level10Light(
+    currentLevel?.level.paths.find(p=>p.id===13)?.points??[],
+    {x:viewer.camera.position.x/GAME_TO_RENDER,y:-viewer.camera.position.y/GAME_TO_RENDER,z:-viewer.camera.position.z/GAME_TO_RENDER},player):null);
   playerLight=stepPointLights(pointLights,player);
   tickSoundSequence();
 

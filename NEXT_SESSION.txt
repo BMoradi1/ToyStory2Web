@@ -169,7 +169,11 @@
  executable, follows Buzz and is restored after burst transitions/respawn.
  All 15 records and framebuffer/full-encounter returns verified. Triangle-normal
  shading is still approximate; zero-RGB fallback is now replaced in gameplay.
- NEXT: scripted slot-1 lights and slot-0 overrides, retail normals and other effect/beam light callers;
+ SCRIPTED LIGHT (2026-09-13): reserved slot 1 now supports persistent script
+ selection and temporary-light competition. Level 10 path-13 white lamps
+ connected with retail camera/player cutoffs; unit and real-lamp browser tests
+ verify selection, transitions, redraw independence and selector cleanup.
+ NEXT: other scripted slot-1 lights and slot-0 overrides, retail normals and other effect/beam light callers;
  clear-colour/backdrop matching and sprite fog-enable comparison. Exact routines and gamma lookup
  findings are in docs/FRONTEND.md. Controller visor/target-lock and menu/
  cancel bindings still need corresponding input work. Do not claim full parity.

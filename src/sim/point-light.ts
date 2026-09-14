@@ -6,8 +6,9 @@ export interface PointLight extends LightSample { life:number; owner:number }
 export interface PlayerLight { direction:Point; colour:readonly [number,number,number] }
 export interface PointLights {
   slots:PointLight[];
-  /** -1 is the browser's base lighting, corresponding to reserved slot 0. */
+  /** -1 is reserved slot 0; -2 is the scripted reserved slot 1. */
   selected:number; remaining:number; from:LightSample; base:PointLight;
+  scripted:PointLight;
   profile:CharacterLight|null;
 }
 const empty=():PointLight=>({x:0,y:0,z:0,r:0,g:0,b:0,life:0,owner:0});
@@ -15,8 +16,13 @@ const empty=():PointLight=>({x:0,y:0,z:0,r:0,g:0,b:0,life:0,owner:0});
 export function createPointLights(profile:CharacterLight|null=null):PointLights{
   const base=empty();
   if(profile)[base.r,base.g,base.b]=profile.colour;
-  return {slots:Array.from({length:4},empty),selected:-1,remaining:0,from:empty(),base,
+  return {slots:Array.from({length:4},empty),selected:-1,remaining:0,from:empty(),base,scripted:empty(),
     profile:profile?{offset:{...profile.offset},colour:[...profile.colour]}:null};
+}
+/** Disabling slot 1 retains its outgoing sample for the return transition. */
+export function setScriptedLight(state:PointLights,light:PointLight|null):void{
+  if(light)Object.assign(state.scripted,light);
+  else state.scripted.life=0;
 }
 export function addPointLight(state:PointLights,light:PointLight):void{
   const pool=state.slots;
@@ -41,6 +47,11 @@ export function stepPointLights(state:PointLights,player:Point):PlayerLight|null
     state.base.y+=state.profile.offset.y;
     state.base.z+=state.profile.offset.z;
   }
+  if(state.scripted.life!==0){
+    const l=state.scripted;
+    selected=-2;
+    nearest=((l.x-origin.x)>>8)**2+((l.y-origin.y)>>8)**2+((l.z-origin.z)>>8)**2;
+  }
   for(let i=0;i<state.slots.length;i++){
     const light=state.slots[i]!;
     light.life=Math.max(0,light.life-1);
@@ -49,7 +60,7 @@ export function stepPointLights(state:PointLights,player:Point):PlayerLight|null
     if(d>0x8000){light.life=0;continue;}
     if(d<nearest){nearest=d;selected=i;}
   }
-  const at=(slot:number)=>slot<0?state.base:state.slots[slot]!;
+  const at=(slot:number)=>slot===-2?state.scripted:slot===-1?state.base:state.slots[slot]!;
   if(at(state.selected).owner!==at(selected).owner){
     // Capture the outgoing interpolated sample before choosing a new owner.
     state.from=blend(state.from,at(state.selected),state.remaining);

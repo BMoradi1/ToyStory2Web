@@ -747,7 +747,30 @@ All 15 records were read from the local executable. The character-light probe
 checks signed direction, colour, tracking and reset; Chromium checks reserved
 RGB pixels and the full six-wave return to level 9's base light.
 
-Remaining: level scripts' slot-1 sources, dynamic slot-0 overrides (including
+Remaining: level scripts' slot-1 sources except level 10 below, dynamic slot-0 overrides (including
 level 3), retail normal shading and the other temporary-light callers. The
 renderer still adds light to existing vertex colours using posed triangle
 normals, so this is not a claim of complete retail lighting parity.
+
+### Level 10 scripted lamp light (2026-09-13)
+
+`00425f60..004260d0` now supplies reserved slot 1 from path 13. Each point
+shifts left five into game units. Camera-minus-point components shift right
+eight, with squared distance strictly below 1,000,000 required before considering
+the point. Among those candidates the nearest to (Buzz.x, Buzz.y-8192, Buzz.z)
+wins; the script shifts player-minus-point components and requires squared
+distance strictly below 65536. Equal distances retain the first point. RGB is
+(255,255,255); point identity substitutes for the retail path-point address.
+
+Reserved slot 1 is enabled by the script, not aged as a temporary light. The
+shared selector compares its distance with temporary sources; a temporary source
+must be strictly closer to replace it. Entry and return use the existing
+64-tick reserved-light blend. Disabling the slot retains its old sample for
+the transition back to slot 0. Spawn/respawn/exit reset it with the pool.
+The lens flare remains a separate source with its own visibility rules.
+
+`tools/scripted-light-probe.ts` covers source selection, strict cutoffs, ties,
+reserved lifetime and temporary competition. The path variant of
+`tools/lens-flare-flow-check.js` visits an authored level 10 lamp, checks the
+settled character-light state and redraw independence, verifies additive flare
+pixels and exits cleanly to the selector. Other scripted sources remain queued.

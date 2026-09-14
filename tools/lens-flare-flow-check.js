@@ -69,6 +69,19 @@
     const {parseDat}=await import('/src/formats/dat.ts');
     const point=parseDat(await file.arrayBuffer()).paths.find(p=>p.id===(flickering?6:13)).points[0];
     source={x:point.x/256,y:-point.y/256,z:-point.z/256};
+    if(!flickering){
+      for(let i=0;i<70;i++){
+        ts2.player.x=point.x*32;ts2.player.y=point.y*32+8192;ts2.player.z=point.z*32;
+        ts2.player.hitStun=1000;ts2.tickGame({},1);
+      }
+      const light=ts2.effects.scriptedLight;
+      if(light.life!==1||light.r!==255||light.g!==255||light.b!==255)throw Error('level 10 scripted light missing');
+      if(ts2.effects.lightTransition.selected!==-2||ts2.effects.lightTransition.remaining!==0)throw Error('scripted light transition did not settle');
+      const frozen=JSON.stringify(ts2.effects.lightTransition);
+      for(let i=0;i<5;i++)ts2.redrawHud();
+      if(JSON.stringify(ts2.effects.lightTransition)!==frozen)throw Error('rendering advances scripted light');
+      console.log('LEVEL 10 SCRIPTED LIGHT PASS',JSON.stringify(light));
+    }
   }
   let visible=false;
   for(const [x,y,z] of [[0,0,1],[1,0,0],[0,0,-1],[-1,0,0],[0,-1,0]]){

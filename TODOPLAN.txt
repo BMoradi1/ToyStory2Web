@@ -896,7 +896,8 @@
            character shading approximate. Owner-based 64-tick return blending
            now verified in unit/framebuffer/full-encounter tests. Reserved slot 0
            reads authored per-level offset/RGB and survives respawn; scripted
-           slot-1 lights and slot-0 overrides,
+           slot 1 now supports level 10 path-13 lamps with verified range gates
+           and temporary-light competition. Other slot-1 sources, slot-0 overrides,
            retail normal lighting and other light callers remain open;
            Follow camera correctly ignores script target height in retail;
            exact half-turn target steering corrected and regression tested.

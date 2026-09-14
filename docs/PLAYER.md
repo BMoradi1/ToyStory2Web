@@ -737,3 +737,16 @@ world zone/detail clipping from the camera model. Retail turning lag and
 firing motion are still unported; this first pass rigidly follows the camera.
 `tools/aim-model-probe.ts` checks all fifteen scenes and keeps source placements
 unchanged. The browser aiming check covers world hiding and camera attachment.
+
+The camera model now preserves independent part rotations. At nominal one-tick
+speed, `004042c7..00404355` moves model pitch/yaw one sixth of the signed shortest
+angle toward the aim (integer truncation leaves a five-unit settling band).
+`00404360` reads the phase's sine, shifted right ten. Object 0x2d uses current
+pitch/yaw plus half the sway; 0x2e uses lagged pitch/yaw plus full sway; 0x2f
+uses lagged pitch/yaw plus half sway. The phase starts at 0x7f8 and advances
+0x40 per tick (`00404463..004044df`, normal branch). This is continuous motion,
+not a decoded shot-triggered recoil. The port cancels aiming on damage, so the
+retail slowed phase branch while hurt is not used. Model rotation remains visual:
+manual lasers and disks continue to use the camera ray. Pause freezes both phase
+and tracking; re-entry reseeds them. Browser checks verify changing vertex data;
+unit checks cover wraparound, integer settling and unchanged shot direction.

@@ -1,3 +1,12 @@
+CURRENT UPDATE — 2026-09-14: first-person model motion
+  Ported the verified model tracking and sine sway from FUN_004038e0: independent
+  part rotations, one-sixth shortest-angle tracking per game tick, half/full sway
+  amplitudes and the 0x7f8 initial phase. Laser/disk aim stays on the camera ray.
+  Browser and unit checks pass for moving geometry, wraparound, settling, pause,
+  toggle/respawn reset and camera attachment; production build passes.
+  The motion decoded here is continuous sway, not evidence of a separate recoil
+  animation. Next visor work remains retail target lock/cycling and aim feedback.
+
 CURRENT UPDATE — 2026-09-14: selector, late levels and original visor
   Fixed the selector inheriting the previous gameplay backdrop. The selector now
   clears both backdrop and visor meshes before awaiting scene loads.

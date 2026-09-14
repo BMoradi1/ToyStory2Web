@@ -1,5 +1,5 @@
 import {aimObjectIndices,buildAimModel} from './render/aim-model.ts';
-import {createAimView,stepAimView,aimCamera} from './sim/aim-view.ts';
+import {createAimView,stepAimView,aimCamera,aimModelAngles} from './sim/aim-view.ts';
 import {stepTokenSparkles} from './sim/token-sparkles.ts';
 import {readTokenReveal,type TokenRevealProfile} from './formats/token-reveal.ts';
 import {stepTokenReveal,revealEarnedToken} from './sim/token-reveal.ts';
@@ -3175,6 +3175,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   stepAimView(aimView,player,held,cut.noControl);
   viewer.setPlayerVisible(!aimView.active);
   viewer.setAimVisible(aimView.active);
+  if(aimView.active)viewer.setAimPose(aimModelAngles(aimView));
   if(aimView.active) held={...held,moveX:0,moveY:0,jump:false,spin:false,cameraLeft:false,cameraRight:false};
   const playerGround = groundFromCollision(currentCollisionWorld, levelPoles, levelZipLines);
   playerGround.beforeMove = () => tickPushBlocks(held);

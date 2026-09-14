@@ -41,10 +41,14 @@
   const eye=ts2.viewer.camera.position;
   if(Math.abs(eye.y-(-(ts2.player.y-0x3000)/8192))>0.0001)throw Error('wrong first-person eye');
   const start={x:ts2.player.x,z:ts2.player.z};
+  const visorBefore=ts2.viewer.aimModel.geometry.getAttribute('position').array.slice();
   ts2.tickGame({aim:true},1);
   if(!ts2.aimView.active)throw Error('held toggle repeated');
   ts2.tickGame({aim:false,moveX:1,moveY:1},10);
   if(!ts2.aimView.pitch||ts2.player.x!==start.x||ts2.player.z!==start.z)throw Error('aim input moved Buzz');
+  const visorAfter=ts2.viewer.aimModel.geometry.getAttribute('position').array;
+  if(!visorBefore.some((value,i)=>Math.abs(value-visorAfter[i])>0.00001))throw Error('visor is rigid while turning');
+  if(ts2.aimView.modelYaw===ts2.aimView.yaw)throw Error('arm does not trail turn');
   let fired=false;
   for(let i=0;i<30;i++){
     ts2.tickGame({fire:true},1);

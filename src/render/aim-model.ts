@@ -12,5 +12,5 @@ export function buildAimModel(level: DatLevel) {
     position:{x:0,y:0,z:0},rotation:{x:0,y:3072,z:0},
     scale:{x:2048,y:2048,z:2048},zone:null,
   }));
-  return buildLevelGeometry({...level,objects});
+  return buildLevelGeometry({...level,objects},{separate:new Set(objects.map((_,i)=>i))});
 }

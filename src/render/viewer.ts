@@ -80,13 +80,31 @@ export class Viewer {
   private readonly backdrop = new Backdrop();
   setBackdrop(texture: THREE.Texture | null): void { this.backdrop.set(texture); }
   private aimModel: THREE.Mesh | null = null;
+  private aimBase: Float32Array | null = null;
+  private aimGroups: LevelGeometry['groups'] = [];
+  /** Apply the three independent retail part rotations in camera space. */
+  setAimPose(angles:readonly (readonly [number,number])[]):void {
+    if(!this.aimModel||!this.aimBase)return;
+    const attribute=this.aimModel.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const v=new THREE.Vector3(),q=new THREE.Quaternion();
+    for(const group of this.aimGroups){
+      const angle=angles[group.object??-1];if(!angle)continue;
+      q.setFromEuler(new THREE.Euler(angle[0]*Math.PI/2048,-angle[1]*Math.PI/2048,0,'YXZ'));
+      for(let i=group.start;i<group.start+group.count;i++){
+        v.fromArray(this.aimBase,i*3).applyQuaternion(q);attribute.setXYZ(i,v.x,v.y,v.z);
+      }
+    }
+    attribute.needsUpdate=true;
+  }
   setAimModel(geometry: LevelGeometry | null, textures = new Map<number, THREE.Texture>()): void {
     if(this.aimModel) {
       this.scene.remove(this.aimModel);this.aimModel.geometry.dispose();
       for(const m of this.aimModel.material as THREE.Material[])m.dispose();
       this.aimModel=null;
     }
+    this.aimBase=null;this.aimGroups=[];
     if(!geometry?.triangleCount)return;
+    this.aimBase=geometry.positions.slice();this.aimGroups=geometry.groups;
     const buffer=new THREE.BufferGeometry();
     buffer.setAttribute('position',new THREE.BufferAttribute(geometry.positions,3));
     buffer.setAttribute('color',this.gammaColours(geometry.colors));

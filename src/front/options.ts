@@ -1,10 +1,10 @@
 /** Retail options artwork and root/volume timing from FUN_004371b0. */
 import { PAD, setFade, stepFade, type FrontItem, type PadWord, type StepResult } from './screens.ts';
 import { DEFAULT_PAD, validBindingCode, type PadBindings, type KeyBindings, type Action } from '../sim/input.ts';
-export interface OptionsValues { sfx: number; bgm: number; activeCamera: boolean; detail: number; keys: KeyBindings; pad?: PadBindings }
+export interface OptionsValues { sfx: number; bgm: number; activeCamera: boolean; detail: number; keys: KeyBindings; pad?: PadBindings; animatedTextures?: boolean }
 export const CONTROL_ACTIONS: Action[] = ['up','down','left','right','jump','fire','spin','cameraLeft','cameraRight'];
 export function createOptions(value: OptionsValues) {
-  const values={...structuredClone(value),pad:structuredClone(value.pad??DEFAULT_PAD)};
+  const values={...structuredClone(value),pad:structuredClone(value.pad??DEFAULT_PAD),animatedTextures:value.animatedTextures??true};
   return { value: structuredClone(values), snapshot: structuredClone(values), page: -1, row: 0, subrow: 0,
     cursorY: 65 * 256, ticks: 0, remaining: -1, capture: false, controlTop: 0, captureLock: 0, controlDevice: 'keyboard' as 'keyboard'|'gamepad', gfxRepeat: 0, queuedSounds: [] as number[],
     fade: {level:0,target:128,speed:12} };
@@ -49,14 +49,15 @@ export function stepOptions(s: ReturnType<typeof createOptions>, pad: PadWord, t
       if(value!==s.value[key]){s.value[key]=value;sounds.push(2);}
       if(edge(PAD.jump)){s.page=-1;sounds.push(1);}
     }else{
-      const max=s.page===0?CONTROL_ACTIONS.length+1:0;
+      const max=s.page===0?CONTROL_ACTIONS.length+1:1;
       if(edge(PAD.up)&&s.subrow>0){s.subrow--;sounds.push(2);}
       if(edge(PAD.down)&&s.subrow<max){s.subrow++;sounds.push(2);}
       if(s.page===3){
         const delta=s.gfxRepeat>0?0:pad.now&PAD.right?1:pad.now&PAD.left?-1:0;
         if(s.gfxRepeat>0)s.gfxRepeat--;
         else if(delta)s.gfxRepeat=15;
-        s.value.detail=Math.max(0,Math.min(2,s.value.detail+delta));
+        if(s.subrow===0)s.value.detail=Math.max(0,Math.min(2,s.value.detail+delta));
+        else if(delta)s.value.animatedTextures=!s.value.animatedTextures;
         if(delta)sounds.push(2);
         if(edge(PAD.jump)){s.page=-1;sounds.push(1);}
       }else if(edge(PAD.jump)&&s.captureLock===0){
@@ -105,9 +106,10 @@ export function stepOptions(s: ReturnType<typeof createOptions>, pad: PadWord, t
     optionText(items,text(0x5008bc),50);
     const labels=[0x5009f4,0x5009f8,0x5009fc];
     // The host resolves pointer-table text for this negative-address request.
-    if(s.ticks%20<10)optionText(items,text(-labels[s.value.detail]!),100);
-    if(s.value.detail>0)items.push({kind:'sprite',index:56,frame:3,x:50,y:97,space:320,colour:128,alpha:1,scaleX:2048,scaleY:2048});
-    if(s.value.detail<2)items.push({kind:'sprite',index:56,frame:2,x:255,y:97,space:320,colour:128,alpha:1,scaleX:2048,scaleY:2048});
+    if(s.subrow!==0||s.ticks%20<10)optionText(items,text(-labels[s.value.detail]!),100);
+    if(s.subrow!==1||s.ticks%20<10)optionText(items,text(s.value.animatedTextures?0x5008f4:0x50090c),150);
+    if(s.subrow===1||s.value.detail>0)items.push({kind:'sprite',index:56,frame:3,x:50,y:s.subrow===0?97:147,space:320,colour:128,alpha:1,scaleX:2048,scaleY:2048});
+    if(s.subrow===1||s.value.detail<2)items.push({kind:'sprite',index:56,frame:2,x:255,y:s.subrow===0?97:147,space:320,colour:128,alpha:1,scaleX:2048,scaleY:2048});
     optionText(items,text(0x5009bc),178,1536);
     optionText(items,text(0x5009d8),186,1536);
   }

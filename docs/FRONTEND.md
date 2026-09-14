@@ -386,11 +386,13 @@ gamepad Cancel and Start remain available. The active/passive camera and
 Accept rows are browser additions; retail visor-toggle, target-lock and
 menu/cancel binding rows still depend on their corresponding input work.
 
-The supported graphics detail row now has the retail half-scale arrows,
+The supported graphics detail and animated-texture rows have retail half-scale arrows,
 20-tick blinking, 15-tick repeat cooldown and y178/y186 prompts from
-`FUN_0049caa0`. Detail persists under `ts2.detail`; volume/camera remain in
-the game's save block. Lens flare, animated textures and gamma are still
-not exposed: their rendering paths remain unported. This is not full
+`FUN_0049caa0`. Detail persists under `ts2.detail`, animated textures under
+`ts2.animatedTextures` (default on); volume/camera remain in the game's save
+block. Animated textures use the original on/off labels at y150 and support
+preview, cancellation rollback and persistence. Lens flare and gamma remain
+unexposed because their rendering paths are unported. This is not full
 controller/graphics feature parity.
 
 `src/front/load-screen.ts` restores the PC load/save root and eight-slot
@@ -452,8 +454,9 @@ menus. Options, load/save and movie screens were visually inspected.
 
 ## What is left
 
-1. Renderer support for the remaining graphics rows: lens flare, texture
-   animation and gamma; then expose those controls. Controller visor/target
+1. Renderer support for the remaining graphics rows: lens flare and gamma;
+   then expose those controls. Two conditional texture scripts also remain
+   (see docs/EFFECTS.md). Controller visor/target
    lock and menu/cancel bindings also remain outside the current input set.
    Load/save transition timing and the supported controller layout are ported.
 2. The level selector's per-level ambience and camera-flight comparison.

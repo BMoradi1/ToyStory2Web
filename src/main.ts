@@ -1,3 +1,4 @@
+import { createTextureAnimation, stepTextureAnimation, copyScrolledTexture } from './sim/texture-animation.ts';
 import { readSoundSequences, startSequence, stepSequence, type SoundSequences, type SequenceVoice } from './audio/sequences.ts';
 import { createGuideSparkles, stepGuideSparkles, spendGuide } from './sim/guide-sparkles.ts';
 import { createStompProps, stepStompProps, stompObjects, paintStreamScale } from './sim/stomp-props.ts';
@@ -291,6 +292,7 @@ async function showLevel(index: number): Promise<void> {
   levelPoles = [];
   levelZipLines = [];
   stompProps = createStompProps();
+  resetTextureAnimations();
   guideSparkles = createGuideSparkles([]);
   sequenceVoice = null;
   tasks = null;
@@ -456,6 +458,7 @@ async function open(dir: GameDir): Promise<void> {
     if(keys&&Object.keys(input.keys).every(k=>Array.isArray(keys[k])&&keys[k].length>0&&keys[k].every(validBindingCode)))input.keys=keys;
     const pad=JSON.parse(localStorage.getItem('ts2.pad')??'null');
     if(pad&&Object.keys(input.pad).every(k=>Array.isArray(pad[k])&&pad[k].length>0&&pad[k].every((b:unknown)=>Number.isInteger(b)&&Number(b)>=0&&Number(b)<32)))input.pad=pad;
+    animatedTextures=localStorage.getItem('ts2.animatedTextures')!=='false';
     const detail=localStorage.getItem('ts2.detail');
     if(detail!==null&&/^[012]$/.test(detail))detailOption=Number(detail);
   }catch{}
@@ -644,6 +647,12 @@ async function open(dir: GameDir): Promise<void> {
         return { index: which, yaw: b.segYaw, block: { x: b.x, y: b.y, z: b.z }, player: { x: player.x, y: player.y, z: player.z } };
       },
       get stompProps() { return stompProps; },
+      get textureAnimation() {return { ...textureAnimation,enabled:animatedTextures };},
+      texturePixels(page:number) {
+        const texture=sceneTextures.get(page);
+        if(!(texture instanceof THREE.DataTexture))return null;
+        return {width:texture.image.width,height:texture.image.height,version:texture.version,data:Array.from(texture.image.data)};
+      },
       get guideSparkles() { return guideSparkles; },
       get soundSequence() { return sequenceVoice; },
       get stompSurfaces() {
@@ -1210,6 +1219,7 @@ async function spawnPlayer(): Promise<void> {
   // implemented, so the rest stay hidden until `ts2.revealTokens()`.
   const level = levelNumber(sceneId) ?? 0;
   stompProps = createStompProps();
+  resetTextureAnimations();
   guideSparkles = createGuideSparkles([]);
   sequenceVoice = null;
   drawStompProps(level);
@@ -2376,19 +2386,19 @@ async function runFrontEnd(): Promise<void> {
     movieChoices: () => exeBytes && progress ? movieChoices(exeBytes, progress.p, strings.levelNames, index => movieFile(index) !== null) : [],
     moviePlay: index => playMovie(index),
     loadMovieArt: () => currentDir ? loadFrontArt(currentDir, 'level1t2', [0,1,2,3,4,5,6,7,17,31], [], 'level06') : Promise.resolve(null),
-    optionsValues: () => ({sfx:menu.sfx,bgm:menu.bgm,activeCamera:!cameraPassive,detail:detailOption??1,keys:structuredClone(input.keys),pad:structuredClone(input.pad)}),
+    optionsValues: () => ({sfx:menu.sfx,bgm:menu.bgm,activeCamera:!cameraPassive,detail:detailOption??1,keys:structuredClone(input.keys),pad:structuredClone(input.pad),animatedTextures}),
     controlButtons: () => { const pad=[...(navigator.getGamepads?.()??[])].find(p=>p?.connected);return pad?.buttons.flatMap((b,i)=>b.pressed?[i]:[])??[]; },
     previewOptions(value) {
       menu.sfx=value.sfx;menu.bgm=value.bgm;cameraPassive=!value.activeCamera;
       input.keys=structuredClone(value.keys);
       if(value.pad)input.pad=structuredClone(value.pad);
-      detailOption=value.detail;
+      detailOption=value.detail;animatedTextures=value.animatedTextures??true;
       if(sound)sound.volume=value.sfx/MENU.volumeSteps*0.6;
       if(music)music.volume=Math.round(value.bgm/MENU.volumeSteps*MUSIC_SLIDER_MAX);
     },
     commitOptions() {
       saveProgress();
-      try{localStorage.setItem('ts2.controls',JSON.stringify(input.keys));localStorage.setItem('ts2.pad',JSON.stringify(input.pad));localStorage.setItem('ts2.detail',String(detailOption));}catch{}
+      try{localStorage.setItem('ts2.controls',JSON.stringify(input.keys));localStorage.setItem('ts2.pad',JSON.stringify(input.pad));localStorage.setItem('ts2.detail',String(detailOption));localStorage.setItem('ts2.animatedTextures',String(animatedTextures));}catch{}
     },
     optionText(address) {
       if(!exeBytes)return '';
@@ -2546,6 +2556,7 @@ async function loadDioramaScene(): Promise<{ paths: DatLevel['paths']; placedOf:
   levelPoles = [];
   levelZipLines = [];
   stompProps = createStompProps();
+  resetTextureAnimations();
   guideSparkles = createGuideSparkles([]);
   sequenceVoice = null;
   tasks = null;
@@ -2770,6 +2781,13 @@ let pushBlocks: PushState | null = null;
 let levelPoles: Pole[] = [];
 let levelZipLines: ZipLine[] = [];
 let stompProps = createStompProps();
+let textureAnimation = createTextureAnimation();
+const animatedTextureOriginals = new Map<THREE.DataTexture, Uint8Array | Uint8ClampedArray>();
+function resetTextureAnimations(): void {
+  for(const [texture,original] of animatedTextureOriginals){texture.image.data.set(original);texture.needsUpdate=true;}
+  animatedTextureOriginals.clear();textureAnimation=createTextureAnimation();
+}
+let animatedTextures = true;
 let guideSparkles = createGuideSparkles([]);
 let sequenceTable: SoundSequences | null = null;
 let sequenceVoice: SequenceVoice | null = null;
@@ -3177,6 +3195,14 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   stepBeams(laserBeams);
   // Beams hit immediately; disks move in the effect pool.
   if (player.laserFired !== null) fireLaser();
+  const textureScrolls=stepTextureAnimation(textureAnimation,levelNow,zones.camera,zones.player);
+  if(animatedTextures)for(const scroll of textureScrolls){
+    const texture=sceneTextures.get(scroll.page);
+    if(texture instanceof THREE.DataTexture){
+      if(!animatedTextureOriginals.has(texture))animatedTextureOriginals.set(texture,texture.image.data.slice());
+      if(copyScrolledTexture(texture.image,scroll))texture.needsUpdate=true;
+    }
+  }
   stepEffectsNow();
   tickSoundSequence();
 

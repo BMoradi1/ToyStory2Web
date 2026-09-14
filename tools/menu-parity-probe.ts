@@ -36,9 +36,10 @@ s.page=0;s.captureLock=0;s.snapshot=structuredClone(s.value);s.value.pad.jump=[7
 // Bound buttons actually drive the controller, not only menu labels.
 Object.defineProperty(globalThis,'navigator',{configurable:true,value:{getGamepads:()=>[{connected:true,axes:[0,0],buttons:Array.from({length:16},(_,i)=>({pressed:i===1}))}]}});
 const input=new InputSource(DEFAULT_KEYS,s.value.pad);assert(input.read().jump);assert(!input.read().fire);
-s.page=3;s.value.detail=0;s.gfxRepeat=0;
+s.page=3;s.subrow=0;s.value.detail=0;s.gfxRepeat=0;
 tick(32);assert.equal(s.value.detail,1);for(let i=0;i<15;i++)tick(32,32);assert.equal(s.value.detail,1);tick(32,32);assert.equal(s.value.detail,2);
 assert(!tick().frame.items.some(i=>i.kind==='sprite'&&i.index===56&&i.frame===2),'no right arrow at high detail');
+s.snapshot=structuredClone(s.value);s.gfxRepeat=0;tick(64);tick();tick(32);assert.equal(s.value.animatedTextures,false);tick();tick(0x1000);assert.equal(s.value.animatedTextures,true,'Cancel rolls back animated textures');
 const progress=importProgress(encodeSaveFile('',freshBlock()));
 const slots=Array.from({length:8},(_,i)=>({name:`slot ${i+1}`,progress:i===0?progress:null}));
 const load=createLoadScreen(slots);

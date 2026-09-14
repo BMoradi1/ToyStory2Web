@@ -414,3 +414,39 @@ loads, respawn and selector entry clear the active slot and guide state.
 `tools/prop-feedback-probe.ts` verifies actual script timing, the shared tail,
 looping control flow and guide cadence/lifetime. The stomp probes verify cue
 triggers and retirement, including duplicate-colour reset and all mixtures.
+
+## Animated texture regions (2026-09-13)
+
+`src/sim/texture-animation.ts` ports the seven common level scroll scripts
+for levels 1, 2, 3, 5, 8, 11 and 13. The callsites are respectively
+`00418471`, `0041a722`, `0041b38b`, `0041f76c`, `00423cc0`, `0042aef7`
+and `0042cde3`. Level 1 runs only in camera zone 6; level 11 only in player
+zone 5. Their gated phases hold outside those zones. Other phases advance
+each gameplay tick, even with the graphics option disabled.
+
+The `0049b260` / `004ce510` wrappers feed `004afd30`: x/y name the
+destination rectangle, while x+dx/y+dy locate its source. The source wraps
+within its rectangle before copying. The PC vertical path takes precedence
+over horizontal scrolling whenever scrollY is nonzero. The port preserves
+all RGBA channels, snapshots the source to handle overlap, rejects invalid
+bounds without mutation and marks changed DataTextures for GPU upload.
+Original pixel arrays and scene clocks are restored on respawn, level load
+and selector entry. These clocks are local to the scene in the browser port.
+
+The graphics row uses the original on/off strings and persists the setting;
+turning it off skips copies without stopping script phases. Level 2's supplied
+PC replacement sheet has a solid-colour source region, so repeated scrolling
+there produces no visible movement after the initial copy.
+
+Two known calls remain unported: level 8's `00424227` depends on the
+unimplemented `0052c9b8 & 1` prop flag (page 18, destination 64,0, size
+20x64, source offset 20,0); Cosmic Shield's `004a5331` depends on shield
+activation/rendering (page 16, destination 128,192, size 64x64, source offset
+0,-64). The seven common scripts do not imply full texture-effect parity.
+
+`tools/texture-animation-probe.ts` checks wrapping, vertical precedence,
+overlapping copies, invalid bounds, zone gates and 256 ticks of all seven
+local sheets with unchanged pixels outside each destination. The browser
+`tools/texture-animation-flow-check.js` verifies enabled and disabled pixels,
+GPU upload versions, menu persistence and exact pixel restoration on respawn.
+Both browser cases and the menu probes pass, as does the production build.

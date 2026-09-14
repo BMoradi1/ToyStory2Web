@@ -109,7 +109,14 @@
  30-tick guards, curved slot positions, preserved root selection and 43-tick
  backdrop-only exit fade. Save returns to menu; failed writes are retryable.
  tools/menu-parity-probe.ts and settings-flow-check.js cover this milestone.
- NEXT MENU WORK: renderer support for lens flare/texture animation/gamma,
+ TEXTURE FOLLOW-UP (2026-09-13): seven level texture-scroll scripts now copy
+ authored source rectangles into GPU texture destinations. Original graphics
+ animated-texture row previews, rolls back and persists; default on. Respawn,
+ level changes and selector loads restore pixels/reset clocks. Texture probe,
+ browser enabled/disabled/reset checks, menu probes and production build pass.
+ Remaining conditional scripts: level 8 prop flag and Cosmic Shield; see
+ docs/EFFECTS.md for exact coverage and source/destination semantics.
+ NEXT MENU WORK: renderer support for lens flare/gamma,
  then expose those original graphics rows. Exact routines and gamma lookup
  findings are in docs/FRONTEND.md. Controller visor/target-lock and menu/
  cancel bindings still need corresponding input work. Do not claim full parity.

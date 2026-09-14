@@ -1,9 +1,23 @@
 import type {Point} from './laser.ts';
 import type {PointLight} from './point-light.ts';
 
-/** Level 10, 00425f60..004260d0: white reserved light at nearest path-13
- * point. Camera culling happens before the distance from Buzz's head. */
-export function level10Light(points:readonly Point[],camera:Point,player:Point):PointLight|null{
+/** Undefined means the retail script skips updating the existing slot. */
+export function scriptedPathLight(level:number,paths:readonly {id:number;points:readonly Point[]}[],
+  camera:Point,player:Point,cameraZone:number):PointLight|null|undefined{
+  // 0042ad4d jumps past both assignment and disabling in camera zone 4.
+  if(level===11&&cameraZone===4)return undefined;
+  const settings:Record<number,readonly [number,number,number,number]>={
+    5:[17,128,96,64], // 0041fd41..0041fea3
+    10:[13,255,255,255], // 00425f60..004260d0
+    11:[19,127,127,127], // 0042ad4d..0042aeb9
+  };
+  const config=settings[level];if(!config)return null;
+  const [path,r,g,b]=config;
+  return nearestPathLight(paths.find(p=>p.id===path)?.points??[],camera,player,[r,g,b]);
+}
+/** Camera culling happens before the distance from Buzz's head. */
+export function nearestPathLight(points:readonly Point[],camera:Point,player:Point,
+  colour:readonly [number,number,number]=[255,255,255]):PointLight|null{
   let nearest=0x10000,light:PointLight|null=null;
   for(let i=0;i<points.length;i++){
     const p=points[i]!,x=p.x<<5,y=p.y<<5,z=p.z<<5;
@@ -13,7 +27,7 @@ export function level10Light(points:readonly Point[],camera:Point,player:Point):
     if(distance>=nearest)continue;
     nearest=distance;
     // Stable identity stands in for the retail address of this path point.
-    light={x,y,z,r:255,g:255,b:255,life:1,owner:-1000-i};
+    light={x,y,z,r:colour[0],g:colour[1],b:colour[2],life:1,owner:-1000-i};
   }
   return light;
 }

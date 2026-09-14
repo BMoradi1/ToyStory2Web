@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {level10Light} from '../src/sim/scripted-light.ts';
+import {nearestPathLight as level10Light,scriptedPathLight} from '../src/sim/scripted-light.ts';
 import {createPointLights,setScriptedLight,addPointLight,stepPointLights} from '../src/sim/point-light.ts';
 const camera={x:0,y:0,z:0},player={x:0,y:8192,z:0};
 const points=[{x:8,y:0,z:0},{x:-8,y:0,z:0}];
@@ -27,3 +27,22 @@ for(let i=0;i<64;i++)stepPointLights(pool,player);
 assert.equal(stepPointLights(pool,player),null,'disabled reserved light returns to base');
 assert.equal(createPointLights().scripted.life,0,'fresh level has no stale scripted source');
 console.log('PASS: level 10 path source, stable owner/ties, strict camera/player cutoffs, reserved lifetime, temporary competition and return transitions.');
+
+for(const [level,path,r,g,b] of [[5,17,128,96,64],[10,13,255,255,255],[11,19,127,127,127]] as const){
+  const paths=[{id:path,points}];
+  const source=scriptedPathLight(level,paths,camera,player,0)!;
+  assert.deepEqual([source.r,source.g,source.b],[r,g,b]);
+  assert.equal(scriptedPathLight(level,[],camera,player,0),null,'missing path disables source');
+  assert.equal(scriptedPathLight(level,paths,{x:300000,y:0,z:0},player,0),null,'camera rejection disables source');
+}
+const retained=createPointLights();
+setScriptedLight(retained,scriptedPathLight(11,[{id:19,points}],camera,player,0)!);
+const before={...retained.scripted};
+const skipped=scriptedPathLight(11,[],{x:300000,y:0,z:0},player,4);
+assert.equal(skipped,undefined,'zone 4 skips updating rather than disabling');
+if(skipped!==undefined)setScriptedLight(retained,skipped);
+assert.deepEqual(retained.scripted,before);
+const disabled=scriptedPathLight(11,[],camera,player,0);
+setScriptedLight(retained,disabled!);assert.equal(retained.scripted.life,0);
+assert.equal(scriptedPathLight(1,[],camera,player,0),null);
+console.log('PASS: levels 5/10/11 path and RGB selection, missing/rejected paths, level 11 zone-4 retention and disable on leaving it.');

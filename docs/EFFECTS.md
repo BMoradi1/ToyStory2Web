@@ -747,7 +747,7 @@ All 15 records were read from the local executable. The character-light probe
 checks signed direction, colour, tracking and reset; Chromium checks reserved
 RGB pixels and the full six-wave return to level 9's base light.
 
-Remaining: level scripts' slot-1 sources except level 10 below, dynamic slot-0 overrides (including
+Remaining: level scripts' slot-1 sources except levels 5/10/11 below, dynamic slot-0 overrides (including
 level 3), retail normal shading and the other temporary-light callers. The
 renderer still adds light to existing vertex colours using posed triangle
 normals, so this is not a claim of complete retail lighting parity.
@@ -774,3 +774,19 @@ reserved lifetime and temporary competition. The path variant of
 `tools/lens-flare-flow-check.js` visits an authored level 10 lamp, checks the
 settled character-light state and redraw independence, verifies additive flare
 pixels and exits cleanly to the selector. Other scripted sources remain queued.
+
+### Level 5 and 11 scripted lamps (2026-09-13)
+
+The shared path selector now also connects level 5 path 17, RGB (128,96,64)
+(`0041fd41..0041fea3`), and level 11 path 19, RGB (127,127,127)
+(`0042ad4d..0042aeb9`). Both use the same strict camera/player distance gates
+and first-point tie rule as level 10. These character-light colours differ
+from their screen-flare colours and remain separate.
+
+Level 11 camera zone 4 jumps past both assignment and disabling of reserved
+slot 1. The host therefore retains the old source there; it does not clear it
+as the flare renderer clears its sprites. Outside that zone, missing or
+out-of-range path points disable the source normally. The probe covers this
+distinction and each level's path/RGB mapping. The browser lamp check accepts
+`lightLevel=5` or `11` with `flares=paths`, using the shared scene mapping
+(level 11 is `level01/level1`). Character shading remains approximate.

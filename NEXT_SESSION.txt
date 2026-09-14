@@ -173,6 +173,11 @@
  selection and temporary-light competition. Level 10 path-13 white lamps
  connected with retail camera/player cutoffs; unit and real-lamp browser tests
  verify selection, transitions, redraw independence and selector cleanup.
+ SCRIPTED LAMPS FOLLOW-UP (2026-09-13): level 5 path 17 RGB (128,96,64)
+ and level 11 path 19 RGB (127,127,127) connected. Level 11 camera zone 4
+ retains the old character light while skipping flare output, matching the
+ executable's jump past assignment/disable. Missing/out-of-range paths outside
+ that zone disable normally. Shared scene mapping used by browser lamp checks.
  NEXT: other scripted slot-1 lights and slot-0 overrides, retail normals and other effect/beam light callers;
  clear-colour/backdrop matching and sprite fog-enable comparison. Exact routines and gamma lookup
  findings are in docs/FRONTEND.md. Controller visor/target-lock and menu/

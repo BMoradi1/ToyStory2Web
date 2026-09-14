@@ -47,7 +47,10 @@
   const selector=document.querySelector('#level');
   const flickering=location.search.includes('flares=flicker');
   const pathLight=flickering||location.search.includes('flares=paths');
-  const scene=flickering?'level04/level':pathLight?'level10/level':'level03/level';
+  const lightLevel=Number(new URLSearchParams(location.search).get('lightLevel')??10);
+  const {sceneForLevel}=await import('/src/sim/level-data.ts');
+  const scene=flickering?'level04/level':pathLight?sceneForLevel(lightLevel):'level03/level';
+  if(!scene||![...selector.options].some(o=>o.text===scene))throw Error('missing level scene '+lightLevel);
   selector.selectedIndex=[...selector.options].findIndex(o=>o.text===scene);
   selector.dispatchEvent(new Event('change'));
   await wait(()=>document.querySelector('#status').textContent.includes(scene+': ready'),scene);
@@ -67,20 +70,22 @@
   if(pathLight){
     const file=[...document.querySelector('#pickfile').files].find(f=>f.webkitRelativePath.endsWith('/data/'+scene+'.dat'));
     const {parseDat}=await import('/src/formats/dat.ts');
-    const point=parseDat(await file.arrayBuffer()).paths.find(p=>p.id===(flickering?6:13)).points[0];
+    const point=parseDat(await file.arrayBuffer()).paths.find(p=>p.id===(flickering?6:({5:17,10:13,11:19}[lightLevel]))).points[0];
     source={x:point.x/256,y:-point.y/256,z:-point.z/256};
     if(!flickering){
-      for(let i=0;i<70;i++){
+      for(let i=0;i<240;i++){
         ts2.player.x=point.x*32;ts2.player.y=point.y*32+8192;ts2.player.z=point.z*32;
         ts2.player.hitStun=1000;ts2.tickGame({},1);
+        if(ts2.effects.lightTransition.selected===-2&&ts2.effects.lightTransition.remaining===0)break;
       }
       const light=ts2.effects.scriptedLight;
-      if(light.life!==1||light.r!==255||light.g!==255||light.b!==255)throw Error('level 10 scripted light missing');
-      if(ts2.effects.lightTransition.selected!==-2||ts2.effects.lightTransition.remaining!==0)throw Error('scripted light transition did not settle');
+      const rgb={5:[128,96,64],10:[255,255,255],11:[127,127,127]}[lightLevel];
+      if(light.life!==1||light.r!==rgb[0]||light.g!==rgb[1]||light.b!==rgb[2])throw Error('scripted light missing in level '+lightLevel);
+      if(ts2.effects.lightTransition.selected!==-2||ts2.effects.lightTransition.remaining!==0)throw Error('scripted light transition did not settle '+JSON.stringify({light:ts2.effects.lightTransition,talk:ts2.talk,cut:ts2.cut}));
       const frozen=JSON.stringify(ts2.effects.lightTransition);
       for(let i=0;i<5;i++)ts2.redrawHud();
       if(JSON.stringify(ts2.effects.lightTransition)!==frozen)throw Error('rendering advances scripted light');
-      console.log('LEVEL 10 SCRIPTED LIGHT PASS',JSON.stringify(light));
+      console.log('SCRIPTED LIGHT PASS',lightLevel,JSON.stringify(light));
     }
   }
   let visible=false;

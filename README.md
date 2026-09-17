@@ -6,7 +6,7 @@ Lightyear to the Rescue** (Traveller's Tales, 1999), running in the browser.
 
 🤖 Documentation and Code written with Claude Code under an agentic workflow. This project is testing the limits of what current models can implement with proper direction. Project is using a mix of Fable 5 and Opus 5 with manual monitored hand-offs ensuring token cost efficency. 🤖
 
-
+<img width="700" height="513" alt="chrome-capture-2026-09-13" src="https://github.com/user-attachments/assets/354f9704-5c75-4c60-af8d-99002ce4eb07" />
 ## Screenshots
 ### Phase 1 level render
 <img width="1413" height="937" alt="image" src="https://github.com/user-attachments/assets/2f4abd0a-e8bd-424f-b862-373e684ac664" />
@@ -16,7 +16,7 @@ Lightyear to the Rescue** (Traveller's Tales, 1999), running in the browser.
 #### Gameplay
 <img width="1400" height="966" alt="image" src="https://github.com/user-attachments/assets/ea5f022e-2fab-422c-ae24-bb0898cfaed9" />
 
-<img width="700" height="513" alt="chrome-capture-2026-09-13" src="https://github.com/user-attachments/assets/354f9704-5c75-4c60-af8d-99002ce4eb07" />
+
 
 
 

@@ -1,4 +1,3 @@
-
 # ToyStory2Web
 
 An open-source reimplementation of the engine behind **Toy Story 2: Buzz
@@ -49,6 +48,9 @@ onto the page instead. Nothing is uploaded either way.
 | `p` | stand the selected character on the floor |
 | `c` | cycle back-face culling, to check the winding by eye |
 | `g` | collapse the level to a single material |
+| `s` | report what is actually in the scene |
+| `m` | mute or unmute sound effects |
+| `n` | mute or unmute music |
 
 The game boots the way it did: the three logo movies, the notice cards,
 the title with its "press jump", the list menu and the level select, all
@@ -67,25 +69,21 @@ Progress is the game's own save record: lives, health, the camera choice,
 the volume sliders and the tokens per level, kept in the browser and seeded
 from the `Toy200.sav` in your install the first time. The **save file**
 button downloads a `Toy200.sav` you can copy into the install yourself;
-the viewer never writes there. **Load game** on the main menu lets you choose
-an exported save or the save in the selected install, preview it, and load it
-into the browser. **Options** uses the original Etch A Sketch screen for volume controls,
-keyboard bindings, camera mode and detail level. Jump accepts volume changes;
-Escape cancels a subpage. **Load game** opens the original load/save pages
+the viewer never writes there. **Load game** opens the original load/save pages
 with eight browser slots. **Import save file** opens the native picker and
 places the chosen save in slot eight for loading. Saves never modify the
-install. **Movie viewer** uses the original binocular artwork and replays
+install. **Options** uses the original Etch A Sketch screen for volume controls,
+keyboard bindings, camera mode and detail level. Jump accepts volume changes;
+Escape cancels a subpage. **Movie viewer** uses the original binocular artwork and replays
 unlocked local movies without changing progress. Arrows/stick navigate,
 Space/Enter selects, and Escape/gamepad Triangle goes back. Keyboard bindings
 use physical key capture; Enter accepts the controller page.
-| `s` | report what is actually in the scene |
-| `m` | mute or unmute |
 
 While playing: **WASD** or a gamepad stick to move, **space** to jump (again at
 the top for a double jump), **J** to spin (**J** or **Shift** during a jump
 for ground pound), **K** for the laser, **V** (gamepad Triangle/Y) to toggle
 first-person laser aiming, **Q**/**E** or
-the shoulder buttons to swing the camera, **M** to mute. The normal laser is a
+the shoulder buttons to swing the camera, **M** to mute sound effects, **N** to mute music. The normal laser is a
 red beam; holding K to full charge and releasing fires a wider yellow beam.
 Disk ammunition switches firing to homing disks, consuming one round per shot;
 when it runs out, firing returns to the laser. In laser view, WASD/arrows or
@@ -102,6 +100,26 @@ last safe position.
 
 ## What works today
 
+The latest implemented changes are recorded in [`TODOPLAN.txt`](TODOPLAN.txt).
+This is a playable work in progress; loading every level does not mean every
+mission or boss encounter is complete.
+
+- **First-person aiming.** The original visor, chest and wrist geometry follows
+  the camera with independent tracking and sway. Creature locking and cycling
+  use animated hit centres, with the original growing target marker and
+  acquisition sound. Locked disks home on the selected enemy; manual steering
+  releases tracking. Automatic target selection is still incomplete.
+- **Rendering repairs.** Authored sprite cards and joint-driven animation
+  surfaces render, including Slinky's springs. Level backdrops scroll, and all
+  fifteen playable levels can launch from the selector, including levels 11–15.
+- **HUD, menus and saves.** Original sprite artwork supplies the HUD and dialogue;
+  the front end includes options, browser save slots, save import/export and
+  the movie viewer. Local cutscenes, music and sound effects play from the install.
+- **Pickup and combat effects.** Earned tokens reveal with a camera hold,
+  animation and particle ring; uncollected tokens sparkle. Reusable pickups
+  return on their timer. Collection, rescue and creature-death effects include
+  particles and temporary character lighting, including the Tin Robot explosion.
+
 - **Levels render.** Every one of the game's 16 real scene files parses, 320,257
   triangles in all, textured, with per-face blending and back-face culling. The
   material rules are not guesses: they were read out of the PC executable and
@@ -114,8 +132,8 @@ last safe position.
   tokens of each level are placed where the game places them and collected
   with the engine's own reach test. The game has no "type" field for these:
   it decides what an object is by counting its polygons, and that rule is
-  ported as found. The shapes standing in for them are placeholders: the real
-  coin art is a sprite inside the executable that is not extracted yet.
+  ported as found. Coins use the original sprite artwork; other pickups use
+  their own level geometry, with rotation and collection visibility.
 - **Level 1's five tokens can all be got.** Round up Bo Peep's sheep, bring
   Hamm fifty coins, win the R.C. car's three-lap race, and beat the tin
   robot in the attic, which is immune until it opens up and has to be spun
@@ -123,9 +141,8 @@ last safe position.
   what is still to do, skipping what you have done.
 - **Crates push.** Lean on one of the shove-able crates and it runs along
   the rail the level gives it, tips over a ledge, falls and lands, and can
-  be pushed on from there. Its collision moves with it. The crate you see
-  is a stand-in box: the real one is baked into the level geometry and
-  cannot be moved yet.
+  be pushed on from there. Original crate artwork, collision and Buzz move
+  together. Rope/pole climbing and zip-line riding are also implemented.
 - **Hint signs talk.** Touch one of the tutorial signposts and the game
   does what it always did: freezes Buzz, flies the camera along the sign's
   own path, and types the hint out a character at a time. The words come
@@ -164,30 +181,30 @@ last safe position.
   dangerous hurt him back, using each creature's own hit ellipsoid read out
   of its model. Each one is drawn as the model the game draws, posed by the
   animation its script selected.
-- **Hint signs and push blocks, decoded.** The tutorial signposts (a talk
-  box with a scripted camera flight, also how every character speaks) and
-  the crates Buzz shoves along rails are read out of the executable and
-  checked against every level's scene; see docs/LEVELS.md. Not yet ported.
 - **Two oracles.** An offline rasteriser and a headless browser driver, so a
   change can be checked pixel against pixel rather than by eye. They are how
   most of the bugs above were found.
 
 ## What doesn't work yet
 
-**The camera** has the original's distance, height, yaw lag, hand-turning and
-auto-centring, and pulls in rather than clipping through scenery. What is
-missing is its look-ahead and the pitch it leans into as Buzz climbs or drops,
-so it will not always frame a jump the way the real game does.
+The **Tin Robot intro-to-fight handoff** remains a priority: its defeat effect
+has been checked separately, but that does not validate a complete encounter.
+Remaining boss work and full mission parity are tracked in
+[`TODOPLAN.txt`](TODOPLAN.txt).
 
-**Everything around the moving.** No enemies, no pickups, no HUD, no save file,
-no audio, no cutscenes. The spawn point is a heuristic — the pickup marker
-standing on the largest reachable floor — because the real one lives in the
-level's own code, which is not decoded.
+**Aiming parity** is incomplete. Creature locking works, but the original's
+full automatic candidate selection and separate world-point targeting path
+remain unfinished. Reverse cycling and some input/reticle choices are specific
+to this port.
 
-Smaller things, all recorded in [`TODOPLAN.txt`](TODOPLAN.txt): visibility takes
-one step through the portal graph rather than recursing with a clipped view
-frustum, and absolute screen brightness has not been compared against the retail
-game.
+**Visual and menu parity** still needs work: exact backdrop scale and phase,
+retail character lighting and remaining temporary-light effects, some texture
+scripts, controller/GFX options and load/save timing. Visibility takes one step
+through the portal graph rather than recursing with a clipped view frustum;
+absolute screen brightness has not been compared against the retail game.
+
+First-run guidance, handling incomplete installs, performance and broader
+browser compatibility also remain on the roadmap.
 
 See [`docs/PLAYER.md`](docs/PLAYER.md) for the gameplay research: the physics,
 the animation system, and how each number was found.

@@ -1,3 +1,16 @@
+CURRENT UPDATE — 2026-09-26: Tin Robot encounter regression
+  Verified the existing platform taunt and intro-to-fight handoff in Chromium;
+  the earlier claim that this transition was unported was stale. No gameplay
+  fix was needed. Replaced the defeat test's script jumps with the natural
+  dialogue and authored attack cycle, closed-shell rejection, hit recovery,
+  death frame timing, one-shot burst/light, token reveal, camera release,
+  collection, save and reset assertions.
+  The harness positions Buzz and injects charged-spin damage only while open;
+  this is encounter integration coverage, not an unassisted playthrough.
+  Validation: production build, tin-defeat-probe and expanded browser check pass.
+  Next: automatic aiming candidate selection and the separate world-point path;
+  broader menu, boss and mission parity work remains queued.
+
 CURRENT UPDATE — 2026-09-14: original target marker and locked disks
   Restored persistent effect kind 0x30 / sprite 23 at the selected enemy's
   animated hit center. Installed effect behavior grows it from 8 to 320 units;

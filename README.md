@@ -121,6 +121,10 @@ mission or boss encounter is complete.
   animation and particle ring; uncollected tokens sparkle. Reusable pickups
   return on their timer. Collection, rescue and creature-death effects include
   particles and temporary character lighting, including the Tin Robot explosion.
+- **Tin Robot encounter flow.** Browser regression coverage follows the platform
+  taunt through dismissal, restored control, attack cycles, defeat, token reveal,
+  collection and save. The harness positions Buzz and injects charged-spin damage
+  during vulnerable states; it does not skip the robot's script.
 
 - **Levels render.** Every one of the game's 16 real scene files parses, 320,257
   triangles in all, textured, with per-face blending and back-face culling. The
@@ -189,8 +193,6 @@ mission or boss encounter is complete.
 
 ## What doesn't work yet
 
-The **Tin Robot intro-to-fight handoff** remains a priority: its defeat effect
-has been checked separately, but that does not validate a complete encounter.
 Remaining boss work and full mission parity are tracked in
 [`TODOPLAN.txt`](TODOPLAN.txt).
 

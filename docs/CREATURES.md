@@ -22,6 +22,18 @@ The tin robot idles in a closed three-word loop until its taunt dialogue has
 been seen; the level's tick is what kicks its script out of that. The viewer
 draws each creature as its own model, posed by its `animState` and frame,
 which works because `animState` is a slot in that creature's `.anm`.
+
+**Encounter regression (2026-09-26):** `tools/tin-defeat-flow-check.js` now
+enters the platform taunt naturally, waits before dismissing it, checks player
+control returns, and runs the authored attack cycle through states 1–5. It
+checks closed-shell rejection, hit recovery, death frame timing, the one-shot
+explosion, token reveal/camera release, collection, save and reset. The harness
+positions Buzz and injects charged-spin damage through `hurtCreature` in open
+states; it never seeks the creature script or sets its animation or health.
+This verifies encounter integration, not an unassisted playthrough. The earlier
+claim that the intro handoff was unported was stale; no gameplay change was
+needed to pass this check. Hover wobble and ongoing sparks remain unported.
+
 **Ported since**: the whole of `FUN_00405d20`'s death except the per-type
 death ANIMATIONS — the coin, the per-type death LENGTH, and the burst. The
 length is the one that shows: most types get -1, one tick, and are gone by

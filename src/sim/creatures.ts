@@ -987,7 +987,7 @@ function hoverBot(sim: CreatureSim, c: Creature, args: HandlerArgs): void {
  * a hit, word 101 for dying. And once the death animation passes frame
  * twelve, the boss token is earned.
  *
- * Not ported: the taunt dialogue it opens when Buzz reaches its platform,
+ * The platform taunt and wake-up handoff live in stepTasks. Still unported:
  * its hover wobble and ongoing sparks. Its defeat explosion is queued for
  * the effect system at the hit-shape centre (00416bbb..00416c01).
  */

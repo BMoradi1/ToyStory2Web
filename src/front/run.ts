@@ -44,6 +44,8 @@ export interface FrontHost {
   /** The pad this tick as the engine's 16-bit word (screens.ts `PAD`). */
   pad(): number;
   playSound(effect: number): void;
+  /** Position is the 1-based map order; null releases its looping preview. */
+  selectAmbience(position: number | null): void;
   music(track: number | null, loop?: boolean): void;
   musicEnded(): boolean;
   /** The save's token bytes by internal level, the select cursor, and the last level's entry byte. */
@@ -144,6 +146,7 @@ export class FrontEnd {
     this.show();
     try {
       let next: 'title' | 'menu' | 'select' = 'title';
+      let returningFromLevel = false;
       for (;;) {
         if (next === 'title') {
           this.host.music(TITLE.music, false);
@@ -172,7 +175,9 @@ export class FrontEnd {
         }
         this.inGame = true;
         this.host.music(SELECT.music);
-        const select = createSelect(this.host.tokens(), this.host.strings, this.host.cursor(), this.host.enteredWith());
+        const select = createSelect(this.host.tokens(), this.host.strings, this.host.cursor(),
+          returningFromLevel ? this.host.enteredWith() : null);
+        returningFromLevel = false;
         // `FUN_00453cf0` loads the scene before the routine runs; the
         // cursor past the open levels also puts the camera back at node 0.
         if (this.host.cursor() + 1 > select.open) this.host.setCamNode(0);
@@ -185,6 +190,7 @@ export class FrontEnd {
         this.hide();
         this.host.music(null);
         const outcome = await this.host.playLevel(select.pos);
+        returningFromLevel = true;
         if (outcome === 'gameOver') {
           this.summaryArt = await this.host.loadSummaryArt();
           this.host.music(17, false);
@@ -222,6 +228,7 @@ export class FrontEnd {
         this.show();
       }
     } finally {
+      this.host.selectAmbience(null);
       this.running = false;
       this.hide();
       this.host.quit();
@@ -307,6 +314,7 @@ export class FrontEnd {
   }
 
   private closeDiorama(): void {
+    this.host.selectAmbience(null);
     if (this.diorama) this.host.unloadDiorama();
     this.diorama = null;
     this.lastDiorama = null;
@@ -344,6 +352,7 @@ export class FrontEnd {
       result = stepSummary(screen.state, this.pad, this.host.strings.pressJumpToExit, this.host.rand);
     } else {
       result = stepSelect(screen.state, this.pad, this.host.strings);
+      this.host.selectAmbience(screen.state.pos);
       if (this.diorama) {
         const frame = stepDiorama(this.diorama.state, this.diorama.scene, screen.state.pos, screen.state.ticks, this.host.rand);
         this.lastDiorama = frame;

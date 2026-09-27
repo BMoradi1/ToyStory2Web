@@ -1,3 +1,19 @@
+CURRENT UPDATE — 2026-09-27: selector ambience and initial cursor
+  Added all fifteen original Level01-Level15 looping previews from the
+  executable's level-16 sound bank. Front-end names now override gameplay
+  names; Select/Switch/Cancel use direct effect IDs. Hover reuses one loop,
+  navigation replaces it, and leaving the map stops it. Late reads cannot
+  restart obsolete previews. Returning from gameplay resumes the sound bank.
+  Fixed startup/menu entry incorrectly triggering the first-clear advance:
+  opening honors the saved cursor; fresh progress starts at Andy's House.
+  Actual first-clear returns still advance once.
+  Validation: build, selector audio probe, front-end validation, sound-table
+  validation and Chromium playback of all 15 previews, rapid switching,
+  cancellation, level entry/return and saved initial selection pass.
+  New user report: airport plane does not move. Not reproduced or decoded yet.
+  docs/LEVELS.md now has a partial environment-gap list; a complete level-by-
+  level audit is still needed. Do not treat old roadmap statuses as current.
+
 CURRENT UPDATE — 2026-09-26: Tin Robot encounter regression
   Verified the existing platform taunt and intro-to-fight handoff in Chromium;
   the earlier claim that this transition was unported was stale. No gameplay

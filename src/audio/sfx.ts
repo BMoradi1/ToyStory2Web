@@ -34,6 +34,10 @@ export class SoundBank {
    * what is still running, and a repeat is dropped until it ends.
    */
   private readonly sustaining = new Set<string>();
+  /** The selector owns one looping preview, separate from one-shot effects. */
+  private ambience: { name: string; source: AudioBufferSourceNode; trim: GainNode } | null = null;
+
+  get ambienceName(): string | null { return this.ambience?.name ?? null; }
 
   /** Off until the user asks for it; browsers refuse audio before a gesture anyway. */
   enabled = false;
@@ -73,6 +77,41 @@ export class SoundBank {
   stop(): void {
     this.enabled = false;
     this.sustaining.clear();
+    this.setAmbience(null);
+  }
+
+  /** Called each selector tick: reuse the loop, replace it on hover, stop on exit.
+   * Loading only fills the cache; a stale read can never start an old preview.
+   */
+  setAmbience(name: string | null, gain = 1): void {
+    const key = name?.toLowerCase() ?? null;
+    if (this.ambience?.name === key) {
+      this.ambience.trim.gain.value = gain;
+      return;
+    }
+    if (this.ambience) {
+      this.ambience.source.stop();
+      this.ambience.source.disconnect();
+      this.ambience.trim.disconnect();
+      this.ambience = null;
+    }
+    if (!key || !this.enabled || !this.context || !this.gain) return;
+    if (this.context.state !== 'running') {
+      void this.context.resume().catch(() => {});
+      return;
+    }
+    const buffer = this.buffers.get(key);
+    if (buffer === undefined) { void this.load(key); return; }
+    if (!buffer) return;
+    const source = this.context.createBufferSource();
+    const trim = this.context.createGain();
+    source.buffer = buffer;
+    source.loop = true;
+    trim.gain.value = gain;
+    source.connect(trim);
+    trim.connect(this.gain);
+    source.start();
+    this.ambience = { name: key, source, trim };
   }
 
   /** How many effects are decoded and ready, for the status line. */

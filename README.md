@@ -62,6 +62,8 @@ the select, and the pause menu's "exit level" brings the select back.
 The select flies over its diorama — the neighbourhood model in
 `data/level06/level1`, which is what the game's "level 16" turns out to
 be — with the level's name, the tokens you hold and the arrows over it.
+Each highlighted level plays its original background sound. Opening the map
+keeps the saved level selected; a fresh save starts at Andy's House.
 
 The cutscenes play from your install too: the three logos when the
 folder opens, a level's intro the first time you play it, and a boss's

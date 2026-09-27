@@ -245,8 +245,27 @@ reached by tag.
   squared reach, an eighth of the gap a tick capped at `0x2000 /
   (distance / 128 + 0x100)`; the eye the renderer gets eases halfway to
   the camera each tick.
-- *Sound.* A 3D event `position + 6` every tick at the level's look
-  point (`FUN_004a3b90`) — not ported.
+- *Sound* (ported 2026-09-27). Each position requests its own looping
+  `Level01`–`Level15` preview from the level-16 sound bank. The selector at
+  `00438dd6` passes zero-based effect `position + 6` to `FUN_004a3b90`;
+  the mixer adds one, so the name-table index is `position + 7`. These
+  are effect IDs, not gameplay sound events. This bank starts at index 1
+  and overrides the global gameplay names; menu sounds resolve to Select,
+  Switch and Cancel. The PC wrapper discards the supplied look-point
+  position and uses volume 0x60, so preview playback is non-positional.
+  One loop is reused while hovering, replaced on navigation and stopped on
+  selector exit. Returning from gameplay resumes the sound bank. The menu
+  music continues underneath. Late file reads only populate the cache and
+  cannot start an obsolete preview.
+
+The initial selection honors the save's cursor (Andy’s House for a fresh
+save). The first-clear advance applies only after returning from gameplay,
+once; opening or reopening the selector from the menu does not advance it.
+`tools/select-audio-flow-check.js` checks all fifteen decoded loops in
+Chromium, rapid navigation, cursor persistence, cancellation, entering a
+level and returning to the map. Use `--user-gesture` with browser-shot for
+the audio-context checks. `tools/select-audio-probe.ts` covers file mappings,
+loop lifecycle, mute, missing files and out-of-order load completion.
 
 The level select's sprite table (level 16's) names its art on this
 bundle: the token spinner on slot 0, the "tokens" sign on 4, the arrows
@@ -465,7 +484,7 @@ menus. Options, load/save and movie screens were visually inspected.
    (see docs/EFFECTS.md). Controller visor/target
    lock and menu/cancel bindings also remain outside the current input set.
    Load/save transition timing and the supported controller layout are ported.
-2. The level selector's per-level ambience and camera-flight comparison.
+2. The level selector's camera-flight comparison (per-level ambience is ported).
 
 
 ### Menu follow-up validation (2026-09-13)

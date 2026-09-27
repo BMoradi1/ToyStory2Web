@@ -527,7 +527,7 @@ async function open(dir: GameDir): Promise<void> {
       get hasAnm() { return playerModel?.anm ? playerModel.anm.animations.length : null; },
       get sound() {
         return sound
-          ? { enabled: sound.enabled, ready: sound.ready, raised: [...soundLog] }
+          ? { enabled: sound.enabled, ready: sound.ready, raised: [...soundLog], ambience: sound.ambienceName }
           : null;
       },
       get pickups() {
@@ -2516,6 +2516,7 @@ async function runFrontEnd(): Promise<void> {
   const strings = readFrontStrings(exeBytes, exeString);
   const menuTable = readSpriteTable(exeBytes, 0);
   const selectTable = readSpriteTable(exeBytes, 16);
+  const frontSounds = readSoundTable(exeBytes, 16);
   dioramaLists = readDioramaLists(exeBytes);
   input.attach();
   void sound?.start();
@@ -2532,8 +2533,24 @@ async function runFrontEnd(): Promise<void> {
       if (frontKeys.escape || [...(navigator.getGamepads?.() ?? [])].some(pad=>pad?.connected&&pad.buttons[3]?.pressed)) word |= PAD.cancel;
       return word;
     },
-    playSound(effect) { playEvent(effect); },
+    playSound(effect) {
+      // MENU_SOUND already uses 1-based effect IDs, not gameplay events.
+      const name = frontSounds.nameOfEffect(effect);
+      soundLog.push(`front:${effect}:${name ?? 'silent'}`);
+      if (soundLog.length > 32) soundLog.shift();
+      if (name) sound?.play(name);
+    },
+    selectAmbience(position) {
+      // 00438dd6: zero-based effect position+6; the loader adds one. The
+      // PC wrapper 004a3b90 discards the position argument and loops at 0x60.
+      const name = position !== null && position >= 1 && position <= 15
+        ? frontSounds.nameOfEffect(position + 7) : null;
+      sound?.setAmbience(name, 10 ** (MUSIC_VOLUME_CURVE[0x60]! / 2000));
+    },
     music(track, loop = true) {
+      // Leaving gameplay stops the bank. Each front-end presentation must
+      // resume it as well as its music, including summary -> selector.
+      if (track !== null) void sound?.start();
       if (!music) return;
       if (track === null) { music.stop(); return; }
       music.start();

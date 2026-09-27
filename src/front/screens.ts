@@ -427,9 +427,10 @@ export interface SelectState {
  * `cursor` is the save's select cursor (`DAT_0052ad8a`, 0-based) and
  * `enteredWith` the token byte the last level was entered with
  * (`DAT_00830ca8`): a level just cleared for the first time moves the
- * cursor on to the next.
+ * cursor on to the next. Pass null when opening from the menu rather than
+ * returning from gameplay, so saved tokens cannot look like a fresh clear.
  */
-export function createSelect(tokens: readonly number[], strings: FrontStrings, cursor: number, enteredWith: number): SelectState {
+export function createSelect(tokens: readonly number[], strings: FrontStrings, cursor: number, enteredWith: number | null): SelectState {
   const { count, held, wanted } = openLevels(tokens, strings.tokensWanted);
   const open = Math.min(count, SELECT.maxOpen) + 1;
   let pos = cursor + 1;

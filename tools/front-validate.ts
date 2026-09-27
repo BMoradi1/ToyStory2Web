@@ -117,6 +117,8 @@ check(menuTextColour(0x80).alpha === 1 && menuTextColour(0).alpha === 1 && menuT
   s = createSelect(two, strings, 0, 0);
   check(s.open === 3 && s.held === 2 && s.wanted === 3, 'two open, two held, the boss wants three');
   check(s.pos === 2, 'a level cleared for the first time moves the cursor on');
+  check(createSelect(two, strings, 0, null).pos === 1, 'opening a saved game keeps Andy\'s House selected');
+  check(createSelect(two, strings, 1, null).pos === 2, 'opening from menu honors the saved cursor');
   s = createSelect(two, strings, 0, 0x81);
   check(s.pos === 1, 'not when it was entered with tokens already');
   for (let t = 0; t < 0x3d; t++) stepSelect(s, idle, strings);

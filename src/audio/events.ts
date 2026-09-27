@@ -175,8 +175,11 @@ export function readSoundTable(exe: Uint8Array, level: number): SoundTable {
 
   const nameOfEffect = (effect: number): string | null => {
     if (effect < 1) return null;
+    // The front-end bank starts at 1 and replaces the gameplay names. Most
+    // level banks start at 87 and merely extend them.
+    if (effect >= base && effect < base + own.length) return own[effect - base] || null;
     if (effect <= GLOBAL_COUNT) return global[effect - 1] || null;
-    return own[effect - base] ?? null;
+    return null;
   };
   return {
     events, nameOfEffect,

@@ -18,7 +18,7 @@
   const tracks = []; let endings = 0;
   const front = new FrontEnd({ strings:readFrontStrings(exe,exeString),
     menuTable:readSpriteTable(exe,0), selectTable:readSpriteTable(exe,16), ...art,
-    pad:()=>0, playSound:()=>{}, music:(track,loop)=>tracks.push([track,loop]), musicEnded:()=>false,
+    pad:()=>0, playSound:()=>{}, selectAmbience:()=>{}, music:(track,loop)=>tracks.push([track,loop]), musicEnded:()=>false,
     tokens:()=>Array(17).fill(255), cursor:()=>14, setCursor:()=>{}, enteredWith:()=>255,
     playLevel:async position=>{if(position!==15)throw Error('wrong finale position'); return 'won';},
     attract:async()=>{}, summary:()=>null, loadSummaryArt:async()=>null,

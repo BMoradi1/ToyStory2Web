@@ -1333,6 +1333,24 @@ With that, every boss in the game is decoded: 6 is ported, 3, 9, 12 and
 15 are written up above with what each needs.
 
 
+## Known environment gaps (reviewed 2026-09-27)
+
+Loading a scene does not implement all of its object scripts. This is a
+partial list, not a completed audit of every level against the original.
+
+| Area | Gap | Evidence / status |
+|---|---|---|
+| Airport scenes | Plane movement | User reports a stationary plane. Exact scene/object and original motion still need reproduction and decoding. |
+| Construction Yard | Outdoor paint cans | The trailer paint puzzle is ported; its implementation explicitly does not cover the outdoor cans. |
+| Al's Space Land (8) | Prop-controlled texture effect | Call `00424227` waits on the unimplemented `0052c9b8 & 1` prop flag; see docs/EFFECTS.md. |
+| Moving platforms | Player attachment during ledge climbing | Still listed as unported; the ledge controller handles static collision. This is separate from the implemented push-block collision updates. |
+| Other scripted props | Motion and interaction feedback | Per-level object scripts remain only partly covered. Guide sparkles have retirement hooks for the chair, pushables and trailer controls, but not all other props. |
+
+Creature-specific gaps also remain, including Tin Robot hover wobble/sparks.
+The Zurg and finale fight controllers are separately documented as unported.
+Existing scene loading, shared creature scripts, particles and texture
+animation should not be read as evidence that every level interaction works.
+
 ## Ground-pound chair and trailer paint (ported 2026-09-13)
 
 `src/sim/stomp-props.ts` connects ground-pound landings to the actual terrain

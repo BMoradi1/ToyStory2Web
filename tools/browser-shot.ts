@@ -15,6 +15,7 @@
  *   npx tsx tools/browser-shot.ts "Toy Story 2" out.png [--level N] [--eval "js"]
  *
  * `--eval-file path.js` reads the same script from a file for repeatable checks.
+ * `--user-gesture` gives that evaluation a browser gesture for audio checks.
  * `--eval` runs after the level is up, with `ts2.viewer` in scope, so a camera
  * can be placed to reproduce a particular screenshot. Needs `npm run dev` on
  * port 5173 (or BASE_URL).
@@ -94,8 +95,8 @@ async function main() {
   const { targetId } = await send('Target.createTarget', { url: 'about:blank' });
   const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true });
   const call = (method: string, params: object = {}) => send(method, params, sessionId);
-  const evaluate = async (expression: string) => {
-    const r = await call('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
+  const evaluate = async (expression: string, userGesture = false) => {
+    const r = await call('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true, userGesture });
     if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description ?? 'evaluate failed');
     return r.result.value;
   };
@@ -182,7 +183,7 @@ async function main() {
       `diag=${JSON.stringify(await evaluate('window.__ts2diag'))}, ` +
       `status="${await evaluate(`document.getElementById('status').textContent`)}"`);
   }
-  if (evalJs) console.log(`eval: ${JSON.stringify(await evaluate(evalJs))}`);
+  if (evalJs) console.log(`eval: ${JSON.stringify(await evaluate(evalJs, args.includes('--user-gesture')))}`);
   // Let a couple of frames render with the final camera.
   await sleep(700);
   const { data } = await call('Page.captureScreenshot', { format: 'png' });

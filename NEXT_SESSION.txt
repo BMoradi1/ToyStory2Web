@@ -1,3 +1,12 @@
+CURRENT UPDATE — 2026-09-27: Tarmac helicopter motion
+  Prior plane/ledge fixes pushed as 0a13034. Added helicopter helper 0042e1d0:
+  eight near/far/token objects, sine hover, spinning rotors and live token
+  pickup coordinates. Token drawing retains hover through tumble/reveal updates.
+  Original light puzzle/lowering, success camera/sequence and helicopter
+  ambience remain open. No collision motion invented: this helper moves none.
+  Build, helicopter probe and expanded Tarmac browser motion/collection/
+  pause/reset/re-entry checks pass.
+
 CURRENT UPDATE — 2026-09-27: moving ledge attachment
   Dynamic ledge queries now retain the collision group, matching the role of
   original DAT_00559e80. Translation/yaw movers carry the climb anchor through
@@ -5,7 +14,7 @@ CURRENT UPDATE — 2026-09-27: moving ledge attachment
   moving props exactly once, fixing scenery freezing while Buzz pulls up.
   Static/moving ledge probes, plane and push probes, build and expanded Tarmac
   browser acquisition/attachment/pause/landing/reset/exit checks pass.
-  Next: separate Tarmac helicopter controller and remaining level motion.
+  Next: Tarmac helicopter light puzzle/lowering and remaining level motion.
   Pitch/roll attachment and the original climb-camera transition remain open.
 
 CURRENT UPDATE — 2026-09-27: Tarmac plane fix

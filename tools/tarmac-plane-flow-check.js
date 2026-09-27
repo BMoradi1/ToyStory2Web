@@ -41,13 +41,13 @@
   const plane=ts2.tarmacPlane;
   check(plane&&plane.angle===0,'fresh plane state');
   const sample=id=>{
-    const index=plane.objects.find(o=>o.id===id).index;
+    const index=[...plane.objects,...ts2.tarmacHelicopter.objects].find(o=>o.id===id).index;
     const ranges=ts2.viewer.objectVertices.get(index);
     check(ranges?.length,'missing independent draw object '+id);
     const at=ranges[0].start*3;
     return [...ts2.viewer.current.geometry.getAttribute('position').array.slice(at,at+3)];
   };
-  const near=sample(0),far=sample(16);
+  const near=sample(0),far=sample(16),helicopterNear=sample(3),helicopterFar=sample(49),rotor=sample(48);
   const floor=plane.hull.polys.filter(p=>p.normal.y<-.99).sort((a,b)=>a.vertices[0].y-b.vertices[0].y)[0];
   const centre=floor.vertices.reduce((s,v)=>({x:s.x+v.x/3,y:s.y+v.y/3,z:s.z+v.z/3}),{x:0,y:0,z:0});
   // Face +Z for the landing test; the separate descending edge-grab test follows below.
@@ -61,9 +61,21 @@
   check(JSON.stringify(sample(0))!==JSON.stringify(near),'near plane mesh stayed still');
   check(JSON.stringify(sample(16))!==JSON.stringify(far),'far plane mesh stayed still');
   check(plane.angle===220,'one angle per simulation tick');
+  check(ts2.tarmacHelicopter.phase===(219*33&4095),'helicopter phase rate');
+  check(JSON.stringify(sample(3))!==JSON.stringify(helicopterNear),'near helicopter did not hover');
+  check(JSON.stringify(sample(49))!==JSON.stringify(helicopterFar),'far helicopter did not hover');
+  check(JSON.stringify(sample(48))!==JSON.stringify(rotor),'rotor did not turn');
+  const helicopterModule=await import('/src/sim/tarmac-helicopter.ts');
+  const tokenPose=helicopterModule.helicopterPoses(ts2.tarmacHelicopter).find(o=>o.id===116);
+  check(ts2.helicopterToken.y===tokenPose.position.y,'token collection position not following hover');
+  const renderedOffset=ts2.viewer.objectTransforms.get(tokenPose.index).split('|')[1].split(',').map(Number);
+  check(Math.abs(renderedOffset[1]+(tokenPose.position.y-tokenPose.rest.y)/256)<1e-8,'pickup draw reset token offset');
+  const hoverPaused=ts2.tarmacHelicopter.phase;
+
   ts2.openMenu();const paused=plane.angle;
   ts2.tickGame({},60);
   check(plane.angle===paused,'plane moved under pause');
+  check(ts2.tarmacHelicopter.phase===hoverPaused,'helicopter moved under pause');
   ts2.pressMenu('back');ts2.tickGame({},1);
   ts2.tickGame({jump:true},1,0);
   check(!ts2.player.onGround&&ts2.player.vy<0,'jump could not leave plane');
@@ -71,6 +83,7 @@
   check(plane.angle>paused,'plane did not resume');
   await ts2.spawnPlayer();ts2.viewer.stop();
   check(ts2.tarmacPlane.angle===0,'restart did not reset angle');
+  check(ts2.tarmacHelicopter.phase===0&&JSON.stringify(sample(3))===JSON.stringify(helicopterNear),'helicopter restart did not restore artwork');
   check(JSON.stringify(sample(0))===JSON.stringify(near),'restart did not restore artwork');
   // Descend across a verified edge in the installed aircraft hull. Do not
   // inject the climb timer/group: acquisition must identify collision object 0.
@@ -124,7 +137,13 @@
   if(ts2.front.screen==='summary'){ts2.frontDrive(0,650);ts2.frontDrive(0x4000);ts2.frontDrive(0,130);}
   await wait(()=>ts2.front.screen==='select','selector did not return');
   check(ts2.tarmacPlane===null,'plane state leaked into selector');
+  check(ts2.tarmacHelicopter===null,'helicopter state leaked into selector');
   await enter();
   check(ts2.tarmacPlane&&ts2.tarmacPlane.ticks<30,'re-entry retained old plane state');
-  console.log('PASS: Tarmac near/far geometry, landing/riding/jump, natural moving ledge acquisition/anchor/landing, pause, reset, wheel damage/invulnerability, fall respawn and level exit/re-entry');
+  check(ts2.tarmacHelicopter&&ts2.tarmacHelicopter.ticks<30,'helicopter retained old phase');
+  const token=ts2.helicopterToken, tokens=ts2.pickups.tokens;
+  Object.assign(ts2.player,{x:token.x*32,y:(token.y+230)*32,z:token.z*32,vx:0,vy:0,vz:0,onGround:false,contacts:[]});
+  ts2.tickGame({},1,0);
+  check(ts2.helicopterToken.collected&&ts2.pickups.tokens===(tokens|8),'cannot collect token at its moving position '+JSON.stringify({token:ts2.helicopterToken,tokens:ts2.pickups.tokens,player:ts2.player}));
+  console.log('PASS: helicopter hover/rotors/live token collection and lifecycle; Tarmac near/far geometry, landing/riding/jump, natural moving ledge acquisition/anchor/landing, pause, reset, wheel damage/invulnerability, fall respawn and level exit/re-entry');
 })()

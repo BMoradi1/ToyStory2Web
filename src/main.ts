@@ -1,3 +1,4 @@
+import { TARMAC_HELICOPTER_OBJECTS, createTarmacHelicopter, helicopterPoses, stepTarmacHelicopter, syncHelicopterToken, type TarmacHelicopter } from './sim/tarmac-helicopter.ts';
 import { TARMAC_PLANE_OBJECTS, createTarmacPlane, planePoses, stepTarmacPlane, planeWheelHit, restorePlaneCollision, type TarmacPlane } from './sim/tarmac-plane.ts';
 import {createAimMarker,stepAimMarker} from './sim/aim-marker.ts';
 import {createAimLock,stepAimLock,type AimTarget} from './sim/aim-lock.ts';
@@ -305,6 +306,7 @@ async function showLevel(index: number): Promise<void> {
   creatureSim = null;
   pushBlocks = null;
   tarmacPlane = null;
+  tarmacHelicopter = null;
   levelPoles = [];
   levelZipLines = [];
   stompProps = createStompProps();
@@ -394,7 +396,7 @@ async function showLevel(index: number): Promise<void> {
         const index = parsed.objectIds[id];
         if (index !== undefined && index >= 0) separate.add(index);
       }
-      if (levelNumber(level.id) === 14) for (const id of TARMAC_PLANE_OBJECTS) {
+      if (levelNumber(level.id) === 14) for (const id of [...TARMAC_PLANE_OBJECTS, ...TARMAC_HELICOPTER_OBJECTS]) {
         const index = parsed.objectIds[id];
         if (index !== undefined && index >= 0) separate.add(index);
       }
@@ -685,6 +687,8 @@ async function open(dir: GameDir): Promise<void> {
       },
       get stompProps() { return stompProps; },
       get tarmacPlane() { return tarmacPlane; },
+      get tarmacHelicopter() { return tarmacHelicopter; },
+      get helicopterToken() { const item=pickups?.items.find(i=>i.id===116); return tarmacHelicopter&&item?{...item}:null; },
       redrawHud(){if(player)drawHud(levelNumber(levels[levelEl.selectedIndex]?.id??'')??0);return flareSprites;},
       get lensFlares(){return {enabled:lensFlare,sprites:flareSprites,flicker:{...flareFlicker}};},
       /** Resolve the current attack requests without advancing the cast (collision/damage probes). */
@@ -1290,6 +1294,7 @@ async function spawnPlayer(): Promise<void> {
   const level = levelNumber(sceneId) ?? 0;
   tarmacPlane = level === 14 ? createTarmacPlane(currentLevel.level, currentCollisionWorld) : null;
   drawTarmacPlane();
+  tarmacHelicopter = level === 14 ? createTarmacHelicopter(currentLevel.level) : null;
   stompProps = createStompProps();
   flareFlicker = createFlareFlicker();
   resetTextureAnimations();
@@ -1406,6 +1411,7 @@ async function spawnPlayer(): Promise<void> {
   // once here rather than every frame.
   pickupAngles = pickups.items.map(() => [0, 0, 0]);
   pickupAngleMap.clear();
+  drawTarmacHelicopter();
   pickupFloor = pickups.items.map((item) => {
     const hit = currentCollisionWorld
       ? groundBelow(currentCollisionWorld, item.x, item.y, item.z)
@@ -1810,7 +1816,11 @@ function drawCoins(): void {
       a[1] = (a[1] + (((i >> 2) & 3) * 3 + 7) * 2) % OBJECT_ANGLE_UNITS;
       a[2] = (a[2] + ((i & 7) + 4) * 2) % OBJECT_ANGLE_UNITS;
       const scale=item.tokenSlot>=0?pickups.revealScales[item.tokenSlot]??1:1;
-      pickupAngleMap.set(item.objectIndex, {angles:a,scale:[scale,scale,scale]});
+      const helicopterToken = tarmacHelicopter && item.id === 116
+        ? tarmacHelicopter.objects.find(o=>o.id===116) : null;
+      pickupAngleMap.set(item.objectIndex, {angles:a,scale:[scale,scale,scale],
+        offset: helicopterToken ? [(item.x-helicopterToken.rest.x)/WORLD_SCALE,
+          -(item.y-helicopterToken.rest.y)/WORLD_SCALE, -(item.z-helicopterToken.rest.z)/WORLD_SCALE] : undefined});
       continue;
     }
     // Every coin in the list advances the phase, taken or not, so collecting
@@ -2304,6 +2314,24 @@ function talkDraw(): TalkDraw | null {
   };
 }
 
+/** Helicopter bodies/rotors use their authored poses; token tumble/reveal scale
+ * stays owned by drawCoins, with the same live position as the collection test. */
+function drawTarmacHelicopter(): void {
+  if (!viewer || !tarmacHelicopter) return;
+  if (pickups) syncHelicopterToken(tarmacHelicopter, pickups);
+  const transforms = new Map<number, ObjectTransform>();
+  for (const pose of helicopterPoses(tarmacHelicopter)) {
+    const token = pose.id === 116 ? pickups?.items.findIndex(i=>i.id===116) ?? -1 : -1;
+    const scale = token >= 0 ? pickups?.revealScales[3] ?? 1 : 1;
+    transforms.set(pose.index, { angles: token >= 0 ? pickupAngles[token] ?? pose.angles : pose.angles,
+      scale: [scale,scale,scale],
+      offset: [(pose.position.x-pose.rest.x*pose.scale)/WORLD_SCALE,
+        -(pose.position.y-pose.rest.y*pose.scale)/WORLD_SCALE,
+        -(pose.position.z-pose.rest.z*pose.scale)/WORLD_SCALE] });
+  }
+  viewer.setObjectTransforms(transforms);
+}
+
 /** Apply both near and far plane poses; positions are game units, artwork uses renderer axes. */
 function drawTarmacPlane(): void {
   if (!viewer || !tarmacPlane) return;
@@ -2765,6 +2793,7 @@ async function loadDioramaScene(): Promise<{ paths: DatLevel['paths']; placedOf:
   podBeams.length = 0;
   pushBlocks = null;
   tarmacPlane = null;
+  tarmacHelicopter = null;
   levelPoles = [];
   levelZipLines = [];
   stompProps = createStompProps();
@@ -2997,6 +3026,7 @@ let talk: TalkState | null = null;
 /** The level's push blocks, once the player has spawned. */
 let pushBlocks: PushState | null = null;
 let tarmacPlane: TarmacPlane | null = null;
+let tarmacHelicopter: TarmacHelicopter | null = null;
 let levelPoles: Pole[] = [];
 let levelZipLines: ZipLine[] = [];
 let stompProps = createStompProps();
@@ -3270,6 +3300,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       stepTarmacPlane(tarmacPlane, currentCollisionWorld!, player!);
       drawTarmacPlane();
     }
+    if (tarmacHelicopter) { stepTarmacHelicopter(tarmacHelicopter); drawTarmacHelicopter(); }
   };
   stepPlayer(player, held, playerRuntime, playerGround, cameraYaw);
   if (tarmacPlane) {

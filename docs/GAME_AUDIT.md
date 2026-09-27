@@ -73,7 +73,7 @@ not evidence for untested interactions.
 | 11 | Al's Penthouse | BUZZARD, GUNSL and FATBLOKE hooks absent. | Level-local prop helpers, hazards and encounters. |
 | 12 | The Evil Emperor Zurg | Fight controller missing despite no absent shared hook in inventory. | Implement decoded boss controller and end-to-end reward check. |
 | 13 | Airport Infiltration | FATBLOKE, BUZZARD and PROSP hooks absent. | Indoor transport/platform controllers and traversal; distinct from Tarmac. |
-| 14 | Tarmac Trouble | Plane motion/collision, wheels/fans, ground/climbing passengers and wheel hazards implemented and tested. FATBLOKE, BUZZARD and SMITH hooks absent. | Helicopter controller and remaining challenges; pitch/roll attachment on other movers. |
+| 14 | Tarmac Trouble | Plane motion/collision, wheels/fans, ground/climbing passengers, wheel hazards and helicopter hover/rotors/token motion implemented and tested. FATBLOKE, BUZZARD and SMITH hooks absent. | Helicopter light puzzle/lowering, remaining challenges and ambient audio; pitch/roll attachment on other movers. |
 | 15 | Final Showdown | Fight controller missing; SMITH, GUNSL and PROSP hooks absent. | Multi-boss encounter, final reward, rescue/credits/save handoff. |
 
 ## Prioritized work
@@ -91,8 +91,11 @@ not evidence for untested interactions.
    this is not a full Tarmac playthrough. The expanded browser regression also
    acquires an actual moving ledge, follows the climb, pauses/resumes and lands
    aboard. `ledge-probe.ts` covers moving anchor stability and early damage/death
-   release. The separate helicopter controller, pitch/roll attachment and original
-   climb-camera transition remain open.
+   release. Helicopter helper `0042e1d0` is now ported in `tarmac-helicopter.ts`: hover,
+   near/far rotors and token artwork/collection coordinates. The node and combined
+   Tarmac browser regressions cover motion, phase wrap, pickup collection, pause,
+   reset and re-entry. The light puzzle that lowers the helicopter, its ambient
+   sound, pitch/roll attachment and original climb-camera transition remain open.
 2. **Other level motion.** Use the original mutation call inventory to account
    for each object/controller, starting with traversal-critical platforms in
    Elevator Hop and both airport scenes. Share transform/collision integration;

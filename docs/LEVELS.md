@@ -1341,7 +1341,7 @@ review checklist are in [GAME_AUDIT.md](GAME_AUDIT.md).
 
 | Area | Gap | Evidence / status |
 |---|---|---|
-| Tarmac Trouble (14) | Plane movement and moving ledge attachment implemented | `tarmac-plane.ts` ports `0042dcb0`: near/far meshes, collision 0, wheels/fans, wheel hazards, grounded riders and moving ledge attachment. Node and browser regressions pass. Helicopter ID 3 is separate and remains unported. |
+| Tarmac Trouble (14) | Plane movement and moving ledge attachment implemented | `tarmac-plane.ts` ports `0042dcb0`: near/far meshes, collision 0, wheels/fans, wheel hazards, grounded riders and moving ledge attachment. Node and browser regressions pass. Helicopter hover/rotors and token motion are now ported separately; the light puzzle/lowering remains unported. |
 | Construction Yard | Outdoor paint cans | The trailer paint puzzle is ported; its implementation explicitly does not cover the outdoor cans. |
 | Al's Space Land (8) | Prop-controlled texture effect | Call `00424227` waits on the unimplemented `0052c9b8 & 1` prop flag; see docs/EFFECTS.md. |
 | Moving platforms | Broader controller coverage | Translation/yaw attachment during ledge climbing is implemented and tested on Tarmac. Other level controllers, pitch/roll attachment and the climb-camera transition still need work. |
@@ -1447,5 +1447,34 @@ entry clears the controller. Player-only fall respawn leaves world motion runnin
 `tools/tarmac-plane-probe.ts` and `tools/tarmac-plane-flow-check.js` verify this
 behavior, including actual browser vertex movement in both LOD sets. The
 expanded browser check acquires and finishes a moving ledge climb while the
-plane continues ticking; pause freezes both. Helicopter object 3 belongs to the
-separate `0042e1d0` controller and is outside this aircraft fix.
+plane continues ticking; pause freezes both. Helicopter object 3 belongs to the separate `0042e1d0` helper, now ported below.
+
+
+## Tarmac helicopter hover and rotors (ported 2026-09-27)
+
+`src/sim/tarmac-helicopter.ts` ports motion helper `0042e1d0`. Near objects
+3, 48, 66, 67 and 68 bob by trunc(sin(phase)/2) in game units; far objects
+49/50 apply that displacement in quarter space. Phase advances by 0x21 each
+simulation tick, after placing the objects. Rotors 48/50 use absolute angles
+(0, phase × 21, 0); other pieces retain their authored tilt. This helper does
+not move collision geometry in the original, so no new helicopter hull motion
+is invented.
+
+Token 116 uses trunc(sin(phase)/4) plus the shared height offset minus 0xa000.
+Its live pickup coordinates now follow this motion as well as its mesh. The
+pickup drawing pass preserves the animated translation while retaining its
+normal tumble and reveal scale. Collection retires the record normally. Pause
+freezes motion, restart restores the initial pose, and selector exit clears it.
+
+The shared height offset starts at zero. The light puzzle in `0042e790` changes
+it after a successful solution (0x80 per eligible tick while below 48000); that
+puzzle, its camera/success sequence, and helicopter sound event 0x9b are still
+unported. This change restores continuous hover/rotor motion and token alignment,
+not the puzzle's completion route.
+
+`tools/tarmac-helicopter-probe.ts` checks cardinal phases, far/near alignment,
+authored tilt, rotor rates, phase wrap and collection at the shifted token.
+`tools/tarmac-plane-flow-check.js` now covers helicopter vertex movement, token
+render/collection agreement, pause, restart and re-entry alongside aircraft and
+moving-ledge behavior. Its token collection check positions Buzz; it does not
+solve the light puzzle.

@@ -1,9 +1,22 @@
+CURRENT UPDATE — 2026-09-27: Tarmac light puzzle and helicopter sound
+  Ported original pad/goal logic, installed-stream scrambling, three attempts,
+  failure reset/cue, authored lamp/pad/count meshes and guide retirement.
+  Success lowers helicopter/token by 0x80 per eligible tick to 48000 and runs
+  the original 300-tick moving-token camera cut and success sequence.
+  Event 0x9b now supplies the spatial helicopter sound. Sustained sources stop
+  on exit/mute; stale end callbacks cannot interrupt a replacement voice.
+  Verified 200 generated puzzles; Chromium real pad pounds, failure/retry,
+  success/lowering/camera/pause, collection, restart and selector cleanup.
+  Build, helicopter/ledge probes and audio lifecycle tests pass.
+  Next audit targets: Slinky's Tarmac challenge and other level controllers;
+  broader creature hooks, platform motion and boss gaps remain in GAME_AUDIT.
+
 CURRENT UPDATE — 2026-09-27: Tarmac helicopter motion
   Prior plane/ledge fixes pushed as 0a13034. Added helicopter helper 0042e1d0:
   eight near/far/token objects, sine hover, spinning rotors and live token
   pickup coordinates. Token drawing retains hover through tumble/reveal updates.
-  Original light puzzle/lowering, success camera/sequence and helicopter
-  ambience remain open. No collision motion invented: this helper moves none.
+  Light puzzle/lowering, success camera/sequence and helicopter ambience
+  are now ported by the newer update above. No collision motion invented: this helper moves none.
   Build, helicopter probe and expanded Tarmac browser motion/collection/
   pause/reset/re-entry checks pass.
 
@@ -14,7 +27,7 @@ CURRENT UPDATE — 2026-09-27: moving ledge attachment
   moving props exactly once, fixing scenery freezing while Buzz pulls up.
   Static/moving ledge probes, plane and push probes, build and expanded Tarmac
   browser acquisition/attachment/pause/landing/reset/exit checks pass.
-  Next: Tarmac helicopter light puzzle/lowering and remaining level motion.
+  Next: remaining level motion/challenges; helicopter puzzle now ported above.
   Pitch/roll attachment and the original climb-camera transition remain open.
 
 CURRENT UPDATE — 2026-09-27: Tarmac plane fix

@@ -1341,7 +1341,7 @@ review checklist are in [GAME_AUDIT.md](GAME_AUDIT.md).
 
 | Area | Gap | Evidence / status |
 |---|---|---|
-| Tarmac Trouble (14) | Plane movement and moving ledge attachment implemented | `tarmac-plane.ts` ports `0042dcb0`: near/far meshes, collision 0, wheels/fans, wheel hazards, grounded riders and moving ledge attachment. Node and browser regressions pass. Helicopter hover/rotors and token motion are now ported separately; the light puzzle/lowering remains unported. |
+| Tarmac Trouble (14) | Plane movement and moving ledge attachment implemented | `tarmac-plane.ts` ports `0042dcb0`: near/far meshes, collision 0, wheels/fans, wheel hazards, grounded riders and moving ledge attachment. Node and browser regressions pass. Helicopter hover/rotors and token motion are now ported separately; the light puzzle/lowering and helicopter sound are now implemented too. |
 | Construction Yard | Outdoor paint cans | The trailer paint puzzle is ported; its implementation explicitly does not cover the outdoor cans. |
 | Al's Space Land (8) | Prop-controlled texture effect | Call `00424227` waits on the unimplemented `0052c9b8 & 1` prop flag; see docs/EFFECTS.md. |
 | Moving platforms | Broader controller coverage | Translation/yaw attachment during ledge climbing is implemented and tested on Tarmac. Other level controllers, pitch/roll attachment and the climb-camera transition still need work. |
@@ -1468,9 +1468,9 @@ freezes motion, restart restores the initial pose, and selector exit clears it.
 
 The shared height offset starts at zero. The light puzzle in `0042e790` changes
 it after a successful solution (0x80 per eligible tick while below 48000); that
-puzzle, its camera/success sequence, and helicopter sound event 0x9b are still
-unported. This change restores continuous hover/rotor motion and token alignment,
-not the puzzle's completion route.
+puzzle, its camera/success sequence and helicopter sound event 0x9b are now
+implemented by the follow-up below. The hover helper itself does not decide
+when the puzzle has been solved.
 
 `tools/tarmac-helicopter-probe.ts` checks cardinal phases, far/near alignment,
 authored tilt, rotor rates, phase wrap and collection at the shifted token.
@@ -1478,3 +1478,49 @@ authored tilt, rotor rates, phase wrap and collection at the shifted token.
 render/collection agreement, pause, restart and re-entry alongside aircraft and
 moving-ledge behavior. Its token collection check positions Buzz; it does not
 solve the light puzzle.
+
+
+## Tarmac light puzzle and helicopter reward (ported 2026-09-27)
+
+`src/sim/tarmac-lights.ts` ports `0042d710`, `0042d8b0`, `0042d9c0`,
+`0042db10` and the puzzle branch of `0042e790`. Each pad sets its own bit and
+clears its predecessor, wrapping pad 0 to bit 3. The low nibble is the player's
+row and the high nibble the goal. The installed random stream chooses a starting
+pattern and three moves; candidates are rejected unless all three moves change
+two bits and the final pattern differs. The rows are then swapped, giving an
+authored three-press challenge. Initialization and first approach scramble the
+board; failure retries use the same shared random stream as the other scripts.
+Exact board sequences depend on which other original random consumers are ported.
+
+A descending ground-pound impact on collision surface 32–35 spends a press.
+Normal landings, other surfaces and contacts outside the original 500-unit
+shifted-distance sphere around (-0xd2ac0, -0xf9f7, -0x98d72) do nothing. The
+actual meshes represent lamps, remaining presses and depressed pads: no new UI
+or substitute artwork is used. A pad flashes for the original 12-count timer;
+all four corresponding guide sparkles retire on a valid press. Three failed
+presses clear the lamps, wait until the counter is below -60, scramble again,
+and play error sequence -6 only when no camera cut is active.
+
+Matching rows blink between zero and 0xff on a 64-count cycle. While Buzz is in
+the puzzle area, the shared helicopter/token height advances by 0x80 each tick
+until 48000 (375 ticks). Success starts sequence -5 and a one-shot 300-tick cut
+to the moving token at distance 0x20, with eye Z offset +0x8000. The look point
+tracks the token's previous pose, matching the level-script order. Control
+returns through the existing camera system; the already-visible puzzle token
+remains collectible at its live animated position.
+
+Every active level tick raises sustained sound event 0x9b (`Helicopt` in the
+installed level bank). Its source is interpolated three quarters of the way
+from helicopter object 68 toward the camera before spatial attenuation. The
+existing sustained-sample path prevents overlapping copies. SoundBank now stops
+its sustained sources on exit/mute and ignores stale end callbacks from a
+previous level. Pause freezes puzzle motion/camera; restart resets the puzzle,
+height and reward, and selector entry clears its state.
+
+`tools/tarmac-lights-probe.ts` checks 200 generated boards, input/range gates,
+mesh choices, retry timing, full lowering and single camera/success emission.
+`tools/tarmac-lights-flow-check.js` drives actual ground-pound input against the
+installed pad collision, deliberately fails and retries, solves, checks the
+camera and pause, collects the lowered token and verifies restart/exit. It
+positions Buzz to exercise these interactions rather than playing the whole
+route unassisted. Sustained voice cleanup is tested in `select-audio-probe.ts`.

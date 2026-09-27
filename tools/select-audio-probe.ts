@@ -25,6 +25,7 @@ class FakeNode {
 }
 class FakeSource extends FakeNode {
   buffer: unknown; loop = false; starts = 0; stops = 0;
+  onended: (() => void) | null = null;
   start() { this.starts++; }
   stop() { this.stops++; }
 }
@@ -72,3 +73,17 @@ await bank.start(); bank.setAmbience('missing');
 await new Promise(resolve => setImmediate(resolve));
 bank.setAmbience('missing'); assert.equal(bank.ambienceName, null, 'missing file is silent');
 console.log('PASS: 15 installed selector previews, menu/gameplay banks, loop reuse, switching, stale reads, exit, mute and missing files.');
+
+bank.play('a',1,0,true);
+const voice=sources.at(-1)!, count=sources.length;
+for(let i=0;i<120;i++)bank.play('a',1,0,true);
+assert.equal(sources.length,count,'sustained event reuses the running voice');
+bank.stop();assert.equal(voice.stops,1,'level exit stops sustained sound');
+await bank.start();bank.play('a',1,0,true);
+const replacement=sources.at(-1)!;
+voice.onended?.();bank.play('a',1,0,true);
+assert.equal(sources.length,count+1,'old ended callback cannot release the new level voice');
+replacement.onended?.();bank.play('a',1,0,true);
+assert.equal(sources.length,count+2,'completed sustained sample can play again');
+bank.stop();
+console.log('PASS: sustained voice reuse, scene-exit stop, completion/replay and stale end callbacks');

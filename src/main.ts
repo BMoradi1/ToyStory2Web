@@ -1,3 +1,4 @@
+import { TARMAC_LIGHT_OBJECTS, createTarmacLights, stepTarmacLights, lightScales, helicopterSoundPoint, type TarmacLights } from './sim/tarmac-lights.ts';
 import { TARMAC_HELICOPTER_OBJECTS, createTarmacHelicopter, helicopterPoses, stepTarmacHelicopter, syncHelicopterToken, type TarmacHelicopter } from './sim/tarmac-helicopter.ts';
 import { TARMAC_PLANE_OBJECTS, createTarmacPlane, planePoses, stepTarmacPlane, planeWheelHit, restorePlaneCollision, type TarmacPlane } from './sim/tarmac-plane.ts';
 import {createAimMarker,stepAimMarker} from './sim/aim-marker.ts';
@@ -17,7 +18,7 @@ import {readCharacterLight} from './formats/character-light.ts';
 import { createTextureAnimation, stepTextureAnimation, copyScrolledTexture } from './sim/texture-animation.ts';
 import { readSoundSequences, startSequence, stepSequence, type SoundSequences, type SequenceVoice } from './audio/sequences.ts';
 import { createGuideSparkles, stepGuideSparkles, spendGuide } from './sim/guide-sparkles.ts';
-import { createStompProps, stepStompProps, stompObjects, paintStreamScale } from './sim/stomp-props.ts';
+import { createStompProps, stepStompProps, stompObjects, paintStreamScale, standingSurface } from './sim/stomp-props.ts';
 import { CREDIT_SLOTS, CREDIT_TEXT } from './front/endings.ts';
 import { chooseSaveFile } from './front/browser-menu.ts';
 import { movieChoices } from './front/movies.ts';
@@ -307,6 +308,7 @@ async function showLevel(index: number): Promise<void> {
   pushBlocks = null;
   tarmacPlane = null;
   tarmacHelicopter = null;
+  tarmacLights = null;
   levelPoles = [];
   levelZipLines = [];
   stompProps = createStompProps();
@@ -396,7 +398,7 @@ async function showLevel(index: number): Promise<void> {
         const index = parsed.objectIds[id];
         if (index !== undefined && index >= 0) separate.add(index);
       }
-      if (levelNumber(level.id) === 14) for (const id of [...TARMAC_PLANE_OBJECTS, ...TARMAC_HELICOPTER_OBJECTS]) {
+      if (levelNumber(level.id) === 14) for (const id of [...TARMAC_PLANE_OBJECTS, ...TARMAC_HELICOPTER_OBJECTS, ...TARMAC_LIGHT_OBJECTS]) {
         const index = parsed.objectIds[id];
         if (index !== undefined && index >= 0) separate.add(index);
       }
@@ -688,6 +690,7 @@ async function open(dir: GameDir): Promise<void> {
       get stompProps() { return stompProps; },
       get tarmacPlane() { return tarmacPlane; },
       get tarmacHelicopter() { return tarmacHelicopter; },
+      get tarmacLights() { return tarmacLights ? {...tarmacLights} : null; },
       get helicopterToken() { const item=pickups?.items.find(i=>i.id===116); return tarmacHelicopter&&item?{...item}:null; },
       redrawHud(){if(player)drawHud(levelNumber(levels[levelEl.selectedIndex]?.id??'')??0);return flareSprites;},
       get lensFlares(){return {enabled:lensFlare,sprites:flareSprites,flicker:{...flareFlicker}};},
@@ -1337,6 +1340,8 @@ async function spawnPlayer(): Promise<void> {
       }
     }
   }
+  tarmacLights = level === 14 && creatureSim ? createTarmacLights(() => creatureSim!.rand.byte()) : null;
+  drawTarmacLights();
   // The crates Buzz shoves. Their rails are paths in the scene and their
   // collision is a numbered dynamic group in the terrain file.
   const S = GAME_UNITS_PER_LEVEL_UNIT;
@@ -1367,6 +1372,7 @@ async function spawnPlayer(): Promise<void> {
   // executable, and its second half is per level (docs/HUD.md).
   spriteTable = exeBytes ? readSpriteTable(exeBytes, level) : [];
   soundTable = exeBytes ? readSoundTable(exeBytes, level) : null;
+  if (level === 14) { const name=soundTable?.nameOf(0x9b); if(name)sound?.preload([name]); }
   sequenceTable = exeBytes ? readSoundSequences(exeBytes) : null;
   sequenceVoice = null;
   guideSparkles = createGuideSparkles(currentLevel.level.paths.find(p => p.id === 58)?.points ?? []);
@@ -2314,6 +2320,19 @@ function talkDraw(): TalkDraw | null {
   };
 }
 
+/** Actual lamp/pad/count meshes from the level's object table. */
+function drawTarmacLights(): void {
+  if(!viewer||!currentLevel||!tarmacLights)return;
+  const transforms=new Map<number,ObjectTransform>();
+  for(const [id,scale] of lightScales(tarmacLights)) {
+    const index=currentLevel.level.objectIds[id];
+    const object=index===undefined?null:currentLevel.level.objects[index];
+    if(!object||index===undefined)continue;
+    transforms.set(index,{angles:[object.rotation.x,object.rotation.y,object.rotation.z],scale:[scale,scale,scale]});
+  }
+  viewer.setObjectTransforms(transforms);
+}
+
 /** Helicopter bodies/rotors use their authored poses; token tumble/reveal scale
  * stays owned by drawCoins, with the same live position as the collection test. */
 function drawTarmacHelicopter(): void {
@@ -2794,6 +2813,7 @@ async function loadDioramaScene(): Promise<{ paths: DatLevel['paths']; placedOf:
   pushBlocks = null;
   tarmacPlane = null;
   tarmacHelicopter = null;
+  tarmacLights = null;
   levelPoles = [];
   levelZipLines = [];
   stompProps = createStompProps();
@@ -3027,6 +3047,7 @@ let talk: TalkState | null = null;
 let pushBlocks: PushState | null = null;
 let tarmacPlane: TarmacPlane | null = null;
 let tarmacHelicopter: TarmacHelicopter | null = null;
+let tarmacLights: TarmacLights | null = null;
 let levelPoles: Pole[] = [];
 let levelZipLines: ZipLine[] = [];
 let stompProps = createStompProps();
@@ -3300,13 +3321,30 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       stepTarmacPlane(tarmacPlane, currentCollisionWorld!, player!);
       drawTarmacPlane();
     }
-    if (tarmacHelicopter) { stepTarmacHelicopter(tarmacHelicopter); drawTarmacHelicopter(); }
   };
   stepPlayer(player, held, playerRuntime, playerGround, cameraYaw);
   if (tarmacPlane) {
     const angle = planeWheelHit(tarmacPlane, player);
     if (angle !== null) applyCreatureTouch(angle, 3);
   }
+  if (tarmacLights && tarmacHelicopter && creatureSim) {
+    stepTarmacLights(tarmacLights,player,player.stompImpact,standingSurface(player,currentCollisionWorld),
+      ()=>creatureSim!.rand.byte(),cut.ticks>0);
+    tarmacHelicopter.height=tarmacLights.height;
+    if(tarmacLights.guidesSpent)for(let i=0;i<4;i++)spendGuide(guideSparkles,effects,i,true);
+    if(tarmacLights.sequence!==null)playEvent(tarmacLights.sequence,player);
+    if(tarmacLights.trackCamera) {
+      // The original samples the token before advancing the helicopter helper.
+      const item=pickups?.items.find(i=>i.id===116);
+      if(item) {
+        const at={x:item.x*32,y:item.y*32,z:item.z*32};
+        if(tarmacLights.startCamera){startCut(cut,at,300,0x20,player);cut.eye.z+=0x8000;}
+        cut.look=at;
+      }
+    }
+    drawTarmacLights();
+  }
+  if(tarmacHelicopter){stepTarmacHelicopter(tarmacHelicopter);drawTarmacHelicopter();}
   if (player.stompImpact && camera) camera.shake = 40;
   if (player.stompImpact && effects) {
     spawnChild(effects, effectWorld(), player.x, player.y - 0x400, player.z, 0x12, 0xb);
@@ -3385,6 +3423,10 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   // table, which is what lets the spin's whine and whirl hold rather than
   // restart every tick.
   for (const event of player.events) playEvent(event, player);
+  if(tarmacHelicopter&&camera) {
+    const pose=helicopterPoses(tarmacHelicopter).find(o=>o.id===68)!;
+    playEvent(0x9b,helicopterSoundPoint({x:pose.position.x*32,y:pose.position.y*32,z:pose.position.z*32},camera));
+  }
 
   // The level's talkers. Only while nothing else is being said.
   if (creatureSim && tasks && !talk && exeBytes) {

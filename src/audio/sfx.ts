@@ -34,6 +34,7 @@ export class SoundBank {
    * what is still running, and a repeat is dropped until it ends.
    */
   private readonly sustaining = new Set<string>();
+  private readonly sustainedSources = new Map<string, AudioBufferSourceNode>();
   /** The selector owns one looping preview, separate from one-shot effects. */
   private ambience: { name: string; source: AudioBufferSourceNode; trim: GainNode } | null = null;
 
@@ -76,6 +77,8 @@ export class SoundBank {
 
   stop(): void {
     this.enabled = false;
+    for(const source of this.sustainedSources.values()){source.stop();source.disconnect();}
+    this.sustainedSources.clear();
     this.sustaining.clear();
     this.setAmbience(null);
   }
@@ -166,7 +169,12 @@ export class SoundBank {
     const source = this.context.createBufferSource();
     if (sustained) {
       this.sustaining.add(key);
-      source.onended = () => this.sustaining.delete(key);
+      this.sustainedSources.set(key,source);
+      source.onended = () => {
+        // A stopped voice may finish after a new level has started this sound.
+        if(this.sustainedSources.get(key)!==source)return;
+        this.sustainedSources.delete(key);this.sustaining.delete(key);
+      };
     }
     source.buffer = buffer;
     let tail: AudioNode = this.gain;

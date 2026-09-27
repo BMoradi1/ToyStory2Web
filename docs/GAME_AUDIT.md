@@ -73,7 +73,7 @@ not evidence for untested interactions.
 | 11 | Al's Penthouse | BUZZARD, GUNSL and FATBLOKE hooks absent. | Level-local prop helpers, hazards and encounters. |
 | 12 | The Evil Emperor Zurg | Fight controller missing despite no absent shared hook in inventory. | Implement decoded boss controller and end-to-end reward check. |
 | 13 | Airport Infiltration | FATBLOKE, BUZZARD and PROSP hooks absent. | Indoor transport/platform controllers and traversal; distinct from Tarmac. |
-| 14 | Tarmac Trouble | Plane motion/collision, wheels/fans, ground/climbing passengers, wheel hazards and helicopter hover/rotors/token motion implemented and tested. FATBLOKE, BUZZARD and SMITH hooks absent. | Helicopter light puzzle/lowering, remaining challenges and ambient audio; pitch/roll attachment on other movers. |
+| 14 | Tarmac Trouble | Plane motion/collision, wheels/fans, ground/climbing passengers, wheel hazards and helicopter hover/rotors/token motion and light puzzle/lowering implemented and tested. FATBLOKE, BUZZARD and SMITH hooks absent. | Slinky challenge, remaining creature hooks and other ambient effects; pitch/roll attachment on other movers. |
 | 15 | Final Showdown | Fight controller missing; SMITH, GUNSL and PROSP hooks absent. | Multi-boss encounter, final reward, rescue/credits/save handoff. |
 
 ## Prioritized work
@@ -94,8 +94,13 @@ not evidence for untested interactions.
    release. Helicopter helper `0042e1d0` is now ported in `tarmac-helicopter.ts`: hover,
    near/far rotors and token artwork/collection coordinates. The node and combined
    Tarmac browser regressions cover motion, phase wrap, pickup collection, pause,
-   reset and re-entry. The light puzzle that lowers the helicopter, its ambient
-   sound, pitch/roll attachment and original climb-camera transition remain open.
+   reset and re-entry. The light puzzle and helicopter sound are now implemented too:
+   `tarmac-lights-probe.ts` validates 200 generated boards and original timing;
+   `tarmac-lights-flow-check.js` uses real pad ground-pounds for failure/retry,
+   success/lowering/camera, pause, reward collection, restart and exit. It
+   positions Buzz above pads and at the lowered token; this is not an unassisted
+   traversal. Pitch/roll attachment and the original climb-camera transition
+   remain open.
 2. **Other level motion.** Use the original mutation call inventory to account
    for each object/controller, starting with traversal-critical platforms in
    Elevator Hop and both airport scenes. Share transform/collision integration;

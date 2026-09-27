@@ -92,7 +92,7 @@ const rows = LEVEL_SELECT_ORDER.map((level, index) => {
       handlers, unimplementedHandlers: handlers.filter(h => !h.implemented),
       dynamicCollision: [...new Set(dynamic)],
       collisionWithoutMappedController: [...new Set(dynamic)].filter(n => !pushes.some(p => p.collisionObject === n) && !(level === 14 && n === 0)),
-      motionControllers: level === 14 ? ['tarmac-plane.ts (collision 0)', 'tarmac-helicopter.ts (artwork/pickup motion)'] : [],
+      motionControllers: level === 14 ? ['tarmac-plane.ts (collision 0)', 'tarmac-helicopter.ts (artwork/pickup motion)', 'tarmac-lights.ts (pads/lowering)'] : [],
       pushBlocks: pushes.length, stompObjectIds: stompObjects(level),
       poles: readPoles(paths(61)).length, zipLines: readZipLines(paths(62)).length,
       taskFeatures: tasks ? Object.keys(tasks) : [],

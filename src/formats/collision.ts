@@ -343,6 +343,43 @@ export function collisionGroupByObject(world: CollisionWorld, objectNumber: numb
   return world.groups.findIndex((g) => g.dynamic && g.objectNumber === objectNumber);
 }
 
+/** Immutable rest geometry for a moving hull. Always transform from this pose,
+ * never from last frame's rounded vertices, so a full turn cannot accumulate drift. */
+export function captureCollisionGroup(world: CollisionWorld, groupIndex: number) {
+  const group = world.groups[groupIndex];
+  if (!group?.position) throw Error(`Missing collision group ${groupIndex}`);
+  return { groupIndex, origin: { ...group.position }, polys: group.polys.map(index => ({
+    index, vertices: world.polys[index]!.vertices.map(v => ({ ...v })),
+    normal: { ...world.polys[index]!.normal },
+  })) };
+}
+
+/** Absolute yaw + position in collision/level units. Also rotates contact normals
+ * and rebuilds spatial-index membership, including removing vacated cells. */
+export function transformCollisionGroup(
+  world: CollisionWorld, rest: ReturnType<typeof captureCollisionGroup>,
+  position: Vec3, radians: number,
+): void {
+  const c = Math.cos(radians), s = Math.sin(radians);
+  world.groups[rest.groupIndex]!.position = { ...position };
+  for (const base of rest.polys) {
+    const poly = world.polys[base.index]!;
+    forEachCell(world, poly.vertices.map(v => v.x), poly.vertices.map(v => v.z), cell => {
+      const at = cell.indexOf(base.index);
+      if (at >= 0) cell.splice(at, 1);
+    });
+    poly.vertices = base.vertices.map(v => {
+      const x = v.x - rest.origin.x, z = v.z - rest.origin.z;
+      return { x: position.x + x * c + z * s, y: position.y + v.y - rest.origin.y,
+        z: position.z + z * c - x * s };
+    });
+    poly.normal = { x: base.normal.x * c + base.normal.z * s, y: base.normal.y,
+      z: base.normal.z * c - base.normal.x * s };
+    forEachCell(world, poly.vertices.map(v => v.x), poly.vertices.map(v => v.z), cell => cell.push(base.index), true);
+    for (const v of poly.vertices) world.lowestY = Math.max(world.lowestY, v.y);
+  }
+}
+
 /**
  * Move one group's collision, the way the engine moves a pushed block's
  * (`FUN_00488510`). Shifts every vertex and re-files the polygons in the
@@ -386,7 +423,10 @@ function forEachCell(
       const key = `${gx},${gz}`;
       let cell = world.cells.get(key);
       if (!cell && create) { cell = []; world.cells.set(key, cell); }
-      if (cell) visit(cell);
+      if (cell) {
+        visit(cell);
+        if (cell.length === 0) world.cells.delete(key);
+      }
     }
   }
 }
@@ -414,10 +454,10 @@ export function groundBelow(
   y: number,
   z: number,
   tolerance = 64,
-): { y: number; normal: { x: number; y: number; z: number } } | null {
+): { y: number; normal: { x: number; y: number; z: number }; group: number } | null {
   const cell = world.cells.get(`${Math.floor(x / world.cellSize)},${Math.floor(z / world.cellSize)}`);
   if (!cell) return null;
-  let best: { y: number; normal: { x: number; y: number; z: number } } | null = null;
+  let best: { y: number; normal: { x: number; y: number; z: number }; group: number } | null = null;
   for (const index of cell) {
     const poly = world.polys[index]!;
     if (!poly.walkable) continue;
@@ -427,7 +467,7 @@ export function groundBelow(
     if (Math.abs(n.y) < 1e-6) continue;
     const surfaceY = v0.y - (n.x * (x - v0.x) + n.z * (z - v0.z)) / n.y;
     if (surfaceY < y - tolerance) continue;
-    if (!best || surfaceY < best.y) best = { y: surfaceY, normal: n };
+    if (!best || surfaceY < best.y) best = { y: surfaceY, normal: n, group: poly.group };
   }
   return best;
 }

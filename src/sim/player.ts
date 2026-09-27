@@ -159,6 +159,8 @@ export interface PlayerState {
   animPhase: number;
   /** DAT_0053c660: edge-climb ticks remaining; animation state 9. */
   climb: number;
+  /** Dynamic collision group retained during the pull-up; -1 for a static ledge. */
+  climbGroup: number;
 
   /** `DAT_0053c838`: counts up while falling; 0x50 once the fall is long enough to hurt, negative while stunned on landing. */
   fallTimer: number;
@@ -222,7 +224,7 @@ export function createPlayer(x = 0, y = 0, z = 0, yaw = 0): PlayerState {
     hitStun: 0,
     dying: false,
     animPhase: 0,
-    climb: 0,
+    climb: 0, climbGroup: -1,
     zipLine: -1, zipPhase: 0, zipDistance: 0, zipSpeed: 0, zipTicks: 0, zipCooldown: 0,
     pole: -1, poleLock: -1, poleTicks: 0, poleMotion: 0,
     fallTimer: 0,
@@ -526,7 +528,7 @@ export function stepPlayer(
   const previousY = runtime.previousY;
   runtime.previousY = p.y;
   p.stompImpact = false;
-  if (p.dying || p.hitStun > 0) { p.stomp = 0; p.launched = false; }
+  if (p.dying || p.hitStun > 0) { p.stomp = 0; p.launched = false; p.climb = 0; p.climbGroup = -1; }
   // FUN_00434d20: a fresh spin press during a jump starts the stomp.
   if (input.spin && !prev.spin && !p.onGround && p.coyote === 0
       && p.stomp === 0 && p.zipLine < 0 && p.pole < 0 && p.climb === 0
@@ -557,6 +559,7 @@ export function stepPlayer(
       if (edge) {
         p.x = edge.x; p.y = edge.y; p.z = edge.z; p.targetYaw = edge.yaw;
         p.climb = CLIMB_TICKS;
+        p.climbGroup = edge.group ?? -1;
         p.laser = 0; p.laserCharge = 0;
         p.fallTimer = 0;
         p.events.push(0x17);
@@ -569,6 +572,9 @@ export function stepPlayer(
       p.vx = p.vy = p.vz = p.forwardSpeed = p.lateralSpeed = 0;
       p.onGround = false; p.coyote = 0; p.groundNormal = null; p.contacts = [];
       p.animPhase = 9;
+      // The climb locks player input, not the world. Movers must still advance
+      // once and carry the retained ledge anchor before this early return.
+      ground.beforeMove?.(p, input);
       runtime.previousY = p.y;
       runtime.previous = { ...input };
       return;
@@ -604,6 +610,8 @@ export function stepPlayer(
     if (p.zipPhase === 1) p.vx = p.vz = p.forwardSpeed = p.lateralSpeed = 0;
   }
   ground.beforeMove?.(p, input);
+  // Keep attachment through the final carry, then hand back to floor contacts.
+  p.climbGroup = -1;
 
   // --- move ----------------------------------------------------------------
   // The mover. The sphere centre sits radius + centreLift above the origin, so

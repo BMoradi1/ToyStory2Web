@@ -1341,10 +1341,10 @@ review checklist are in [GAME_AUDIT.md](GAME_AUDIT.md).
 
 | Area | Gap | Evidence / status |
 |---|---|---|
-| Tarmac Trouble (14) | Plane movement | Confirmed missing controller: original tick `0042e790` calls `0042dcb0` for near/far plane meshes, collision object 0, wheels/fans and hazards. See GAME_AUDIT.md; implementation remains open. |
+| Tarmac Trouble (14) | Plane movement and moving ledge attachment implemented | `tarmac-plane.ts` ports `0042dcb0`: near/far meshes, collision 0, wheels/fans, wheel hazards, grounded riders and moving ledge attachment. Node and browser regressions pass. Helicopter ID 3 is separate and remains unported. |
 | Construction Yard | Outdoor paint cans | The trailer paint puzzle is ported; its implementation explicitly does not cover the outdoor cans. |
 | Al's Space Land (8) | Prop-controlled texture effect | Call `00424227` waits on the unimplemented `0052c9b8 & 1` prop flag; see docs/EFFECTS.md. |
-| Moving platforms | Player attachment during ledge climbing | Still listed as unported; the ledge controller handles static collision. This is separate from the implemented push-block collision updates. |
+| Moving platforms | Broader controller coverage | Translation/yaw attachment during ledge climbing is implemented and tested on Tarmac. Other level controllers, pitch/roll attachment and the climb-camera transition still need work. |
 | Other scripted props | Motion and interaction feedback | Per-level object scripts remain only partly covered. Guide sparkles have retirement hooks for the chair, pushables and trailer controls, but not all other props. |
 
 Creature-specific gaps also remain, including Tin Robot hover wobble/sparks.
@@ -1418,3 +1418,34 @@ inputs and ground-pound landings, checks the liquid fill, and verifies the
 reward reveal. Existing controller, crate, zip-line, NPC/pole browser, and
 level-to-selector regressions also pass. State and transformed meshes are
 recreated on level load; nothing from the puzzle runs in the selector.
+
+
+## Tarmac aircraft movement (ported 2026-09-27)
+
+`0042e600` constructs the aircraft pivot by averaging wheel object 10 with 11,
+then averaging that result with object 13. `0042dcb0` runs from `0042e790`:
+collision 0 receives angular velocity 4 in quarter-angle units (one 12-bit angle
+per simulation tick) and X/Z velocity three quarters of the error to the last
+render origin. Translation velocities are signed shorts. The pivot is constant;
+the aircraft's authored positions orbit the world origin. Render positions use
+the executable's separate near and quarter-scale far calculations and shifts.
+
+`src/sim/tarmac-plane.ts` controls 33 objects: 0–15 except 3, 16–30 and 84–86.
+Fans 8/9 and far 23/24 roll by angle × 0x327. Wheels 10/11/13 and far 25/26/28
+roll by −15/−21/−18 times the angle, with yaw offsets 1024/1024/700. Wheel hazard
+centres use the unquantized new X/Z and original Y + 0xc00; `0049f400` shifts
+coordinate differences by 8 and checks squared distance below 80². Contact
+uses reaction 3 (knockback and damage) through the existing damage path.
+
+Collision transforms rebuild vertices/normals from an immutable rest pose,
+update spatial-index cells and remove empty old cells. Grounded passengers
+follow translation and yaw before their own collision sweep; airborne and wall
+contacts do not attach. Pause/dialogue freeze with the rest of the world.
+Restart restores the hull before constructing a fresh controller, and selector
+entry clears the controller. Player-only fall respawn leaves world motion running.
+
+`tools/tarmac-plane-probe.ts` and `tools/tarmac-plane-flow-check.js` verify this
+behavior, including actual browser vertex movement in both LOD sets. The
+expanded browser check acquires and finishes a moving ledge climb while the
+plane continues ticking; pause freezes both. Helicopter object 3 belongs to the
+separate `0042e1d0` controller and is outside this aircraft fix.

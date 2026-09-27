@@ -4,7 +4,7 @@ import { GAME_UNITS_PER_LEVEL_UNIT } from './player-constants.ts';
 import { cos, idiv, sin, yawOf } from './trig.ts';
 
 export interface LedgeProbe { x: number; y: number; z: number; yaw: number; previousY: number }
-export interface LedgeTarget { x: number; y: number; z: number; yaw: number }
+export interface LedgeTarget { x: number; y: number; z: number; yaw: number; group?: number }
 export const CLIMB_TICKS = 0x52;
 
 export function findLedge(world: CollisionWorld, p: LedgeProbe): LedgeTarget | null {
@@ -29,5 +29,8 @@ export function findLedge(world: CollisionWorld, p: LedgeProbe): LedgeTarget | n
   // The lower sweep finds the wall normal used to square Buzz to the edge.
   const wall = sweep({ ...from, y }, across).contacts.find(c => Math.abs(c.normal.y) < 0.5);
   return { x: p.x + dx, y, z: p.z + dz,
+    // 00435f30 retains the mover returned by 0048e1d0 in DAT_00559e80.
+    // Keep our collision-group identity, which is what platform transforms use.
+    group: world.groups[top.group]?.dynamic ? top.group : -1,
     yaw: wall ? yawOf(-wall.normal.x, -wall.normal.z) : p.yaw };
 }

@@ -345,8 +345,25 @@ fires sound event `0x17`, zeros velocity, and locks movement for `0x52` ticks.
 Animation **state 9, slot 10** contains the pull-up displacement relative to
 that anchor; the controller must not add another animated translation.
 Damage/death cancels the climb and respawn clears it. The existing mover
-settles Buzz onto the top when control resumes. Moving-platform attachment
-and the original camera's climb transition remain unported.
+settles Buzz onto the top when control resumes. Moving-platform attachment for
+translation and yaw is now implemented (2026-09-27); the original camera's climb
+transition and pitch/roll platform attachment remain unported.
+
+`FUN_00435f30` stores the mover from `FUN_0048e1d0` in `DAT_00559e80` until
+climbing finishes. The port retains the queried top's dynamic collision group
+as `climbGroup`. `moving-platform.ts` carries that anchor even though ordinary
+floor contacts are cleared during the climb. The climb's early return now runs
+`beforeMove` exactly once, so scripted scenery continues moving while player
+input is locked. The last climb tick carries the anchor before returning to
+normal floor contact; damage, death and player reset clear the attachment.
+Static ledges retain group -1 and never attach to an unrelated mover.
+
+The synthetic ledge regression acquires a translating/rotating platform through
+the real collision query and checks local anchor stability, exactly one mover
+tick per player tick, landing and early damage/death interruption. The Tarmac
+browser regression starts Buzz descending beside an actual aircraft edge and
+lets the normal controller acquire it; no climb state or timer is injected.
+It verifies moving attachment, pause/resume and landing on the aircraft.
 
 `tools/ledge-probe.ts` checks ordinary running-jump acquisition, fast descent,
 reach/facing, low ceilings, steep tops, state gates, all 82 animation ticks,

@@ -1,3 +1,4 @@
+import { TARMAC_PLANE_OBJECTS, createTarmacPlane, planePoses, stepTarmacPlane, planeWheelHit, restorePlaneCollision, type TarmacPlane } from './sim/tarmac-plane.ts';
 import {createAimMarker,stepAimMarker} from './sim/aim-marker.ts';
 import {createAimLock,stepAimLock,type AimTarget} from './sim/aim-lock.ts';
 import {aimObjectIndices,buildAimModel} from './render/aim-model.ts';
@@ -303,6 +304,7 @@ async function showLevel(index: number): Promise<void> {
   currentCollisionWorld = null;
   creatureSim = null;
   pushBlocks = null;
+  tarmacPlane = null;
   levelPoles = [];
   levelZipLines = [];
   stompProps = createStompProps();
@@ -389,6 +391,10 @@ async function showLevel(index: number): Promise<void> {
         if (index !== undefined && index >= 0) separate.add(index);
       }
       for (const id of stompObjects(levelNumber(level.id) ?? 0)) {
+        const index = parsed.objectIds[id];
+        if (index !== undefined && index >= 0) separate.add(index);
+      }
+      if (levelNumber(level.id) === 14) for (const id of TARMAC_PLANE_OBJECTS) {
         const index = parsed.objectIds[id];
         if (index !== undefined && index >= 0) separate.add(index);
       }
@@ -678,6 +684,7 @@ async function open(dir: GameDir): Promise<void> {
         return { index: which, yaw: b.segYaw, block: { x: b.x, y: b.y, z: b.z }, player: { x: player.x, y: player.y, z: player.z } };
       },
       get stompProps() { return stompProps; },
+      get tarmacPlane() { return tarmacPlane; },
       redrawHud(){if(player)drawHud(levelNumber(levels[levelEl.selectedIndex]?.id??'')??0);return flareSprites;},
       get lensFlares(){return {enabled:lensFlare,sprites:flareSprites,flicker:{...flareFlicker}};},
       /** Resolve the current attack requests without advancing the cast (collision/damage probes). */
@@ -1241,6 +1248,12 @@ async function spawnPlayer(): Promise<void> {
   await loadCollision();
   if (!currentCollisionWorld) { infoEl.textContent = 'no collision for this scene'; return; }
 
+  if (tarmacPlane) {
+    restorePlaneCollision(tarmacPlane, currentCollisionWorld);
+    // Model reads below yield. Do not let the old controller move the restored
+    // hull while a live restart is waiting for them.
+    tarmacPlane = null;
+  }
   const sceneId = levels[levelEl.selectedIndex]?.id ?? '';
   const fromTable = tableSpawn(sceneId, currentCollisionWorld);
   let start: { x: number; z: number; yaw: number; ground: { y: number; normal: { x: number; y: number; z: number } } };
@@ -1275,6 +1288,8 @@ async function spawnPlayer(): Promise<void> {
   // the one the level's own init reveals is shown; the tasks are not
   // implemented, so the rest stay hidden until `ts2.revealTokens()`.
   const level = levelNumber(sceneId) ?? 0;
+  tarmacPlane = level === 14 ? createTarmacPlane(currentLevel.level, currentCollisionWorld) : null;
+  drawTarmacPlane();
   stompProps = createStompProps();
   flareFlicker = createFlareFlicker();
   resetTextureAnimations();
@@ -2289,6 +2304,19 @@ function talkDraw(): TalkDraw | null {
   };
 }
 
+/** Apply both near and far plane poses; positions are game units, artwork uses renderer axes. */
+function drawTarmacPlane(): void {
+  if (!viewer || !tarmacPlane) return;
+  const transforms = new Map<number, ObjectTransform>();
+  for (const pose of planePoses(tarmacPlane)) transforms.set(pose.index, {
+    angles: pose.angles,
+    offset: [(pose.position.x - pose.rest.x * pose.scale) * GAME_TO_RENDER,
+      -(pose.position.y - pose.rest.y * pose.scale) * GAME_TO_RENDER,
+      -(pose.position.z - pose.rest.z * pose.scale) * GAME_TO_RENDER],
+  });
+  viewer.setObjectTransforms(transforms);
+}
+
 /** Move the actual scene artwork by the same displacement as its collision. */
 function drawPushBlocks(): void {
   if (!viewer || !pushBlocks || !currentLevel) return;
@@ -2736,6 +2764,7 @@ async function loadDioramaScene(): Promise<{ paths: DatLevel['paths']; placedOf:
   viewer?.setAimVisible(false);
   podBeams.length = 0;
   pushBlocks = null;
+  tarmacPlane = null;
   levelPoles = [];
   levelZipLines = [];
   stompProps = createStompProps();
@@ -2967,6 +2996,7 @@ let music: MusicPlayer | null = null;
 let talk: TalkState | null = null;
 /** The level's push blocks, once the player has spawned. */
 let pushBlocks: PushState | null = null;
+let tarmacPlane: TarmacPlane | null = null;
 let levelPoles: Pole[] = [];
 let levelZipLines: ZipLine[] = [];
 let stompProps = createStompProps();
@@ -3234,8 +3264,18 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   if(aimView.active)viewer.setAimPose(aimModelAngles(aimView));
   if(aimView.active) held={...held,moveX:0,moveY:0,jump:false,spin:false,cameraLeft:false,cameraRight:false};
   const playerGround = groundFromCollision(currentCollisionWorld, levelPoles, levelZipLines);
-  playerGround.beforeMove = () => tickPushBlocks(held);
+  playerGround.beforeMove = () => {
+    tickPushBlocks(held);
+    if (tarmacPlane) {
+      stepTarmacPlane(tarmacPlane, currentCollisionWorld!, player!);
+      drawTarmacPlane();
+    }
+  };
   stepPlayer(player, held, playerRuntime, playerGround, cameraYaw);
+  if (tarmacPlane) {
+    const angle = planeWheelHit(tarmacPlane, player);
+    if (angle !== null) applyCreatureTouch(angle, 3);
+  }
   if (player.stompImpact && camera) camera.shake = 40;
   if (player.stompImpact && effects) {
     spawnChild(effects, effectWorld(), player.x, player.y - 0x400, player.z, 0x12, 0xb);

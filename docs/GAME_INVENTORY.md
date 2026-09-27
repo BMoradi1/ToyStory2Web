@@ -4,9 +4,9 @@ Regenerate: `node --import tsx tools/game-audit.ts "Toy Story 2"`. Internal leve
 
 This snapshot includes `--decompile /path/to/toy2_levels.c` motion evidence. Supply a fresh local DumpAll.java output to regenerate that section.
 
-This is static inventory, **not** a completed playthrough or parity score. Missing shared handlers are explicit absent dispatch entries; level controllers may own related behavior. Unmapped dynamic collision objects need review, not automatic movement.
+This is static inventory, **not** a completed playthrough or parity score. Missing shared handlers are explicit absent dispatch entries; level controllers may own related behavior. Unmapped dynamic collision objects need review, not automatic movement. Mapped controllers currently include push blocks and the Tarmac plane.
 
-| Play order | Level | Scene parses | Creature hooks absent | Dynamic collision IDs without push controller | Poles / zip lines | Boss controller |
+| Play order | Level | Scene parses | Creature hooks absent | Dynamic collision IDs without mapped controller | Poles / zip lines | Boss controller |
 |---|---|---|---|---|---|---|
 | 1 (1) | andy's house | yes | — | 8, 9, 10, 12, 13, 14, 15 | 14 / 2 | taunt/reward hooks; inspect per-creature combat |
 | 2 (2) | andy's neighborhood | yes | LAWN (12), ZGCAR (14), ZKITE (15) | 0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 12 | 6 / 5 | taunt/reward hooks; inspect per-creature combat |
@@ -21,7 +21,7 @@ This is static inventory, **not** a completed playthrough or parity score. Missi
 | 11 (11) | al's penthouse | yes | BUZZARD (41), GUNSL (45), FATBLOKE (46) | 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 22, 23, 24, 25, 26 | 7 / 0 | taunt/reward hooks; inspect per-creature combat |
 | 12 (12) | the evil emperor zurg | yes | — | — | 0 / 0 | MISSING |
 | 13 (13) | airport infiltration | yes | FATBLOKE (46), BUZZARD (41), PROSP (61) | 0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 12, 13, 14 | 13 / 2 | taunt/reward hooks; inspect per-creature combat |
-| 14 (14) | tarmac trouble | yes | FATBLOKE (46), BUZZARD (41), SMITH (58) | 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13 | 9 / 1 | taunt/reward hooks; inspect per-creature combat |
+| 14 (14) | tarmac trouble | yes | FATBLOKE (46), BUZZARD (41), SMITH (58) | 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13 | 9 / 1 | taunt/reward hooks; inspect per-creature combat |
 | 15 (15) | final showdown | yes | SMITH (58), GUNSL (45), PROSP (61) | — | 0 / 0 | MISSING |
 
 ## Missing shared behavior hooks
@@ -68,21 +68,21 @@ This is static inventory, **not** a completed playthrough or parity score. Missi
 
 ## Existing task and prop coverage (implementation presence only)
 
-- andy's house: tasks potato, hamm, boss, race, hintNpc, findFive; 7 push blocks; stomp-driven object IDs 23.
-- andy's neighborhood: tasks boss, race, hamm, hintNpc, findFive; 2 push blocks; stomp-driven object IDs none.
-- bombs away: tasks bossFight; 0 push blocks; stomp-driven object IDs none.
-- construction yard: tasks boss, challenge, potato, hamm, hintNpc, findFive; 2 push blocks; stomp-driven object IDs 33, 34, 35, 48, 49, 50, 51, 52, 53.
-- alleys and gullies: tasks boss, challenge, hamm, hintNpc, findFive; 4 push blocks; stomp-driven object IDs none.
-- slime time: tasks slimeBoss; 0 push blocks; stomp-driven object IDs none.
-- al's toy barn: tasks potato, fetch, boss, hamm, hintNpc, findFive; 2 push blocks; stomp-driven object IDs none.
-- al's space land: tasks reachBox, hamm, hintNpc, findFive; 3 push blocks; stomp-driven object IDs none.
-- toy barn encounter: tasks none; 0 push blocks; stomp-driven object IDs none.
-- elevator hop: tasks potato, offer, boss, hamm, hintNpc, findFive; 0 push blocks; stomp-driven object IDs none.
-- al's penthouse: tasks boss, challenge, hamm, hintNpc, findFive; 3 push blocks; stomp-driven object IDs none.
-- the evil emperor zurg: tasks none; 0 push blocks; stomp-driven object IDs none.
-- airport infiltration: tasks boss, challenge, potato, hamm, hintNpc, findFive; 1 push blocks; stomp-driven object IDs none.
-- tarmac trouble: tasks offer, boss, hamm, hintNpc, findFive; 0 push blocks; stomp-driven object IDs none.
-- final showdown: tasks none; 0 push blocks; stomp-driven object IDs none.
+- andy's house: tasks potato, hamm, boss, race, hintNpc, findFive; 7 push blocks; motion none mapped; stomp-driven object IDs 23.
+- andy's neighborhood: tasks boss, race, hamm, hintNpc, findFive; 2 push blocks; motion none mapped; stomp-driven object IDs none.
+- bombs away: tasks bossFight; 0 push blocks; motion none mapped; stomp-driven object IDs none.
+- construction yard: tasks boss, challenge, potato, hamm, hintNpc, findFive; 2 push blocks; motion none mapped; stomp-driven object IDs 33, 34, 35, 48, 49, 50, 51, 52, 53.
+- alleys and gullies: tasks boss, challenge, hamm, hintNpc, findFive; 4 push blocks; motion none mapped; stomp-driven object IDs none.
+- slime time: tasks slimeBoss; 0 push blocks; motion none mapped; stomp-driven object IDs none.
+- al's toy barn: tasks potato, fetch, boss, hamm, hintNpc, findFive; 2 push blocks; motion none mapped; stomp-driven object IDs none.
+- al's space land: tasks reachBox, hamm, hintNpc, findFive; 3 push blocks; motion none mapped; stomp-driven object IDs none.
+- toy barn encounter: tasks none; 0 push blocks; motion none mapped; stomp-driven object IDs none.
+- elevator hop: tasks potato, offer, boss, hamm, hintNpc, findFive; 0 push blocks; motion none mapped; stomp-driven object IDs none.
+- al's penthouse: tasks boss, challenge, hamm, hintNpc, findFive; 3 push blocks; motion none mapped; stomp-driven object IDs none.
+- the evil emperor zurg: tasks none; 0 push blocks; motion none mapped; stomp-driven object IDs none.
+- airport infiltration: tasks boss, challenge, potato, hamm, hintNpc, findFive; 1 push blocks; motion none mapped; stomp-driven object IDs none.
+- tarmac trouble: tasks offer, boss, hamm, hintNpc, findFive; 0 push blocks; motion tarmac-plane.ts (collision 0); stomp-driven object IDs none.
+- final showdown: tasks none; 0 push blocks; motion none mapped; stomp-driven object IDs none.
 
 ## Original motion call inventory
 

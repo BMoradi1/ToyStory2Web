@@ -91,7 +91,8 @@ const rows = LEVEL_SELECT_ORDER.map((level, index) => {
       parsed: true, objects: dat.objects.length, creatures: creatures.length, typesWithoutSharedDefinition,
       handlers, unimplementedHandlers: handlers.filter(h => !h.implemented),
       dynamicCollision: [...new Set(dynamic)],
-      collisionWithoutPushController: [...new Set(dynamic)].filter(n => !pushes.some(p => p.collisionObject === n)),
+      collisionWithoutMappedController: [...new Set(dynamic)].filter(n => !pushes.some(p => p.collisionObject === n) && !(level === 14 && n === 0)),
+      motionControllers: level === 14 ? ['tarmac-plane.ts (collision 0)'] : [],
       pushBlocks: pushes.length, stompObjectIds: stompObjects(level),
       poles: readPoles(paths(61)).length, zipLines: readZipLines(paths(62)).length,
       taskFeatures: tasks ? Object.keys(tasks) : [],
@@ -109,11 +110,11 @@ else {
   console.log('# Generated game coverage inventory\n');
   console.log('Regenerate: `node --import tsx tools/game-audit.ts "Toy Story 2"`. Internal level IDs 3 and 6 differ from play order.\n');
   if (decompileArg >= 0) console.log('This snapshot includes `--decompile /path/to/toy2_levels.c` motion evidence. Supply a fresh local DumpAll.java output to regenerate that section.\n');
-  console.log('This is static inventory, **not** a completed playthrough or parity score. Missing shared handlers are explicit absent dispatch entries; level controllers may own related behavior. Unmapped dynamic collision objects need review, not automatic movement.\n');
-  console.log('| Play order | Level | Scene parses | Creature hooks absent | Dynamic collision IDs without push controller | Poles / zip lines | Boss controller |');
+  console.log('This is static inventory, **not** a completed playthrough or parity score. Missing shared handlers are explicit absent dispatch entries; level controllers may own related behavior. Unmapped dynamic collision objects need review, not automatic movement. Mapped controllers currently include push blocks and the Tarmac plane.\n');
+  console.log('| Play order | Level | Scene parses | Creature hooks absent | Dynamic collision IDs without mapped controller | Poles / zip lines | Boss controller |');
   console.log('|---|---|---|---|---|---|---|');
   for (const r of rows) {
-    console.log(`| ${r.position} (${r.level}) | ${r.name} | ${r.parsed ? 'yes' : r.error} | ${r.unimplementedHandlers?.map(h => `${h.name} (${h.type})`).join(', ') || '—'} | ${r.collisionWithoutPushController?.join(', ') || '—'} | ${r.poles ?? '—'} / ${r.zipLines ?? '—'} | ${r.bossController ?? '—'} |`);
+    console.log(`| ${r.position} (${r.level}) | ${r.name} | ${r.parsed ? 'yes' : r.error} | ${r.unimplementedHandlers?.map(h => `${h.name} (${h.type})`).join(', ') || '—'} | ${r.collisionWithoutMappedController?.join(', ') || '—'} | ${r.poles ?? '—'} / ${r.zipLines ?? '—'} | ${r.bossController ?? '—'} |`);
   }
   console.log('\n## Missing shared behavior hooks\n');
   for (const r of rows) for (const h of r.unimplementedHandlers ?? []) {
@@ -121,7 +122,7 @@ else {
   }
   for (const r of rows) if (r.typesWithoutSharedDefinition?.length) console.log(`- ${r.name}: types without a shared creature definition ${r.typesWithoutSharedDefinition.map(t => `${names.get(t) ?? '?'} (${t})`).join(', ')}; may be NPCs, props or level-owned, not automatically missing behavior.`);
   console.log('\n## Existing task and prop coverage (implementation presence only)\n');
-  for (const r of rows) console.log(`- ${r.name}: tasks ${r.taskFeatures?.join(', ') || 'none'}; ${r.pushBlocks ?? 0} push blocks; stomp-driven object IDs ${r.stompObjectIds?.join(', ') || 'none'}.`);
+  for (const r of rows) console.log(`- ${r.name}: tasks ${r.taskFeatures?.join(', ') || 'none'}; ${r.pushBlocks ?? 0} push blocks; motion ${r.motionControllers?.join(', ') || 'none mapped'}; stomp-driven object IDs ${r.stompObjectIds?.join(', ') || 'none'}.`);
   if (decompileArg >= 0) {
     console.log('\n## Original motion call inventory\n');
     console.log('Static call sites from each tick and available level-local helpers. Conditions, speed, timing, indirect calls and port parity require review. Zero calls does not prove no movement.\n');

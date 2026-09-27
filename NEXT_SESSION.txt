@@ -1,3 +1,26 @@
+CURRENT UPDATE — 2026-09-27: moving ledge attachment
+  Dynamic ledge queries now retain the collision group, matching the role of
+  original DAT_00559e80. Translation/yaw movers carry the climb anchor through
+  the final tick; damage/death/reset clear it. The climb early return now ticks
+  moving props exactly once, fixing scenery freezing while Buzz pulls up.
+  Static/moving ledge probes, plane and push probes, build and expanded Tarmac
+  browser acquisition/attachment/pause/landing/reset/exit checks pass.
+  Next: separate Tarmac helicopter controller and remaining level motion.
+  Pitch/roll attachment and the original climb-camera transition remain open.
+
+CURRENT UPDATE — 2026-09-27: Tarmac plane fix
+  Implemented original 0042dcb0: 33 near/far objects, rotating fans/wheels,
+  smoothed rotating collision hull, grounded passengers and wheel hazards.
+  Reusable collision transforms rebuild from rest and update spatial indexing;
+  moving-platform.ts carries floor contacts and releases jumping passengers.
+  Verified node orbit/LOD/hazards/index/reset, landing/riding/walking/jumping;
+  Chromium mesh movement, pause, reset, damage/invulnerability, fall respawn
+  and selector exit/re-entry. Existing push-block physics probe, production
+  build and all-15-level Chromium launch/exit smoke check pass.
+  Moving ledge attachment is now covered by the newer update above; the
+  separate helicopter remains open.
+  See docs/GAME_AUDIT.md for the remaining prioritized work.
+
 CURRENT UPDATE — 2026-09-27: whole-game audit baseline
   See docs/GAME_AUDIT.md (current status and prioritized checklist) and
   docs/GAME_INVENTORY.md (generated evidence for all 15 scenes).
@@ -6,11 +29,11 @@ CURRENT UPDATE — 2026-09-27: whole-game audit baseline
   Found 16 distinct absent shared behavior hooks, missing Zurg/finale fight
   controllers and many moving-prop leads. Leads are not automatically bugs.
   Tarmac Trouble is the plane report: tick 0042e790 calls helper 0042dcb0,
-  moving near/far meshes, collision 0, fans/wheels and hazards. Port still open.
+  moving near/far meshes, collision 0, fans/wheels and hazards. Now ported above.
   Build and Chromium all-15 launch/simulate/exit smoke passed. This does not
   verify mission completion, progression or full original-game parity.
-  Next: Tarmac plane + reusable moving-collision/rider support, followed by
-  original motion coverage, progression blockers, puzzles, effects and audio.
+  Next: remaining original motion coverage, moving ledges, progression
+  blockers, puzzles, effects and audio.
 
 CURRENT UPDATE — 2026-09-27: selector ambience and initial cursor
   Added all fifteen original Level01-Level15 looping previews from the

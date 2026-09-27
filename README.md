@@ -1,5 +1,9 @@
 # ToyStory2Web
 
+Current completeness and known gaps: [whole-game audit](docs/GAME_AUDIT.md),
+with a reproducible inventory of all 15 levels. Scene loading does not imply
+complete gameplay parity.
+
 An open-source reimplementation of the engine behind **Toy Story 2: Buzz
 Lightyear to the Rescue** (Traveller's Tales, 1999), running in the browser.
 

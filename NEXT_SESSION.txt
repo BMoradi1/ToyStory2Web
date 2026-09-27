@@ -1,3 +1,17 @@
+CURRENT UPDATE — 2026-09-27: whole-game audit baseline
+  See docs/GAME_AUDIT.md (current status and prioritized checklist) and
+  docs/GAME_INVENTORY.md (generated evidence for all 15 scenes).
+  tools/game-audit.ts inventories creature hooks, tasks, props and collision;
+  optional --decompile inventories original motion calls with function IDs.
+  Found 16 distinct absent shared behavior hooks, missing Zurg/finale fight
+  controllers and many moving-prop leads. Leads are not automatically bugs.
+  Tarmac Trouble is the plane report: tick 0042e790 calls helper 0042dcb0,
+  moving near/far meshes, collision 0, fans/wheels and hazards. Port still open.
+  Build and Chromium all-15 launch/simulate/exit smoke passed. This does not
+  verify mission completion, progression or full original-game parity.
+  Next: Tarmac plane + reusable moving-collision/rider support, followed by
+  original motion coverage, progression blockers, puzzles, effects and audio.
+
 CURRENT UPDATE — 2026-09-27: selector ambience and initial cursor
   Added all fifteen original Level01-Level15 looping previews from the
   executable's level-16 sound bank. Front-end names now override gameplay
@@ -10,9 +24,7 @@ CURRENT UPDATE — 2026-09-27: selector ambience and initial cursor
   Validation: build, selector audio probe, front-end validation, sound-table
   validation and Chromium playback of all 15 previews, rapid switching,
   cancellation, level entry/return and saved initial selection pass.
-  New user report: airport plane does not move. Not reproduced or decoded yet.
-  docs/LEVELS.md now has a partial environment-gap list; a complete level-by-
-  level audit is still needed. Do not treat old roadmap statuses as current.
+  Plane report and whole-game audit are tracked in the newer update above.
 
 CURRENT UPDATE — 2026-09-26: Tin Robot encounter regression
   Verified the existing platform taunt and intro-to-fight handoff in Chromium;

@@ -1073,11 +1073,12 @@ token timing and reset. `tools/tin-defeat-flow-check.js` exercises the
 installed level 1 robot through its vulnerable states and checks the five
 particles, light source, redraw independence, one-shot emission and reset.
 
-The browser harness explicitly seeks to script words 10 and 40 because the robot's
-intro-to-fight handoff is still unported: without that bypass the authored
-robot remains at word 8; word 40 isolates its open-state health transition
-from the unfinished fight flow. This verifies the defeat effect, not a complete
-playable encounter. The missing intro transition is now the next gameplay task.
+Updated 2026-09-27: the intro-to-fight handoff is implemented. The expanded
+`tools/tin-defeat-flow-check.js` follows the natural intro and authored attack
+cycle, then checks damage, defeat, token collection, save and reset. It positions
+Buzz and injects charged-spin damage while vulnerable; it no longer jumps script
+words. This is encounter integration coverage, not an unassisted playthrough.
+Hover wobble and sparks remain separate presentation gaps.
 
 The first-person launcher now honors the actively locked creature for kind 0x47;
 manual unlocked aiming uses kind 0x48. The live homing target follows the animated

@@ -1336,11 +1336,12 @@ With that, every boss in the game is decoded: 6 is ported, 3, 9, 12 and
 ## Known environment gaps (reviewed 2026-09-27)
 
 Loading a scene does not implement all of its object scripts. This is a
-partial list, not a completed audit of every level against the original.
+partial list. The current whole-game inventory, evidence rules and prioritized
+review checklist are in [GAME_AUDIT.md](GAME_AUDIT.md).
 
 | Area | Gap | Evidence / status |
 |---|---|---|
-| Airport scenes | Plane movement | User reports a stationary plane. Exact scene/object and original motion still need reproduction and decoding. |
+| Tarmac Trouble (14) | Plane movement | Confirmed missing controller: original tick `0042e790` calls `0042dcb0` for near/far plane meshes, collision object 0, wheels/fans and hazards. See GAME_AUDIT.md; implementation remains open. |
 | Construction Yard | Outdoor paint cans | The trailer paint puzzle is ported; its implementation explicitly does not cover the outdoor cans. |
 | Al's Space Land (8) | Prop-controlled texture effect | Call `00424227` waits on the unimplemented `0052c9b8 & 1` prop flag; see docs/EFFECTS.md. |
 | Moving platforms | Player attachment during ledge climbing | Still listed as unported; the ledge controller handles static collision. This is separate from the implemented push-block collision updates. |

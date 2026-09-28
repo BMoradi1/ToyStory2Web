@@ -1,8 +1,9 @@
 /** Original three-press light puzzle, using only the supplied random data. */
+import { aircraftSoundPoint } from '../src/sim/tarmac-scenery.ts';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {RandomStream} from '../src/sim/creatures.ts';
-import {createTarmacLights,stepTarmacLights,pressLight,lightScales,LIGHT_PUZZLE_CENTRE as at,lightsMatch,helicopterSoundPoint} from '../src/sim/tarmac-lights.ts';
+import {createTarmacLights,stepTarmacLights,pressLight,lightScales,LIGHT_PUZZLE_CENTRE as at,lightsMatch} from '../src/sim/tarmac-lights.ts';
 const root=process.argv[2]??'Toy Story 2';
 const random=new RandomStream(readFileSync(`${root}/data/rand.dat`));
 const byte=()=>random.byte();
@@ -56,5 +57,5 @@ for(const busy of[false,true]) {
   assert.equal(s.attempts,3);assert.equal(s.sequence,busy?null:-6);
   assert.equal(s.height,0);solve(s.bits);
 }
-assert.deepEqual(helicopterSoundPoint({x:101,y:-101,z:0},{x:0,y:0,z:0}),{x:26,y:-26,z:0});
+assert.deepEqual(aircraftSoundPoint({x:101,y:-101,z:0},{x:0,y:0,z:0}),{x:26,y:-26,z:0});
 console.log('PASS: 200 solvable puzzles, real surface/range gates, lamp/pad meshes, three tries, retry timing, lowering, one-shot cut/sequence and spatial sound origin');

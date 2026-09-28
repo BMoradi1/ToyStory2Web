@@ -1,4 +1,5 @@
-import { TARMAC_LIGHT_OBJECTS, createTarmacLights, stepTarmacLights, lightScales, helicopterSoundPoint, type TarmacLights } from './sim/tarmac-lights.ts';
+import { TARMAC_SCENERY_OBJECTS, createTarmacScenery, sceneryPoses, stepTarmacScenery, aircraftSoundPoint, type TarmacScenery } from './sim/tarmac-scenery.ts';
+import { TARMAC_LIGHT_OBJECTS, createTarmacLights, stepTarmacLights, lightScales, type TarmacLights } from './sim/tarmac-lights.ts';
 import { TARMAC_HELICOPTER_OBJECTS, createTarmacHelicopter, helicopterPoses, stepTarmacHelicopter, syncHelicopterToken, type TarmacHelicopter } from './sim/tarmac-helicopter.ts';
 import { TARMAC_PLANE_OBJECTS, createTarmacPlane, planePoses, stepTarmacPlane, planeWheelHit, restorePlaneCollision, type TarmacPlane } from './sim/tarmac-plane.ts';
 import {createAimMarker,stepAimMarker} from './sim/aim-marker.ts';
@@ -309,6 +310,7 @@ async function showLevel(index: number): Promise<void> {
   tarmacPlane = null;
   tarmacHelicopter = null;
   tarmacLights = null;
+  tarmacScenery = null;
   levelPoles = [];
   levelZipLines = [];
   stompProps = createStompProps();
@@ -398,7 +400,7 @@ async function showLevel(index: number): Promise<void> {
         const index = parsed.objectIds[id];
         if (index !== undefined && index >= 0) separate.add(index);
       }
-      if (levelNumber(level.id) === 14) for (const id of [...TARMAC_PLANE_OBJECTS, ...TARMAC_HELICOPTER_OBJECTS, ...TARMAC_LIGHT_OBJECTS]) {
+      if (levelNumber(level.id) === 14) for (const id of [...TARMAC_PLANE_OBJECTS, ...TARMAC_HELICOPTER_OBJECTS, ...TARMAC_LIGHT_OBJECTS, ...TARMAC_SCENERY_OBJECTS]) {
         const index = parsed.objectIds[id];
         if (index !== undefined && index >= 0) separate.add(index);
       }
@@ -691,6 +693,7 @@ async function open(dir: GameDir): Promise<void> {
         return { index: which, yaw: b.segYaw, block: { x: b.x, y: b.y, z: b.z }, player: { x: player.x, y: player.y, z: player.z } };
       },
       get stompProps() { return stompProps; },
+      get tarmacScenery() { return tarmacScenery; },
       get tarmacPlane() { return tarmacPlane; },
       get tarmacHelicopter() { return tarmacHelicopter; },
       get tarmacLights() { return tarmacLights ? {...tarmacLights} : null; },
@@ -1300,6 +1303,7 @@ async function spawnPlayer(): Promise<void> {
   const level = levelNumber(sceneId) ?? 0;
   tarmacPlane = level === 14 ? createTarmacPlane(currentLevel.level, currentCollisionWorld) : null;
   drawTarmacPlane();
+  tarmacScenery = level === 14 ? createTarmacScenery(currentLevel.level) : null;
   tarmacHelicopter = level === 14 ? createTarmacHelicopter(currentLevel.level) : null;
   stompProps = createStompProps();
   flareFlicker = createFlareFlicker();
@@ -1375,7 +1379,9 @@ async function spawnPlayer(): Promise<void> {
   // executable, and its second half is per level (docs/HUD.md).
   spriteTable = exeBytes ? readSpriteTable(exeBytes, level) : [];
   soundTable = exeBytes ? readSoundTable(exeBytes, level) : null;
-  if (level === 14) { const name=soundTable?.nameOf(0x9b); if(name)sound?.preload([name]); }
+  if (level === 14) for (const event of [0x6f, 0x9b, 0x9c]) {
+    const name = soundTable?.nameOf(event); if (name) sound?.preload([name]);
+  }
   sequenceTable = exeBytes ? readSoundSequences(exeBytes) : null;
   sequenceVoice = null;
   guideSparkles = createGuideSparkles(currentLevel.level.paths.find(p => p.id === 58)?.points ?? []);
@@ -1421,6 +1427,7 @@ async function spawnPlayer(): Promise<void> {
   pickupAngles = pickups.items.map(() => [0, 0, 0]);
   pickupAngleMap.clear();
   drawTarmacHelicopter();
+  drawTarmacScenery();
   pickupFloor = pickups.items.map((item) => {
     const hit = currentCollisionWorld
       ? groundBelow(currentCollisionWorld, item.x, item.y, item.z)
@@ -2337,6 +2344,12 @@ function drawTarmacLights(): void {
   viewer.setObjectTransforms(transforms);
 }
 
+function drawTarmacScenery(): void {
+  if (!viewer || !tarmacScenery) return;
+  viewer.setObjectTransforms(new Map(sceneryPoses(tarmacScenery).map(pose =>
+    [pose.index, { angles: pose.angles }])));
+}
+
 /** Helicopter bodies/rotors use their authored poses; token tumble/reveal scale
  * stays owned by drawCoins, with the same live position as the collection test. */
 function drawTarmacHelicopter(): void {
@@ -2818,6 +2831,7 @@ async function loadDioramaScene(): Promise<{ paths: DatLevel['paths']; placedOf:
   tarmacPlane = null;
   tarmacHelicopter = null;
   tarmacLights = null;
+  tarmacScenery = null;
   levelPoles = [];
   levelZipLines = [];
   stompProps = createStompProps();
@@ -3052,6 +3066,7 @@ let pushBlocks: PushState | null = null;
 let tarmacPlane: TarmacPlane | null = null;
 let tarmacHelicopter: TarmacHelicopter | null = null;
 let tarmacLights: TarmacLights | null = null;
+let tarmacScenery: TarmacScenery | null = null;
 let levelPoles: Pole[] = [];
 let levelZipLines: ZipLine[] = [];
 let stompProps = createStompProps();
@@ -3349,6 +3364,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     drawTarmacLights();
   }
   if(tarmacHelicopter){stepTarmacHelicopter(tarmacHelicopter);drawTarmacHelicopter();}
+  if(tarmacScenery){stepTarmacScenery(tarmacScenery);drawTarmacScenery();}
   if (player.stompImpact && camera) camera.shake = 40;
   if (player.stompImpact && effects) {
     spawnChild(effects, effectWorld(), player.x, player.y - 0x400, player.z, 0x12, 0xb);
@@ -3427,9 +3443,13 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   // table, which is what lets the spin's whine and whirl hold rather than
   // restart every tick.
   for (const event of player.events) playEvent(event, player);
+  if (tarmacPlane && camera) {
+    playEvent(0x6f);
+    playEvent(0x9c, aircraftSoundPoint(tarmacPlane.renderOrigin, camera));
+  }
   if(tarmacHelicopter&&camera) {
     const pose=helicopterPoses(tarmacHelicopter).find(o=>o.id===68)!;
-    playEvent(0x9b,helicopterSoundPoint({x:pose.position.x*32,y:pose.position.y*32,z:pose.position.z*32},camera));
+    playEvent(0x9b,aircraftSoundPoint({x:pose.position.x*32,y:pose.position.y*32,z:pose.position.z*32},camera));
   }
 
   // The level's talkers. Only while nothing else is being said.

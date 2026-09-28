@@ -106,8 +106,8 @@ function readString(exe: Uint8Array, address: number): string | null {
   let out = '';
   while (p < exe.length && exe[p] !== 0) {
     const c = exe[p++]!;
-    // The tables are followed by unrelated data; anything unprintable means
-    // the list has ended rather than that a name is odd.
+    // Empty/runtime-only entries need not point at a stored filename.
+    // Unprintable data is not a usable name, but does not end the pointer list.
     if (c < 0x20 || c > 0x7e) return null;
     out += String.fromCharCode(c);
   }
@@ -135,9 +135,12 @@ export function readSoundTable(exe: Uint8Array, level: number): SoundTable {
     base = u32(LEVEL_NAMES + level * LEVEL_STRIDE + 4);
     if (list >= IMAGE_BASE && list < IMAGE_BASE + exe.length) {
       for (let i = 0; i < 64; i++) {
-        const name = readString(exe, u32(list + i * 4));
-        if (name === null) break;
-        own.push(name);
+        if (list + i * 4 + 4 > IMAGE_BASE + exe.length) break;
+        const address = u32(list + i * 4);
+        // 0047d6e0 ends on a null POINTER, but skips empty names while
+        // still advancing the effect index. Tarmac has such a hole at 88.
+        if (address === 0) break;
+        own.push(readString(exe, address) ?? '');
       }
     }
   }

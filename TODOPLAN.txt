@@ -1,3 +1,15 @@
+CURRENT UPDATE — 2026-09-27: Tarmac scenery and ambient sound
+  Fixed shared sound-bank reading: null POINTER ends a list; an empty name
+  still occupies an effect slot. Tarmac's hole at 88 hid RainLoop, Thunder
+  and proplane. All 17 installed banks now checked against their slot lists.
+  Restored rain 0x6f and spatial plane 0x9c event calls, with existing sustained
+  voice cleanup/reuse. Shared original aircraft source interpolation.
+  Ported original relative sway of near/far scenery IDs 69/70 without drift.
+  Verified all 4096 phases, real browser vertices and decoded rain/engine audio,
+  pause/mute, restart and exit/re-entry. Build and audio/light probes pass.
+  Next: thunder/lightning/rain-particle scheduling and remaining creature hooks;
+  keep broader moving-platform/boss backlog in docs/GAME_AUDIT.md in view.
+
 CURRENT UPDATE — 2026-09-27: Slinky's Tarmac timed path
   Replaced unconditional slot-2 offer with original 0042e790 run rules:
   offer/reminder, clock 170 decremented per 64 ticks, jump states 1..4,

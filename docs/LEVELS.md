@@ -1557,3 +1557,43 @@ waits out the full timer, retries and collects the reward. It also checks pause,
 restart and selector exit. Positions are supplied for focused integration;
 this is not an unassisted traversal of the entire path. Slinky's idle chatter
 helper and the remaining Tarmac effects/creature hooks are still separate work.
+
+
+### Tarmac: ambient sound bank and near/far scenery sway
+
+`0047d6e0` walks a **null-pointer-terminated** list of names, advancing the
+effect index even if a pointed-to name is empty. Tarmac's second entry is an
+unused runtime pointer (`00528160`), not a terminator. `readSoundTable` formerly
+stopped there, silently dropping effects 89–91. It now preserves the empty
+slot 88 and resolves 89 `RainLoop`, 90 `Thunder`, and 91 `proplane`, all backed
+by WAVs in the supplied install. The same reader serves all 17 gameplay/global/
+front-end banks; the regression checks each bank and both kinds of terminator.
+
+The level tick `0042e790` raises event `0x6f` without a position and `0x9c`
+from plane object 0. These now join the existing helicopter event `0x9b`.
+Plane/helicopter sources both use the original truncating three-quarter offset
+toward the camera (`0042eded..0042eed6`), shared as `aircraftSoundPoint`.
+Sustained playback uses the existing sound-bank voice reuse and exit/mute cleanup.
+Thunder's mapping is restored, but its separate weather trigger is still open;
+this change does not implement rain particles, lightning or weather timing.
+
+`0042ea97..0042eb79` advances counter `0052ffd4`, then applies the same sway
+to object IDs 69 and 70 (near and quarter-space far artwork). For tick `t`,
+`S(n)` is the original signed 16-bit sine table:
+
+- yaw delta = truncate(`S(17t) * S(11t) / 2^21`)
+- roll delta = truncate(`S(7t) * S(11t) / 2^22`)
+
+Helper `004ccc70` adds those deltas to the **authored** rotation. The port
+separates these objects from static geometry and rebuilds their poses from rest,
+without accumulating drift or inventing a collision mover. Phase wraps at 4096,
+which preserves the original sine indices. Pause freezes it; restart restores
+the authored pose and selector exit clears the controller.
+
+`tarmac-scenery-probe.ts` compares every phase with the installed sine data,
+checks near/far agreement, sound offsets, sparse banks, terminators and WAV
+existence. `tarmac-scenery-flow-check.js` checks actual rendered vertices,
+decoded rain/engine playback and voice reuse, pause, mute, restart and exit/re-entry.
+It positions Buzz on the aircraft for a focused audible-source check, not a
+full level traversal. Existing selector/audio lifecycle and light-puzzle probes
+remain part of this regression pass.

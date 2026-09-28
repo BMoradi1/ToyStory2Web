@@ -79,10 +79,3 @@ export function lightScales(s: TarmacLights): Map<number, number> {
   }
   return out;
 }
-
-/** 0042e790 places the rotor sound three quarters of the way toward the eye. */
-export function helicopterSoundPoint(helicopter: Point, eye: Point): Point {
-  return { x: helicopter.x+Math.trunc((eye.x-helicopter.x)*3/4),
-    y: helicopter.y+Math.trunc((eye.y-helicopter.y)*3/4),
-    z: helicopter.z+Math.trunc((eye.z-helicopter.z)*3/4) };
-}

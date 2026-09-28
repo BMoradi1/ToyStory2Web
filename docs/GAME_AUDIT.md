@@ -73,7 +73,7 @@ not evidence for untested interactions.
 | 11 | Al's Penthouse | BUZZARD, GUNSL and FATBLOKE hooks absent. | Level-local prop helpers, hazards and encounters. |
 | 12 | The Evil Emperor Zurg | Fight controller missing despite no absent shared hook in inventory. | Implement decoded boss controller and end-to-end reward check. |
 | 13 | Airport Infiltration | FATBLOKE, BUZZARD and PROSP hooks absent. | Indoor transport/platform controllers and traversal; distinct from Tarmac. |
-| 14 | Tarmac Trouble | Plane motion/collision, wheels/fans, ground/climbing passengers, wheel hazards and helicopter hover/rotors/token motion and light puzzle/lowering implemented and tested. Slinky timed-path rules and retry implemented. FATBLOKE, BUZZARD and SMITH hooks absent. | Remaining creature hooks and other ambient effects; pitch/roll attachment on other movers. |
+| 14 | Tarmac Trouble | Plane motion/collision, wheels/fans, ground/climbing passengers, wheel hazards and helicopter hover/rotors/token motion and light puzzle/lowering implemented and tested. Slinky timed-path rules and retry implemented. Near/far scenery sway, rain and plane sound restored. FATBLOKE, BUZZARD and SMITH hooks absent. | Remaining creature hooks and other ambient effects; pitch/roll attachment on other movers. |
 | 15 | Final Showdown | Fight controller missing; SMITH, GUNSL and PROSP hooks absent. | Multi-boss encounter, final reward, rescue/credits/save handoff. |
 
 ## Prioritized work
@@ -107,6 +107,13 @@ not evidence for untested interactions.
    `tarmac-path-flow-check.js` uses actual dialogue, jump input, slime collision,
    timeout, retry, token collection, pause, restart and exit, with positions
    supplied for focused checks. Idle chatter and full-route traversal remain open.
+   Near/far scenery 69/70 now sways using the original tick's relative-angle
+   helper. A shared sound-bank parser fix preserves unused slots, restoring
+   Tarmac's rain/thunder/plane mappings; rain and plane-engine event calls now
+   run alongside the helicopter. `tarmac-scenery-probe.ts` checks 4096 phases
+   and all 17 banks. `tarmac-scenery-flow-check.js` checks rendered motion,
+   decoded audio, voice reuse, pause/mute, reset and exit/re-entry. Thunder
+   scheduling, lightning, rain particles and remaining creature hooks stay open.
 2. **Other level motion.** Use the original mutation call inventory to account
    for each object/controller, starting with traversal-critical platforms in
    Elevator Hop and both airport scenes. Share transform/collision integration;

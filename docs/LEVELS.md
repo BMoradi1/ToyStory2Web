@@ -1524,3 +1524,36 @@ installed pad collision, deliberately fails and retries, solves, checks the
 camera and pause, collects the lowered token and verifies restart/exit. It
 positions Buzz to exercise these interactions rather than playing the whole
 route unassisted. Sustained voice cleanup is tested in `select-audio-probe.ts`.
+
+
+### Tarmac: Slinky's timed path
+
+`0042e790` gives creature 38 (Slinky), dialogue path 4, a revocable slot-2
+reward (object 117). The former unconditional `offer` omitted the actual run.
+`LEVEL_TASKS[14].timedPath` now records the original offer/reminder addresses
+`004f471c` / `004f47a4`, acceptance sound `0xb6`, initial clock `0xaa` and
+failure surface 0. No installed dialogue text is copied into the port.
+
+State `0052f2f8` is idle (0), waiting for the offer to close (1), or running
+(2). Closing the offer reveals the token through the existing reward camera;
+the next task tick starts the clock at 170. The shared 64-tick divider decrements
+it. Failure occurs **below** 100, so the 100 display has one final divider
+interval. Jump states 1..4 (`0052f38c`) or standing surface 0 (`0052b81c`, green
+slime) force failure immediately. The original explicitly excludes jump states
+5/6 from that comparison; this port preserves it. Collection ends the run
+before failure checks, while a reminder neither reveals again nor resets time.
+
+`hideToken` mirrors `004a0e60`: remove the uncollected reward and cancel its
+reveal state. The task clears its offered bit and the renderer's revealed-slot
+cache, allowing the next conversation to reveal it again. The countdown feeds
+the existing timed-run HUD. Opening dialogue also prevents creature contacts
+later in that same tick from queuing an immediate second conversation.
+
+`tools/tarmac-path-probe.ts` covers offer/close/reminder, exact clock boundary,
+all tested jump states, slime failure, repeated reveals and collection immunity.
+`tools/tarmac-path-flow-check.js` positions Buzz near Slinky, triggers actual
+contact/dialogue, jumps through player input, lands on authored slime collision,
+waits out the full timer, retries and collects the reward. It also checks pause,
+restart and selector exit. Positions are supplied for focused integration;
+this is not an unassisted traversal of the entire path. Slinky's idle chatter
+helper and the remaining Tarmac effects/creature hooks are still separate work.

@@ -73,7 +73,7 @@ not evidence for untested interactions.
 | 11 | Al's Penthouse | BUZZARD, GUNSL and FATBLOKE hooks absent. | Level-local prop helpers, hazards and encounters. |
 | 12 | The Evil Emperor Zurg | Fight controller missing despite no absent shared hook in inventory. | Implement decoded boss controller and end-to-end reward check. |
 | 13 | Airport Infiltration | FATBLOKE, BUZZARD and PROSP hooks absent. | Indoor transport/platform controllers and traversal; distinct from Tarmac. |
-| 14 | Tarmac Trouble | Plane motion/collision, wheels/fans, ground/climbing passengers, wheel hazards and helicopter hover/rotors/token motion and light puzzle/lowering implemented and tested. FATBLOKE, BUZZARD and SMITH hooks absent. | Slinky challenge, remaining creature hooks and other ambient effects; pitch/roll attachment on other movers. |
+| 14 | Tarmac Trouble | Plane motion/collision, wheels/fans, ground/climbing passengers, wheel hazards and helicopter hover/rotors/token motion and light puzzle/lowering implemented and tested. Slinky timed-path rules and retry implemented. FATBLOKE, BUZZARD and SMITH hooks absent. | Remaining creature hooks and other ambient effects; pitch/roll attachment on other movers. |
 | 15 | Final Showdown | Fight controller missing; SMITH, GUNSL and PROSP hooks absent. | Multi-boss encounter, final reward, rescue/credits/save handoff. |
 
 ## Prioritized work
@@ -101,6 +101,12 @@ not evidence for untested interactions.
    positions Buzz above pads and at the lowered token; this is not an unassisted
    traversal. Pitch/roll attachment and the original climb-camera transition
    remain open.
+   Slinky's slot-2 challenge now ports `0042e790`: offer/reminder, clock,
+   jump/slime/timeout failure, token withdrawal and retry. The node probe
+   `tarmac-path-probe.ts` checks original boundaries and reward lifecycle.
+   `tarmac-path-flow-check.js` uses actual dialogue, jump input, slime collision,
+   timeout, retry, token collection, pause, restart and exit, with positions
+   supplied for focused checks. Idle chatter and full-route traversal remain open.
 2. **Other level motion.** Use the original mutation call inventory to account
    for each object/controller, starting with traversal-critical platforms in
    Elevator Hop and both airport scenes. Share transform/collision integration;

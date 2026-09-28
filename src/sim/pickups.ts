@@ -221,6 +221,14 @@ export function revealToken(state: PickupState, slot: number, quiet=true): Picku
   return fresh;
 }
 
+/** FUN_004a0e60: withdraw an uncollected timed reward so it can be offered again. */
+export function hideToken(state: PickupState, slot: number): void {
+  if (slot < 0 || slot >= 5 || !Number.isInteger(slot) || (state.tokens & (1 << slot))) return;
+  for (const item of state.items) if (item.tokenSlot === slot && !item.collected) item.enabled = false;
+  state.revealTimers[slot] = 0;
+  state.revealScales[slot] = 0;
+}
+
 /**
  * Collect anything within reach. Returns what was taken this tick, so the
  * caller can play a sound and stop drawing it.

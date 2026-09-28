@@ -484,6 +484,11 @@ export interface LevelTasks {
     failZone: number;
     slot: number;
   };
+  /** Tarmac's timed path: no jumping and no contact with the slime surface. */
+  timedPath?: {
+    creature: number; pathTag: number; askText: number; hurryText: number;
+    clock: number; failSurface: number; slot: number; startSound: number;
+  };
   /**
    * "Beat me to the top": accept the challenge, then get inside a box. The
    * engine's own test is an axis-aligned box in x and z with a height to be
@@ -780,7 +785,8 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
     },
   },
   14: {
-    offer: { creature: 0x26, pathTag: 4, text: 0x4f471c, slot: 2 },
+    timedPath: { creature: 0x26, pathTag: 4, askText: 0x4f471c, hurryText: 0x4f47a4,
+      clock: 0xaa, failSurface: 0, slot: 2, startSound: 0xb6 },
     boss: {
       creature: 0x2e,
       slot: 4,

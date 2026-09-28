@@ -95,6 +95,9 @@ export interface TaskState {
   bossGone: number;
   /** The reach-a-box challenge: 0 not offered, 1 accepted, 2 running. */
   reach: number;
+  /** Timed path: 0 idle, 1 dialogue, 2 running. Clock uses the same 100 floor as fetch. */
+  pathRun: number;
+  pathClock: number;
   /** The timed fetch run: 0 idle, 1 offered, 2 running. */
   fetch: number;
   /** How many of its two runs have been finished. */
@@ -156,7 +159,7 @@ export function createTasks(): TaskState {
   return {
     done: 0, hammChatter: 0, hintChatter: 0, hintIndex: -1,
     slime: null, pod:null,
-    boss: 0, bossGone: 0, reach: 0, fetch: 0, fetchDone: 0, fetchClock: 100, slowTick: 0, potatoPart: 0, powerUps: 0, potatoChatter: 0, challenge: 0, challengeFrom: 0,
+    boss: 0, bossGone: 0, reach: 0, pathRun: 0, pathClock: 100, fetch: 0, fetchDone: 0, fetchClock: 100, slowTick: 0, potatoPart: 0, powerUps: 0, potatoChatter: 0, challenge: 0, challengeFrom: 0,
     bossPhase: 0, bossClock: 0, bossHurt: 0, bossHealthWas: -1, bossRamp: 0, bossSwing: 0,
     bossTaunt: 0, bossShout: 0, bossYaw: 0, bossFlip: 0, bossCut: 0,
     bossBeaten: false, levelWon: false,
@@ -475,6 +478,11 @@ export function stepTasks(
     tokens: number;
     /** `DAT_0052f38e`: most boss taunts will not fire while Buzz is airborne. */
     onGround: boolean;
+    /** Original player +0x8c and collision surface, used by the timed path. */
+    jumpState?: number;
+    standingSurface?: number;
+    /** Remove a failed challenge's uncollected token and its reveal animation. */
+    hideToken?: (slot: number) => void;
     /** The level's paths by tag, level units, for the race car. */
     pathPoints: (tag: number) => readonly { x: number; y: number; z: number }[] | null;
     /** A dust puff the car asked for, game units. Only level 2's car does. */
@@ -566,6 +574,43 @@ export function stepTasks(
       else egg.flags &= ~0x81;
     }
     if (request) return request;
+  }
+
+  // --- Tarmac's path (0042e790). Revealing the token starts a RUN, not a win.
+  const path = level.timedPath;
+  if (path) {
+    const giver = creatureAt(path.creature);
+    const touched = giver && tookTalk(giver);
+    if ((world.tokens & (1 << path.slot)) !== 0) {
+      tasks.pathRun = 0;
+    } else {
+      if (touched) {
+        const starting = tasks.pathRun === 0;
+        if (starting) {
+          tasks.pathRun = 1;
+          world.sound?.(path.startSound, giver);
+        }
+        return { creature: path.creature, pathTag: path.pathTag,
+          text: starting ? path.askText : path.hurryText,
+          playerYaw: -1, creatureYaw: 0, slot: starting ? path.slot : -1 };
+      }
+      if (tasks.pathRun === 1 && !world.talking) {
+        tasks.pathRun = 2;
+        tasks.pathClock = path.clock;
+      }
+      if (tasks.pathRun === 2) {
+        // Preserve the original 1..4 test: double-jump states 5/6 are separate.
+        if (((world.jumpState ?? 0) > 0 && (world.jumpState ?? 0) < 5)
+          || world.standingSurface === path.failSurface) tasks.pathClock = 99;
+        if (slow) tasks.pathClock--;
+        if (tasks.pathClock < 100) {
+          tasks.pathClock = 100;
+          tasks.pathRun = 0;
+          tasks.done &= ~(1 << path.slot);
+          world.hideToken?.(path.slot);
+        }
+      }
+    }
   }
 
   // --- beat me to the top: accept, then get into the box.

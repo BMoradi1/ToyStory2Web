@@ -76,7 +76,7 @@ import { readDioramaLists, type DioramaLists } from './front/diorama.ts';
 import { SAVE, LEVEL_SELECT_ORDER, selectIndexOf, tokenCount } from './formats/save-file.ts';
 import { MUSIC, MUSIC_SLIDER_MAX, MUSIC_TRACKS, MUSIC_VOLUME_CURVE, MusicPlayer, trackForLevel } from './audio/music.ts';
 import {
-  PICKUP, createPickups, pickupObjects, PickupKind, revealToken, stepPickups, type PickupState,
+  PICKUP, createPickups, pickupObjects, PickupKind, revealToken, hideToken, stepPickups, type PickupState,
 } from './sim/pickups.ts';
 import {
   COIN_DRAW, SPRITE, SPRITE_SHEET, readSpriteTable, type SpriteHeader,
@@ -545,6 +545,9 @@ async function open(dir: GameDir): Promise<void> {
           total: pickups.items.length, taken: pickups.taken, coins: pickups.coins,
           reappearing:{index:pickups.reappearIndex,ticks:pickups.reappearTicks},
           health: pickups.health, lives: pickups.lives, tokens: pickups.tokens,
+          tokenItems: pickups.items.filter(i => i.tokenSlot >= 0).map(i => ({
+            slot: i.tokenSlot, x: i.x, y: i.y, z: i.z, enabled: i.enabled, collected: i.collected,
+          })),
           kinds: pickups.items.reduce<Record<string, number>>((acc, it) => {
             const k = PickupKind[it.kind] ?? String(it.kind); acc[k] = (acc[k] ?? 0) + 1; return acc;
           }, {}),
@@ -774,7 +777,7 @@ async function open(dir: GameDir): Promise<void> {
           bossCut: tasks.bossCut, bossRamp: tasks.bossRamp, bossSwing: tasks.bossSwing,
           bossBeaten: tasks.bossBeaten, levelWon: tasks.levelWon,
           fetch: tasks.fetch, fetchDone: tasks.fetchDone, fetchClock: tasks.fetchClock,
-          slowTick: tasks.slowTick,
+          slowTick: tasks.slowTick, pathRun: tasks.pathRun, pathClock: tasks.pathClock,
           race: tasks.race, laps: tasks.laps, quadrant: tasks.raceQuadrant,
           carNode: tasks.carNode, carLaps: tasks.carLaps,
           checkpoint: tasks.checkpoint, challenge: tasks.challenge, blocked: tasks.raceBlocked,
@@ -1953,6 +1956,7 @@ function hudReadout(level: number): HudReadout {
   if (tasks) {
     if (tasks.race === RaceState.Running) clock = tasks.laps;
     else if (tasks.fetch === 2) clock = tasks.fetchClock;
+    else if (tasks.pathRun === 2) clock = tasks.pathClock;
   }
   const challenge = LEVEL_TASKS[level]?.challenge;
   const collected = tasks && challenge && tasks.challenge === 1
@@ -3451,6 +3455,14 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
           cameraZone: zones.camera,
           playerZone: zones.player,
           onGround: player.onGround,
+          jumpState: player.jumpState,
+          standingSurface: standingSurface(player, currentCollisionWorld),
+          hideToken: (slot) => {
+            if (!pickups) return;
+            hideToken(pickups, slot);
+            revealedSlots.delete(slot);
+            drawPickups();
+          },
           pathPoints: (tag) => currentLevel?.level.paths.find((p) => p.id === tag)?.points ?? null,
           cameraYaw: camera?.yaw ?? 0,
           cut: cutHandle,
@@ -3525,8 +3537,12 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   if (creatureSim) {
     creatureSim.raceState = tasks?.race ?? 0;
     stepCreatures(creatureSim, player);
-    for (const touch of contactCreatures(creatureSim, player, attackFromPlayer(player))) {
-      applyCreatureTouch(touch.angle, touch.reaction);
+    // A task may have opened a dialogue above. Do not queue another touch
+    // before its script has moved Buzz away from the speaker.
+    if (!talk) {
+      for (const touch of contactCreatures(creatureSim, player, attackFromPlayer(player))) {
+        applyCreatureTouch(touch.angle, touch.reaction);
+      }
     }
     for (const raised of creatureSim.sounds) {
       playEvent(raised.event, raised);

@@ -1,3 +1,16 @@
+CURRENT UPDATE — 2026-09-27: Slinky's Tarmac timed path
+  Replaced unconditional slot-2 offer with original 0042e790 run rules:
+  offer/reminder, clock 170 decremented per 64 ticks, jump states 1..4,
+  slime surface 0 and expiry below 100 withdraw the uncollected token.
+  Retry clears the reveal cache and animates the reward again; collection
+  ends the run. Timer feeds the HUD; acceptance raises sound 0xb6.
+  Prevented dialogue-start contacts from queuing a duplicate conversation.
+  Node probe covers exact boundaries/retry/collection. Browser regression
+  covers real contact/dialogue/jump/slime, timeout/retry, collection and lifecycle.
+  Build, node probes, Slinky and helicopter-puzzle browser checks pass.
+  Next: remaining Tarmac ambient effects/creature hooks, then traversal-critical
+  moving platforms and missing bosses in docs/GAME_AUDIT.md. No full parity claim.
+
 CURRENT UPDATE — 2026-09-27: Tarmac light puzzle and helicopter sound
   Ported original pad/goal logic, installed-stream scrambling, three attempts,
   failure reset/cue, authored lamp/pad/count meshes and guide retirement.

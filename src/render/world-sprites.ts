@@ -1,3 +1,4 @@
+import { weatherLight } from './weather-light.ts';
 import { gammaModulate } from './gamma.ts';
 /**
  * Camera-facing and floor-flat cards, which is how the engine draws coins,
@@ -63,6 +64,7 @@ const VERTEX = /* glsl */`
 `;
 
 const FRAGMENT = /* glsl */`
+  uniform float weatherLight;
   uniform sampler2D map;
   varying vec2 vUv;
   varying vec4 vColour;
@@ -71,10 +73,10 @@ const FRAGMENT = /* glsl */`
     #ifdef SUBTRACT
       // What is subtracted from the floor. A keyed texel has alpha 0 and
       // must take nothing, so the coverage multiplies into the colour.
-      gl_FragColor = vec4(texel.rgb * vColour.rgb * texel.a * vColour.a, 1.0);
+      gl_FragColor = vec4(texel.rgb * vColour.rgb * weatherLight * texel.a * vColour.a, 1.0);
     #else
       if (texel.a < 0.5) discard;
-      gl_FragColor = vec4(texel.rgb * vColour.rgb, texel.a * vColour.a);
+      gl_FragColor = vec4(texel.rgb * vColour.rgb * weatherLight, texel.a * vColour.a);
     #endif
   }
 `;
@@ -94,7 +96,7 @@ export class SpriteBatch {
 
   constructor(private readonly flat: boolean, blend: SpriteBlend) {
     this.material = new THREE.ShaderMaterial({
-      uniforms: { map: { value: null } },
+      uniforms: { map: { value: null }, weatherLight },
       vertexShader: VERTEX,
       fragmentShader: FRAGMENT,
       defines: blend === 'subtract' ? { SUBTRACT: '' } : {},

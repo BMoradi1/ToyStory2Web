@@ -1,3 +1,16 @@
+CURRENT UPDATE — 2026-09-27: Tarmac weather
+  Added original bounded rain pool, downward-speed compensation, authored floor
+  limits and sprite 0x33. Fixed sprite-page routing: rain uses page 23, not 31.
+  Effect renderer now supports secondary pages for upright and flat particles.
+  Added eighth-tick ground splashes (kind 0x1b/mode 2), original lightning
+  countdown/envelope and delayed spatial thunder. World-light uniform leaves
+  saved gamma separate. Exact HUD/backdrop modulation still needs comparison.
+  Node tests, real browser rain texture/cards/splashes/framebuffer flashes,
+  pause/restart/mid-flash exit/re-entry, light-puzzle browser regression,
+  scenery/audio and gamma probes, and production build pass.
+  Next: Tarmac beacon/target lighting and missing creature hooks (notably SMITH),
+  then broader platform and boss gaps in docs/GAME_AUDIT.md. No full parity claim.
+
 CURRENT UPDATE — 2026-09-27: Tarmac scenery and ambient sound
   Fixed shared sound-bank reading: null POINTER ends a list; an empty name
   still occupies an effect slot. Tarmac's hole at 88 hid RainLoop, Thunder

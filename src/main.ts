@@ -1,3 +1,5 @@
+import { createTarmacWeather, stepTarmacWeather, type TarmacWeather } from './sim/tarmac-weather.ts';
+import { setWeatherLight } from './render/weather-light.ts';
 import { TARMAC_SCENERY_OBJECTS, createTarmacScenery, sceneryPoses, stepTarmacScenery, aircraftSoundPoint, type TarmacScenery } from './sim/tarmac-scenery.ts';
 import { TARMAC_LIGHT_OBJECTS, createTarmacLights, stepTarmacLights, lightScales, type TarmacLights } from './sim/tarmac-lights.ts';
 import { TARMAC_HELICOPTER_OBJECTS, createTarmacHelicopter, helicopterPoses, stepTarmacHelicopter, syncHelicopterToken, type TarmacHelicopter } from './sim/tarmac-helicopter.ts';
@@ -311,6 +313,7 @@ async function showLevel(index: number): Promise<void> {
   tarmacHelicopter = null;
   tarmacLights = null;
   tarmacScenery = null;
+  tarmacWeather = null; setWeatherLight(128);
   levelPoles = [];
   levelZipLines = [];
   stompProps = createStompProps();
@@ -693,6 +696,7 @@ async function open(dir: GameDir): Promise<void> {
         return { index: which, yaw: b.segYaw, block: { x: b.x, y: b.y, z: b.z }, player: { x: player.x, y: player.y, z: player.z } };
       },
       get stompProps() { return stompProps; },
+      get tarmacWeather() { return tarmacWeather; },
       get tarmacScenery() { return tarmacScenery; },
       get tarmacPlane() { return tarmacPlane; },
       get tarmacHelicopter() { return tarmacHelicopter; },
@@ -1303,6 +1307,7 @@ async function spawnPlayer(): Promise<void> {
   const level = levelNumber(sceneId) ?? 0;
   tarmacPlane = level === 14 ? createTarmacPlane(currentLevel.level, currentCollisionWorld) : null;
   drawTarmacPlane();
+  tarmacWeather = level === 14 ? createTarmacWeather() : null; setWeatherLight(128);
   tarmacScenery = level === 14 ? createTarmacScenery(currentLevel.level) : null;
   tarmacHelicopter = level === 14 ? createTarmacHelicopter(currentLevel.level) : null;
   stompProps = createStompProps();
@@ -1379,7 +1384,7 @@ async function spawnPlayer(): Promise<void> {
   // executable, and its second half is per level (docs/HUD.md).
   spriteTable = exeBytes ? readSpriteTable(exeBytes, level) : [];
   soundTable = exeBytes ? readSoundTable(exeBytes, level) : null;
-  if (level === 14) for (const event of [0x6f, 0x9b, 0x9c]) {
+  if (level === 14) for (const event of [0x6f, 0x70, 0x9b, 0x9c]) {
     const name = soundTable?.nameOf(event); if (name) sound?.preload([name]);
   }
   sequenceTable = exeBytes ? readSoundSequences(exeBytes) : null;
@@ -1428,6 +1433,7 @@ async function spawnPlayer(): Promise<void> {
   pickupAngleMap.clear();
   drawTarmacHelicopter();
   drawTarmacScenery();
+  drawEffects();
   pickupFloor = pickups.items.map((item) => {
     const hit = currentCollisionWorld
       ? groundBelow(currentCollisionWorld, item.x, item.y, item.z)
@@ -1743,9 +1749,18 @@ function drawEffects(): void {
   if (!viewer || !effects) return;
   const sheet = sceneSheets.get(SPRITE_SHEET);
   if (!sheet) { viewer.setEffectCards(effectCards, effectFlat); return; }
+  const pages=new Map<number,{texture:THREE.Texture;cards:WorldSprite[];flat:WorldSprite[]}>();
+  const addCard=(page:number,card:WorldSprite,flat=false)=>{
+    if(page===SPRITE_SHEET){(flat?effectFlat:effectCards).push(card);return;}
+    const texture=sceneTextures.get(page);if(!texture)return;
+    let batch=pages.get(page);
+    if(!batch){batch={texture,cards:[],flat:[]};pages.set(page,batch);}
+    (flat?batch.flat:batch.cards).push(card);
+  };
   for (const e of liveEffects(effects)) {
     const header = spriteTable[e.sprite];
     if (!header) continue;
+    const sheet=sceneSheets.get(header.texture);if(!sheet)continue;
     const f = header.frames[e.frame] ?? header.frames[0];
     if (!f) continue;
     const card: WorldSprite = {
@@ -1756,7 +1771,17 @@ function drawEffects(): void {
       r: e.r / 128, g: e.g / 128, b: e.b / 128,
       rotation: toRadians(e.rotation),
     };
-    ((e.flags & EFFECT_FLAGS.flat) !== 0 ? effectFlat : effectCards).push(card);
+    addCard(header.texture,card,(e.flags & EFFECT_FLAGS.flat) !== 0);
+  }
+  // 0044f010: sprite 0x33, 30 by 200 level units, neutral 0x40 modulation.
+  const rainHeader=spriteTable[0x33],rainFrame=rainHeader?.frames[0];
+  const rainSheet=rainHeader?sceneSheets.get(rainHeader.texture):null;
+  if(tarmacWeather&&rainHeader&&rainFrame&&rainSheet)for(const drop of tarmacWeather.rain){
+    if(drop.bottom===0)continue;
+    addCard(rainHeader.texture,{...effectCardPlacement({...drop,width:30,height:200}),
+      u0:rainFrame.u/rainSheet.width,v0:rainFrame.v/rainSheet.height,
+      u1:(rainFrame.u+rainHeader.width)/rainSheet.width,v1:(rainFrame.v+rainHeader.height)/rainSheet.height,
+      r:0.5,g:0.5,b:0.5,alpha:1});
   }
   // Sprite 9 is the beam strip. The engine tiles it every 400 level units,
   // with frame 2 at the tail and frame 1 along the remainder.
@@ -1781,7 +1806,7 @@ function drawEffects(): void {
       });
     }
   }
-  viewer.setEffectCards(effectCards, effectFlat);
+  viewer.setEffectCards(effectCards, effectFlat,pages);
 }
 
 /**
@@ -2832,6 +2857,7 @@ async function loadDioramaScene(): Promise<{ paths: DatLevel['paths']; placedOf:
   tarmacHelicopter = null;
   tarmacLights = null;
   tarmacScenery = null;
+  tarmacWeather = null; setWeatherLight(128);
   levelPoles = [];
   levelZipLines = [];
   stompProps = createStompProps();
@@ -3067,6 +3093,7 @@ let tarmacPlane: TarmacPlane | null = null;
 let tarmacHelicopter: TarmacHelicopter | null = null;
 let tarmacLights: TarmacLights | null = null;
 let tarmacScenery: TarmacScenery | null = null;
+let tarmacWeather: TarmacWeather | null = null;
 let levelPoles: Pole[] = [];
 let levelZipLines: ZipLine[] = [];
 let stompProps = createStompProps();
@@ -3586,6 +3613,21 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   }
   stepEffectsNow();
   stepPodBeams();
+  if (tarmacWeather && effects && camera) {
+    const direction=viewer.camera.getWorldDirection(new THREE.Vector3());
+    const eye=viewer.camera.position;
+    stepTarmacWeather(tarmacWeather,{
+      render:{x:eye.x/GAME_TO_RENDER,y:-eye.y/GAME_TO_RENDER,z:-eye.z/GAME_TO_RENDER,
+        yaw:yawOf(-direction.x,-direction.z),
+        pitch:Math.round(Math.atan2(-direction.y,Math.hypot(direction.x,direction.z))*4096/(2*Math.PI))},
+      follow:camera,playerVY:player.vy,zone:zones.camera,eighthTick:effects.gate.eight,fading:false,
+      byte:()=>effects!.rand.byte(),
+      ground:at=>{const hit=groundBelow(currentCollisionWorld!,at.x/32,at.y/32,at.z/32);return hit?hit.y*32:null;},
+      splash:at=>{spawnChild(effects!,effectWorld(),at.x,at.y,at.z,0x1b,2);},
+    });
+    setWeatherLight(tarmacWeather.brightness);
+    if(tarmacWeather.thunder)playEvent(0x70,tarmacWeather.thunderAt);
+  }
   if(levelNow===3)pointLights.profile=slimeBaseLight(player);
   const scriptedLight=levelNow===3?slimeBlobLight(effects?.effects??[]):scriptedPathLight(levelNow,currentLevel?.level.paths??[],
     {x:viewer.camera.position.x/GAME_TO_RENDER,y:-viewer.camera.position.y/GAME_TO_RENDER,z:-viewer.camera.position.z/GAME_TO_RENDER},player,zones.camera,flareFlicker.intensity);

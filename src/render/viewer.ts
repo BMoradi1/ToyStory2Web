@@ -718,6 +718,8 @@ export class Viewer {
   private shadows: readonly WorldSprite[] = [];
   private effects: readonly WorldSprite[] = [];
   private effectsFlat: readonly WorldSprite[] = [];
+  private readonly effectPages = new Map<number,{cards:SpriteBatch;flat:SpriteBatch}>();
+  private effectPageData: ReadonlyMap<number,{texture:THREE.Texture;cards:WorldSprite[];flat:WorldSprite[]}> = new Map();
   private creatures: THREE.InstancedMesh | null = null;
 
   /**
@@ -892,9 +894,21 @@ export class Viewer {
   }
 
   /** The additive effect cards this frame: the upright ones and the flat ones. */
-  setEffectCards(cards: readonly WorldSprite[], flat: readonly WorldSprite[]): void {
+  setEffectCards(cards: readonly WorldSprite[], flat: readonly WorldSprite[],
+    pages: ReadonlyMap<number,{texture:THREE.Texture;cards:WorldSprite[];flat:WorldSprite[]}> = new Map()): void {
     this.effects = cards;
     this.effectsFlat = flat;
+    this.effectPageData = pages;
+    for(const [page,data] of pages){
+      let batches=this.effectPages.get(page);
+      if(!batches){batches={cards:new SpriteBatch(false,'add'),flat:new SpriteBatch(true,'add')};this.effectPages.set(page,batches);}
+      batches.cards.setSheet(data.texture);batches.flat.setSheet(data.texture);
+      if(!batches.cards.mesh.parent){this.scene.add(batches.cards.mesh);this.scene.add(batches.flat.mesh);}
+    }
+    for(const [page,batches] of this.effectPages)if(!pages.has(page)){
+      batches.cards.setSheet(null);batches.flat.setSheet(null);
+      batches.cards.update([],this.camera);batches.flat.update([],this.camera);
+    }
   }
 
   /** What to draw as cards this frame: the upright ones and the flat ones. */
@@ -1180,6 +1194,10 @@ export class Viewer {
     this.coinCards.update(this.cards, this.camera);
     this.coinShadows.update(this.shadows, this.camera);
     this.effectCards.update(this.effects, this.camera);
+    for(const [page,data] of this.effectPageData){
+      const batches=this.effectPages.get(page)!;
+      batches.cards.update(data.cards,this.camera);batches.flat.update(data.flat,this.camera);
+    }
     this.effectFlat.update(this.effectsFlat, this.camera);
 
     // Black the whole canvas, then draw the game into its own rectangle.

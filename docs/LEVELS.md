@@ -1597,3 +1597,51 @@ decoded rain/engine playback and voice reuse, pause, mute, restart and exit/re-e
 It positions Buzz on the aircraft for a focused audible-source check, not a
 full level traversal. Existing selector/audio lifecycle and light-puzzle probes
 remain part of this regression pass.
+
+
+### Tarmac: rain, ground splashes and lightning/thunder
+
+`src/sim/tarmac-weather.ts` now owns the weather called by `0042e790`.
+The streak pool follows `0044ed60/0044ed90`: 64 records, one drop budget per
+active tick, at most eight inactive candidates, falling at 4096 game units/tick.
+A player downward velocity above 1024 adds twice that velocity to the fall rate.
+Four installed random-stream bytes place each drop relative to the rendered
+camera and its pitch/yaw. Zone 3 uses the authored `0xf80c` bottom; other zones
+use the zero-plane sentinel, capped by the 0x24000 travel range.
+
+`0044f010` draws these as 30-by-200 level-unit additive cards with sprite 0x33,
+frame 0, grey 0x40. That header uses **texture page 23**, not the common effects
+page 31. The renderer now batches effect sprites by their actual header page,
+including secondary upright/flat batches, and clears them on reset/exit. This
+also prevents future level-specific particles from sampling the wrong sheet.
+A screenshot review found and corrected this routing before the fix shipped.
+
+On the engine's eighth-tick divider, `0042eee7..0042efa6` chooses a point ahead
+of the follow camera, queries the ground from 0x8000 above it, and emits kind
+0x1b/mode 2 only when the ground is below the camera. These use the installed
+splash template and normal particle lifetime handling.
+
+The flash countdown starts at 200. Crossing below 32 draws two random bytes:
+one chooses thunder delay/distance, the other its bearing around the follow
+camera. Brightness is `countdown * 3 + 128` for 31..0; the next tick reloads
+`random * 2 + 32`. Thunder event 0x70 fires when its delay drops below 1, then
+reloads to 20000 until another flash supplies a new source/delay. The original
+zero-initialized delay also emits once on the first tick; the port keeps that
+behavior. The controller includes the original fade-suppression branch;
+normal play supplies false and scene lifecycle explicitly restores neutral light.
+
+World meshes and sprite batches use a shared temporary brightness uniform,
+separate from saved gamma and authored colour data. The existing HUD canvas and
+backdrop rendering paths retain their own modulation; exact original modulation
+across those layers remains a presentation comparison, not a claimed completed
+full-screen parity check. Pause freezes the weather simulation. Restart and
+selector exit clear drops, secondary batches and brightness, including mid-flash.
+
+`tarmac-weather-probe.ts` covers pool/quota limits, velocity adjustment, floor
+limits, splash gating and installed lifetime, flash boundaries, cooldown and
+thunder delay. `tarmac-weather-flow-check.js` verifies actual secondary-page
+cards, live splashes, natural flash/thunder events, framebuffer brightening,
+pause, restart, exit during a flash and re-entry. It keeps Buzz at the authored
+spawn for focused weather checks; it is not a full level traversal. The existing
+helicopter light-puzzle browser regression, scenery/audio and gamma probes, and
+production build pass with weather enabled.

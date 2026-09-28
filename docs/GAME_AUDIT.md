@@ -73,7 +73,7 @@ not evidence for untested interactions.
 | 11 | Al's Penthouse | BUZZARD, GUNSL and FATBLOKE hooks absent. | Level-local prop helpers, hazards and encounters. |
 | 12 | The Evil Emperor Zurg | Fight controller missing despite no absent shared hook in inventory. | Implement decoded boss controller and end-to-end reward check. |
 | 13 | Airport Infiltration | FATBLOKE, BUZZARD and PROSP hooks absent. | Indoor transport/platform controllers and traversal; distinct from Tarmac. |
-| 14 | Tarmac Trouble | Plane motion/collision, wheels/fans, ground/climbing passengers, wheel hazards and helicopter hover/rotors/token motion and light puzzle/lowering implemented and tested. Slinky timed-path rules and retry implemented. Near/far scenery sway, rain and plane sound restored. FATBLOKE, BUZZARD and SMITH hooks absent. | Remaining creature hooks and other ambient effects; pitch/roll attachment on other movers. |
+| 14 | Tarmac Trouble | Plane motion/collision, wheels/fans, ground/climbing passengers, wheel hazards and helicopter hover/rotors/token motion and light puzzle/lowering implemented and tested. Slinky timed-path rules and retry implemented. Near/far scenery sway, rain/plane sound, rain particles and lightning/thunder restored. FATBLOKE, BUZZARD and SMITH hooks absent. | Remaining creature hooks and other ambient effects; pitch/roll attachment on other movers. |
 | 15 | Final Showdown | Fight controller missing; SMITH, GUNSL and PROSP hooks absent. | Multi-boss encounter, final reward, rescue/credits/save handoff. |
 
 ## Prioritized work
@@ -113,7 +113,15 @@ not evidence for untested interactions.
    run alongside the helicopter. `tarmac-scenery-probe.ts` checks 4096 phases
    and all 17 banks. `tarmac-scenery-flow-check.js` checks rendered motion,
    decoded audio, voice reuse, pause/mute, reset and exit/re-entry. Thunder
-   scheduling, lightning, rain particles and remaining creature hooks stay open.
+   scheduling, lightning and rain particles are now implemented by the weather pass below.
+   Weather now ports `0044ed60/0044ed90/0044f010` and the weather portion of
+   `0042e790`: bounded rain pool, installed page-23 rain artwork, ground splashes,
+   lightning envelope and delayed thunder. Secondary sprite-page batching fixes
+   the wrong-sheet rendering path. Node probes and the weather browser check
+   cover timing, actual cards/splashes, framebuffer brightening, pause/reset and
+   mid-flash exit/re-entry. The latter positions Buzz for focused checks. Exact
+   brightness modulation across the separate HUD/backdrop layers remains open,
+   along with beacon/target lighting and the absent shared creature hooks.
 2. **Other level motion.** Use the original mutation call inventory to account
    for each object/controller, starting with traversal-critical platforms in
    Elevator Hop and both airport scenes. Share transform/collision integration;

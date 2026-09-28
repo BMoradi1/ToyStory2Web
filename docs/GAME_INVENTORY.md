@@ -81,7 +81,7 @@ This is static inventory, **not** a completed playthrough or parity score. Missi
 - al's penthouse: tasks boss, challenge, hamm, hintNpc, findFive; 3 push blocks; motion none mapped; stomp-driven object IDs none.
 - the evil emperor zurg: tasks none; 0 push blocks; motion none mapped; stomp-driven object IDs none.
 - airport infiltration: tasks boss, challenge, potato, hamm, hintNpc, findFive; 1 push blocks; motion none mapped; stomp-driven object IDs none.
-- tarmac trouble: tasks timedPath, boss, hamm, hintNpc, findFive; 0 push blocks; motion tarmac-plane.ts (collision 0), tarmac-helicopter.ts (artwork/pickup motion), tarmac-lights.ts (pads/lowering), tarmac-scenery.ts (near/far sway); stomp-driven object IDs none.
+- tarmac trouble: tasks timedPath, boss, hamm, hintNpc, findFive; 0 push blocks; motion tarmac-plane.ts (collision 0), tarmac-helicopter.ts (artwork/pickup motion), tarmac-lights.ts (pads/lowering), tarmac-scenery.ts (near/far sway), tarmac-weather.ts (rain/lightning/thunder); stomp-driven object IDs none.
 - final showdown: tasks none; 0 push blocks; motion none mapped; stomp-driven object IDs none.
 
 ## Original motion call inventory

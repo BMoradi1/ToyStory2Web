@@ -1,3 +1,15 @@
+CURRENT UPDATE — 2026-09-28: Tarmac blacksmith combat lifecycle
+  Restored the level-local combat subset of 0042d3e0/0042e790: 60-tick hit
+  recovery, health-9 defeat script, contact-hazard removal, defeat sound and
+  delayed slot-4 token. Corrected the HUD health span from 11 to 20.
+  Installed-placement probe and Chromium actual taunt/wake, injected-hit
+  recovery/defeat/reward, restart and exit/re-entry pass. Production build,
+  Slinky, Tin Robot and special-light probes pass. No full playthrough claim.
+  Beacon flares and nearby character lighting were already implemented;
+  corrected the stale audit lead. SMITH shared hook remains incomplete.
+  Next: blacksmith axe attack/projectile and hit flashing, then the remaining
+  Tarmac hooks and broader platform/boss backlog in docs/GAME_AUDIT.md.
+
 CURRENT UPDATE — 2026-09-27: Tarmac weather
   Added original bounded rain pool, downward-speed compensation, authored floor
   limits and sprite 0x33. Fixed sprite-page routing: rain uses page 23, not 31.
@@ -8,7 +20,7 @@ CURRENT UPDATE — 2026-09-27: Tarmac weather
   Node tests, real browser rain texture/cards/splashes/framebuffer flashes,
   pause/restart/mid-flash exit/re-entry, light-puzzle browser regression,
   scenery/audio and gamma probes, and production build pass.
-  Next: Tarmac beacon/target lighting and missing creature hooks (notably SMITH),
+  Next (superseded above): missing creature hooks (notably SMITH),
   then broader platform and boss gaps in docs/GAME_AUDIT.md. No full parity claim.
 
 CURRENT UPDATE — 2026-09-27: Tarmac scenery and ambient sound

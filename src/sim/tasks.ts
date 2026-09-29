@@ -771,13 +771,49 @@ export function stepTasks(
         c.pc = taunt.wakeWord;
         c.wait = 0;
         c.flags |= CREATURE_FLAGS.chase;
+        if (world.level === 14) c.record.facing = 0;
+      }
+    }
+    // Tarmac SMITH combat subset, 0042d3e0 + 0042e790. Its last nine
+    // health points belong to the defeat script, not another round of hits.
+    // Keep this level-local: the finale uses a different controller.
+    if (world.level === 14 && c && c.type === 58) {
+      if (tasks.bossHealthWas === -1) tasks.bossHealthWas = c.record.health;
+      if (tasks.bossHealthWas !== c.health) {
+        tasks.bossHealthWas = c.health;
+        tasks.bossHurt = 60;
+        c.record.vulnerable = 4;
+      }
+      if (tasks.boss === 2) {
+        tasks.bossHurt -= dt;
+        if (tasks.bossHurt < 0) {
+          tasks.bossHurt = 0;
+          c.record.vulnerable = 6;
+        }
+        if (c.health < 10) {
+          c.pc = 45;
+          c.wait = 0;
+          c.record.vulnerable = 4;
+          c.flags &= ~(CREATURE_FLAGS.hurts | CREATURE_FLAGS.chase);
+          c.record.speed = 16;
+          tasks.boss = 3;
+          world.sound?.(-2, c);
+        }
+      }
+    }
+    // The original level timer keeps running after the model disappears.
+    if (world.level === 14 && tasks.boss > 2) {
+      if (tasks.boss < 120) tasks.boss += dt;
+      else if (tasks.boss !== 200) {
+        markSlotDone(tasks, boss.slot);
+        tasks.boss = 200;
       }
     }
     // Gone for good — its type is zeroed when it is removed and does not
     // respawn — so run the level scripts' delay and hand the token over.
     // A boss slot that is not in the level's list at all awards nothing:
     // that would be a token for a fight that never happened.
-    if (c && c.type === 0) {
+    if (world.level !== 14 && c && c.type === 0) {
       tasks.bossGone += dt;
       if (tasks.bossGone >= boss.delay) markSlotDone(tasks, boss.slot);
     }

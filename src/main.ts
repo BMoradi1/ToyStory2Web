@@ -1967,7 +1967,9 @@ function hudReadout(level: number): HudReadout {
     const fighting = c && c.type !== 0 && c.health > 0
       && (tasks !== null && tasks.boss >= 2 || c.health < c.record.health);
     if (c && fighting) {
-      bossBar = Math.max(0, Math.min(0x36, Math.round(((c.health - 9) * 0x36) / 11)));
+      bossBar = Math.max(0, Math.min(0x36, level === 14
+        ? Math.trunc(((c.health - 9) * 0x36) / 20)
+        : Math.round(((c.health - 9) * 0x36) / 11)));
     }
   }
   // A world boss has its own bar, on for as long as the fight is (the level

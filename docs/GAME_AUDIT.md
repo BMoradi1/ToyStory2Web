@@ -1,6 +1,6 @@
 # Whole-game parity audit
 
-Reviewed 2026-09-27. This is the current audit index; older roadmap entries
+Reviewed 2026-09-28. This is the current audit index; older roadmap entries
 may describe work that has since shipped. The first pass covers all 15 scenes,
 their creature dispatch hooks, authored collision objects, existing task/prop
 controllers, original level motion calls, and browser entry/exit. **It is not
@@ -73,7 +73,7 @@ not evidence for untested interactions.
 | 11 | Al's Penthouse | BUZZARD, GUNSL and FATBLOKE hooks absent. | Level-local prop helpers, hazards and encounters. |
 | 12 | The Evil Emperor Zurg | Fight controller missing despite no absent shared hook in inventory. | Implement decoded boss controller and end-to-end reward check. |
 | 13 | Airport Infiltration | FATBLOKE, BUZZARD and PROSP hooks absent. | Indoor transport/platform controllers and traversal; distinct from Tarmac. |
-| 14 | Tarmac Trouble | Plane motion/collision, wheels/fans, ground/climbing passengers, wheel hazards and helicopter hover/rotors/token motion and light puzzle/lowering implemented and tested. Slinky timed-path rules and retry implemented. Near/far scenery sway, rain/plane sound, rain particles and lightning/thunder restored. FATBLOKE, BUZZARD and SMITH hooks absent. | Remaining creature hooks and other ambient effects; pitch/roll attachment on other movers. |
+| 14 | Tarmac Trouble | Plane motion/collision, wheels/fans, ground/climbing passengers, wheel hazards and helicopter hover/rotors/token motion and light puzzle/lowering implemented and tested. Slinky timed-path rules and retry implemented. Near/far scenery sway, rain/plane sound, rain particles and lightning/thunder restored. Blacksmith recovery, defeat and delayed reward implemented; axe throws and hit flashing missing. FATBLOKE and BUZZARD hooks absent. | Remaining creature hooks and other ambient effects; pitch/roll attachment on other movers. |
 | 15 | Final Showdown | Fight controller missing; SMITH, GUNSL and PROSP hooks absent. | Multi-boss encounter, final reward, rescue/credits/save handoff. |
 
 ## Prioritized work
@@ -121,7 +121,22 @@ not evidence for untested interactions.
    cover timing, actual cards/splashes, framebuffer brightening, pause/reset and
    mid-flash exit/re-entry. The latter positions Buzz for focused checks. Exact
    brightness modulation across the separate HUD/backdrop layers remains open,
-   along with beacon/target lighting and the absent shared creature hooks.
+   along with the absent shared creature hooks. Beacon flares and nearby Buzz
+   lighting already exist in `lens-flare.ts` and `scripted-light.ts`; the
+   `00830d78..00830d8e` registers describe lighting, not aiming targets.
+   `special-light-probe.ts` checks Tarmac's radial colour split and cutoff.
+   Blacksmith combat is now **partial**: the level-local subset of `0042d3e0`
+   and `0042e790` restores 60-tick hit recovery, the health-below-10 defeat
+   script entry, contact-hazard removal, sound sequence -2 and slot-4 reveal
+   after the original phase countdown. The HUD uses its 20-point health span.
+   `tarmac-smith-probe.ts` reads the installed placement and executes the defeat
+   wordcode; it covers recovery boundaries, reward after model removal, reset
+   and finale isolation. `tarmac-smith-flow-check.js` checks actual taunt/wake,
+   recovery, defeat/reward, restart and exit/re-entry in Chromium. Both inject
+   hits; the browser also positions Buzz. Axe attacks/projectiles and hit
+   flashing remain missing; this is not a complete encounter playthrough.
+   The shared SMITH hook stays listed as absent in the generated inventory:
+   this combat subset lives in the Tarmac task controller, not that hook.
 2. **Other level motion.** Use the original mutation call inventory to account
    for each object/controller, starting with traversal-critical platforms in
    Elevator Hop and both airport scenes. Share transform/collision integration;

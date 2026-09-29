@@ -19,7 +19,7 @@ This is static inventory, **not** a completed playthrough or parity score. Missi
 | 9 (9) | toy barn encounter | yes | ZGCAR (14) | — | 0 / 0 | pod-boss.ts |
 | 10 (10) | elevator hop | yes | GUNSP (31) | 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19 | 0 / 1 | taunt/reward hooks; inspect per-creature combat |
 | 11 (11) | al's penthouse | yes | BUZZARD (41), GUNSL (45), FATBLOKE (46) | 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 22, 23, 24, 25, 26 | 7 / 0 | taunt/reward hooks; inspect per-creature combat |
-| 12 (12) | the evil emperor zurg | yes | — | — | 0 / 0 | MISSING |
+| 12 (12) | the evil emperor zurg | yes | — | — | 0 / 0 | zurg-boss.ts |
 | 13 (13) | airport infiltration | yes | FATBLOKE (46), BUZZARD (41), PROSP (61) | 0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 12, 13, 14 | 13 / 2 | taunt/reward hooks; inspect per-creature combat |
 | 14 (14) | tarmac trouble | yes | FATBLOKE (46), BUZZARD (41), SMITH (58) | 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13 | 9 / 1 | taunt/reward hooks; inspect per-creature combat |
 | 15 (15) | final showdown | yes | SMITH (58), GUNSL (45), PROSP (61) | — | 0 / 0 | MISSING |

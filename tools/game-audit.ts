@@ -96,8 +96,8 @@ const rows = LEVEL_SELECT_ORDER.map((level, index) => {
       pushBlocks: pushes.length, stompObjectIds: stompObjects(level),
       poles: readPoles(paths(61)).length, zipLines: readZipLines(paths(62)).length,
       taskFeatures: tasks ? Object.keys(tasks) : [],
-      bossController: level === 3 ? 'slime-boss.ts' : level === 9 ? 'pod-boss.ts'
-        : tasks?.bossFight ? 'tasks.ts stepBossFight' : level === 12 || level === 15 ? 'MISSING'
+      bossController: level === 3 ? 'slime-boss.ts' : level === 9 ? 'pod-boss.ts' : level === 12 ? 'zurg-boss.ts'
+        : tasks?.bossFight ? 'tasks.ts stepBossFight' : level === 15 ? 'MISSING'
         : tasks?.boss ? 'taunt/reward hooks; inspect per-creature combat' : 'none',
     };
   } catch (e) {

@@ -1,0 +1,31 @@
+/** Installed Zurg effect templates: bouncing/homing balls, trails and contact. */
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {readEffectTable,EFFECT,EFFECT_FLAGS} from '../src/formats/effect-table.ts';
+import {createEffects,spawnEffect,stepEffects,touchPlayer} from '../src/sim/effects.ts';
+import {RandomStream} from '../src/sim/creatures.ts';
+const table=readEffectTable(readFileSync('Toy Story 2/toy2.exe'));
+const fresh=()=>createEffects(table.kinds,table.modes,new RandomStream(new Uint8Array([128])));
+const world={cameraX:-120000,cameraY:-80000,cameraZ:65000,playerX:-120000,playerY:-80000,playerZ:90000,
+ playerYaw:0,playerVx:0,playerVz:0,groundAt:()=>null,waterY:null};
+let sim=fresh();
+const ball=spawnEffect(sim,world,-120000,-77000,65000,0,1024,0,256,0,0,108)!;
+assert(ball);assert.equal(ball.mode,47);assert.equal(ball.vy,512);assert.equal(ball.gravity,64);
+stepEffects(sim,world);assert(ball.vy<0,'floor bounce reverses vertical velocity');
+assert(sim.sounds.some(s=>s.event===0x43));
+for(let i=0;i<8;i++)stepEffects(sim,world);
+assert(sim.effects.some(e=>e.life>0&&e.kind===110),'ballistic trail');
+sim=fresh();
+const missile=spawnEffect(sim,world,-120000,-85000,65000,0,-2,0,0,0,0,109)!;
+const y=missile.y;stepEffects(sim,world);
+assert.equal(missile.y,y);assert(missile.z>65000,'homing ball advances');
+for(let i=0;i<8;i++)stepEffects(sim,world);
+assert(sim.effects.some(e=>e.life>0&&e.kind===111),'homing trail');
+Object.assign(world,{playerX:missile.x,playerY:missile.y+EFFECT.hitAbove,playerZ:missile.z});
+sim.spinning=true;touchPlayer(sim,world);
+assert.equal(sim.hurt,null);assert.equal(missile.flags&(EFFECT_FLAGS.hurts|EFFECT_FLAGS.homing),0);
+assert.equal(missile.vy,-1024);assert(sim.sounds.some(s=>s.event===7),'spin deflection cue');
+sim=fresh();
+const hit=spawnEffect(sim,world,world.playerX,world.playerY-EFFECT.hitAbove,world.playerZ,0,-2,0,0,0,0,109)!;
+touchPlayer(sim,world);assert.notEqual(sim.hurt,null);assert.equal(hit.life,1);
+console.log('PASS: installed Zurg ball floor bounce/trail, horizontal homing/trail, spin deflection and contact damage.');

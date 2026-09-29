@@ -14,6 +14,7 @@ import {stepTokenReveal,revealEarnedToken} from './sim/token-reveal.ts';
 import { readLensFlareTable, buildLensFlares, flareRay, levelFlareSources, pathFlareSources, createFlareFlicker, stepFlareFlicker, type FlareEntry, type FlareSprite } from './sim/lens-flare.ts';
 import { getGamma, setGamma } from './render/gamma.ts';
 import {podMuzzle,podBeam,podImpactHits,podBossAim,podAttachment,podImpactLight} from './sim/pod-beam.ts';
+import {createZurgBoss,zurgBossBar} from './sim/zurg-boss.ts';
 import {createPodBoss,readPodHelpers,podBossBar} from './sim/pod-boss.ts';
 import {createPointLights,addPointLight,setScriptedLight,stepPointLights,type PlayerLight} from './sim/point-light.ts';
 import {scriptedPathLight,slimeBaseLight,slimeBlobLight} from './sim/scripted-light.ts';
@@ -779,6 +780,7 @@ async function open(dir: GameDir): Promise<void> {
         return tasks ? {
           done: tasks.done, hintIndex: tasks.hintIndex, slime: tasks.slime ? { ...tasks.slime } : null,
           pod:tasks.pod?{...tasks.pod}:null,
+          zurg:tasks.zurg?{...tasks.zurg}:null,
           boss: tasks.boss, potatoPart: tasks.potatoPart, powerUps: tasks.powerUps,
           bossPhase: tasks.bossPhase, bossClock: tasks.bossClock, bossHurt: tasks.bossHurt,
           bossCut: tasks.bossCut, bossRamp: tasks.bossRamp, bossSwing: tasks.bossSwing,
@@ -1993,6 +1995,7 @@ function hudReadout(level: number): HudReadout {
   }
   if (tasks?.slime && tasks.slime.phase >= 999) bossBar = slimeBossBar(tasks.slime);
   if(tasks?.pod&&tasks.pod.phase>=2)bossBar=podBossBar(tasks.pod);
+  if(tasks?.zurg&&tasks.zurg.phase>=2)bossBar=zurgBossBar(tasks.zurg);
   // The shared task counter: under 100 the flag counts laps down, at 100 or
   // more it is a countdown in tenths of a minute.
   let clock: number | null = null;
@@ -2163,6 +2166,10 @@ function drawCreatures(): void {
     if(tasks?.pod){
       const {stretch,flashScale}=tasks.pod;
       viewer.setCreatureAppearance(0,[flashScale,stretch*flashScale,flashScale],[1,1,1]);
+    }
+    if(tasks?.zurg){
+      const scale=tasks.zurg.flashScale;
+      viewer.setCreatureAppearance(0,[scale,scale,scale],[1,1,1]);
     }
     // The trailer's PAINT creature is the liquid inside pushable object 0.
     // Place it after the generic creature pass, which otherwise treats it as a static actor.
@@ -3021,6 +3028,11 @@ function saveProgress(): void {
  * `bossFight` have one.
  */
 function startBossFight(level: number): void {
+  if(level===12&&creatureSim&&tasks){
+    const boss=creatureSim.creatures.find(c=>c.slot===0);
+    if(boss)tasks.zurg=createZurgBoss(boss);
+    return;
+  }
   if(level===9&&creatureSim&&tasks&&exeBytes){
     tasks.pod=createPodBoss(slot=>creatureSim!.creatures.find(c=>c.slot===slot),readPodHelpers(exeBytes));
     return;
@@ -3524,6 +3536,11 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
           pathPoints: (tag) => currentLevel?.level.paths.find((p) => p.id === tag)?.points ?? null,
           cameraYaw: camera?.yaw ?? 0,
           cut: cutHandle,
+          pinPlayer:(point)=>Object.assign(player!,point),
+          projectile:(shot)=>{
+            if(effects&&camera)spawnEffect(effects,effectWorld(),shot.x,shot.y,shot.z,
+              shot.vx,shot.vy,shot.vz,shot.gravity,shot.rotation,shot.spin,shot.kind);
+          },
           releaseGate:effects?.gate,
           cameraEye:{x:viewer.camera.position.x/GAME_TO_RENDER,y:-viewer.camera.position.y/GAME_TO_RENDER,z:-viewer.camera.position.z/GAME_TO_RENDER},
           lookAt:(point)=>{if(camera)camera.lookAt=point;},

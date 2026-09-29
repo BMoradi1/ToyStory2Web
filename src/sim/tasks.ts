@@ -19,6 +19,7 @@ import type { RandomStream } from './creatures.ts';
 import { cos, sin } from './trig.ts';
 import { stepSlimeBoss, type SlimeBoss, type SlimeWorld } from './slime-boss.ts';
 import {stepPodBoss,type PodBoss,type PodWorld} from './pod-boss.ts';
+import {stepZurgBoss,type ZurgBoss,type ZurgWorld} from './zurg-boss.ts';
 
 /** A dialogue the level wants opened, as `FUN_004027f0` takes it. */
 export interface DialogueRequest {
@@ -50,6 +51,7 @@ export const enum RaceState {
 export interface TaskState {
   slime: SlimeBoss | null;
   pod: PodBoss | null;
+  zurg: ZurgBoss | null;
   /** Bit per slot, the engine's own per-level byte of saved token bits. */
   done: number;
   /** Idle-chatter timers, one per talker. */
@@ -158,7 +160,7 @@ export function startLevelTasks(tasks: TaskState, level: number, held = 0): void
 export function createTasks(): TaskState {
   return {
     done: 0, hammChatter: 0, hintChatter: 0, hintIndex: -1,
-    slime: null, pod:null,
+    slime: null, pod:null, zurg:null,
     boss: 0, bossGone: 0, reach: 0, pathRun: 0, pathClock: 100, fetch: 0, fetchDone: 0, fetchClock: 100, slowTick: 0, potatoPart: 0, powerUps: 0, potatoChatter: 0, challenge: 0, challengeFrom: 0,
     bossPhase: 0, bossClock: 0, bossHurt: 0, bossHealthWas: -1, bossRamp: 0, bossSwing: 0,
     bossTaunt: 0, bossShout: 0, bossYaw: 0, bossFlip: 0, bossCut: 0,
@@ -458,6 +460,8 @@ export function stepTasks(
   level: LevelTasks,
   creatureAt: (index: number) => Creature | undefined,
   world: {
+    projectile?:ZurgWorld['projectile'];
+    pinPlayer?:ZurgWorld['pinPlayer'];
     attachment?:PodWorld['attachment'];
     releaseGate?:PodWorld['releaseGate'];
     cameraEye?:PodWorld['cameraEye'];
@@ -712,6 +716,14 @@ export function stepTasks(
     }
   }
 
+  if(tasks.zurg){
+    const boss=creatureAt(0);
+    if(boss)stepZurgBoss(tasks.zurg,boss,world,dt);
+    tasks.bossPhase=tasks.zurg.phase;tasks.bossCut=tasks.zurg.cutTicks;
+    if(tasks.zurg.beaten){tasks.bossBeaten=true;tasks.zurg.beaten=false;}
+    if(tasks.zurg.won){tasks.levelWon=true;tasks.zurg.won=false;}
+    return null;
+  }
   if(tasks.pod){
     stepPodBoss(tasks.pod,creatureAt,world);
     tasks.bossPhase=tasks.pod.phase===3?2:tasks.pod.phase;

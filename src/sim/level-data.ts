@@ -762,6 +762,7 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
       askText: 0x4f3874, doneText: 0x4f3900, slot: 1, needed: 5, countedBy: 'creature',
     },
   },
+  12: {}, // Zurg's level-owned controller (src/sim/zurg-boss.ts).
   13: {
     boss: {
       creature: 0x20,

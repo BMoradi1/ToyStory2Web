@@ -1180,66 +1180,49 @@ Focused probes cover transforms, selected parts, terrain query origin,
 helper/camera placement and both gate boundaries. The full browser fight
 regression is rerun for all six waves and victory cleanup.
 
-## Zurg, internal level 12 — DECODED, not ported
+## Zurg, internal level 12 — controller ported 2026-09-28
 
-Decoded 2026-09-07 from `FUN_0042b300` (init) and `FUN_0042b3a0`
-(tick). Scene `level02/level1`, which the port cannot load until
-`parseDat` is retiled (docs/FORMATS.md); music `buzvzurg`; the boss is
-slot 0. A simple fight with a set-piece death.
+`src/sim/zurg-boss.ts` implements init `0042b300` and tick `0042b3a0`,
+rechecked against a fresh local decompile. Scene `level02/level1` now loads;
+the older parser prerequisite is resolved. Boss slot 0 is type 57, script 38,
+with 29 initial health. Existing path-0 flares and nearby character lighting
+already implement the light registers; they are not an aiming target marker.
 
-**Init.** Flag 0x800; the boss raised 0x28000 and moved 0x10000 along z,
-heading 0xc00, `targetY` its own height, record +0xe (its anim/speed
-byte) 0; a 300-tick clock, a 0x78 voice timer, a 0x104 attack clock.
+- **Entrance:** init moves Zurg up 0x28000 and along z by 0x10000, faces him
+  at 0xc00 and disables turning. Buzz crossing x = -0x18b2a starts a 300-tick
+  camera cut and cue 0xd8. Zurg descends 0x200 per tick (+Y down), the camera
+  tracks him, and voice 0xb9 fires after 120 ticks. Buzz is repositioned to the
+  authored safe point whenever his y exceeds -70000 during this or the death cut.
+  The cut's end enables chase/script velocity, turn rate 10 and vulnerability 6.
+- **Fight:** the attack clock starts at 260 and reloads to 302 below zero,
+  with a random sideways velocity at heading +/-512. Crossing 200 selects
+  animation 0/script 24; crossings at 146, 138 and 126 release a projectile
+  from animated part 1 at (-250,-250,0), with sound 0x9d. Crossing 104 returns
+  to animation 1/script 2. The ballistic kind 0x6c uses heading -128, downward
+  velocity and gravity; kind 0x6d homes at Buzz. After a surviving hit the
+  following volley homes; otherwise only the middle shot homes at health <=19.
+- **Hits:** health changes close the shell to vulnerability 4 for 60 ticks;
+  it reopens only when the clock goes below zero. The retail mode-1 draw
+  triple alternates normal and doubled scale during recovery. Voice cues,
+  the 20-point health bar and the boss camera look-at are connected.
+- **Defeat:** below 10 health, the controller records the existing boss-save
+  bit and starts a 300-tick death cut, animation 2/script 25 and voice 0xc0.
+  It clears chase/script velocity, drives Zurg out of the arena rectangle,
+  then spins and accelerates him DOWN toward y=170000. Sounds 0x9e/0x9f and
+  kind-0x70 particles accompany the fall. Cut completion triggers the existing
+  boss movie and front-end victory handoff once.
+- **Arena constraint:** the end-of-tick clamp excludes an INNER radius of
+  1280 level units around (-0xbd7c,0x99); it does not contain Zurg inside it.
 
-**Phases** (`DAT_0052fe24`):
-
-| phase | what happens |
-|---|---|
-| 0 | waiting. Buzz's x rising to -0x18b2a or above starts it: music, a 300-tick cut to the boss (eye 0x3000 short of it, 0x5000 up, look 0x4000 up), sound 0xd8 |
-| 1 | the entrance: the boss rises 0x200 a tick, the cut's eye 0x220 a tick and back along x (faster under 0xb4); voice 0xb9 once after 0x78; Buzz is pinned to (-0x1da7c, -0x12bd0, 0xf699) whenever he gets above -70,000; at the cut's end flags |= 0xc (script velocity and chase), record +0xe = 10, `vulnerable` 6, phase 2 |
-| 2 | the fight |
-| 3 | dying |
-| 4 | over |
-
-**The fight.** A voice line every `rand * 2 + 400` ticks (0xba..0xbd);
-the camera's look-at is the boss; the boss theme timer is set. **A hit**:
-a one-in-four voice 0xd9 at Buzz; stun 0x3c; shell closed (`vulnerable`
-4); flicker through the draw triple on alternate ticks while stunned.
-Under 10 health it **dies**: phase 3, a 300-tick cut from a sine unit off
-its heading and 0x4000 up, anim 2 / script 0x19, chase and script
-velocity cleared, its two animation-rate bytes 0xc0 and the record's
-+0x1c/+0x1d 0x20, the save's token bit, voice 0xc0. Otherwise a voice
-(0xbe/0xbf), anim 1 / script 2, rate bytes 0xe0, attack clock 0.
-
-**The attack clock** `DAT_0052fe30` runs 0x12e down to 0. Passing 200:
-anim 0 / script 0x18, rates 0xc0 (winding up). Passing 0x92, 0x8a, and
-each tick from 0x7e to 0x7f: a shot from (-0xfa, -0xfa, 0) in the
-boss's frame — kind 0x6c with velocity from its heading (a cosine from
-the table at 0x4fee88 and a sine 0x80 round, both a quarter) and gravity
-0x400 when its health is above 0x13 or `DAT_0052fe34` is 0, else kind
-0x6d thrown straight up with rotation `heading * 4` — and sound 0x9d.
-Passing 0x68: anim 1 / script 2, rates 0xe0. At 0 the clock reloads and
-the boss strafes: velocity a sixteenth of a sine unit at heading ±0x200,
-the sign random.
-
-**Dying** (phase 3). Buzz pinned as before. The boss turns toward
-(-0xbd7c, 0x99); inside the box x (-0x256d6, 0xe0aa) z (-0x1b3e9,
-0x1b297) it drives outward at a sixteenth of a sine unit; outside it,
-record +0xe = 0, it spins 0x10 a tick and RISES with an accelerating
-`DAT_0052fe2c` (+0x40 a tick) to 170,000, sound 0x9f on arrival, sound
-0x9e above 70,000, and throws effects of kind 0x70 from 80,000 up with
-velocity -0x2400 while detail is on. The cut looks at it from
--0x188e0 up, a sine unit over its acceleration away; the level is won
-when the cut ends. Whatever the phase, the boss is held within 0x500
-steps of that same point, and the bar is `(health - 9) * 0x36 / 20`.
-The target marker (`DAT_00830d84`) is put on the path-0 node nearest
-Buzz that lies within 1,000 steps of the camera, and every such node
-gets a grey glow.
-
-**What the port needs first.** The draw triple and mode word, effect
-kinds 0x6c / 0x6d / 0x70, the target marker, and Buzz pinned by the
-level. No knockback and no hit-table rewriting, so it is the easiest of
-the four after level 6.
+The installed-data `tools/zurg-boss-probe.ts` checks exact thresholds,
+projectile selection/attachment requests, recovery, inner clamp, falling death,
+reward/win, reset and task integration. `tools/zurg-boss-flow-check.js` follows
+the real entrance, camera and attack scripts, checks pause, both projectile
+kinds, recovery, save bit, falling defeat, movie/victory exit, restart and
+replay. It positions/protects Buzz and injects damage; an unassisted combat
+playthrough remains unverified. Particle emission currently runs regardless
+of the original detail option. Shared frame ordering and exact camera/render
+comparison still need an original-versus-port visual pass.
 
 ## The finale, internal level 15 — DECODED, not ported
 
@@ -1329,8 +1312,8 @@ Each also has its attack:
   heading, rotation `0x7ff - heading`, sound 0xa6. Defeat entry: word
   0x2d of script 41.
 
-With that, every boss in the game is decoded: 6 is ported, 3, 9, 12 and
-15 are written up above with what each needs.
+All boss controllers are decoded. Levels 3, 6, 9 and 12 have implementations;
+level 15 remains unported. See GAME_AUDIT.md for current validation limits.
 
 
 ## Known environment gaps (reviewed 2026-09-27)
@@ -1348,7 +1331,7 @@ review checklist are in [GAME_AUDIT.md](GAME_AUDIT.md).
 | Other scripted props | Motion and interaction feedback | Per-level object scripts remain only partly covered. Guide sparkles have retirement hooks for the chair, pushables and trailer controls, but not all other props. |
 
 Creature-specific gaps also remain, including Tin Robot hover wobble/sparks.
-The Zurg and finale fight controllers are separately documented as unported.
+Zurg now has a tested controller; the finale fight controller remains unported.
 Existing scene loading, shared creature scripts, particles and texture
 animation should not be read as evidence that every level interaction works.
 

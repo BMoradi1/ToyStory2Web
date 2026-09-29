@@ -71,7 +71,7 @@ not evidence for untested interactions.
 | 9 | Toy Barn Encounter | Dedicated pod controller and beam tests exist; ZGCAR hook absent. | Full fight/summon cycles and reward; determine the absent hook's role. |
 | 10 | Elevator Hop | GUNSP hook absent; 20 dynamic collision IDs lack push controllers. | Elevators/platforms, rider attachment, gunslinger and traversal completion. |
 | 11 | Al's Penthouse | BUZZARD, GUNSL and FATBLOKE hooks absent. | Level-local prop helpers, hazards and encounters. |
-| 12 | The Evil Emperor Zurg | Fight controller missing despite no absent shared hook in inventory. | Implement decoded boss controller and end-to-end reward check. |
+| 12 | The Evil Emperor Zurg | Entrance, attacks, recovery, defeat, save bit and victory/movie handoff implemented in `zurg-boss.ts`. Installed-data and focused browser checks pass. | Unassisted combat, original-versus-port camera/render comparison and detail-dependent particles. |
 | 13 | Airport Infiltration | FATBLOKE, BUZZARD and PROSP hooks absent. | Indoor transport/platform controllers and traversal; distinct from Tarmac. |
 | 14 | Tarmac Trouble | Plane motion/collision, wheels/fans, ground/climbing passengers, wheel hazards and helicopter hover/rotors/token motion and light puzzle/lowering implemented and tested. Slinky timed-path rules and retry implemented. Near/far scenery sway, rain/plane sound, rain particles and lightning/thunder restored. Blacksmith recovery, defeat and delayed reward implemented; axe throws implemented; hit flashing missing. FATBLOKE and BUZZARD hooks absent. | Remaining creature hooks and other ambient effects; pitch/roll attachment on other movers. |
 | 15 | Final Showdown | Fight controller missing; SMITH, GUNSL and PROSP hooks absent. | Multi-boss encounter, final reward, rescue/credits/save handoff. |
@@ -149,10 +149,25 @@ not evidence for untested interactions.
    for each object/controller, starting with traversal-critical platforms in
    Elevator Hop and both airport scenes. Share transform/collision integration;
    keep authored timing and state transitions specific to each level.
-3. **Progression blockers.** Zurg and finale controllers, then missing challenge
+3. **Progression blockers.** Finale controller, then missing challenge
    handlers (lawnmower/kite, drill, boat, dinosaur, buggy, gunslingers). There are
    16 distinct absent shared hooks across the install. Determine what shared
    wordcode already does before replacing any behavior.
+   Zurg's controller is now implemented from `0042b300/0042b3a0`, including
+   entrance and death cuts, both projectile types, 60-tick hit recovery,
+   retaliation, inner-radius constraint, falling death, boss-save bit and
+   movie/victory handoff. `zurg-boss-probe.ts` checks installed placement,
+   exact timing/selection boundaries and one-shot progression requests.
+   `zurg-boss-flow-check.js` exercises entrance, pause, authored volleys,
+   recovery/defeat, save, movie exit, restart and replay. It positions/protects
+   Buzz and injects damage; natural combat completion remains unverified.
+   `zurg-projectile-probe.ts` checks installed bouncing/homing effects, trails,
+   spin deflection and contact damage. All 15 scenes still pass entry/exit.
+   Broader validation found a pre-existing `slime-probe.ts` triangle assertion
+   failure (2385 actual versus 2277 expected), reproduced from unchanged commit
+   `fbfaf47`; investigate the probe/model expectation separately.
+   Older decode notes incorrectly described descent as rising, the inner
+   clamp as an outer bound, and lighting as aiming; these are corrected.
 4. **Puzzles, hazards and rewards.** Outdoor paint cans, remaining prop flags,
    all token routes, power-up unlocks, collectible counts and replay behavior.
 5. **Presentation parity.** Triggered effects and spatial sounds, texture gates,

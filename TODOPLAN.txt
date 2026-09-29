@@ -1,3 +1,19 @@
+CURRENT UPDATE — 2026-09-28: Zurg encounter controller
+  Added zurg-boss.ts from freshly checked 0042b300/0042b3a0: entrance/camera,
+  safety reposition, ballistic/homing volleys from animated part 1, retaliation,
+  recovery/draw scaling, voices/HUD, inner-radius clamp and falling defeat.
+  Connected boss save bit, death movie and front-end victory/replay lifecycle.
+  Installed-data boundaries and browser entrance/pause/volleys/recovery/defeat,
+  save/movie exit/restart/replay pass; browser positions/protects Buzz and
+  injects hits. Natural combat and exact camera/render parity remain unverified.
+  Corrected stale decode notes: descent is +Y, clamp excludes inner circle,
+  and path-0 light registers already had character-light integration.
+  Validation: controller/projectile probes, Pod/blacksmith/save regressions,
+  all-15-level browser entry/exit and production build pass. Slime probe's
+  2385-vs-2277 triangle assertion also fails on baseline fbfaf47; tracked in audit.
+  Next: finale controller and missing challenge/platform controllers, plus
+  natural boss playthroughs. Blacksmith hit flashing remains a smaller gap.
+
 CURRENT UPDATE — 2026-09-28: Tarmac blacksmith axe attack
   Ported 0042d47f..0042d57d: chase/range gate, throw animation 3/script 24,
   63-tick release, frame-47 movement handoff and repeat attacks. Axe kind 0x66

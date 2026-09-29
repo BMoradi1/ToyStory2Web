@@ -1,3 +1,14 @@
+CURRENT UPDATE — 2026-09-28: Tarmac blacksmith axe attack
+  Ported 0042d47f..0042d57d: chase/range gate, throw animation 3/script 24,
+  63-tick release, frame-47 movement handoff and repeat attacks. Axe kind 0x66
+  follows animated part 4, homes horizontally at Buzz and raises sound 0xa7.
+  Pending release cancels on defeat; fresh creatures/effects clear on restart.
+  Installed-data probe covers timing/gates/repeat/cancel/reset, finale isolation
+  and projectile movement/contact damage. Browser reaches the authored attack
+  and checks release/sound, pause, defeat/reward, restart and exit/re-entry.
+  Next: blacksmith hit flashing and remaining Tarmac hooks; then broader
+  platform/boss backlog. No full encounter or whole-game parity claim.
+
 CURRENT UPDATE — 2026-09-28: Tarmac blacksmith combat lifecycle
   Restored the level-local combat subset of 0042d3e0/0042e790: 60-tick hit
   recovery, health-9 defeat script, contact-hazard removal, defeat sound and

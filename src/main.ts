@@ -1569,6 +1569,15 @@ function spawnCreatureEffects(): void {
       0x40, 0, 0x80, EFFECT_KIND.hoverShot);
   }
   creatureSim.shots.length = 0;
+  for (const c of creatureSim.smithThrows) {
+    const art = creatureArt.get(c.type), animation = art?.anm?.animations[c.animState];
+    const pose = art?.anm && animation
+      ? poseBone(art.anm, animation, (c.frame >>> 16) % Math.max(1, animation.frameCount), 4) : null;
+    const at = podAttachment(c, pose, { x: 180, y: -150, z: -50 });
+    const axe = spawnEffect(effects, world, at.x, at.y, at.z, 0, -2, 0, c.heading * 4, 0, 0, 0x66);
+    if (axe) axe.pitch = -1;
+  }
+  creatureSim.smithThrows.length = 0;
   for (const spark of creatureSim.sparks) {
     spawnEffect(effects, world, spark.x, spark.y, spark.z, 0, 0, 0, 0, 0, 0, 0x11);
   }

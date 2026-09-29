@@ -51,6 +51,26 @@
   ts2.tickGame({},1,0);
   check(ts2.tasks.boss===2&&smith().vulnerable===6,'fight did not open');
   check(!token().enabled,'reward visible before defeat');
+  // Let the authored chase script reach the throw; only Buzz's position is
+  // controlled. Do not seek the creature script or inject its animation.
+  let throwing=false, released=false;
+  for(let i=0;i<800&&!released;i++) {
+    const c=smith();
+    Object.assign(ts2.player,{x:c.x+30000,y:c.y,z:c.z,vx:0,vy:0,vz:0});
+    ts2.tickGame({},1,0);
+    if(smith().animState===3&&!throwing) {
+      throwing=true;
+      const frame=smith().frame;
+      ts2.openMenu();ts2.tickGame({},100,0);
+      check(smith().frame===frame&&!ts2.effects.kinds.includes(0x66),'pause advanced pending throw');
+      ts2.pressMenu('back');
+    }
+    if(ts2.effects.kinds.includes(0x66)) {
+      released=true;
+      check(ts2.sound.raised.some(s=>s.startsWith('a7:')),'axe release sound missing');
+    }
+  }
+  check(throwing&&released,'authored approach did not animate and release axe: '+JSON.stringify(smith()));
   // Move Buzz away to isolate recovery and defeat from player-contact damage.
   Object.assign(ts2.player,{x:smith().x+90000,z:smith().z+90000});
   for(let hit=0;hit<10;hit++) {
@@ -64,6 +84,7 @@
   check(token().enabled&&(ts2.tasks.done&16),'reward missing after defeat');
   await ts2.spawnPlayer();ts2.viewer.stop();
   check(ts2.tasks.boss===0&&ts2.tasks.bossHurt===0&&smith().health===29&&!token().enabled,'restart retained fight');
+  check(!ts2.effects.kinds.includes(0x66),'restart retained axe');
   ts2.openMenu();
   for(let i=0;i<3;i++){ts2.pressMenu('down');ts2.tickGame({},1);}
   ts2.pressMenu('select');ts2.tickGame({},1);ts2.pressMenu('down');ts2.tickGame({},1);ts2.pressMenu('select');ts2.tickGame({},1);
@@ -73,5 +94,5 @@
   check(ts2.tasks===null,'fight leaked into selector');
   await enter();
   check(ts2.tasks.boss===0&&smith().health===29&&!token().enabled,'re-entry retained fight');
-  console.log('PASS: blacksmith actual taunt/wake, injected hits, recovery, defeat/reward, restart, exit and re-entry. Axe throws remain unimplemented.');
+  console.log('PASS: blacksmith actual taunt/wake, injected hits, recovery, defeat/reward, restart, exit and re-entry. Authored axe animation, projectile release and sound also checked.');
 })()

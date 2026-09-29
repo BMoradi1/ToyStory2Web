@@ -228,6 +228,8 @@ export interface CreatureSim {
   shots: { x: number; y: number; z: number; heading: number }[];
   /** Sustained ZPOD beams requested this tick; resolved against terrain by the host. */
   beamCasters: Creature[];
+  /** Tarmac blacksmith throws; the host resolves animated hand attachments. */
+  smithThrows: Creature[];
   /**
    * `DAT_0052b7d8`: how many of the level's five lost things have been
    * brought home. One global for every level, counted by whichever creature
@@ -338,7 +340,7 @@ export function createCreatureSim(
     creatures, world, rand, level,
     sounds: [], rescues: [], sparks: [], dust: [], raceState: 0, carFront: 0, carRear: 0, shots: [], beamCasters: [], deaths: [], defeatBursts: [], near: [],
     foundCount: 0, lastKilled: -1, models: null,
-    bossLastHealth: -1, bossSlotEarned: false,
+    bossLastHealth: -1, bossSlotEarned: false, smithThrows: [],
   };
 }
 
@@ -856,7 +858,44 @@ export function updateCreature(
   // 12. The per-type C handler, if this type has one.
   const handler = c.handler ? CREATURE_HANDLERS[c.handler] : undefined;
   if (handler) handler(sim, c, { bits, chasing, fwd: across, side: along, dt });
+  if (sim.level === 14 && c.type === 58) {
+    stepSmithAttack(sim, c, player, chasing, dt);
+  }
   return bits;
+}
+
+/** Attack subset of 0042d3e0; recovery/defeat remain in the Tarmac task tick.
+ * The finale's SMITH uses 0042f310 and must not take this path.
+ */
+export function stepSmithAttack(
+  sim: CreatureSim, c: Creature, player: { x: number; y: number; z: number },
+  chasing: boolean, dt = 1,
+): void {
+  if (sim.level !== 14 || c.type !== 58) return;
+  if (c.health < 10) { c.timer = 0; return; }
+  const dx = (player.x - c.x) >> 8, dy = (player.y - c.y) >> 8, dz = (player.z - c.z) >> 8;
+  if (chasing && dx * dx + dy * dy + dz * dz < 200 * 200 && c.animState === 1) {
+    c.animState = 3;
+    c.animScript = ANIM_SCRIPTS[24]!;
+    c.animIndex = 0;
+    c.frame = c.animScript[0]! << 16;
+    c.record.speed = 0;
+    c.timer = 63;
+  }
+  if (c.animState === 3 && (c.frame >>> 16) > 46) {
+    c.pc = 16;
+    c.wait = 0;
+    c.record.speed = 16;
+    c.flags &= ~(CREATURE_FLAGS.scriptVelocity | CREATURE_FLAGS.chase);
+  }
+  if (c.timer !== 0) {
+    c.timer -= dt;
+    if (c.timer <= 0) {
+      c.timer = 0;
+      sim.smithThrows.push(c);
+      sim.sounds.push({ event: 0xa7, x: c.x, y: c.y, z: c.z });
+    }
+  }
 }
 
 // --- the per-type C handlers -------------------------------------------------
@@ -1116,6 +1155,7 @@ export function stepCreatures(
   sim.sparks.length = 0;
   sim.shots.length = 0;
   sim.beamCasters.length = 0;
+  sim.smithThrows.length = 0;
   const near: number[] = [];
 
   for (let i = 0; i < sim.creatures.length; i++) {

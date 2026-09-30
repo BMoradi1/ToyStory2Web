@@ -196,6 +196,8 @@ export class RandomStream {
 export interface CreatureSound { event: number; x: number; y: number; z: number }
 
 export interface CreatureSim {
+  /** Level-owned behavior after shared movement/animation, before contacts. */
+  levelHandler?: (c: Creature, args: HandlerArgs, player: { x: number; y: number; z: number }) => void;
   creatures: Creature[];
   world: CreatureWorld;
   rand: RandomStream;
@@ -861,6 +863,7 @@ export function updateCreature(
   if (sim.level === 14 && c.type === 58) {
     stepSmithAttack(sim, c, player, chasing, dt);
   }
+  sim.levelHandler?.(c, { bits, chasing, fwd: across, side: along, dt }, player);
   return bits;
 }
 

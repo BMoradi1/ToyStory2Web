@@ -15,6 +15,7 @@ import { readLensFlareTable, buildLensFlares, flareRay, levelFlareSources, pathF
 import { getGamma, setGamma } from './render/gamma.ts';
 import {podMuzzle,podBeam,podImpactHits,podBossAim,podAttachment,podImpactLight} from './sim/pod-beam.ts';
 import {createZurgBoss,zurgBossBar} from './sim/zurg-boss.ts';
+import {createFinale,stepFinaleFighter,finaleBar,FINALE_SCENERY_OBJECTS} from './sim/finale.ts';
 import {createPodBoss,readPodHelpers,podBossBar} from './sim/pod-boss.ts';
 import {createPointLights,addPointLight,setScriptedLight,stepPointLights,type PlayerLight} from './sim/point-light.ts';
 import {scriptedPathLight,slimeBaseLight,slimeBlobLight} from './sim/scripted-light.ts';
@@ -410,6 +411,9 @@ async function showLevel(index: number): Promise<void> {
       }
       const aimObjects=levelNumber(level.id)!==null ? aimObjectIndices(parsed) : [];
       for(const index of aimObjects)separate.add(index);
+      if(levelNumber(level.id)===15)for(const id of FINALE_SCENERY_OBJECTS){
+        const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);
+      }
       const geometry = buildLevelGeometry(parsed, { zones, separate });
 
       setStatus(`${level.id}: uploading ${geometry.triangleCount} triangles\u2026`);
@@ -781,6 +785,7 @@ async function open(dir: GameDir): Promise<void> {
           done: tasks.done, hintIndex: tasks.hintIndex, slime: tasks.slime ? { ...tasks.slime } : null,
           pod:tasks.pod?{...tasks.pod}:null,
           zurg:tasks.zurg?{...tasks.zurg}:null,
+          finale:tasks.finale?structuredClone(tasks.finale):null,
           boss: tasks.boss, potatoPart: tasks.potatoPart, powerUps: tasks.powerUps,
           bossPhase: tasks.bossPhase, bossClock: tasks.bossClock, bossHurt: tasks.bossHurt,
           bossCut: tasks.bossCut, bossRamp: tasks.bossRamp, bossSwing: tasks.bossSwing,
@@ -1996,6 +2001,7 @@ function hudReadout(level: number): HudReadout {
   if (tasks?.slime && tasks.slime.phase >= 999) bossBar = slimeBossBar(tasks.slime);
   if(tasks?.pod&&tasks.pod.phase>=2)bossBar=podBossBar(tasks.pod);
   if(tasks?.zurg&&tasks.zurg.phase>=2)bossBar=zurgBossBar(tasks.zurg);
+  if(tasks?.finale?.active&&creatureSim)bossBar=finaleBar(tasks.finale,i=>creatureSim!.creatures.find(c=>c.slot===i));
   // The shared task counter: under 100 the flag counts laps down, at 100 or
   // more it is a countdown in tenths of a minute.
   let clock: number | null = null;
@@ -2170,6 +2176,10 @@ function drawCreatures(): void {
     if(tasks?.zurg){
       const scale=tasks.zurg.flashScale;
       viewer.setCreatureAppearance(0,[scale,scale,scale],[1,1,1]);
+    }
+    if(tasks?.finale)for(let i=0;i<3;i++){
+      const scale=tasks.finale.fighters[i]!.scale;
+      viewer.setCreatureAppearance(i,[scale,scale,scale],[1,1,1]);
     }
     // The trailer's PAINT creature is the liquid inside pushable object 0.
     // Place it after the generic creature pass, which otherwise treats it as a static actor.
@@ -2383,6 +2393,21 @@ function drawTarmacLights(): void {
     const object=index===undefined?null:currentLevel.level.objects[index];
     if(!object||index===undefined)continue;
     transforms.set(index,{angles:[object.rotation.x,object.rotation.y,object.rotation.z],scale:[scale,scale,scale]});
+  }
+  viewer.setObjectTransforms(transforms);
+}
+
+function drawFinaleStage(): void {
+  if(!viewer||!currentLevel||!tasks?.finale)return;
+  const s=tasks.finale,transforms=new Map<number,ObjectTransform>();
+  for(const id of FINALE_SCENERY_OBJECTS){
+    const index=currentLevel.level.objectIds[id];
+    const object=index===undefined?undefined:currentLevel.level.objects[index];
+    if(!object||index===undefined)continue;
+    const rest=object.position,unit=object.unitScale*32;
+    transforms.set(index,{angles:s.angles[id]??[object.rotation.x,object.rotation.y,object.rotation.z],
+      offset:s.entrance===0||id===2?[0,0,0]:[(s.origin.x-rest.x*unit)*GAME_TO_RENDER,
+        -(s.origin.y-rest.y*unit)*GAME_TO_RENDER,-(s.origin.z-rest.z*unit)*GAME_TO_RENDER]});
   }
   viewer.setObjectTransforms(transforms);
 }
@@ -2835,17 +2860,9 @@ async function runFrontEnd(): Promise<void> {
   frontEnd = null;
 }
 
-/**
- * The level select's scene, the engine's "level 16": `level06/level1.dat`
- * with the `level1t1.ngn` textures (`FUN_00452fc0` takes ten off the level
- * number and forces texture set 1; docs/FRONTEND.md). Every used object is
- * kept separate so the select can show, hide and move them by id.
- */
-async function loadDioramaScene(): Promise<{ paths: DatLevel['paths']; placedOf: (id: number) => { position: { x: number; y: number; z: number }; yaw: number } | null } | null> {
-  if (!viewer) return null;
-  // The diorama uses playMode for its scripted camera, too. Discard the
-  // level simulation before any await so enabling that camera cannot resume
-  // the old level and recreate its creatures, pickups, effects or HUD.
+/** Retire gameplay before any front-end screen can reuse the renderer. */
+function discardLevel(): void {
+  if(!viewer)return;
   viewer.setBackdrop(null);
   viewer.setAimModel(null);
   currentLevel = null;
@@ -2901,6 +2918,20 @@ async function loadDioramaScene(): Promise<{ paths: DatLevel['paths']; placedOf:
   viewer.setVisibleZones(null);
   viewer.setHiddenObjects(new Set());
   hudPainter?.clear();
+}
+
+/**
+ * The level select's scene, the engine's "level 16": `level06/level1.dat`
+ * with the `level1t1.ngn` textures (`FUN_00452fc0` takes ten off the level
+ * number and forces texture set 1; docs/FRONTEND.md). Every used object is
+ * kept separate so the select can show, hide and move them by id.
+ */
+async function loadDioramaScene(): Promise<{ paths: DatLevel['paths']; placedOf: (id: number) => { position: { x: number; y: number; z: number }; yaw: number } | null } | null> {
+  if (!viewer) return null;
+  // The diorama uses playMode for its scripted camera, too. Discard the
+  // level simulation before any await so enabling that camera cannot resume
+  // the old level and recreate its creatures, pickups, effects or HUD.
+  discardLevel();
   const scene = levels.find((l) => l.id === 'level06/level1');
   // The texture set is a bundle on its own, not a scene, so it is not in
   // the scene list; it is read straight from the install.
@@ -2970,6 +3001,8 @@ async function playLevelFromFront(position: number): Promise<'exit' | 'won' | 'g
     };
   }
   if (viewer?.playMode) setPlaying(false);
+  // Ending/credits can precede the selector: retire gameplay before either.
+  discardLevel();
   input.attach();
   return how;
 }
@@ -3028,6 +3061,33 @@ function saveProgress(): void {
  * `bossFight` have one.
  */
 function startBossFight(level: number): void {
+  if(level===15&&creatureSim&&tasks&&currentLevel){
+    const object=currentLevel.level.objects[currentLevel.level.objectIds[0]!]!;
+    const unit=object.unitScale*32;
+    tasks.finale=createFinale(i=>creatureSim!.creatures.find(c=>c.slot===i),
+      {x:object.position.x*unit,y:object.position.y*unit,z:object.position.z*unit});
+    creatureSim.levelHandler=(c,args,p)=>{
+      if(!tasks?.finale||!creatureSim)return;
+      stepFinaleFighter(tasks.finale,c,args,{...p,rand:creatureSim.rand,
+        sound:(event,at)=>playEvent(event,at??undefined),
+        attachment:(c,part,point)=>{
+          const art=creatureArt.get(c.type),animation=art?.anm?.animations[c.animState];
+          const pose=art?.anm&&animation?poseBone(art.anm,animation,(c.frame>>>16)%Math.max(1,animation.frameCount),part):null;
+          return podAttachment(c,pose,point);
+        },
+        projectile:shot=>{
+          if(effects&&camera)spawnEffect(effects,effectWorld(),shot.x,shot.y,shot.z,
+            shot.vx,shot.vy,shot.vz,shot.gravity,shot.rotation,shot.spin,shot.kind);
+        },
+        spark:(p,spin)=>{
+          if(!effects||!camera)return;
+          const e=spawnChild(effects,effectWorld(),p.x,p.y,p.z,100,15);if(e)e.spin=spin;
+        },
+      });
+    };
+    drawFinaleStage();
+    return;
+  }
   if(level===12&&creatureSim&&tasks){
     const boss=creatureSim.creatures.find(c=>c.slot===0);
     if(boss)tasks.zurg=createZurgBoss(boss);
@@ -3487,6 +3547,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       shown.eye.x * GAME_TO_RENDER, -shown.eye.y * GAME_TO_RENDER, -shown.eye.z * GAME_TO_RENDER,
       look.x * GAME_TO_RENDER, -look.y * GAME_TO_RENDER, -look.z * GAME_TO_RENDER,
     );
+    if(tasks?.finale&&!aimView.active&&!cut.noControl)viewer.camera.rotateZ(-toRadians(tasks.finale.roll));
   }
   for (const effect of player.sounds) sound?.play(effect);
   // Events carry their own volume and sustained flag out of the level's sound
@@ -3584,6 +3645,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
         },
       );
       if (request) startDialogue(request);
+      if(tasks.finale)drawFinaleStage();
       // Mr Potato Head hands the power-up back inside that step.
       recordPowerUp();
       if (tasks.bossBeaten) { recordBossBeaten(level); tasks.bossBeaten = false; }

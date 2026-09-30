@@ -4,7 +4,7 @@ Regenerate: `node --import tsx tools/game-audit.ts "Toy Story 2"`. Internal leve
 
 This snapshot includes `--decompile /path/to/toy2_levels.c` motion evidence. Supply a fresh local DumpAll.java output to regenerate that section.
 
-This is static inventory, **not** a completed playthrough or parity score. Missing shared handlers are explicit absent dispatch entries; level controllers may own related behavior. Unmapped dynamic collision objects need review, not automatic movement. Mapped controllers currently include push blocks and the Tarmac plane.
+This is static inventory, **not** a completed playthrough or parity score. Missing handlers are absent shared or known level-owned dispatch entries; level controllers may own related behavior. Unmapped dynamic collision objects need review, not automatic movement. Mapped controllers currently include push blocks and the Tarmac plane.
 
 | Play order | Level | Scene parses | Creature hooks absent | Dynamic collision IDs without mapped controller | Poles / zip lines | Boss controller |
 |---|---|---|---|---|---|---|
@@ -22,7 +22,7 @@ This is static inventory, **not** a completed playthrough or parity score. Missi
 | 12 (12) | the evil emperor zurg | yes | — | — | 0 / 0 | zurg-boss.ts |
 | 13 (13) | airport infiltration | yes | FATBLOKE (46), BUZZARD (41), PROSP (61) | 0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 12, 13, 14 | 13 / 2 | taunt/reward hooks; inspect per-creature combat |
 | 14 (14) | tarmac trouble | yes | FATBLOKE (46), BUZZARD (41), SMITH (58) | 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13 | 9 / 1 | taunt/reward hooks; inspect per-creature combat |
-| 15 (15) | final showdown | yes | SMITH (58), GUNSL (45), PROSP (61) | — | 0 / 0 | MISSING |
+| 15 (15) | final showdown | yes | — | — | 0 / 0 | finale.ts (stage + three fighters) |
 
 ## Missing shared behavior hooks
 

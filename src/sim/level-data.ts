@@ -548,6 +548,7 @@ export interface LevelTasks {
  * asking. Everything else works on all ten.
  */
 export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
+  15: {}, // Final Showdown stage and fighters (src/sim/finale.ts).
   1: {
     potato: { creature: 0x1f, pathTag: 0x19, askText: 0x4f0adc, thanksText: 0x4f0b60, explainText: 0x4f0c10, playerYaw: 0x200, creatureYaw: 0xa00 },
     hamm: { creature: 0x1e, pathTag: 0x1d, playerYaw: 0xe10, creatureYaw: 0x6e0, slot: 0 },

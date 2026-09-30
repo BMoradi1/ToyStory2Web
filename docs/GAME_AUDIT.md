@@ -1,6 +1,6 @@
 # Whole-game parity audit
 
-Reviewed 2026-09-28. This is the current audit index; older roadmap entries
+Reviewed 2026-09-29. This is the current audit index; older roadmap entries
 may describe work that has since shipped. The first pass covers all 15 scenes,
 their creature dispatch hooks, authored collision objects, existing task/prop
 controllers, original level motion calls, and browser entry/exit. **It is not
@@ -74,7 +74,7 @@ not evidence for untested interactions.
 | 12 | The Evil Emperor Zurg | Entrance, attacks, recovery, defeat, save bit and victory/movie handoff implemented in `zurg-boss.ts`. Installed-data and focused browser checks pass. | Unassisted combat, original-versus-port camera/render comparison and detail-dependent particles. |
 | 13 | Airport Infiltration | FATBLOKE, BUZZARD and PROSP hooks absent. | Indoor transport/platform controllers and traversal; distinct from Tarmac. |
 | 14 | Tarmac Trouble | Plane motion/collision, wheels/fans, ground/climbing passengers, wheel hazards and helicopter hover/rotors/token motion and light puzzle/lowering implemented and tested. Slinky timed-path rules and retry implemented. Near/far scenery sway, rain/plane sound, rain particles and lightning/thunder restored. Blacksmith recovery, defeat and delayed reward implemented; axe throws implemented; hit flashing missing. FATBLOKE and BUZZARD hooks absent. | Remaining creature hooks and other ambient effects; pitch/roll attachment on other movers. |
-| 15 | Final Showdown | Fight controller missing; SMITH, GUNSL and PROSP hooks absent. | Multi-boss encounter, final reward, rescue/credits/save handoff. |
+| 15 | Final Showdown | Stage and three fighter controllers implemented in `finale.ts`; rendered entrance, attacks, rescue, completion save, ending/credits and replay tested. | Natural combat completion; exact roll/framing and voice/pitch parity. |
 
 ## Prioritized work
 
@@ -149,8 +149,7 @@ not evidence for untested interactions.
    for each object/controller, starting with traversal-critical platforms in
    Elevator Hop and both airport scenes. Share transform/collision integration;
    keep authored timing and state transitions specific to each level.
-3. **Progression blockers.** Finale controller, then missing challenge
-   handlers (lawnmower/kite, drill, boat, dinosaur, buggy, gunslingers). There are
+3. **Progression blockers.** Missing challenge handlers (lawnmower/kite, drill, boat, dinosaur, buggy, gunslingers). There are
    16 distinct absent shared hooks across the install. Determine what shared
    wordcode already does before replacing any behavior.
    Zurg's controller is now implemented from `0042b300/0042b3a0`, including
@@ -168,6 +167,17 @@ not evidence for untested interactions.
    `fbfaf47`; investigate the probe/model expectation separately.
    Older decode notes incorrectly described descent as rising, the inner
    clamp as an outer bound, and lighting as aiming; these are corrected.
+   Final Showdown now ports `0042faa0/0042fc50` and `0042f310/0042f530/0042f7b0`:
+   staged entrance with retained near/far mesh identity, bounce/wobble, all three
+   attacks, recovery/defeat, spacing/bounds, camera roll, rescue, save and the
+   existing ending/credits handoff. Shared level cleanup now runs before credits,
+   not only upon selector reload. `finale-probe.ts` checks installed wordcode,
+   exact timers, two-shot gunslinger bursts, all six defeat orders, rescue/win
+   timing and reset. `finale-flow-check.js` follows authored attacks, measures
+   stage vertex movement/pause/reset, and checks save, credits and replay.
+   The browser positions/protects Buzz and injects damage. An unassisted win
+   remains unverified; dynamic sound pitch, exact camera-roll/framing comparison
+   and per-character voice overlap gating remain open.
 4. **Puzzles, hazards and rewards.** Outdoor paint cans, remaining prop flags,
    all token routes, power-up unlocks, collectible counts and replay behavior.
 5. **Presentation parity.** Triggered effects and spatial sounds, texture gates,

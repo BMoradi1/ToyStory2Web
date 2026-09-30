@@ -1,3 +1,17 @@
+CURRENT UPDATE — 2026-09-29: Final Showdown stage and three fighters
+  Added finale.ts from 0042faa0/0042fc50 and 0042f310/530/7b0: entrance/release,
+  near/far stage bounce/rotation, Smith axe, two-shot gunslinger burst, Prospector
+  pick, recovery/defeat, spacing/bounds, camera roll, rescue and completion.
+  Fixed moving-stage geometry grouping and shared gameplay cleanup before credits.
+  Browser verifies authored attacks, actual stage vertices/pause/reset, rescue,
+  boss save bit/gameBeaten, ending/credits and replay with positioned/protected
+  Buzz and injected hits. Unit probe covers original timing and all defeat orders.
+  Build, finale probes/browser, all-15 entry/exit, Zurg, Pod and Tarmac attack
+  regressions pass. Natural combat, exact roll/framing, dynamic sound pitch and voice gating remain
+  open. All world-boss controllers now exist; no full parity claim.
+  Next: traversal-critical platforms and missing challenge handlers across the
+  other levels; retain blacksmith hit flashing and old Slime probe failure in audit.
+
 CURRENT UPDATE — 2026-09-28: Zurg encounter controller
   Added zurg-boss.ts from freshly checked 0042b300/0042b3a0: entrance/camera,
   safety reposition, ballistic/homing volleys from animated part 1, retaliation,

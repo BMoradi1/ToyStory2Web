@@ -1224,9 +1224,9 @@ playthrough remains unverified. Particle emission currently runs regardless
 of the original detail option. Shared frame ordering and exact camera/render
 comparison still need an original-versus-port visual pass.
 
-## The finale, internal level 15 — DECODED, not ported
+## The finale, internal level 15 — controller ported 2026-09-29
 
-Decoded 2026-09-07 from `FUN_0042faa0` (init) and `FUN_0042fc50`
+Decoded 2026-09-07 and rechecked 2026-09-29 from `FUN_0042faa0` (init) and `FUN_0042fc50`
 (tick). Scene `level05/level1`, music `buzvpros`. Five creatures: slots
 0-2 the three bosses SMITH, GUNSL and PROSP (29 health each, scripts 39,
 33, 41), slot 3 JESSIE and slot 4 WOODY (1 health, never respawn). The
@@ -1235,7 +1235,7 @@ boss's own behaviour is a per-type handler of its own, `FUN_0042f310`
 (SMITH), `FUN_0042f530` (GUNSL) and `FUN_0042f7b0` (PROSP), installed for
 this level and described after the stage.
 
-**Init.** All five turned to 0x400; the three bosses' health zeroed and
+**Init.** The three bosses turned to 0x400; the three bosses' health zeroed and
 placed at (-0x32c6d, -0x92d6, -0x14f5), (-0x327cc, -0x92da, -0x45cd)
 and (-0x32bbf, -0x92db, -0x8251); everyone's respawn 10000; the arena
 point read from scene object 0 (`FUN_004ccef0`) and its y kept.
@@ -1246,14 +1246,14 @@ distance 0x38 to scene object 0 (eye 0x4000 up, look 0x2000 up; between
 0x168 and 0xf0 of it the eye tracks 0x180 a tick along x). The counter
 runs to 1000 and fires as it passes: 0x96 voice 0xcd at Jessie; 0x118
 Jessie thrown up (vy -0x300) and Woody (-0x400); 0x14f the same swapped;
-0x168 both again with a spin and their z velocity zeroed; 0x1ae the three
+0x168 both again with x velocity -0x400 and target height zeroed; 0x1ae the three
 bosses thrown up (-0x700, -0x600, -0x800) and given 29 health, Jessie's
 and Woody's health cleared, sound 10 — each step with sound 0x2f, a
 bounce of scene objects 0, 1, 3 and 4 (a velocity from -0xc00 rising
-0x200 a tick, capped at the kept y) and a 0x800-tick wobble applied to
+0x200 a tick, capped at the kept y) and a wobble phase starting at 0x800, reduced by 0x100 each tick, applied to
 objects 0-3 as a rotation from a sine, its axis by which step. Under 0x1e
 of the cut, once: music, the three bosses' phase words set to 2 and each
-jumped to word 0xe of its script with its record's +0xf cleared, ground
+jumped to word 0xe of its script with its record's +0xf cleared, upward
 velocities and a 0x400 x velocity, sound 0xe, voice 199 at PROSP.
 
 **The chain.** While the fight is on, GUNSL keeps a sine unit (0x4000
@@ -1276,15 +1276,15 @@ bit, a 300-tick cut to Woody at distance 0x40 (eye 0x3000 along, 0x3000
 up, 0x1000 back; its z drifting 0x20 a tick), the level-complete flow
 (`DAT_0052b7dc = 1`, `DAT_0052f2dc = 0xf0`). Path-0 nodes within 1,024
 steps of the camera glow (node 2 red, the rest grey) and the nearest to
-Buzz is the target marker.
+Buzz supplies the existing character-light slot.
 
 **The three fighters.** All three share a shape: a hit is noticed by the
 health changing and starts a 0x3c-tick stun with the shell closed
 (`vulnerable` 4) and a flicker on alternate ticks through the draw
 triple (0x2000, mode 1); the stun ending opens the shell (6 for SMITH
 and PROSP, 7 for GUNSL); and under 10 health, in phase 2, the boss is
-jumped to its script's defeat entry, its shell closed, its chase flags
-cleared, sequence -2 played, the win counter `DAT_00530064` advanced, its
+jumped to its script's defeat entry, its shell closed and contact damage
+disabled (SMITH and PROSP also clear chase), sequence -2 played, the win counter `DAT_00530064` advanced, its
 phase word set to 3 and itself recorded as the last beaten (0, 1, 2).
 Each also has its attack:
 
@@ -1293,11 +1293,11 @@ Each also has its attack:
   Past frame 0x2e of state 3 he returns to script word 0x10 with speed
   0x10 and chase cleared. When the fuse ends, a thrown effect of kind 0x66
   from (0xb4, -0x96, -0x32) in his frame with velocity (0, -2, 0), its
-  rotation `heading * 4`, no homing, and sound 0xa7. Defeat entry: word
+  homing yaw `heading * 4`, pitch -1 (horizontal homing), and sound 0xa7. Defeat entry: word
   0x2d of script 39.
 - **GUNSL.** Sound 0xc1 on every hit. His script sets `+0x8a`; above 0x14
   it is reset to 10 and the muzzle taken from bone 0xf, then it counts
-  down, the muzzle from bone 0x10 as it expires, and every tick it runs he
+  down, the muzzle from bone 0x10 as it expires, and at those TWO endpoints he
   fires: sound 0x56, a shot of kind 0x61 toward Buzz clamped to within
   0x100 of his heading (straight ahead if further), velocity a quarter
   sine and vy 0x200, plus five sparks of kind 100 (mode 0xf) while awake.
@@ -1312,8 +1312,23 @@ Each also has its attack:
   heading, rotation `0x7ff - heading`, sound 0xa6. Defeat entry: word
   0x2d of script 41.
 
-All boss controllers are decoded. Levels 3, 6, 9 and 12 have implementations;
-level 15 remains unported. See GAME_AUDIT.md for current validation limits.
+`src/sim/finale.ts` now implements the stage and all three fighters. The host
+keeps scenery IDs 0/1/3/4 separate in geometry (ID 2 is absent in this install),
+poses weapon attachments, emits effects and applies hit scaling and camera roll.
+After the last-boss cut, rescue starts the original 240-tick completion countdown
+alongside the 300-tick cut; the existing ending flow saves `gameBeaten`, plays
+its movie and enters credits. Gameplay state is retired before credits.
+
+`finale-probe.ts` uses the installed placements and defeat wordcode, tests stage
+and attack boundaries, recovery, all defeat orders and one-shot completion.
+`finale-flow-check.js` checks actual rendered stage vertices, pause/reset,
+authored weapon attacks, rescue, both completion save flags, ending/credits
+and replay. It positions/protects Buzz and injects hits; natural combat is not
+yet verified. Sound 0xa8 currently uses the mixer's fixed pitch; exact roll
+sign/framing and per-character voice overlap gating still need comparison.
+
+All five world-boss controllers now have implementations. This does not imply
+full encounter parity; see GAME_AUDIT.md for the remaining validation limits.
 
 
 ## Known environment gaps (reviewed 2026-09-27)
@@ -1331,7 +1346,8 @@ review checklist are in [GAME_AUDIT.md](GAME_AUDIT.md).
 | Other scripted props | Motion and interaction feedback | Per-level object scripts remain only partly covered. Guide sparkles have retirement hooks for the chair, pushables and trailer controls, but not all other props. |
 
 Creature-specific gaps also remain, including Tin Robot hover wobble/sparks.
-Zurg now has a tested controller; the finale fight controller remains unported.
+Zurg and Final Showdown now have tested controllers; natural combat completion
+and remaining presentation details still need review.
 Existing scene loading, shared creature scripts, particles and texture
 animation should not be read as evidence that every level interaction works.
 

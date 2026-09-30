@@ -12,6 +12,7 @@ import { CREATURE_LIST_TYPE, parseCreatureList, parseCreatureNames } from '../sr
 import { LEVEL_SELECT_ORDER } from '../src/formats/save-file.ts';
 import { CREATURE_TYPES } from '../src/sim/creature-data.ts';
 import { CREATURE_HANDLERS } from '../src/sim/creatures.ts';
+import { FINALE_HANDLERS } from '../src/sim/finale.ts';
 import { LEVEL_TASKS, PUSH_BLOCKS, sceneForLevel, exeString } from '../src/sim/level-data.ts';
 import { stompObjects } from '../src/sim/stomp-props.ts';
 import { readPoles } from '../src/sim/poles.ts';
@@ -75,9 +76,10 @@ const rows = LEVEL_SELECT_ORDER.map((level, index) => {
     const typesWithoutSharedDefinition = [...new Set(creatures.map(c => c.type))]
       .filter(type => !CREATURE_TYPES[type]);
     const handlers = [...new Set(creatures.map(c => c.type))].flatMap(type => {
-      const handler = CREATURE_TYPES[type]?.handler;
+      const levelHandler=level===15?FINALE_HANDLERS[type]:undefined;
+      const handler = levelHandler??CREATURE_TYPES[type]?.handler;
       return handler ? [{ type, name: names.get(type), handler,
-        implemented: handler in CREATURE_HANDLERS,
+        implemented: !!levelHandler || handler in CREATURE_HANDLERS,
         slots: creatures.filter(c => c.type === type).map(c => c.slot) }] : [];
     });
     const pushes = PUSH_BLOCKS[level] ?? [];
@@ -92,12 +94,12 @@ const rows = LEVEL_SELECT_ORDER.map((level, index) => {
       handlers, unimplementedHandlers: handlers.filter(h => !h.implemented),
       dynamicCollision: [...new Set(dynamic)],
       collisionWithoutMappedController: [...new Set(dynamic)].filter(n => !pushes.some(p => p.collisionObject === n) && !(level === 14 && n === 0)),
-      motionControllers: level === 14 ? ['tarmac-plane.ts (collision 0)', 'tarmac-helicopter.ts (artwork/pickup motion)', 'tarmac-lights.ts (pads/lowering)', 'tarmac-scenery.ts (near/far sway)', 'tarmac-weather.ts (rain/lightning/thunder)'] : [],
+      motionControllers: level === 14 ? ['tarmac-plane.ts (collision 0)', 'tarmac-helicopter.ts (artwork/pickup motion)', 'tarmac-lights.ts (pads/lowering)', 'tarmac-scenery.ts (near/far sway)', 'tarmac-weather.ts (rain/lightning/thunder)'] : level===15 ? ['finale.ts (entrance bounce/rotation)'] : [],
       pushBlocks: pushes.length, stompObjectIds: stompObjects(level),
       poles: readPoles(paths(61)).length, zipLines: readZipLines(paths(62)).length,
       taskFeatures: tasks ? Object.keys(tasks) : [],
       bossController: level === 3 ? 'slime-boss.ts' : level === 9 ? 'pod-boss.ts' : level === 12 ? 'zurg-boss.ts'
-        : tasks?.bossFight ? 'tasks.ts stepBossFight' : level === 15 ? 'MISSING'
+        : tasks?.bossFight ? 'tasks.ts stepBossFight' : level === 15 ? 'finale.ts (stage + three fighters)'
         : tasks?.boss ? 'taunt/reward hooks; inspect per-creature combat' : 'none',
     };
   } catch (e) {

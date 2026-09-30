@@ -20,6 +20,7 @@ import { cos, sin } from './trig.ts';
 import { stepSlimeBoss, type SlimeBoss, type SlimeWorld } from './slime-boss.ts';
 import {stepPodBoss,type PodBoss,type PodWorld} from './pod-boss.ts';
 import {stepZurgBoss,type ZurgBoss,type ZurgWorld} from './zurg-boss.ts';
+import {stepFinaleStage,type Finale} from './finale.ts';
 
 /** A dialogue the level wants opened, as `FUN_004027f0` takes it. */
 export interface DialogueRequest {
@@ -52,6 +53,7 @@ export interface TaskState {
   slime: SlimeBoss | null;
   pod: PodBoss | null;
   zurg: ZurgBoss | null;
+  finale: Finale | null;
   /** Bit per slot, the engine's own per-level byte of saved token bits. */
   done: number;
   /** Idle-chatter timers, one per talker. */
@@ -160,7 +162,7 @@ export function startLevelTasks(tasks: TaskState, level: number, held = 0): void
 export function createTasks(): TaskState {
   return {
     done: 0, hammChatter: 0, hintChatter: 0, hintIndex: -1,
-    slime: null, pod:null, zurg:null,
+    slime: null, pod:null, zurg:null, finale:null,
     boss: 0, bossGone: 0, reach: 0, pathRun: 0, pathClock: 100, fetch: 0, fetchDone: 0, fetchClock: 100, slowTick: 0, potatoPart: 0, powerUps: 0, potatoChatter: 0, challenge: 0, challengeFrom: 0,
     bossPhase: 0, bossClock: 0, bossHurt: 0, bossHealthWas: -1, bossRamp: 0, bossSwing: 0,
     bossTaunt: 0, bossShout: 0, bossYaw: 0, bossFlip: 0, bossCut: 0,
@@ -716,6 +718,14 @@ export function stepTasks(
     }
   }
 
+  if(tasks.finale){
+    stepFinaleStage(tasks.finale,creatureAt,world,dt);
+    tasks.bossPhase=tasks.finale.active?2:tasks.finale.entrance?1:0;
+    tasks.bossCut=tasks.finale.cutTicks;
+    if(tasks.finale.beaten){tasks.bossBeaten=true;tasks.finale.beaten=false;}
+    if(tasks.finale.won){tasks.levelWon=true;tasks.finale.won=false;}
+    return null;
+  }
   if(tasks.zurg){
     const boss=creatureAt(0);
     if(boss)stepZurgBoss(tasks.zurg,boss,world,dt);

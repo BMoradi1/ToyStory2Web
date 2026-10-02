@@ -1644,3 +1644,14 @@ pause, restart, exit during a flash and re-entry. It keeps Buzz at the authored
 spawn for focused weather checks; it is not a full level traversal. The existing
 helicopter light-puzzle browser regression, scenery/audio and gamma probes, and
 production build pass with weather enabled.
+
+
+### Elevator Hop and Airport platform controllers (2026-10-01)
+
+`level-platforms.ts` now owns Elevator Hop's three stomp-operated wire indicators,
+barrier release, both lifts (including compound hulls, distant meshes and cables),
+and Airport Infiltration's five looping vehicle/platform paths. The host updates
+collision and passengers before player physics and switches after impacts, and
+restores hulls before restarting. Independent geometry groups preserve visible
+motion. See `GAME_AUDIT.md` for exact IDs, original function references, regression
+commands and remaining obstruction/effect/timing parity work.

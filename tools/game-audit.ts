@@ -93,8 +93,8 @@ const rows = LEVEL_SELECT_ORDER.map((level, index) => {
       parsed: true, objects: dat.objects.length, creatures: creatures.length, typesWithoutSharedDefinition,
       handlers, unimplementedHandlers: handlers.filter(h => !h.implemented),
       dynamicCollision: [...new Set(dynamic)],
-      collisionWithoutMappedController: [...new Set(dynamic)].filter(n => !pushes.some(p => p.collisionObject === n) && !(level === 14 && n === 0)),
-      motionControllers: level === 14 ? ['tarmac-plane.ts (collision 0)', 'tarmac-helicopter.ts (artwork/pickup motion)', 'tarmac-lights.ts (pads/lowering)', 'tarmac-scenery.ts (near/far sway)', 'tarmac-weather.ts (rain/lightning/thunder)'] : level===15 ? ['finale.ts (entrance bounce/rotation)'] : [],
+      collisionWithoutMappedController: [...new Set(dynamic)].filter(n => !pushes.some(p => p.collisionObject === n) && !(level === 14 && n === 0) && !(level===10&&[0,1,2,3,6,7,8,9,10,11,12,13,14,15,16,17,19].includes(n)) && !(level===13&&[1,2,5,8,10].includes(n))),
+      motionControllers: level === 14 ? ['tarmac-plane.ts (collision 0)', 'tarmac-helicopter.ts (artwork/pickup motion)', 'tarmac-lights.ts (pads/lowering)', 'tarmac-scenery.ts (near/far sway)', 'tarmac-weather.ts (rain/lightning/thunder)'] : [10,13].includes(level) ? ['level-platforms.ts (lifts / airport routes; partial parity)'] : level===15 ? ['finale.ts (entrance bounce/rotation)'] : [],
       pushBlocks: pushes.length, stompObjectIds: stompObjects(level),
       poles: readPoles(paths(61)).length, zipLines: readZipLines(paths(62)).length,
       taskFeatures: tasks ? Object.keys(tasks) : [],
@@ -112,7 +112,7 @@ else {
   console.log('# Generated game coverage inventory\n');
   console.log('Regenerate: `node --import tsx tools/game-audit.ts "Toy Story 2"`. Internal level IDs 3 and 6 differ from play order.\n');
   if (decompileArg >= 0) console.log('This snapshot includes `--decompile /path/to/toy2_levels.c` motion evidence. Supply a fresh local DumpAll.java output to regenerate that section.\n');
-  console.log('This is static inventory, **not** a completed playthrough or parity score. Missing shared handlers are explicit absent dispatch entries; level controllers may own related behavior. Unmapped dynamic collision objects need review, not automatic movement. Mapped controllers currently include push blocks and the Tarmac plane.\n');
+  console.log('This is static inventory, **not** a completed playthrough or parity score. Missing shared handlers are explicit absent dispatch entries; level controllers may own related behavior. Unmapped dynamic collision objects need review, not automatic movement. Mapped controllers currently include push blocks, the Tarmac plane, Elevator Hop lifts/barrier, and Airport routes.\n');
   console.log('| Play order | Level | Scene parses | Creature hooks absent | Dynamic collision IDs without mapped controller | Poles / zip lines | Boss controller |');
   console.log('|---|---|---|---|---|---|---|');
   for (const r of rows) {

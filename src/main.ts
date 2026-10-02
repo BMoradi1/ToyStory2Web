@@ -1,3 +1,4 @@
+import { createLevelPlatforms, platformObjects, stepLevelPlatforms, stepPlatformSwitches, restoreLevelPlatforms, type LevelPlatforms } from './sim/level-platforms.ts';
 import { createTarmacWeather, stepTarmacWeather, type TarmacWeather } from './sim/tarmac-weather.ts';
 import { setWeatherLight } from './render/weather-light.ts';
 import { TARMAC_SCENERY_OBJECTS, createTarmacScenery, sceneryPoses, stepTarmacScenery, aircraftSoundPoint, type TarmacScenery } from './sim/tarmac-scenery.ts';
@@ -312,6 +313,7 @@ async function showLevel(index: number): Promise<void> {
   creatureSim = null;
   pushBlocks = null;
   tarmacPlane = null;
+  levelPlatforms = null;
   tarmacHelicopter = null;
   tarmacLights = null;
   tarmacScenery = null;
@@ -412,6 +414,9 @@ async function showLevel(index: number): Promise<void> {
       const aimObjects=levelNumber(level.id)!==null ? aimObjectIndices(parsed) : [];
       for(const index of aimObjects)separate.add(index);
       if(levelNumber(level.id)===15)for(const id of FINALE_SCENERY_OBJECTS){
+        const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);
+      }
+      for(const id of platformObjects(levelNumber(level.id)??0)) {
         const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);
       }
       const geometry = buildLevelGeometry(parsed, { zones, separate });
@@ -703,6 +708,7 @@ async function open(dir: GameDir): Promise<void> {
       get stompProps() { return stompProps; },
       get tarmacWeather() { return tarmacWeather; },
       get tarmacScenery() { return tarmacScenery; },
+      get levelPlatforms() { return levelPlatforms; },
       get tarmacPlane() { return tarmacPlane; },
       get tarmacHelicopter() { return tarmacHelicopter; },
       get tarmacLights() { return tarmacLights ? {...tarmacLights} : null; },
@@ -1272,6 +1278,7 @@ async function spawnPlayer(): Promise<void> {
   await loadCollision();
   if (!currentCollisionWorld) { infoEl.textContent = 'no collision for this scene'; return; }
 
+  if(levelPlatforms){restoreLevelPlatforms(levelPlatforms,currentCollisionWorld);levelPlatforms=null;}
   if (tarmacPlane) {
     restorePlaneCollision(tarmacPlane, currentCollisionWorld);
     // Model reads below yield. Do not let the old controller move the restored
@@ -1314,6 +1321,8 @@ async function spawnPlayer(): Promise<void> {
   const level = levelNumber(sceneId) ?? 0;
   tarmacPlane = level === 14 ? createTarmacPlane(currentLevel.level, currentCollisionWorld) : null;
   drawTarmacPlane();
+  levelPlatforms=createLevelPlatforms(level,currentLevel.level,currentCollisionWorld);
+  drawLevelPlatforms();
   tarmacWeather = level === 14 ? createTarmacWeather() : null; setWeatherLight(128);
   tarmacScenery = level === 14 ? createTarmacScenery(currentLevel.level) : null;
   tarmacHelicopter = level === 14 ? createTarmacHelicopter(currentLevel.level) : null;
@@ -2436,6 +2445,15 @@ function drawTarmacHelicopter(): void {
   viewer.setObjectTransforms(transforms);
 }
 
+function drawLevelPlatforms(): void {
+  if(!viewer||!levelPlatforms)return;
+  const transforms=new Map<number,ObjectTransform>();
+  for(const o of levelPlatforms.objects)transforms.set(o.index,{angles:levelPlatforms.level===13?[0,o.yaw,0]:o.angles,
+    offset:[(o.position.x-o.rest.x)*GAME_TO_RENDER,-(o.position.y-o.rest.y)*GAME_TO_RENDER,-(o.position.z-o.rest.z)*GAME_TO_RENDER],
+    scale:[o.scale,o.scale*o.scaleY,o.scale]});
+  viewer.setObjectTransforms(transforms);
+}
+
 /** Apply both near and far plane poses; positions are game units, artwork uses renderer axes. */
 function drawTarmacPlane(): void {
   if (!viewer || !tarmacPlane) return;
@@ -2889,6 +2907,7 @@ function discardLevel(): void {
   podBeams.length = 0;
   pushBlocks = null;
   tarmacPlane = null;
+  levelPlatforms = null;
   tarmacHelicopter = null;
   tarmacLights = null;
   tarmacScenery = null;
@@ -3173,6 +3192,7 @@ let talk: TalkState | null = null;
 /** The level's push blocks, once the player has spawned. */
 let pushBlocks: PushState | null = null;
 let tarmacPlane: TarmacPlane | null = null;
+let levelPlatforms: LevelPlatforms | null = null;
 let tarmacHelicopter: TarmacHelicopter | null = null;
 let tarmacLights: TarmacLights | null = null;
 let tarmacScenery: TarmacScenery | null = null;
@@ -3446,12 +3466,16 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   const playerGround = groundFromCollision(currentCollisionWorld, levelPoles, levelZipLines);
   playerGround.beforeMove = () => {
     tickPushBlocks(held);
+    if(levelPlatforms){stepLevelPlatforms(levelPlatforms,currentCollisionWorld!,player!);drawLevelPlatforms();}
     if (tarmacPlane) {
       stepTarmacPlane(tarmacPlane, currentCollisionWorld!, player!);
       drawTarmacPlane();
     }
   };
   stepPlayer(player, held, playerRuntime, playerGround, cameraYaw);
+  if(levelPlatforms){stepPlatformSwitches(levelPlatforms,player,currentCollisionWorld);drawLevelPlatforms();
+    if(levelPlatforms.success)playEvent(-5,player);
+  }
   if (tarmacPlane) {
     const angle = planeWheelHit(tarmacPlane, player);
     if (angle !== null) applyCreatureTouch(angle, 3);

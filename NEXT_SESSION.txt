@@ -1,3 +1,13 @@
+CURRENT UPDATE — 2026-10-01: Elevator Hop and Airport platforms
+  Added level-platforms.ts: wire puzzle activates two compound lifts and removes
+  its barrier; five airport routes now move paired artwork and collision.
+  Shared floor/ledge carry, jump release, seam protection, pause/reset/exit cleanup.
+  Installed-data physics probe, both-level browser puzzle/mesh/lifecycle checks,
+  production build and all-15 entry/exit pass. Browser positions Buzz for stomps.
+  Partial parity: fixed midpoint lift waits; original obstruction/reversal guards,
+  airport spring/exhaust and lift feedback remain open in docs/GAME_AUDIT.md.
+  Full natural traversal remains unverified. No game assets or dumps committed.
+
 CURRENT UPDATE — 2026-09-29: Final Showdown stage and three fighters
   Added finale.ts from 0042faa0/0042fc50 and 0042f310/530/7b0: entrance/release,
   near/far stage bounce/rotation, Smith axe, two-shot gunslinger burst, Prospector

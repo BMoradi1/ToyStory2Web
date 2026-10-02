@@ -10,30 +10,39 @@ a completed original-versus-port playthrough.**
 ## 2026-10-01 — Elevator Hop and Airport platforms
 
 `src/sim/level-platforms.ts` follows Elevator tick `00425f60`, movement helper
-`0048acc0`, and Airport init/tick/helpers `0042c930`, `0042ca60`, `0042c2b0`,
-`0042c3e0`. This is **partial original parity**, with verified traversal primitives.
+`0048acc0`, Airport init/tick/helpers `0042c930`, `0042ca60`, `0042c2b0`,
+`0042c3e0`, spring launch `00434090`, and the ledge identity written at `0043611d`.
 
-- Elevator Hop: surfaces 32/33/34 transfer wire positions from `[0,2,0]` toward
-  `[1,1,1]`; real stomp impacts activate both lifts and remove collision 19.
-  Sixteen compound collision objects move with near/far artwork and cable scaling.
-  The original route endpoints and acceleration/deceleration are used; randomized
-  waits currently use their fixed midpoint. Switch artwork and success sequence
-  update; original warning flashes, shrinking barriers, and lift sounds remain open.
-- Airport Infiltration: collision IDs 8/10/2/5/1 follow DAT paths 2/4/6/7/5,
-  including the third vehicle's node-8 start, authored headings, acceleration,
-  route recycling, and paired artwork. Original obstruction guards, synchronized
-  reversal of vehicles 2/3, stomp spring response and exhaust are still absent.
-- Shared: collision spatial index updates, floor/ledge carrying, jump release,
-  single carry across compound-hull seams, reset restoration, pause and exit cleanup.
-- `tools/level-platforms-probe.ts` checks installed paths, puzzle/barrier gating,
-  landing/riding/jumping with real player physics, ledge transport, seam contacts,
-  long route cycles, exact hull restoration and spatial-index cleanup.
-- `tools/level-platforms-flow-check.js` verifies actual rendered vertices, stomp
-  puzzle activation, pause, restart and exit for both scenes. Buzz is positioned
-  above switches and placed into the stomp state; this is not an unassisted run.
-- Production build and `tools/game-audit-flow-check.js` pass (all 15 entry/exit).
-  Full traversal completion, natural ledge acquisition and original timing/audio
-  comparison remain unverified. Existing Slime probe baseline failure is unchanged.
+- Elevator Hop: wire stomp puzzle, collision barrier release, both compound lifts,
+  near/far artwork and cables, random waits from the shared game byte stream
+  (base 96/32 plus byte & 127), 128-tick barrier shrink, 64-tick warning cycle,
+  warning point light, movement hum/bells and guide retirement.
+- Airport: five authored paths/headings, node-8 third-vehicle start, loop recycling,
+  swept truck/player obstruction, reverse acceleration, paired truck reversal and
+  rear-position correction. Acquired ledges pause the relevant truck pair or lift.
+  This corrects the earlier assumption that these controllers should always carry
+  an acquired ledge: the original checks the grabbed object separately from floors.
+- Both fixed airport springs and three truck springs respond to real stomp impacts
+  with the original -3072 launch, sound, 16-tick artwork recovery, guide retirement
+  for fixed springs and exhaust shutdown for stomped vehicles. Three exhaust
+  emitters use kind 115/mode 2 and camera-distance culling.
+- Shared: floor carry, jumping off, compound-hull seam protection, collision index
+  updates, reset restoration, pause and exit cleanup. Hull-restricted sphere casts
+  test incoming truck collisions without touching the static world query behavior.
+- `tools/level-platforms-probe.ts`: landing/riding/jumping, a 2,100-tick lift ride,
+  ledge pauses, seam protection, long route cycles, reset and spatial-index cleanup.
+- `tools/platform-interactions-probe.ts`: wait-range boundaries, warning/barrier
+  timing, sound cues, paired ledge pause, a physical truck obstruction without
+  injected contact flags, paired reversal, all five spring launches using real
+  collision landings, exhaust state and artwork recovery. Spring translation is
+  frozen for those five isolated landing tests; the browser covers a moving truck.
+- `tools/level-platforms-flow-check.js`: actual mesh transforms, wire impacts,
+  warning/barrier artwork, moving-truck spring launch/roll, live exhaust effects,
+  sound events, pause, reset and exit. It positions Buzz and seeds stomp state.
+- Production build, player probe (24 checks), Tarmac plane regression, and all-15
+  entry/exit smoke pass. No unassisted full-level completion claim. Exact original
+  collision solver equivalence, route-script instruction scheduling and an audible
+  comparison remain unverified; the missing behaviors above now have controllers.
 
 ## Evidence and status rules
 
@@ -98,10 +107,10 @@ not evidence for untested interactions.
 | 7 | Al's Toy Barn | DINO, BOX and BPLANE hooks absent. | Dinosaur encounter and original moving-collision calls. |
 | 8 | Al's Space Land | BBUGGY and ZGCAR hooks absent; prop-gated texture effect missing. | Buggy challenge, `0052c9b8 & 1` effect trigger and reward paths. |
 | 9 | Toy Barn Encounter | Dedicated pod controller and beam tests exist; ZGCAR hook absent. | Full fight/summon cycles and reward; determine the absent hook's role. |
-| 10 | Elevator Hop | Wire puzzle and both compound lifts implemented; GUNSP hook absent. | Exact lift obstruction/random-wait parity, feedback, gunslinger and full traversal completion. |
+| 10 | Elevator Hop | Wire puzzle and both compound lifts implemented; GUNSP hook absent. | Exact collision/script timing comparison, gunslinger and full-level traversal completion. |
 | 11 | Al's Penthouse | BUZZARD, GUNSL and FATBLOKE hooks absent. | Level-local prop helpers, hazards and encounters. |
 | 12 | The Evil Emperor Zurg | Entrance, attacks, recovery, defeat, save bit and victory/movie handoff implemented in `zurg-boss.ts`. Installed-data and focused browser checks pass. | Unassisted combat, original-versus-port camera/render comparison and detail-dependent particles. |
-| 13 | Airport Infiltration | Five authored transport routes implemented; FATBLOKE, BUZZARD and PROSP hooks absent. | Transport obstruction/reversal and effects, full traversal; distinct from Tarmac. |
+| 13 | Airport Infiltration | Five authored transport routes implemented; FATBLOKE, BUZZARD and PROSP hooks absent. | Exact collision/script timing comparison and full-level traversal; distinct from Tarmac. |
 | 14 | Tarmac Trouble | Plane motion/collision, wheels/fans, ground/climbing passengers, wheel hazards and helicopter hover/rotors/token motion and light puzzle/lowering implemented and tested. Slinky timed-path rules and retry implemented. Near/far scenery sway, rain/plane sound, rain particles and lightning/thunder restored. Blacksmith recovery, defeat and delayed reward implemented; axe throws implemented; hit flashing missing. FATBLOKE and BUZZARD hooks absent. | Remaining creature hooks and other ambient effects; pitch/roll attachment on other movers. |
 | 15 | Final Showdown | Stage and three fighter controllers implemented in `finale.ts`; rendered entrance, attacks, rescue, completion save, ending/credits and replay tested. | Natural combat completion; exact roll/framing and voice/pitch parity. |
 

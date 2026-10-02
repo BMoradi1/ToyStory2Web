@@ -1654,4 +1654,6 @@ and Airport Infiltration's five looping vehicle/platform paths. The host updates
 collision and passengers before player physics and switches after impacts, and
 restores hulls before restarting. Independent geometry groups preserve visible
 motion. See `GAME_AUDIT.md` for exact IDs, original function references, regression
-commands and remaining obstruction/effect/timing parity work.
+commands and remaining original-versus-port timing comparisons. The follow-up adds randomized
+waits, ledge pauses, truck obstruction/reversal, spring launches/exhaust, warning
+flashes, barrier shrink and lift sounds. Floor passengers still ride normally.

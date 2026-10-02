@@ -685,7 +685,11 @@ export function sweepSphere(
   from: { x: number; y: number; z: number },
   velocity: { x: number; y: number; z: number },
   radius: number,
-  options: { scale?: number; passes?: number; groundNormalY?: number; skin?: number; stopAtFirstContact?: boolean } = {},
+  options: {
+    scale?: number; passes?: number; groundNormalY?: number; skin?: number; stopAtFirstContact?: boolean;
+    /** Restrict a relative-motion cast to one moving hull or compound platform. */
+    groups?: ReadonlySet<number>;
+  } = {},
 ): SphereSweep {
   const scale = options.scale ?? 32;
   const groundY = options.groundNormalY ?? -0.5;
@@ -711,7 +715,7 @@ export function sweepSphere(
     for (let gx = gx0; gx <= gx1; gx++) {
       for (let gz = gz0; gz <= gz1; gz++) {
         for (const i of world.cells.get(`${gx},${gz}`) ?? []) {
-          if (!seen.has(i)) { seen.add(i); candidates.push(i); }
+          if (!seen.has(i) && (!options.groups || options.groups.has(world.polys[i]!.group))) { seen.add(i); candidates.push(i); }
         }
       }
     }

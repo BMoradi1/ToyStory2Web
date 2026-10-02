@@ -1,3 +1,14 @@
+CURRENT UPDATE — 2026-10-01: Platform interaction follow-up
+  Added truck/player swept obstruction and paired reversal; corrected acquired
+  ledge handling to pause the relevant lift/truck pair. Floor passengers still ride.
+  Added five airport springs (-3072 launch), roll recovery, exhaust and shutdown,
+  guide retirement; lift byte-stream random waits, warning/light cycles, barrier
+  shrink and movement hum/bells. Correct fixed-spring authored headings preserved.
+  Probes cover physical obstruction, all springs, random bounds and a full lift
+  cycle. Browser covers actual effects/artwork/sounds, moving spring, reset/exit.
+  Build, player, Tarmac and all-15 smoke pass. Exact solver/script equivalence and
+  unassisted full-level completion remain unverified. See docs/GAME_AUDIT.md.
+
 CURRENT UPDATE — 2026-10-01: Elevator Hop and Airport platforms
   Added level-platforms.ts: wire puzzle activates two compound lifts and removes
   its barrier; five airport routes now move paired artwork and collision.

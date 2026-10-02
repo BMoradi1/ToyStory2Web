@@ -306,3 +306,5 @@ Static call sites from each tick and available level-local helpers. Conditions, 
 - 0042fc50: render position; object 4.
 
 Platform coverage update (2026-10-01): levels 10 and 13 now use `level-platforms.ts`; original-motion evidence above is preserved. Controller mapping does not imply complete parity; see `GAME_AUDIT.md`.
+
+Platform follow-up: random waits, ledge pauses, truck reversal, spring/exhaust and lift feedback now implemented; mapping is unchanged. See the interaction probes and audit for verification limits.

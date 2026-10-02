@@ -58,6 +58,34 @@
     const initial=sample(),m=state.movers[0],before={...m.position};
     ts2.tickGame({},80);check(JSON.stringify(sample())!==JSON.stringify(initial),'actual mesh stayed still');
     check(JSON.stringify(m.position)!==JSON.stringify(before),'collision stayed still');
+    if(level===10){
+      ts2.tickGame({},128);
+      check(state.barrierScale===0,'barrier did not shrink away');
+      const lights=new Set();
+      for(let i=0;i<64;i++){ts2.tickGame({},1);lights.add(state.objects.find(o=>o.id===70).scale);}
+      check(lights.size===2,'warning artwork did not flash');
+      check(ts2.sound.raised.some(s=>s.startsWith('8f:')),'lift movement sound absent');
+    }else{
+      const m=state.movers[2],h=m.hulls[0];
+      Object.assign(ts2.player,{x:m.position.x,y:m.position.y-20000,z:m.position.z,onGround:false,contacts:[],stomp:0,climb:0,climbGroup:-1,vy:0});
+      ts2.tickGame({},40); // Let the follow camera enter the effect spawn radius.
+      // Put Buzz above the current moving truck; use real landing and spring launch.
+      const floor=h.polys.filter(p=>p.normal.y<-.99).sort((a,b)=>a.vertices[0].y-b.vertices[0].y)[0];
+      const c=floor.vertices.reduce((a,v)=>({x:a.x+v.x/3,y:a.y+v.y/3,z:a.z+v.z/3}),{x:0,y:0,z:0});
+      const yaw=m.yaw*Math.PI/2048,dx=(c.x-h.origin.x)*32,dz=(c.z-h.origin.z)*32;
+      Object.assign(ts2.player,{x:m.position.x+dx*Math.cos(yaw)+dz*Math.sin(yaw),
+        y:m.position.y+(c.y-h.origin.y)*32-2000,z:m.position.z+dz*Math.cos(yaw)-dx*Math.sin(yaw),
+        onGround:false,contacts:[],stomp:24,climb:0,climbGroup:-1,hitStun:0,vy:0});
+      let launched=false,exhaustSeen=false;
+      for(let i=0;i<40&&!launched;i++){ts2.tickGame({},1);launched=ts2.player.launched;exhaustSeen||=ts2.effects.kinds.includes(0x73);}
+      check(launched&&state.springRoll<0,'moving truck spring did not launch Buzz');
+      check(!m.exhaust,'stomp did not stop truck exhaust');
+      check(exhaustSeen,'airport exhaust did not reach the effect pool');
+      const artwork=state.objects.find(o=>o.id===state.springObject);
+      check(ts2.viewer.objectTransforms.get(artwork.index).startsWith('0,'+artwork.yaw+','+state.springRoll+'|'),'spring roll not rendered');
+      ts2.tickGame({},16);check(state.springRoll===0,'spring artwork did not recover');
+      check(ts2.sound.raised.some(s=>s.startsWith('1c:')),'spring sound absent');
+    }
     ts2.openMenu();const ticks=state.ticks;ts2.tickGame({},60);check(state.ticks===ticks,'movers advanced during pause');
     ts2.pressMenu('back');ts2.tickGame({},1);
     await ts2.spawnPlayer();ts2.viewer.stop();check(ts2.levelPlatforms!==state&&ts2.levelPlatforms.ticks===0,'restart retained mover state');

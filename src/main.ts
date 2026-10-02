@@ -2448,7 +2448,7 @@ function drawTarmacHelicopter(): void {
 function drawLevelPlatforms(): void {
   if(!viewer||!levelPlatforms)return;
   const transforms=new Map<number,ObjectTransform>();
-  for(const o of levelPlatforms.objects)transforms.set(o.index,{angles:levelPlatforms.level===13?[0,o.yaw,0]:o.angles,
+  for(const o of levelPlatforms.objects)transforms.set(o.index,{angles:levelPlatforms.level===13?[0,o.yaw,o.roll]:o.angles,
     offset:[(o.position.x-o.rest.x)*GAME_TO_RENDER,-(o.position.y-o.rest.y)*GAME_TO_RENDER,-(o.position.z-o.rest.z)*GAME_TO_RENDER],
     scale:[o.scale,o.scale*o.scaleY,o.scale]});
   viewer.setObjectTransforms(transforms);
@@ -3466,7 +3466,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   const playerGround = groundFromCollision(currentCollisionWorld, levelPoles, levelZipLines);
   playerGround.beforeMove = () => {
     tickPushBlocks(held);
-    if(levelPlatforms){stepLevelPlatforms(levelPlatforms,currentCollisionWorld!,player!);drawLevelPlatforms();}
+    if(levelPlatforms){stepLevelPlatforms(levelPlatforms,currentCollisionWorld!,player!,()=>creatureSim?.rand.byte()??0);drawLevelPlatforms();}
     if (tarmacPlane) {
       stepTarmacPlane(tarmacPlane, currentCollisionWorld!, player!);
       drawTarmacPlane();
@@ -3475,6 +3475,18 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   stepPlayer(player, held, playerRuntime, playerGround, cameraYaw);
   if(levelPlatforms){stepPlatformSwitches(levelPlatforms,player,currentCollisionWorld);drawLevelPlatforms();
     if(levelPlatforms.success)playEvent(-5,player);
+    for(const event of levelPlatforms.sounds){
+      const at=levelPlatforms.level===10&&camera?{
+        x:event.at.x+Math.trunc((camera.x-event.at.x)*3/4),
+        y:event.at.y+Math.trunc((camera.y-event.at.y)*3/4),
+        z:event.at.z+Math.trunc((camera.z-event.at.z)*3/4)}:event.at;
+      playEvent(event.event,at);
+    }
+    for(const guide of levelPlatforms.guidesSpent)spendGuide(guideSparkles,effects,guide,true);
+    if(levelPlatforms.warningLight)addPointLight(pointLights,{x:-64120,y:-918347,z:193996,r:255,g:0,b:0,life:16,owner:-1});
+    if(effects&&camera)for(const at of levelPlatforms.exhaust){
+      if(Math.hypot(at.x-camera.x,at.y-camera.y,at.z-camera.z)<600*256)spawnChild(effects,effectWorld(),at.x,at.y,at.z,0x73,2);
+    }
   }
   if (tarmacPlane) {
     const angle = planeWheelHit(tarmacPlane, player);

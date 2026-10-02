@@ -32,7 +32,7 @@ for(const [level,scene,terrain]of [[10,'level10/level','level10/TERRAIN'],[13,'l
  for(let i=0;i<60;i++)stepPlayer(p,NO_INPUT,runtime,ground,0);
  assert(p.onGround&&p.contacts.some(c=>c.group===h.groupIndex),`level ${level} landing`);
  const relative={x:p.x-m.position.x,y:p.y-m.position.y,z:p.z-m.position.z};
- for(let i=0;i<120;i++)stepPlayer(p,NO_INPUT,runtime,ground,0);
+ for(let i=0;i<(level===10?2100:120);i++)stepPlayer(p,NO_INPUT,runtime,ground,0);
  assert(p.onGround&&p.contacts.some(c=>c.group===h.groupIndex),`level ${level} riding`);
  assert(Math.abs(p.y-m.position.y-relative.y)<100,'vertical passenger drift');
  assert(Math.abs(p.x-m.position.x-relative.x)<100,'horizontal passenger drift');
@@ -44,8 +44,8 @@ for(const [level,scene,terrain]of [[10,'level10/level','level10/TERRAIN'],[13,'l
  }
  p.onGround=false;p.contacts=[];p.climb=2;p.climbGroup=h.groupIndex;
  m.velocity={x:100,y:-100,z:0};const ledge={x:p.x,y:p.y};stepLevelPlatforms(s,world,p);
- assert.equal(p.x,ledge.x+100,'ledge carried horizontally');assert.equal(p.y,ledge.y-100,'ledge carried vertically');
- p.climb=0;p.climbGroup=-1;
+ assert.equal(p.x,ledge.x,'grabbed platform pauses horizontally');assert.equal(p.y,ledge.y,'grabbed platform pauses vertically');
+ p.climb=0;p.climbGroup=-1;p.contacts=[];p.x=1e8;
  const seen=s.movers.map(()=>new Set<number>());
  for(let i=0;i<6000;i++){stepLevelPlatforms(s,world,p);s.movers.forEach((m,j)=>seen[j]!.add(m.node));}
  assert(seen.every(set=>set.size>1),'all routes advance');

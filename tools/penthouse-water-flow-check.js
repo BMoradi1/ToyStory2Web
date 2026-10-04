@@ -71,15 +71,29 @@
     ts2.tickGame({},1,0);check(ts2.player.inWater===wet&&ts2.player.vy===gravity,'live water movement boundary '+depth);
   }
   ts2.player.vy=2000;ts2.tickGame({},1,0);check(ts2.player.vy===1024,'live water fall cap');
+  // Let old effects expire, then cross the surface with the live particle pool.
+  for(let i=0;i<200;i++){
+    Object.assign(ts2.player,{x:10000000,z:10000000,y:water.y-10000,vx:0,vy:0,vz:0,hitStun:1000});ts2.tickGame({},1,0);
+  }
+  ts2.player.y=water.y-10;ts2.player.vy=100;ts2.tickGame({},1,0);
+  check(ts2.effects.activeKinds.includes(13),'water entry splash missing');
+  let bubbles=false;
+  for(let i=0;i<250&&!bubbles;i++){
+    Object.assign(ts2.player,{y:water.y+16000,vx:0,vy:0,vz:0,hitStun:1000});ts2.tickGame({},1,0);bubbles=ts2.effects.activeKinds.includes(45);
+  }
+  check(bubbles,'underwater bubbles missing');
+  ts2.player.y=water.y-10000;ts2.player.vy=0;ts2.tickGame({},1,0);check(ts2.waterEffects.dripTicks===180,'water exit did not start wet footprints');
+  ts2.openMenu();ts2.tickGame({},100,0);check(ts2.waterEffects.dripTicks===180,'paused water effect clock advanced');ts2.pressMenu('back');ts2.tickGame({},1,0);
   water.offset=water.target=0;ts2.tickGame({},1,0);ts2.player.vy=0;ts2.tickGame({},1,0);
   check(!ts2.player.inWater&&ts2.player.vy===64,'drained water retained movement override');
   const old=ts2.penthouse;
   await ts2.spawnPlayer();ts2.viewer.stop();
+  check(ts2.waterEffects.dripTicks===0,'water effects not reset');
   check(ts2.penthouse!==old&&ts2.penthouse.water.y===null&&ts2.penthouse.water.selected===16,'water restart failed');
   check(ts2.penthouse.water.floats.every(f=>f.step===0&&f.displacement===0),'float restart failed');
   ts2.openMenu();for(let i=0;i<3;i++){ts2.pressMenu('down');ts2.tickGame({},1);}
   ts2.pressMenu('select');ts2.tickGame({},1);ts2.pressMenu('down');ts2.tickGame({},1);ts2.pressMenu('select');ts2.tickGame({},1);
   await wait(()=>['summary','select'].includes(ts2.front.screen),'exit failed');
   check(ts2.penthouse===null,'water leaked after exit');
-  console.log('PASS: four Penthouse water selectors, moving water/floating meshes, pause, bubble, restart and exit');
+  console.log('PASS: four Penthouse water selectors, moving water/floating meshes, underwater movement/splashes/bubbles, pause, restart and exit');
 })()

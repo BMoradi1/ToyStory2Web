@@ -1,3 +1,4 @@
+import {createWaterEffects,stepWaterEffects} from './sim/water-effects.ts';
 import {readPenthouseTables,penthouseObjects,createPenthouse,stepPenthouse,movePenthouseFloats,restorePenthouse,type Penthouse} from './sim/penthouse.ts';
 import { createProspector, stepProspector } from './sim/prospector.ts';
 import { createGunslinger, stepGunslinger } from './sim/gunslinger.ts';
@@ -319,6 +320,7 @@ async function showLevel(index: number): Promise<void> {
   tarmacPlane = null;
   levelPlatforms = null;
   penthouse = null;
+  waterEffects=createWaterEffects();
   tarmacHelicopter = null;
   tarmacLights = null;
   tarmacScenery = null;
@@ -718,6 +720,7 @@ async function open(dir: GameDir): Promise<void> {
       get tarmacScenery() { return tarmacScenery; },
       get levelPlatforms() { return levelPlatforms; },
       get penthouse() { return penthouse; },
+      get waterEffects() { return {...waterEffects}; },
       get tarmacPlane() { return tarmacPlane; },
       get tarmacHelicopter() { return tarmacHelicopter; },
       get tarmacLights() { return tarmacLights ? {...tarmacLights} : null; },
@@ -1431,6 +1434,7 @@ async function spawnPlayer(): Promise<void> {
       return createEffects(table.kinds, table.modes, creatureSim!.rand);
     })()
     : null;
+  waterEffects=createWaterEffects(player.y);
   pointLights=createPointLights(exeBytes&&level>=1&&level<=15?readCharacterLight(exeBytes,level):null);playerLight=null;
   viewer.setCardSheet(sceneTextures.get(SPRITE_SHEET) ?? null);
   laserBeams.length = 0;
@@ -2952,6 +2956,7 @@ function discardLevel(): void {
   tarmacPlane = null;
   levelPlatforms = null;
   penthouse = null;
+  waterEffects=createWaterEffects();
   tarmacHelicopter = null;
   tarmacLights = null;
   tarmacScenery = null;
@@ -3281,6 +3286,7 @@ let pushBlocks: PushState | null = null;
 let tarmacPlane: TarmacPlane | null = null;
 let levelPlatforms: LevelPlatforms | null = null;
 let penthouse:Penthouse|null=null;
+let waterEffects=createWaterEffects();
 let tarmacHelicopter: TarmacHelicopter | null = null;
 let tarmacLights: TarmacLights | null = null;
 let tarmacScenery: TarmacScenery | null = null;
@@ -3940,10 +3946,12 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     }
   }
   playerLight=stepPointLights(pointLights,player);
+  poseAnimation(Math.hypot(held.moveX, held.moveY) > 0);
+  if(effects&&camera)stepWaterEffects(waterEffects,effects,effectWorld(),player,playerAnim?.footfallMask??0,
+    standingSurface(player,currentCollisionWorld),cut.ticks>0?cut.eye.y:camera.y,event=>playEvent(event,event===0x5f?undefined:player!));
   drawCoins();
   drawEffects();
   drawHud(levelNow);
-  poseAnimation(Math.hypot(held.moveX, held.moveY) > 0);
   if(playerLight){
     const {direction:d,colour}=playerLight;
     viewer.setPlayerLight([d.x,-d.y,-d.z],colour);
@@ -3997,6 +4005,7 @@ async function respawn(): Promise<void> {
   const back = spawnPoint && !Number.isFinite(safe.x) ? spawnPoint : safe;
   const died = player.dying;
   Object.assign(player, createPlayer(back.x, back.y, back.z, safe.yaw));
+  waterEffects=createWaterEffects(player.y);
   pointLights=createPointLights(pointLights.profile);playerLight=null;
   playerRuntime = createRuntime();
   // The engine's own player reset fills the health bar back up.

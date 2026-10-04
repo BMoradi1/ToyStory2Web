@@ -1087,3 +1087,23 @@ hit-shape center. The original targeting marker (kind 0x30, sprite 23, behavior
 selection-dependent colour/rotation. `tools/aim-marker-probe.ts` covers growth,
 tracking, selection changes, cleanup and pool reuse; the marker/disk browser
 check collects real ammunition in construction and verifies both firing paths.
+
+
+### Water presentation (2026-10-03)
+
+`water-effects.ts` restores the water particle section of `004a2d80`. Entry
+spawns kind 13/mode 9 five times (hard falls: mode 14 twenty times). Each gets
+an even 6/8-tick frame period (hard: 8/10), five periods of life and a random
+12-bit rotation. Shallow ripples alternate kinds 27/28 on the four-tick moving
+or sixteen-tick stationary gate. Deep bubbles use kind 45/mode 18, the seven-
+tick gate or two-tick spin gate and a random quarter probability. Assembly
+confirms that each bubble consumes three bytes but reuses the first on all axes.
+
+Emerging sets 180 ticks of wet footsteps. Animation playback exposes a left/
+right footfall mask; eligible dry surfaces -1/13 receive kind 32/mode 2 at the
+original side offset, rotated opposite Buzz's heading. Respawn resets wet state.
+An underwater camera raises global event 0x5f and kind 57/mode 2 surface
+particles on the four-tick gate. Camera colour/warp remains separate work.
+
+`water-effects-probe.ts` checks the installed effects and footfall script;
+`penthouse-water-flow-check.js` verifies live movement, particles and lifecycle.

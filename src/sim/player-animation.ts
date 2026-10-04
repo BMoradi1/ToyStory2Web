@@ -112,11 +112,13 @@ export interface AnimationPlayback {
   frame: number;
   /** Events the script fired this tick. */
   footfalls: number;
+  /** Left/right script opcodes, bits 1/2, for surface footprints. */
+  footfallMask: number;
   sounds: number[];
 }
 
 export function createAnimation(): AnimationPlayback {
-  return { state: AnimState.Idle, cursor: 0, frame: 0, footfalls: 0, sounds: [] };
+  return { state: AnimState.Idle, cursor: 0, frame: 0, footfalls: 0, footfallMask: 0, sounds: [] };
 }
 
 /** The sound event each script opcode fires, from the original's switch. */
@@ -146,7 +148,9 @@ function readScript(play: AnimationPlayback, entry: AnimationState): number | nu
       play.cursor = (play.cursor & 0xffff) + target * CURSOR_ONE;
       continue;
     }
-    if (byte === ANIM_OP.footfallLeft || byte === ANIM_OP.footfallRight) play.footfalls++;
+    if (byte === ANIM_OP.footfallLeft || byte === ANIM_OP.footfallRight) {
+      play.footfalls++;play.footfallMask|=byte===ANIM_OP.footfallLeft?1:2;
+    }
     else if (byte in OPCODE_SOUND) play.sounds.push(OPCODE_SOUND[byte]!);
     play.cursor += CURSOR_ONE;
   }
@@ -202,6 +206,7 @@ export function stepAnimation(
   play: AnimationPlayback, p: PlayerState, hasInput: boolean, speed: number,
 ): { slotA: number; slotB: number; frame: number; frameB: number } {
   play.footfalls = 0;
+  play.footfallMask = 0;
   play.sounds.length = 0;
 
   const wanted = selectState(p, hasInput);

@@ -202,6 +202,7 @@ export interface CreatureSim {
   emissions: {x:number;y:number;z:number;kind:number;mode:number}[];
   /** Local emitter positions resolved through the animated model by the host. */
   attachedEmissions: {creature:Creature;part:number;offset:{x:number;y:number;z:number};kind:number;mode:number}[];
+  attachedProjectiles: {creature:Creature;part:number;offset:{x:number;y:number;z:number};velocity:{x:number;y:number;z:number};gravity:number;kind:number}[];
   /** Level-owned behavior after shared movement/animation, before contacts. */
   levelHandler?: (c: Creature, args: HandlerArgs, player: { x: number; y: number; z: number }) => void;
   creatures: Creature[];
@@ -348,7 +349,7 @@ export function createCreatureSim(
   }
   return {
     creatures, world, rand, level,
-    sounds: [], rescues: [], sparks: [], dust: [], emissions: [], attachedEmissions: [], raceState: 0, carFront: 0, carRear: 0, shots: [], beamCasters: [], gunShots: [], deaths: [], defeatBursts: [], near: [],
+    sounds: [], rescues: [], sparks: [], dust: [], emissions: [], attachedEmissions: [], attachedProjectiles: [], raceState: 0, carFront: 0, carRear: 0, shots: [], beamCasters: [], gunShots: [], deaths: [], defeatBursts: [], near: [],
     foundCount: 0, lastKilled: -1, models: null,
     bossLastHealth: -1, bossSlotEarned: false, smithThrows: [],
   };
@@ -1167,6 +1168,16 @@ const boxPlane:CreatureHandler=(sim,c)=>{
     sim.attachedEmissions.push({creature:c,part:0,offset:{x:0,y:-200,z:400},kind:0x58,mode:3});
 };
 
+/** 0041df70: boats lob a shell every 201 updates, starting immediately. */
+const zurgBoat:CreatureHandler=(sim,c,args)=>{
+  c.timer=(c.timer-args.dt)<<16>>16;
+  if(c.timer<0){
+    c.timer=200;
+    sim.attachedProjectiles.push({creature:c,part:0,offset:{x:0,y:-500,z:-300},
+      velocity:{x:sin(c.heading)>>2,y:-3072,z:cos(c.heading)>>2},gravity:128,kind:92});
+  }
+};
+
 /** 00406a90: the wordcode sets timer when the gun animation fires. */
 const fatBloke:CreatureHandler=(sim,c,_args,player)=>{
   if(c.timer===0||!player)return;
@@ -1209,6 +1220,7 @@ export const CREATURE_HANDLERS: Record<string, CreatureHandler> = {
   LAB_00406620: laserPod,
   LAB_004068e0: planeBox,
   LAB_00406960: boxPlane,
+  FUN_0041df70: zurgBoat,
   FUN_00416ab0: tinRobot,
   LAB_00406a60: raceCar,
   LAB_00406a90: fatBloke,
@@ -1236,6 +1248,7 @@ export function stepCreatures(
   sim.smithThrows.length = 0;
   sim.emissions.length = 0;
   sim.attachedEmissions.length = 0;
+  sim.attachedProjectiles.length = 0;
   const near: number[] = [];
 
   for (let i = 0; i < sim.creatures.length; i++) {

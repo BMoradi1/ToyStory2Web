@@ -1,3 +1,4 @@
+import {createClown,stepClown,clownBar} from './sim/clown.ts';
 import {createWaterEffects,stepWaterEffects} from './sim/water-effects.ts';
 import {readPenthouseTables,penthouseObjects,createPenthouse,stepPenthouse,movePenthouseFloats,restorePenthouse,type Penthouse} from './sim/penthouse.ts';
 import { createProspector, stepProspector } from './sim/prospector.ts';
@@ -802,6 +803,7 @@ async function open(dir: GameDir): Promise<void> {
       get tasks() {
         return tasks ? {
           done: tasks.done, hintIndex: tasks.hintIndex, slime: tasks.slime ? { ...tasks.slime } : null,
+          clown:tasks.clown?{...tasks.clown}:null,
           pod:tasks.pod?{...tasks.pod}:null,
           zurg:tasks.zurg?{...tasks.zurg}:null,
           finale:tasks.finale?structuredClone(tasks.finale):null,
@@ -1593,6 +1595,13 @@ function spawnCreatureEffects(): void {
     spawnChild(effects,world,at.x,at.y,at.z,e.kind,e.mode);
   }
   creatureSim.attachedEmissions.length=0;
+  for(const e of creatureSim.attachedProjectiles){
+    const c=e.creature,art=creatureArt.get(c.type),animation=art?.anm?.animations[c.animState];
+    const pose=art?.anm&&animation?poseBone(art.anm,animation,(c.frame>>>16)%Math.max(1,animation.frameCount),e.part):null;
+    const at=podAttachment(c,pose,e.offset),v=e.velocity;
+    spawnEffect(effects,world,at.x,at.y,at.z,v.x,v.y,v.z,e.gravity,0,0,e.kind);
+  }
+  creatureSim.attachedProjectiles.length=0;
   for (const at of creatureSim.rescues) {
     addPointLight(pointLights, spawnPickupBurst(effects, world, at, 50));
   }
@@ -2047,6 +2056,7 @@ function hudReadout(level: number): HudReadout {
         Math.round(((c.health - fight.bar.from) * 0x36) / fight.bar.over)));
     }
   }
+  if(tasks?.clown)bossBar=clownBar(tasks.clown,creatureSim?.creatures.find(c=>c.slot===3));
   if (tasks?.slime && tasks.slime.phase >= 999) bossBar = slimeBossBar(tasks.slime);
   if(tasks?.pod&&tasks.pod.phase>=2)bossBar=podBossBar(tasks.pod);
   if(tasks?.zurg&&tasks.zurg.phase>=2)bossBar=zurgBossBar(tasks.zurg);
@@ -2223,6 +2233,10 @@ function drawCreatures(): void {
         c.x * GAME_TO_RENDER, -c.y * GAME_TO_RENDER, -c.z * GAME_TO_RENDER,
         toRadians(c.heading), c.drawScale,
       );
+    }
+    if(tasks?.clown){
+      const light=tasks.clown.flash?2:1;
+      viewer.setCreatureAppearance(3,[1,1,1],[light,light,light]);
     }
     if(tasks?.prospector){
       const light=tasks.prospector.flash?2:1;
@@ -3144,6 +3158,15 @@ function saveProgress(): void {
  * `bossFight` have one.
  */
 function startBossFight(level: number): void {
+  if(level===5&&creatureSim&&tasks){
+    const boss=creatureSim.creatures.find(c=>c.slot===3);
+    if(!boss)return;
+    tasks.clown=createClown(boss);
+    creatureSim.levelHandler=(c,args)=>{
+      if(c.slot===3&&tasks?.clown)stepClown(tasks.clown,c,tasks.boss,zones.camera,event=>playEvent(event,c),args.dt);
+    };
+    return;
+  }
   if((level===10||level===11)&&creatureSim&&tasks){
     const slot=level===10?8:11,boss=creatureSim.creatures.find(c=>c.slot===slot);
     if(!boss)return;

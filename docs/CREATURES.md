@@ -589,3 +589,19 @@ box Y minus 0x5000. Sound 0x5d runs until the negative death countdown; touched
 one-health planes receive damage kind 1 at heading minus 0x800. Visible planes
 emit kind 88/mode 3 on the eight-tick gate at local part-zero offset
 (0,-200,400), transformed through the current animation by the host.
+
+### Alleys boat and clown handlers (2026-10-03)
+
+ZBOAT (`0041df70`, type 27) decrements its signed timer and fires when it
+becomes negative, resetting to 200. Its kind-92 shell originates at animated
+part-zero offset (0,-500,-300), with velocity (sin(yaw)>>2,-3072,cos(yaw)>>2)
+and spawn gravity 128. The shared effect system supplies flight and damage.
+
+CLOWN (`0041ddb0`, type 32) is level-owned by `clown.ts`. Any health change
+sets a 60-tick protection interval and vulnerability 4; the same update
+consumes its first tick. It restores vulnerability 7 only below zero, alternating
+2x hit lighting through the zero tick. Contact clears flag 0x200 and raises
+0xa1. Its health bar is health*54/20, held for 90 ticks by camera room 2 during
+the fight. `0041e880` begins the post-removal phase at 3+dt and awards token
+slot 4 on the update after phase 120. Focused tests inject damage; they do not
+claim a natural player-controlled win or full level traversal.

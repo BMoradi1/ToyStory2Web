@@ -1,3 +1,4 @@
+import {stepClownLevel,type Clown} from './clown.ts';
 import type { Prospector } from './prospector.ts';
 import {stepGunslingerLevel,type Gunslinger} from './gunslinger.ts';
 /**
@@ -58,6 +59,7 @@ export interface TaskState {
   finale: Finale | null;
   prospector: Prospector | null;
   gunslinger: Gunslinger | null;
+  clown: Clown | null;
   /** Bit per slot, the engine's own per-level byte of saved token bits. */
   done: number;
   /** Idle-chatter timers, one per talker. */
@@ -166,7 +168,7 @@ export function startLevelTasks(tasks: TaskState, level: number, held = 0): void
 export function createTasks(): TaskState {
   return {
     done: 0, hammChatter: 0, hintChatter: 0, hintIndex: -1,
-    slime: null, pod:null, zurg:null, finale:null, prospector:null, gunslinger:null,
+    slime: null, pod:null, zurg:null, finale:null, prospector:null, gunslinger:null, clown:null,
     boss: 0, bossGone: 0, reach: 0, pathRun: 0, pathClock: 100, fetch: 0, fetchDone: 0, fetchClock: 100, slowTick: 0, potatoPart: 0, powerUps: 0, potatoChatter: 0, challenge: 0, challengeFrom: 0,
     bossPhase: 0, bossClock: 0, bossHurt: 0, bossHealthWas: -1, bossRamp: 0, bossSwing: 0,
     bossTaunt: 0, bossShout: 0, bossYaw: 0, bossFlip: 0, bossCut: 0,
@@ -797,7 +799,7 @@ export function stepTasks(
         c.pc = taunt.wakeWord;
         c.wait = 0;
         c.flags |= CREATURE_FLAGS.chase;
-        if ([10,11,13,14].includes(world.level)) c.record.facing = 0;
+        if ([5,10,11,13,14].includes(world.level)) c.record.facing = 0;
       }
     }
     // Tarmac SMITH combat subset, 0042d3e0 + 0042e790. Its last nine
@@ -827,6 +829,10 @@ export function stepTasks(
         }
       }
     }
+    if(tasks.clown){
+      tasks.boss=stepClownLevel(tasks.clown,c,tasks.boss,dt);
+      if(tasks.boss===200)markSlotDone(tasks,boss.slot);
+    }
     const beforeBoss=tasks.boss;
     if(tasks.gunslinger)tasks.boss=stepGunslingerLevel(tasks.gunslinger,c,tasks.boss,world.rand,dt);
     // The original level timer keeps running after the model disappears.
@@ -841,7 +847,7 @@ export function stepTasks(
     // respawn — so run the level scripts' delay and hand the token over.
     // A boss slot that is not in the level's list at all awards nothing:
     // that would be a token for a fight that never happened.
-    if (![10,11,13,14].includes(world.level) && c && c.type === 0) {
+    if (!tasks.clown && ![10,11,13,14].includes(world.level) && c && c.type === 0) {
       tasks.bossGone += dt;
       if (tasks.bossGone >= boss.delay) markSlotDone(tasks, boss.slot);
     }

@@ -7,6 +7,23 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-03 — Alleys boat cannons and clown combat
+
+- Restored ZBOAT (`0041df70`) shells: first active update, then each strict
+  201-tick cycle; posed part-zero muzzle, heading-based velocity, original
+  upward launch/gravity and installed kind-92 projectile damage.
+- Added CLOWN (`0041ddb0`) health-change protection, alternating hit flash,
+  contact sound and rooftop-room health-bar timer. The bar now uses its actual
+  20-health range. Existing wordcode owns its movement/attack cycle.
+- Matched level `0041e880` removal and delayed slot-4 token timing, keeping
+  the existing taunt and token collection/save flow.
+- Installed-data probes pass all four boats, projectile damage and clown
+  combat/reward boundaries. Browser checks pass boat firing, natural clown
+  intro/movement, injected-hit recovery/flash, defeat, reward collection/save,
+  pause, restart and exit. Build and plane/gunslinger regression probes pass.
+- All known Alleys creature dispatch hooks now have implementations. This does
+  not cover the level's still-unmapped moving scenery or full token traversal.
+
 ## 2026-10-03 — Box-launched planes in Alleys and Toy Barn
 
 - Implemented the shared BOX (`004068e0`) and BPLANE (`00406960`) handlers.
@@ -370,7 +387,7 @@ not evidence for untested interactions.
 | 2 | Andy's Neighborhood | LAWN and ZKITE hooks absent; ZGCAR hook implemented. | Lawnmower/kite state machines, moving scenery and race/reset behavior. |
 | 3 | Bombs Away (internal 6) | `stepBossFight` exists. | Complete boss attacks, damage windows, defeat, token and replay. |
 | 4 | Construction Yard | DRILL hook absent; ZGCAR implemented; trailer paint implemented, outdoor cans missing. | Drill, outdoor paint and collision movement, then token routes. |
-| 5 | Alleys and Gullies | CLOWN and ZBOAT hooks absent; BOX/BPLANE launch cycle implemented. | Boat and clown behavior; 37 poles and 11 zip lines need route checks. |
+| 5 | Alleys and Gullies | BOX/BPLANE launch cycle, boat cannon and clown combat/reward implemented. | Moving scenery/collision; 37 poles and 11 zip lines need route checks. |
 | 6 | Slime Time (internal 3) | Dedicated slime controller exists. | Full encounter, arena effects, reward and replay comparison. |
 | 7 | Al's Toy Barn | DINO hook absent; BOX/BPLANE launch cycle implemented. | Dinosaur encounter and original moving-collision calls. |
 | 8 | Al's Space Land | BBUGGY hook absent; ZGCAR implemented; prop-gated texture effect missing. | Buggy challenge, `0052c9b8 & 1` effect trigger and reward paths. |

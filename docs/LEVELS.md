@@ -1741,8 +1741,9 @@ parity is not claimed. Vertical fans clear stomp and set rising/airborne state.
 `00425eb0` emits kind 79 vertically on seven-tick gates, kind 78 horizontally
 on sixteen-tick gates. Velocity overwrites are 256 times strength (five or
 twelve), spin -256, rotation 4095 minus the shared 32-tick phase times 64.
-The original also writes `00830e3c`; its PC consumer remains unidentified and
-is not the already-mapped camera-shake field `0050a510`.
+The original also writes `00830e3c`: `0049e660` reads this as dynamic sound
+pitch when the event pitch word is nonpositive. It is not the camera-shake
+field `0050a510`; dynamic pitch propagation is not implemented.
 
 Installed physics and browser checks are in `elevator-fans-probe.ts` and
 `elevator-fans-flow-check.js`. They cover real stomp landings, continuous shaft

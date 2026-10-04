@@ -9,7 +9,7 @@ This is static inventory, **not** a completed playthrough or parity score. Missi
 | Play order | Level | Scene parses | Creature hooks absent | Dynamic collision IDs without mapped controller | Poles / zip lines | Boss controller |
 |---|---|---|---|---|---|---|
 | 1 (1) | andy's house | yes | — | 8, 9, 10, 12, 13, 14, 15 | 14 / 2 | taunt/reward hooks; inspect per-creature combat |
-| 2 (2) | andy's neighborhood | yes | LAWN (12), ZKITE (15) | 0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 12 | 6 / 5 | taunt/reward hooks; inspect per-creature combat |
+| 2 (2) | andy's neighborhood | yes | — | 0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 12 | 6 / 5 | neighborhood.ts + tasks.ts reward |
 | 3 (6) | bombs away | yes | — | — | 0 / 0 | tasks.ts stepBossFight |
 | 4 (4) | construction yard | yes | — | 1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 21, 22, 23, 24, 25, 26 | 5 / 0 | drill.ts + tasks.ts reward |
 | 5 (5) | alleys and gullies | yes | — | 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 19, 20, 21, 22, 23, 24, 25 | 37 / 11 | clown.ts + tasks.ts reward |
@@ -26,8 +26,6 @@ This is static inventory, **not** a completed playthrough or parity score. Missi
 
 ## Missing shared behavior hooks
 
-- andy's neighborhood: LAWN, type 12, slots 0 → FUN_00418ce0.
-- andy's neighborhood: ZKITE, type 15, slots 26 → FUN_004189c0.
 - al's space land: BBUGGY, type 47, slots 40 → FUN_00422660.
 - tarmac trouble: SMITH, type 58, slots 46 → FUN_0042d3e0.
 - andy's house: types without a shared creature definition COTBIT (11), BOPEEP (7), ZURG1 (3), HAMM (10); may be NPCs, props or level-owned, not automatically missing behavior.

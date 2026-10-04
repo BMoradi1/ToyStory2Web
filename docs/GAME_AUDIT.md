@@ -7,6 +7,24 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-03 — Neighborhood lawnmower and kite
+
+- Restored lawnmower sound, visibility-gated ground marks and grass clippings,
+  including two-/sixteen-tick dividers, original random-byte reuse, velocity,
+  colour and rotation. Its level-owned update range follows Buzz's rectangle.
+- Restored kite roll/bob, player-facing steering, dive/retreat behavior, height
+  limits, health-change response, camera-look request and 10-health bar.
+- Restored post-removal falling-tail particles and the delayed slot-4 reward.
+  The separate segmented tail mesh remains unimplemented; moving scenery and
+  the Neighborhood's full natural routes remain open.
+- Applied the already-computed creature roll to drawn models. Previously the
+  simulation/attachments leaned while creature meshes stayed upright.
+- Installed-data probes pass emitter random/gate boundaries, flight branches,
+  taunt/bar, falling tail and token timing. Browser checks pass mower effects,
+  natural kite intro/movement/roll, injected-hit flash/defeat, token/save and
+  pause/restart/exit. Production build, pod muzzle/lean probes and the three-level
+  shared-enemy browser regression pass.
+
 ## 2026-10-03 — Emitter timing cross-check
 
 A follow-up against the documented native divider and effect-record fields
@@ -88,7 +106,7 @@ not animation-period writes. Probes now verify those fields and the actual
   and 9: health-change recovery, original sound events and wheel smoke gates.
 - Restored renderer-owned visibility flag 0x1 with original distance hysteresis.
   Frustum membership uses posed mesh bounds; the retail hit-radius sphere is
-  not reproduced exactly. The unknown speed-feedback global is still omitted.
+  not reproduced exactly. Dynamic sound-pitch propagation is still omitted.
 - Fixed shared creatures becoming invisible after a level change: artwork and
   hit-data caches now clear together so the next level reloads both.
 - Installed-data probes pass handler boundaries and recovery. Browser checks
@@ -254,8 +272,8 @@ helper (`00428700`). Model and switch mappings come from the user's executable.
   Buzz to isolate interactions; full natural level traversal remains unverified.
 - Remaining: exact original external-force/contact solver comparison, ambient
   zone-specific debris emitters and other Elevator effects. `00830e3c` receives
-  fan feedback values, but its PC consumer is not established; earlier notes
-  calling it camera feedback were premature. No guessed camera shake was added.
+  fan values that the sound dispatcher reads as dynamic pitch; earlier notes
+  calling it camera feedback were incorrect. No guessed camera shake was added.
 
 Penthouse follow-up now has concrete original routines to work from: water-level
 switches and four floating/bouncing props (`00429fb0`, collision 13–16/artwork
@@ -425,7 +443,7 @@ not evidence for untested interactions.
 | Play order | Level | Confirmed gaps / implementation evidence | Next behavior comparison |
 |---|---|---|---|
 | 1 | Andy's House | Tin intro/fight/reward integration tested; hover wobble/sparks partial. Chair stomp and pushables implemented. | Remaining numbered props and platforms; all five token routes. |
-| 2 | Andy's Neighborhood | LAWN and ZKITE hooks absent; ZGCAR hook implemented. | Lawnmower/kite state machines, moving scenery and race/reset behavior. |
+| 2 | Andy's Neighborhood | Lawnmower effects, kite flight/combat/reward and ZGCAR hook implemented. | Segmented kite tail mesh, moving scenery and natural race/token routes. |
 | 3 | Bombs Away (internal 6) | `stepBossFight` exists. | Complete boss attacks, damage windows, defeat, token and replay. |
 | 4 | Construction Yard | DRILL combat/reward and ZGCAR implemented; trailer paint implemented, outdoor cans missing. | Outdoor paint and collision movement, then token routes. |
 | 5 | Alleys and Gullies | BOX/BPLANE launch cycle, boat cannon and clown combat/reward implemented. | Moving scenery/collision; 37 poles and 11 zip lines need route checks. |

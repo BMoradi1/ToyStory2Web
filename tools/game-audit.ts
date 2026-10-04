@@ -77,7 +77,7 @@ const rows = LEVEL_SELECT_ORDER.map((level, index) => {
     const typesWithoutSharedDefinition = [...new Set(creatures.map(c => c.type))]
       .filter(type => !CREATURE_TYPES[type]);
     const handlers = [...new Set(creatures.map(c => c.type))].flatMap(type => {
-      const levelHandler=level===7&&type===26?'FUN_00420af0':level===4&&type===22?'FUN_0041b780':level===5&&type===32?'FUN_0041ddb0':level===15?FINALE_HANDLERS[type]:level===13&&type===61?'FUN_0042be60':((level===10&&type===31)||(level===11&&type===45))?GUNSLINGER_HANDLERS[level]:undefined;
+      const levelHandler=level===2&&type===12?'FUN_00418ce0':level===2&&type===15?'FUN_004189c0':level===7&&type===26?'FUN_00420af0':level===4&&type===22?'FUN_0041b780':level===5&&type===32?'FUN_0041ddb0':level===15?FINALE_HANDLERS[type]:level===13&&type===61?'FUN_0042be60':((level===10&&type===31)||(level===11&&type===45))?GUNSLINGER_HANDLERS[level]:undefined;
       const handler = levelHandler??CREATURE_TYPES[type]?.handler;
       return handler ? [{ type, name: names.get(type), handler,
         implemented: !!levelHandler || handler in CREATURE_HANDLERS,
@@ -99,7 +99,7 @@ const rows = LEVEL_SELECT_ORDER.map((level, index) => {
       pushBlocks: pushes.length, stompObjectIds: stompObjects(level),
       poles: readPoles(paths(61)).length, zipLines: readZipLines(paths(62)).length,
       taskFeatures: tasks ? Object.keys(tasks) : [],
-      bossController: level===7?'dinosaur.ts + tasks.ts reward':level===4?'drill.ts + tasks.ts reward':level===5?'clown.ts + tasks.ts reward':level===10||level===11?'gunslinger.ts + tasks.ts reward':level === 13 ? 'prospector.ts + tasks.ts reward' : level === 3 ? 'slime-boss.ts' : level === 9 ? 'pod-boss.ts' : level === 12 ? 'zurg-boss.ts'
+      bossController: level===2?'neighborhood.ts + tasks.ts reward':level===7?'dinosaur.ts + tasks.ts reward':level===4?'drill.ts + tasks.ts reward':level===5?'clown.ts + tasks.ts reward':level===10||level===11?'gunslinger.ts + tasks.ts reward':level === 13 ? 'prospector.ts + tasks.ts reward' : level === 3 ? 'slime-boss.ts' : level === 9 ? 'pod-boss.ts' : level === 12 ? 'zurg-boss.ts'
         : tasks?.bossFight ? 'tasks.ts stepBossFight' : level === 15 ? 'finale.ts (stage + three fighters)'
         : tasks?.boss ? 'taunt/reward hooks; inspect per-creature combat' : 'none',
     };

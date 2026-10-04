@@ -1135,7 +1135,7 @@ const zurgCar:CreatureHandler=(sim,c,args)=>{
   }
   if(sim.effectGates?.eight&&c.record.accelSide===255)sim.sounds.push({event:0x42,x:c.x,y:c.y,z:c.z});
   if(args.side>0)sim.sounds.push({event:0x41,x:c.x,y:c.y,z:c.z});
-  // 00830e3c also receives side*4; its PC consumer is not established.
+  // 00830e3c also receives side*4 for 0049e660 dynamic sound pitch.
   if((c.flags&CREATURE_FLAGS.awake)!==0&&c.deathTimer>=0&&args.side>256&&sim.effectGates?.four){
     for(const [x,z]of [[0x7a0,-0x460],[-0x7a0,-0x3a0]])sim.emissions.push({
       x:c.x+(sin(c.heading+x!)*3>>2),y:c.y-4096,z:c.z+(sin(c.heading+z!)*3>>2),kind:39,mode:2,

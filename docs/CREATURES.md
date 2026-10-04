@@ -567,7 +567,7 @@ Health changes below 101 restart script 12 at word 62 unless animation 1 is
 already playing. Positive forward speed raises sound event 0x41; acceleration
 byte 255 raises 0x42 on the eight-tick gate. Visible cars moving faster than
 256 emit paired kind-39/mode-2 wheel smoke on the four-tick gate. The write to
-`00830e3c` is not reproduced: its PC consumer remains unidentified.
+`00830e3c` supplies dynamic pitch to `0049e660`; that propagation is not reproduced.
 
 The host now maintains renderer-owned flag 0x1, using the documented strict
 player range and 250000 hysteresis. Frustum membership currently uses Three's
@@ -639,3 +639,26 @@ and a 32-tick orange light use the first hit-shape centre. The level begins its
 for its collapse animation. Defeat sparks alternate sides on seven-tick gates;
 frame 10 adds random smoke. Recovery reopens at strictly negative hurt time
 only in phase 2. The bar uses (health-9)*54/20 and the original room timeout.
+
+### Neighborhood mower and kite (2026-10-03)
+
+`neighborhood.ts` owns the level-2 LAWN (`00418ce0`) and ZKITE (`004189c0`)
+hooks. Visible mowers emit ground marks (49/mode 2) on sixteen-tick gates and
+kind-50 grass on each two-tick boundary. The grass branch consumes four random
+bytes while reusing byte two for vertical speed/rotation/spin, then one more
+for green intensity. Event 0x4b runs independently of visibility.
+
+The kite rolls at phase +36 and bobs at +64, faces Buzz, spins and dives when
+outside the chase region at fight height, otherwise drifts at +/-512 yaw offsets
+on a 120 countdown. Returning below the arena clears chase and restores the
+home X/Z target and vulnerability 4. The authored script controls attack
+vulnerability; the handler's health response only clears wait and starts its
+flash/sound. Player height limits, camera-look request and health/10 bar follow
+the original. Init retains the original died-once bit to suppress its coin.
+
+The level caches part-zero offset (0,384,0) for the tail. After removal, its
+anchor sinks 192 per tick and drifts with the shared phase, emitting kind 58
+on four-tick gates within the original player range. The reward clock ends at
+120/200. **The segmented tail drawing helper remains unported.** The existing
+creature roll is now applied to render meshes with the same yaw/roll order as
+posed attachments, which also corrects leaning hover enemies.

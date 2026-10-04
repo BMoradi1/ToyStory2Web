@@ -1,3 +1,4 @@
+import {createKite,stepKite,stepMower,kiteBar} from './sim/neighborhood.ts';
 import {createDinosaur,stepDinosaur,dinosaurBar} from './sim/dinosaur.ts';
 import {createDrill,readDrillArena,stepDrill,drillBar} from './sim/drill.ts';
 import {createClown,stepClown,clownBar} from './sim/clown.ts';
@@ -805,6 +806,7 @@ async function open(dir: GameDir): Promise<void> {
       get tasks() {
         return tasks ? {
           done: tasks.done, hintIndex: tasks.hintIndex, slime: tasks.slime ? { ...tasks.slime } : null,
+          kite:tasks.kite?{...tasks.kite}:null,
           dinosaur:tasks.dinosaur?{...tasks.dinosaur}:null,
           drill:tasks.drill?{...tasks.drill}:null,
           clown:tasks.clown?{...tasks.clown}:null,
@@ -2060,6 +2062,7 @@ function hudReadout(level: number): HudReadout {
         Math.round(((c.health - fight.bar.from) * 0x36) / fight.bar.over)));
     }
   }
+  if(tasks?.kite)bossBar=kiteBar(tasks.kite,creatureSim?.creatures.find(c=>c.slot===26));
   if(tasks?.dinosaur)bossBar=dinosaurBar(tasks.dinosaur,creatureSim?.creatures.find(c=>c.slot===0));
   if(tasks?.drill)bossBar=drillBar(tasks.drill,creatureSim?.creatures.find(c=>c.slot===24));
   if(tasks?.clown)bossBar=clownBar(tasks.clown,creatureSim?.creatures.find(c=>c.slot===3));
@@ -2206,7 +2209,7 @@ function drawCreatures(): void {
       viewer.placeCreatureMesh(
         c.slot,
         c.x * GAME_TO_RENDER, -c.y * GAME_TO_RENDER, -c.z * GAME_TO_RENDER,
-        toRadians(c.heading), c.drawScale,
+        toRadians(c.heading), c.drawScale, toRadians(c.hover),
       );
       // Pose it only when something changed, and only while the sim is
       // actually updating it — a creature outside the update radius is frozen
@@ -2237,8 +2240,12 @@ function drawCreatures(): void {
       viewer.placeCreatureMesh(
         c.slot,
         c.x * GAME_TO_RENDER, -c.y * GAME_TO_RENDER, -c.z * GAME_TO_RENDER,
-        toRadians(c.heading), c.drawScale,
+        toRadians(c.heading), c.drawScale, toRadians(c.hover),
       );
+    }
+    if(tasks?.kite){
+      const light=tasks.kite.flash?2:1;
+      viewer.setCreatureAppearance(26,[1,1,1],[light,light,light]);
     }
     if(tasks?.dinosaur){
       const light=tasks.dinosaur.flash?2:1;
@@ -3172,6 +3179,21 @@ function saveProgress(): void {
  * `bossFight` have one.
  */
 function startBossFight(level: number): void {
+  if(level===2&&creatureSim&&tasks){
+    const boss=creatureSim.creatures.find(c=>c.slot===26);
+    if(!boss)return;
+    tasks.kite=createKite(boss);
+    creatureSim.levelHandler=(c,args,p)=>{
+      if(!tasks?.kite||!creatureSim)return;
+      if(c.type===15)stepKite(tasks.kite,c,args,{...p,phase:tasks.boss,rand:creatureSim.rand,sound:event=>playEvent(event,c),lookAt:at=>{if(camera)camera.lookAt=at;}});
+      if(c.type===12&&effects&&camera){const world=effectWorld();stepMower(c,{
+        gateTwo:effects.gate.two,gateSixteen:effects.gate.sixteen,rand:creatureSim.rand,sound:event=>playEvent(event,c),
+        effect:(at,kind,mode)=>spawnChild(effects!,world,at.x,at.y,at.z,kind,mode),
+        projectile:(at,v,gravity,rotation,spin,kind)=>spawnEffect(effects!,world,at.x,at.y,at.z,v.x,v.y,v.z,gravity,rotation,spin,kind),
+      });}
+    };
+    return;
+  }
   if(level===7&&creatureSim&&tasks){
     const boss=creatureSim.creatures.find(c=>c.slot===0);
     if(!boss)return;

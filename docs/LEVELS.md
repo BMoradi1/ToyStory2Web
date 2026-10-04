@@ -1787,3 +1787,23 @@ before restart. Water is also supplied to the existing effects simulation.
 `penthouse-water-probe.ts` covers installed switches, hulls and player sweeps;
 `penthouse-water-flow-check.js` covers rendered meshes and lifecycle. Player
 underwater movement and the connected mechanism puzzle remain open.
+
+
+### Penthouse train puzzle (2026-10-03)
+
+The executable supplies route links at `0xf3df8`, seven mechanism records at
+`0xf3f48` and three stomp-switch records at `0xf3fdc`. `00428890` changes route
+endpoints when mask bits become active and rotates switch arms when they clear.
+`00428ba0` alternates the active track artwork over a 32-tick cycle.
+
+`00428e70` starts on path 1/node 6. Direction links select the first/last node
+of each next path. The near model (38) and quarter-scale far model (80) share
+a game-space pose. Contact drops speed to 16, otherwise it recovers toward 256.
+Push block collision 19/artwork 30 pauses the train while nearby and holds it
+for 180 ticks after clearing. Kind 17/mode 27 smoke and event 0x97 whistles
+use the original shared gate and random stream. Path zero ends movement.
+The original enables collision 27 on completion, absent from the supplied
+TERR1.ALL; the controller guards this optional hull rather than inventing one.
+
+`penthouse-train-probe.ts` tests all 12 route settings and actual switch stomps;
+`penthouse-train-flow-check.js` tests rendered route completion and lifecycle.

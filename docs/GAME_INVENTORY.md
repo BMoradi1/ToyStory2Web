@@ -18,7 +18,7 @@ This is static inventory, **not** a completed playthrough or parity score. Missi
 | 8 (8) | al's space land | yes | ZGCAR (14), BBUGGY (47) | 2 | 9 / 9 | none |
 | 9 (9) | toy barn encounter | yes | ZGCAR (14) | — | 0 / 0 | pod-boss.ts |
 | 10 (10) | elevator hop | yes | — | 18 | 0 / 1 | gunslinger.ts + tasks.ts reward |
-| 11 (11) | al's penthouse | yes | — | 1, 3, 4, 12, 22, 23, 24, 25, 26 | 7 / 0 | gunslinger.ts + tasks.ts reward |
+| 11 (11) | al's penthouse | yes | — | 12, 22, 23, 24, 25, 26 | 7 / 0 | gunslinger.ts + tasks.ts reward |
 | 12 (12) | the evil emperor zurg | yes | — | — | 0 / 0 | zurg-boss.ts |
 | 13 (13) | airport infiltration | yes | — | 0, 3, 4, 6, 9, 12, 13, 14 | 13 / 2 | prospector.ts + tasks.ts reward |
 | 14 (14) | tarmac trouble | yes | SMITH (58) | 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13 | 9 / 1 | taunt/reward hooks; inspect per-creature combat |
@@ -66,7 +66,7 @@ This is static inventory, **not** a completed playthrough or parity score. Missi
 - al's space land: tasks reachBox, hamm, hintNpc, findFive; 3 push blocks; motion none mapped; stomp-driven object IDs none.
 - toy barn encounter: tasks none; 0 push blocks; motion none mapped; stomp-driven object IDs none.
 - elevator hop: tasks potato, offer, boss, hamm, hintNpc, findFive; 0 push blocks; motion level-platforms.ts (lifts), elevator-fans.ts (rotors, switches, airflow); stomp-driven object IDs none.
-- al's penthouse: tasks boss, challenge, hamm, hintNpc, findFive; 3 push blocks; motion penthouse.ts (hazards, switches, water / floating props); stomp-driven object IDs none.
+- al's penthouse: tasks boss, challenge, hamm, hintNpc, findFive; 3 push blocks; motion penthouse.ts (hazards, water / floats, train routing); stomp-driven object IDs none.
 - the evil emperor zurg: tasks none; 0 push blocks; motion none mapped; stomp-driven object IDs none.
 - airport infiltration: tasks boss, challenge, potato, hamm, hintNpc, findFive; 1 push blocks; motion level-platforms.ts (lifts / airport routes; partial parity); stomp-driven object IDs none.
 - tarmac trouble: tasks timedPath, boss, hamm, hintNpc, findFive; 0 push blocks; motion tarmac-plane.ts (collision 0), tarmac-helicopter.ts (artwork/pickup motion), tarmac-lights.ts (pads/lowering), tarmac-scenery.ts (near/far sway), tarmac-weather.ts (rain/lightning/thunder); stomp-driven object IDs none.

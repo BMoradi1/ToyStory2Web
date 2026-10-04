@@ -427,6 +427,8 @@ export interface LevelTasks {
       nearBoss?: number;
       /** ...and the camera's zone is this (docs/LEVELS.md "Zones"). */
       zone?: number;
+      /** Player room, independent of camera placement. */
+      playerZone?: number;
     };
   };
   /**
@@ -707,6 +709,7 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
     },
   },
   8: {
+    boss: {creature:40,slot:4,delay:120,taunt:{pathTag:0x11,text:0x4f2a68,playerYaw:-1,creatureYaw:0,wakeWord:14,grounded:true,playerZone:5,yMin:-0x27a80}},
     reachBox: { creature: 1, pathTag: 0x0c, text: 0x4f2ba0, xMin: -468572, xMax: -393436, zMin: 76232, zMax: 102728, yMax: -0x1419a, slot: 2 },
     hamm: { creature: 0x0, pathTag: 0xa, playerYaw: -1, creatureYaw: 0x0, slot: 0 },
     hintNpc: {

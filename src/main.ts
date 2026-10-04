@@ -1,3 +1,4 @@
+import {createBuggy,stepBuggy,buggyBar} from './sim/buggy.ts';
 import {createKite,stepKite,stepMower,kiteBar} from './sim/neighborhood.ts';
 import {createDinosaur,stepDinosaur,dinosaurBar} from './sim/dinosaur.ts';
 import {createDrill,readDrillArena,stepDrill,drillBar} from './sim/drill.ts';
@@ -807,6 +808,7 @@ async function open(dir: GameDir): Promise<void> {
         return tasks ? {
           done: tasks.done, hintIndex: tasks.hintIndex, slime: tasks.slime ? { ...tasks.slime } : null,
           kite:tasks.kite?{...tasks.kite}:null,
+          buggy:tasks.buggy?{...tasks.buggy}:null,
           dinosaur:tasks.dinosaur?{...tasks.dinosaur}:null,
           drill:tasks.drill?{...tasks.drill}:null,
           clown:tasks.clown?{...tasks.clown}:null,
@@ -2063,6 +2065,7 @@ function hudReadout(level: number): HudReadout {
     }
   }
   if(tasks?.kite)bossBar=kiteBar(tasks.kite,creatureSim?.creatures.find(c=>c.slot===26));
+  if(tasks?.buggy)bossBar=buggyBar(tasks.buggy,creatureSim?.creatures.find(c=>c.slot===40));
   if(tasks?.dinosaur)bossBar=dinosaurBar(tasks.dinosaur,creatureSim?.creatures.find(c=>c.slot===0));
   if(tasks?.drill)bossBar=drillBar(tasks.drill,creatureSim?.creatures.find(c=>c.slot===24));
   if(tasks?.clown)bossBar=clownBar(tasks.clown,creatureSim?.creatures.find(c=>c.slot===3));
@@ -2246,6 +2249,10 @@ function drawCreatures(): void {
     if(tasks?.kite){
       const light=tasks.kite.flash?2:1;
       viewer.setCreatureAppearance(26,[1,1,1],[light,light,light]);
+    }
+    if(tasks?.buggy){
+      const light=tasks.buggy.flash?2:1;
+      viewer.setCreatureAppearance(40,[1,1,1],[light,light,light]);
     }
     if(tasks?.dinosaur){
       const light=tasks.dinosaur.flash?2:1;
@@ -3179,6 +3186,36 @@ function saveProgress(): void {
  * `bossFight` have one.
  */
 function startBossFight(level: number): void {
+  if(level===8&&creatureSim&&tasks){
+    const boss=creatureSim.creatures.find(c=>c.slot===40);
+    if(!boss)return;
+    tasks.buggy=createBuggy(boss);
+    creatureSim.levelHandler=(c,args,p)=>{
+      if(c.slot!==40||!tasks?.buggy||!creatureSim||!effects||!camera)return;
+      const world=effectWorld();
+      stepBuggy(tasks.buggy,c,args,{phase:tasks.boss,player:p,playerZone:zones.player,
+        gateFour:effects.gate.four,gateSeven:effects.gate.seven,gateEight:effects.gate.eight,rand:creatureSim.rand,
+        sound:event=>playEvent(event,event===0xd4?p:c),lookAt:at=>{if(camera)camera.lookAt=at;},hurt:yaw=>applyCreatureTouch(yaw,2),
+        beam:(at,yaw)=>{
+          const shot=fireBeam(laserBeams,at,yaw,0,[],(from,delta)=>{
+            if(!currentCollisionWorld)return 1;
+            const hit=sweepSphere(currentCollisionWorld,from,delta,0x100,{passes:1,skin:0,stopAtFirstContact:true});
+            return hit.touched?Math.min(1,Math.hypot(hit.x-from.x,hit.y-from.y,hit.z-from.z)/Math.hypot(delta.x,delta.y,delta.z)):1;
+          },0);
+          if(shot.wall){
+            const at=shot.beam.to;spawnChild(effects!,world,at.x,at.y,at.z,1,2);
+            for(let i=0;i<5;i++){const e=spawnChild(effects!,world,at.x,at.y,at.z,4,4),life=(creatureSim!.rand.byte()&15)*2+24;if(e)e.life=life;}
+          }
+        },
+        effect:(at,kind,mode)=>spawnChild(effects!,world,at.x,at.y,at.z,kind,mode),
+        projectile:(at,v,gravity,spin,kind)=>spawnEffect(effects!,world,at.x,at.y,at.z,v.x,v.y,v.z,gravity,0,spin,kind),
+        light:light=>addPointLight(pointLights,light),
+      },args.dt);
+      if(tasks.buggy.defeated&&tasks.boss===2)tasks.boss=3;
+    };
+    return;
+  }
+
   if(level===2&&creatureSim&&tasks){
     const boss=creatureSim.creatures.find(c=>c.slot===26);
     if(!boss)return;

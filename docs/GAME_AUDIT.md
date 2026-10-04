@@ -7,6 +7,26 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-03 — Space Land buggy fight
+
+- Added the missing slot-40 boss task: grounded player-room-5 taunt, script
+  wake-up, attack clocks and delayed slot-4 token. The final nine health points
+  belong to the collapse script; waiting for generic creature removal could
+  never complete this fight.
+- Restored laser bursts, narrow player damage window, dropped kind-114 hazards,
+  engine/skid sounds, paired tire smoke, hit protection/flash, arena camera
+  focus, boss bar, collapse burst/light and broken-vehicle sparks.
+- Original sources: `00422660` handler and `00423200` level tick. Laser clock
+  starts at 600, resets below zero to 240, emits below 40 on the eight-tick gate;
+  rear hazards reset below zero to 400. Defeat seeks script 35 word 34 while
+  retaining the script wait. Reward advances phase 3 through 120, then 200.
+- Installed-data probe and browser flow pass natural intro/attacks, injected-hit
+  recovery/flash, defeat and token/save, plus pause/restart/exit. Build passes.
+  This is not a full natural playthrough. Laser visuals use the shared beam
+  renderer and wall clipping; incidental damage to other creatures is not yet
+  reproduced. Dynamic engine pitch and other Space Land scenery/tasks remain
+  open. The inventory now lists only Tarmac SMITH as an absent complete hook.
+
 ## 2026-10-03 — Neighborhood lawnmower and kite
 
 - Restored lawnmower sound, visibility-gated ground marks and grass clippings,
@@ -449,7 +469,7 @@ not evidence for untested interactions.
 | 5 | Alleys and Gullies | BOX/BPLANE launch cycle, boat cannon and clown combat/reward implemented. | Moving scenery/collision; 37 poles and 11 zip lines need route checks. |
 | 6 | Slime Time (internal 3) | Dedicated slime controller exists. | Full encounter, arena effects, reward and replay comparison. |
 | 7 | Al's Toy Barn | Dinosaur breath/combat/defeat/reward and BOX/BPLANE launch cycle implemented. | Original moving-collision calls and full token routes. |
-| 8 | Al's Space Land | BBUGGY hook absent; ZGCAR implemented; prop-gated texture effect missing. | Buggy challenge, `0052c9b8 & 1` effect trigger and reward paths. |
+| 8 | Al's Space Land | Buggy fight/reward and ZGCAR implemented; prop-gated texture effect missing. | Claw machine, saucer course, `0052c9b8 & 1` effect trigger and natural route validation. |
 | 9 | Toy Barn Encounter | Dedicated pod controller, beam tests and ZGCAR hook implemented. | Full natural fight/summon cycles and reward traversal. |
 | 10 | Elevator Hop | Wire puzzle, compound lifts, GUNSP combat/reward, fan switches/rotation/airflow implemented. | Other ambient effects, exact collision/script/force timing and full-level traversal. |
 | 11 | Al's Penthouse | Shared enemies, GUNSL combat/reward, hazards, water/floats, train routing and underwater movement implemented. | Underwater camera colour/warp, light/texture helpers and collision 24 review. |

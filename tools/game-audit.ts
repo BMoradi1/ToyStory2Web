@@ -76,7 +76,7 @@ const rows = LEVEL_SELECT_ORDER.map((level, index) => {
     const typesWithoutSharedDefinition = [...new Set(creatures.map(c => c.type))]
       .filter(type => !CREATURE_TYPES[type]);
     const handlers = [...new Set(creatures.map(c => c.type))].flatMap(type => {
-      const levelHandler=level===15?FINALE_HANDLERS[type]:undefined;
+      const levelHandler=level===15?FINALE_HANDLERS[type]:level===13&&type===61?'FUN_0042be60':undefined;
       const handler = levelHandler??CREATURE_TYPES[type]?.handler;
       return handler ? [{ type, name: names.get(type), handler,
         implemented: !!levelHandler || handler in CREATURE_HANDLERS,
@@ -98,7 +98,7 @@ const rows = LEVEL_SELECT_ORDER.map((level, index) => {
       pushBlocks: pushes.length, stompObjectIds: stompObjects(level),
       poles: readPoles(paths(61)).length, zipLines: readZipLines(paths(62)).length,
       taskFeatures: tasks ? Object.keys(tasks) : [],
-      bossController: level === 3 ? 'slime-boss.ts' : level === 9 ? 'pod-boss.ts' : level === 12 ? 'zurg-boss.ts'
+      bossController: level === 13 ? 'prospector.ts + tasks.ts reward' : level === 3 ? 'slime-boss.ts' : level === 9 ? 'pod-boss.ts' : level === 12 ? 'zurg-boss.ts'
         : tasks?.bossFight ? 'tasks.ts stepBossFight' : level === 15 ? 'finale.ts (stage + three fighters)'
         : tasks?.boss ? 'taunt/reward hooks; inspect per-creature combat' : 'none',
     };

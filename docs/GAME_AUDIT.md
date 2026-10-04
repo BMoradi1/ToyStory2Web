@@ -7,6 +7,26 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-03 — Airport Prospector fight
+
+Airport Infiltration now installs its own `0042be60` controller for type 61,
+slot 32, independently of Final Showdown's Prospector.
+
+- Authored chase/throw animation, 44-tick pick release, projectile and sound;
+  20 combat health points, 60-tick recovery, hit brightness and voice cues.
+- Defeat cancels pending throws and enters the authored death script. The level
+  reward timer continues after the model disappears, then reveals token slot 4.
+  The HUD now uses this encounter's 20-point combat range.
+- `tools/prospector-probe.ts` verifies intro gating, damage/recovery boundaries,
+  throw timing/cancellation, defeat/reward/reset, and installed pick movement and
+  damage. The Tarmac Smith regression and production build pass.
+- `tools/prospector-flow-check.js` verifies the actual intro and authored attack,
+  pause, projectile/sound, hit brightness without enlargement, reward collection
+  and save, restart, exit and re-entry. It positions Buzz and injects laser hits;
+  an unassisted fight and full-level traversal remain unverified. Exact voice
+  overlap, intro camera timing and original-versus-port visual parity remain open.
+- Next level-owned boss routines: Elevator Hop GUNSP and Penthouse GUNSL.
+
 ## 2026-10-03 — Shared late-game gun enemies and buzzards
 
 Original `00406a90` and `00406c70` now dispatch through `CREATURE_HANDLERS`.
@@ -27,7 +47,7 @@ Infiltration and Tarmac Trouble (internal levels 11, 13, 14).
   opcode; it does not claim a natural fight or unassisted playthrough.
 - Build and existing ZPOD beam regression pass. Exact acoustic/visual comparison
   and whole-game random-stream scheduling remain unverified. GUNSP (Elevator Hop),
-  GUNSL (Penthouse) and PROSP (Airport) boss routines remain separate open work;
+  GUNSL (Penthouse) boss routines remain separate open work;
   their finale-specific controllers do not implement these level encounters.
 
 ## 2026-10-01 — Elevator Hop and Airport platforms
@@ -133,7 +153,7 @@ not evidence for untested interactions.
 | 10 | Elevator Hop | Wire puzzle and both compound lifts implemented; GUNSP hook absent. | Exact collision/script timing comparison, gunslinger and full-level traversal completion. |
 | 11 | Al's Penthouse | Shared gun enemy and buzzard handlers implemented; GUNSL boss hook absent. | Level-local prop helpers, hazards and encounters. |
 | 12 | The Evil Emperor Zurg | Entrance, attacks, recovery, defeat, save bit and victory/movie handoff implemented in `zurg-boss.ts`. Installed-data and focused browser checks pass. | Unassisted combat, original-versus-port camera/render comparison and detail-dependent particles. |
-| 13 | Airport Infiltration | Five authored transport routes implemented; Shared gun enemy and buzzard handlers implemented; PROSP boss hook absent. | Exact collision/script timing comparison and full-level traversal; distinct from Tarmac. |
+| 13 | Airport Infiltration | Five authored transport routes, shared gun/buzzard handlers and Prospector fight/reward implemented. | Exact collision/script timing comparison and full-level traversal; distinct from Tarmac. |
 | 14 | Tarmac Trouble | Plane motion/collision, wheels/fans, ground/climbing passengers, wheel hazards and helicopter hover/rotors/token motion and light puzzle/lowering implemented and tested. Slinky timed-path rules and retry implemented. Near/far scenery sway, rain/plane sound, rain particles and lightning/thunder restored. Blacksmith recovery, defeat and delayed reward implemented; axe throws implemented; hit flashing missing. Shared gun enemy and buzzard handlers implemented. | Remaining creature hooks and other ambient effects; pitch/roll attachment on other movers. |
 | 15 | Final Showdown | Stage and three fighter controllers implemented in `finale.ts`; rendered entrance, attacks, rescue, completion save, ending/credits and replay tested. | Natural combat completion; exact roll/framing and voice/pitch parity. |
 

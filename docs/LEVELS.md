@@ -1657,3 +1657,26 @@ motion. See `GAME_AUDIT.md` for exact IDs, original function references, regress
 commands and remaining original-versus-port timing comparisons. The follow-up adds randomized
 waits, ledge pauses, truck obstruction/reversal, spring launches/exhaust, warning
 flashes, barrier shrink and lift sounds. Floor passengers still ride normally.
+
+### Airport Prospector controller (2026-10-03)
+
+Airport Infiltration (internal 13) uses `0042be60` for type 61, slot 32;
+init `0042c930` sets rangeX 90 and the first voice timer to 200. This is
+independent of the finale controller. `src/sim/prospector.ts` owns combat;
+`tasks.ts` keeps the intro and reward lifecycle from tick `0042ca60`.
+
+The installed record starts at 29 health; 20 points are combat and the final
+nine belong to defeat. A health change sets vulnerability 4 for 60 ticks,
+flashes brightness (not scale), and chooses one of three hurt voices. Recovery
+reopens vulnerability 6 below zero. Chase within 200 shifted units in animation
+4 selects animation script 9, rate -48 and a 44-tick pick fuse. Past frame 21,
+the creature returns to wordcode 16 and speed 16. Release emits kind 0x68 at the
+authored offset with horizontal velocity and event 0xa6. Below ten health the
+controller clears chase/contact flags, cancels the fuse, selects wordcode 45,
+plays sequence -2 and advances the reward phase. The level timer reaches 120
+before revealing token slot 4, even if the model has disappeared.
+
+Installed-data and browser checks cover the attack, recovery, defeat, token
+collection/save and restart/re-entry. Browser combat uses positioned Buzz and
+injected hits; full natural combat, exact voice overlap and intro camera timing
+remain unverified. See `GAME_AUDIT.md` for current coverage.

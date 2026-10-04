@@ -1,3 +1,4 @@
+import { createProspector, stepProspector } from './sim/prospector.ts';
 import { enemyGunLife } from './sim/enemy-gun.ts';
 import { createLevelPlatforms, platformObjects, stepLevelPlatforms, stepPlatformSwitches, restoreLevelPlatforms, type LevelPlatforms } from './sim/level-platforms.ts';
 import { createTarmacWeather, stepTarmacWeather, type TarmacWeather } from './sim/tarmac-weather.ts';
@@ -793,6 +794,7 @@ async function open(dir: GameDir): Promise<void> {
           pod:tasks.pod?{...tasks.pod}:null,
           zurg:tasks.zurg?{...tasks.zurg}:null,
           finale:tasks.finale?structuredClone(tasks.finale):null,
+          prospector:tasks.prospector?{...tasks.prospector}:null,
           boss: tasks.boss, potatoPart: tasks.potatoPart, powerUps: tasks.powerUps,
           bossPhase: tasks.bossPhase, bossClock: tasks.bossClock, bossHurt: tasks.bossHurt,
           bossCut: tasks.bossCut, bossRamp: tasks.bossRamp, bossSwing: tasks.bossSwing,
@@ -2005,7 +2007,7 @@ function hudReadout(level: number): HudReadout {
     const fighting = c && c.type !== 0 && c.health > 0
       && (tasks !== null && tasks.boss >= 2 || c.health < c.record.health);
     if (c && fighting) {
-      bossBar = Math.max(0, Math.min(0x36, level === 14
+      bossBar = Math.max(0, Math.min(0x36, (level === 14 || level === 13)
         ? Math.trunc(((c.health - 9) * 0x36) / 20)
         : Math.round(((c.health - 9) * 0x36) / 11)));
     }
@@ -2190,6 +2192,10 @@ function drawCreatures(): void {
         ),
         sceneTextures,
       );
+    }
+    if(tasks?.prospector){
+      const light=tasks.prospector.flash?2:1;
+      viewer.setCreatureAppearance(32,[1,1,1],[light,light,light]);
     }
     if(tasks?.pod){
       const {stretch,flashScale}=tasks.pod;
@@ -3093,6 +3099,20 @@ function saveProgress(): void {
  * `bossFight` have one.
  */
 function startBossFight(level: number): void {
+  if(level===13&&creatureSim&&tasks){
+    const boss=creatureSim.creatures.find(c=>c.slot===32);
+    if(!boss)return;
+    tasks.prospector=createProspector(boss);
+    creatureSim.levelHandler=(c,args,p)=>{
+      if(c.slot!==32||!tasks?.prospector||!creatureSim)return;
+      stepProspector(tasks.prospector,c,args,{...p,active:tasks.boss===2,rand:creatureSim.rand,
+        speaking:!!talk,sound:(event,at)=>playEvent(event,at),
+        projectile:shot=>{if(effects&&camera)spawnEffect(effects,effectWorld(),shot.x,shot.y,shot.z,
+          shot.vx,shot.vy,shot.vz,shot.gravity,shot.rotation,shot.spin,shot.kind);}});
+      if(tasks.prospector.defeated&&tasks.boss===2)tasks.boss=3;
+    };
+    return;
+  }
   if(level===15&&creatureSim&&tasks&&currentLevel){
     const object=currentLevel.level.objects[currentLevel.level.objectIds[0]!]!;
     const unit=object.unitScale*32;

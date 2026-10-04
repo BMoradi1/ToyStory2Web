@@ -1,3 +1,14 @@
+CURRENT UPDATE — 2026-10-03: Airport Prospector fight
+  Implemented level-13 type-61 controller 0042be60, separate from the finale.
+  Authored chase/throw, 44-tick pick release, 60-tick recovery, brightness/voices,
+  20-point combat HUD, defeat cancellation and delayed token reward.
+  Installed-data probe and Tarmac Smith regression pass; production build passes.
+  Browser passes intro/attack/pause, pick/sound, hit brightness, token collection
+  and save, restart/exit/re-entry with positioned Buzz and injected laser hits.
+  Natural combat, exact voice overlap/intro camera timing remain unverified.
+  Next: GUNSP (10) and GUNSL (11) level-owned boss state machines.
+  See docs/GAME_AUDIT.md; never commit executable dumps or game assets.
+
 CURRENT UPDATE — 2026-10-03: Shared late-game gun enemy and buzzard handlers
   Implemented FATBLOKE 00406a90 and BUZZARD 00406c70 across levels 11/13/14.
   Gun wordcode trigger now fires terrain-limited kind-97 bullets with authored

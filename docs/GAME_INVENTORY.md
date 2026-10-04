@@ -14,7 +14,7 @@ This is static inventory, **not** a completed playthrough or parity score. Missi
 | 4 (4) | construction yard | yes | — | 1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 21, 22, 23, 24, 25, 26 | 5 / 0 | drill.ts + tasks.ts reward |
 | 5 (5) | alleys and gullies | yes | — | 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 19, 20, 21, 22, 23, 24, 25 | 37 / 11 | clown.ts + tasks.ts reward |
 | 6 (3) | slime time | yes | — | — | 0 / 0 | slime-boss.ts |
-| 7 (7) | al's toy barn | yes | DINO (26) | 0, 1, 2, 3, 4, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 | 4 / 1 | taunt/reward hooks; inspect per-creature combat |
+| 7 (7) | al's toy barn | yes | — | 0, 1, 2, 3, 4, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 | 4 / 1 | dinosaur.ts + tasks.ts reward |
 | 8 (8) | al's space land | yes | BBUGGY (47) | 2 | 9 / 9 | none |
 | 9 (9) | toy barn encounter | yes | — | — | 0 / 0 | pod-boss.ts |
 | 10 (10) | elevator hop | yes | — | 18 | 0 / 1 | gunslinger.ts + tasks.ts reward |
@@ -28,7 +28,6 @@ This is static inventory, **not** a completed playthrough or parity score. Missi
 
 - andy's neighborhood: LAWN, type 12, slots 0 → FUN_00418ce0.
 - andy's neighborhood: ZKITE, type 15, slots 26 → FUN_004189c0.
-- al's toy barn: DINO, type 26, slots 0 → FUN_00420af0.
 - al's space land: BBUGGY, type 47, slots 40 → FUN_00422660.
 - tarmac trouble: SMITH, type 58, slots 46 → FUN_0042d3e0.
 - andy's house: types without a shared creature definition COTBIT (11), BOPEEP (7), ZURG1 (3), HAMM (10); may be NPCs, props or level-owned, not automatically missing behavior.

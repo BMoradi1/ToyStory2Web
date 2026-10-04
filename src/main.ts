@@ -1,3 +1,4 @@
+import {createDinosaur,stepDinosaur,dinosaurBar} from './sim/dinosaur.ts';
 import {createDrill,readDrillArena,stepDrill,drillBar} from './sim/drill.ts';
 import {createClown,stepClown,clownBar} from './sim/clown.ts';
 import {createWaterEffects,stepWaterEffects} from './sim/water-effects.ts';
@@ -804,6 +805,7 @@ async function open(dir: GameDir): Promise<void> {
       get tasks() {
         return tasks ? {
           done: tasks.done, hintIndex: tasks.hintIndex, slime: tasks.slime ? { ...tasks.slime } : null,
+          dinosaur:tasks.dinosaur?{...tasks.dinosaur}:null,
           drill:tasks.drill?{...tasks.drill}:null,
           clown:tasks.clown?{...tasks.clown}:null,
           pod:tasks.pod?{...tasks.pod}:null,
@@ -2058,6 +2060,7 @@ function hudReadout(level: number): HudReadout {
         Math.round(((c.health - fight.bar.from) * 0x36) / fight.bar.over)));
     }
   }
+  if(tasks?.dinosaur)bossBar=dinosaurBar(tasks.dinosaur,creatureSim?.creatures.find(c=>c.slot===0));
   if(tasks?.drill)bossBar=drillBar(tasks.drill,creatureSim?.creatures.find(c=>c.slot===24));
   if(tasks?.clown)bossBar=clownBar(tasks.clown,creatureSim?.creatures.find(c=>c.slot===3));
   if (tasks?.slime && tasks.slime.phase >= 999) bossBar = slimeBossBar(tasks.slime);
@@ -2236,6 +2239,10 @@ function drawCreatures(): void {
         c.x * GAME_TO_RENDER, -c.y * GAME_TO_RENDER, -c.z * GAME_TO_RENDER,
         toRadians(c.heading), c.drawScale,
       );
+    }
+    if(tasks?.dinosaur){
+      const light=tasks.dinosaur.flash?2:1;
+      viewer.setCreatureAppearance(0,[1,1,1],[light,light,light]);
     }
     if(tasks?.drill){
       const light=tasks.drill.flash?2:1;
@@ -3165,6 +3172,28 @@ function saveProgress(): void {
  * `bossFight` have one.
  */
 function startBossFight(level: number): void {
+  if(level===7&&creatureSim&&tasks){
+    const boss=creatureSim.creatures.find(c=>c.slot===0);
+    if(!boss)return;
+    tasks.dinosaur=createDinosaur(boss);
+    creatureSim.levelHandler=(c,args)=>{
+      if(c.slot!==0||!tasks?.dinosaur||!creatureSim||!effects||!camera)return;
+      const world=effectWorld();
+      stepDinosaur(tasks.dinosaur,c,{phase:tasks.boss,cameraZone:zones.camera,gateSeven:effects.gate.seven,rand:creatureSim.rand,
+        sound:event=>playEvent(event,c),shake:ticks=>{if(camera)camera.shake=ticks;},
+        attachment:(c,part,offset)=>{
+          const art=creatureArt.get(c.type),animation=art?.anm?.animations[c.animState];
+          const pose=art?.anm&&animation?poseBone(art.anm,animation,(c.frame>>>16)%Math.max(1,animation.frameCount),part):null;
+          return podAttachment(c,pose,offset);
+        },
+        effect:(at,kind,mode)=>spawnChild(effects!,world,at.x,at.y,at.z,kind,mode),
+        projectile:(at,v,spin,kind)=>spawnEffect(effects!,world,at.x,at.y,at.z,v.x,v.y,v.z,0,0,spin,kind),
+        light:light=>addPointLight(pointLights,light),
+      },args.dt);
+      if(tasks.dinosaur.defeated&&tasks.boss===2)tasks.boss=3;
+    };
+    return;
+  }
   if(level===4&&creatureSim&&tasks&&exeBytes){
     const boss=creatureSim.creatures.find(c=>c.slot===24);
     if(!boss)return;

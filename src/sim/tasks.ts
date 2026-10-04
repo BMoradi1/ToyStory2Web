@@ -1,3 +1,4 @@
+import {stepDinosaurLevel,type Dinosaur} from './dinosaur.ts';
 import {stepDrillLevel,type Drill} from './drill.ts';
 import {stepClownLevel,type Clown} from './clown.ts';
 import type { Prospector } from './prospector.ts';
@@ -62,6 +63,7 @@ export interface TaskState {
   gunslinger: Gunslinger | null;
   clown: Clown | null;
   drill: Drill | null;
+  dinosaur: Dinosaur | null;
   /** Bit per slot, the engine's own per-level byte of saved token bits. */
   done: number;
   /** Idle-chatter timers, one per talker. */
@@ -170,7 +172,7 @@ export function startLevelTasks(tasks: TaskState, level: number, held = 0): void
 export function createTasks(): TaskState {
   return {
     done: 0, hammChatter: 0, hintChatter: 0, hintIndex: -1,
-    slime: null, pod:null, zurg:null, finale:null, prospector:null, gunslinger:null, clown:null, drill:null,
+    slime: null, pod:null, zurg:null, finale:null, prospector:null, gunslinger:null, clown:null, drill:null, dinosaur:null,
     boss: 0, bossGone: 0, reach: 0, pathRun: 0, pathClock: 100, fetch: 0, fetchDone: 0, fetchClock: 100, slowTick: 0, potatoPart: 0, powerUps: 0, potatoChatter: 0, challenge: 0, challengeFrom: 0,
     bossPhase: 0, bossClock: 0, bossHurt: 0, bossHealthWas: -1, bossRamp: 0, bossSwing: 0,
     bossTaunt: 0, bossShout: 0, bossYaw: 0, bossFlip: 0, bossCut: 0,
@@ -801,7 +803,7 @@ export function stepTasks(
         c.pc = taunt.wakeWord;
         c.wait = 0;
         c.flags |= CREATURE_FLAGS.chase;
-        if ([5,10,11,13,14].includes(world.level)) c.record.facing = 0;
+        if ([5,7,10,11,13,14].includes(world.level)) c.record.facing = 0;
       }
     }
     // Tarmac SMITH combat subset, 0042d3e0 + 0042e790. Its last nine
@@ -831,6 +833,10 @@ export function stepTasks(
         }
       }
     }
+    if(tasks.dinosaur){
+      tasks.boss=stepDinosaurLevel(tasks.dinosaur,tasks.boss,dt);
+      if(tasks.boss===200)markSlotDone(tasks,boss.slot);
+    }
     if(tasks.drill){
       tasks.boss=stepDrillLevel(tasks.drill,c,tasks.boss,world.y,dt);
       if(tasks.boss===200)markSlotDone(tasks,boss.slot);
@@ -853,7 +859,7 @@ export function stepTasks(
     // respawn — so run the level scripts' delay and hand the token over.
     // A boss slot that is not in the level's list at all awards nothing:
     // that would be a token for a fight that never happened.
-    if (!tasks.clown && !tasks.drill && ![10,11,13,14].includes(world.level) && c && c.type === 0) {
+    if (!tasks.clown && !tasks.drill && !tasks.dinosaur && ![10,11,13,14].includes(world.level) && c && c.type === 0) {
       tasks.bossGone += dt;
       if (tasks.bossGone >= boss.delay) markSlotDone(tasks, boss.slot);
     }

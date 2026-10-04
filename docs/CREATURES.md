@@ -623,3 +623,19 @@ three-quarter distance as horizontal speed and the original ballistic division;
 a zero divisor is guarded. Both branches consume the next random byte for spin
 and set width/height 100. The level owns its 30-health HUD and post-removal
 3+dt / 120 / 200 token timing. Full arena traversal and scenery remain unaudited.
+
+### Toy Barn dinosaur (2026-10-03)
+
+`dinosaur.ts` implements `00420af0`. Script timer 30 starts the breath:
+room 4 emits kind 85 at animated part-one offset (20,-600,0), consuming one
+random byte for yaw and two more while reusing the first for vertical velocity
+and spin. Only the timer-30 particle is flagged to hurt Buzz and shakes the
+camera for 40 ticks. Off-room ticks still drain the attack timer.
+
+Below health 10 during combat, script 24 resumes at word 58 without clearing
+the current wait. Contact damage is disabled; five kind-35/mode-14 particles
+and a 32-tick orange light use the first hit-shape centre. The level begins its
+3 / 120 / 200 reward clock immediately, although the dinosaur remains alive
+for its collapse animation. Defeat sparks alternate sides on seven-tick gates;
+frame 10 adds random smoke. Recovery reopens at strictly negative hurt time
+only in phase 2. The bar uses (health-9)*54/20 and the original room timeout.

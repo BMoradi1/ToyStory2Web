@@ -7,6 +7,22 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-03 — Toy Barn dinosaur
+
+- Restored `00420af0`: animated part-one breath, original random consumption,
+  room gate, attack sound and first-particle damage/shake; health-change
+  protection, hurt sound, alternating flash and the nine-point-offset bar.
+- At nine health the dinosaur now enters its authored collapse script, becomes
+  harmless and emits the five-particle burst/orange light. Defeat sparks and
+  frame-10 smoke continue in room 4; remaining attack timers drain normally.
+- The reward clock now advances after that scripted defeat, without requiring
+  the dinosaur model to disappear. Its final nine health points are not another
+  round of combat.
+- Installed-data probes pass breath/damage, recovery, collapse, light/smoke,
+  taunt and delayed token boundaries. Browser checks pass natural intro/breath,
+  injected-hit recovery/flash, nine-health defeat/light, reward collection/save,
+  pause, restart and exit. Build passes. Full natural traversal remains open.
+
 ## 2026-10-03 — Construction Yard jackhammer
 
 - Implemented `0041b780`: arena grid entry constraints from runtime tables,
@@ -406,7 +422,7 @@ not evidence for untested interactions.
 | 4 | Construction Yard | DRILL combat/reward and ZGCAR implemented; trailer paint implemented, outdoor cans missing. | Outdoor paint and collision movement, then token routes. |
 | 5 | Alleys and Gullies | BOX/BPLANE launch cycle, boat cannon and clown combat/reward implemented. | Moving scenery/collision; 37 poles and 11 zip lines need route checks. |
 | 6 | Slime Time (internal 3) | Dedicated slime controller exists. | Full encounter, arena effects, reward and replay comparison. |
-| 7 | Al's Toy Barn | DINO hook absent; BOX/BPLANE launch cycle implemented. | Dinosaur encounter and original moving-collision calls. |
+| 7 | Al's Toy Barn | Dinosaur breath/combat/defeat/reward and BOX/BPLANE launch cycle implemented. | Original moving-collision calls and full token routes. |
 | 8 | Al's Space Land | BBUGGY hook absent; ZGCAR implemented; prop-gated texture effect missing. | Buggy challenge, `0052c9b8 & 1` effect trigger and reward paths. |
 | 9 | Toy Barn Encounter | Dedicated pod controller, beam tests and ZGCAR hook implemented. | Full natural fight/summon cycles and reward traversal. |
 | 10 | Elevator Hop | Wire puzzle, compound lifts, GUNSP combat/reward, fan switches/rotation/airflow implemented. | Other ambient effects, exact collision/script/force timing and full-level traversal. |

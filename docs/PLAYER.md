@@ -817,3 +817,19 @@ list drawn with sprite 30, not the ordinary coin marker list. Its entries are
 added as IDs 1000+ under DAT_00882938 (the category-6 pieces counter). The point
 source and complete interaction are still unresolved; ordinary coins are not
 made aim targets. See docs/HUD.md for the decoded point-list draw path.
+
+
+## Water movement integration (2026-10-03)
+
+`Ground.waterY` supplies an optional active surface in game units. At the start
+of each player tick, flag `inWater` is rebuilt with the strict original
+`player.y > waterY + 0x2000` condition (`00436220`). Water's movement row follows
+hit stun and precedes airborne/skid/launch overrides. Normal vertical movement
+uses divisor 4 and fall cap `0x400`; stomps retain their separate handler.
+Penthouse provides its water plane and clears it when drained. Other levels
+still need their own verified water/slime region controllers.
+
+`player-water-probe.ts` checks boundary crossings, draining, all normal jump
+modes, terminal speed and override order; the existing land probe remains
+24/24. The Penthouse water browser regression also exercises live integration.
+Player water particles and camera/audio presentation remain separate work.

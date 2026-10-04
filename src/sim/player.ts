@@ -50,6 +50,8 @@ export enum JumpState {
  * degrees this tick", which is what makes ledges, steps and slopes behave.
  */
 export interface Ground {
+  /** Active water surface in game units (+Y down); absent means dry. */
+  waterY?: number | null;
   poles?: readonly Pole[];
   zipLines?: readonly ZipLine[];
   /** Moving props resolve after acceleration, before the collision sweep. */
@@ -97,6 +99,8 @@ export const NO_INPUT: PlayerInput = {
  * player block at 0x52f300, so a value can be checked against a debugger.
  */
 export interface PlayerState {
+  /** Retail flag 0x100: origin is more than 8192 units below water. */
+  inWater: boolean;
   /** Retail stomp timer: positive wind-up/drop, negative landing recovery. */
   stomp: number;
   stompImpact: boolean;
@@ -211,7 +215,7 @@ export interface PlayerState {
 
 export function createPlayer(x = 0, y = 0, z = 0, yaw = 0): PlayerState {
   return {
-    stomp: 0, stompImpact: false, launched: false,
+    inWater: false, stomp: 0, stompImpact: false, launched: false,
     x, y, z,
     vx: 0, vy: 0, vz: 0,
     yaw, targetYaw: yaw,
@@ -270,6 +274,7 @@ function isPlain(p: PlayerState): boolean {
 function moveTableFor(p: PlayerState, analog: number): MoveTable {
   const t: MoveTable = { ...MOVE_GROUND };
   if (p.hitStun > 0) Object.assign(t, MOVE_OVERRIDES.hitStun);
+  if (p.inWater) Object.assign(t, MOVE_OVERRIDES.water);
   // The airborne row only replaces forward friction; the original applies it
   // whenever the coyote counter has run out, not merely when off the ground,
   // so a player one tick into a fall still turns with ground authority.
@@ -345,8 +350,7 @@ function accelerate(p: PlayerState, t: MoveTable, hasInput: boolean): void {
  * Jump, double jump and gravity. `FUN_004340d0`.
  *
  * `k` is 2 on land and 4 in water; the original divides every vertical
- * constant by it. Only land is implemented here — nothing has parsed which
- * surfaces are water yet.
+ * constant by it. Level controllers supply the active surface through Ground.
  */
 function vertical(p: PlayerState, input: PlayerInput, t: MoveTable, k = 2): void {
   if (!input.jump) {
@@ -401,7 +405,8 @@ function vertical(p: PlayerState, input: PlayerInput, t: MoveTable, k = 2): void
   }
 
   if (!p.onGround) p.vy += VERTICAL.gravity(k);
-  if (p.vy > VERTICAL.terminalVelocity) p.vy = VERTICAL.terminalVelocity;
+  const terminal = p.inWater ? 0x400 : VERTICAL.terminalVelocity;
+  if (p.vy > terminal) p.vy = terminal;
 }
 
 /**
@@ -523,6 +528,7 @@ export function stepPlayer(
 ): void {
   p.sounds.length = 0;
   p.events.length = 0;
+  p.inWater = ground.waterY != null && p.y > ground.waterY + 0x2000;
   const prev = runtime.previous;
   p.laserFired = null;
   const previousY = runtime.previousY;
@@ -604,7 +610,7 @@ export function stepPlayer(
     // --- vertical, then turn, then horizontal --------------------------------
     // The order matters: the original turns after resolving the jump, so a jump
     // and a hard turn on the same tick both take effect this tick.
-    vertical(p, p.launched ? { ...input, jump: false } : input, table);
+    vertical(p, p.launched ? { ...input, jump: false } : input, table, p.inWater ? 4 : 2);
     turn(p, table, hasInput);
     accelerate(p, table, hasInput);
     if (p.zipPhase === 1) p.vx = p.vz = p.forwardSpeed = p.lateralSpeed = 0;

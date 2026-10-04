@@ -63,6 +63,16 @@
     check(water.planes.filter(q=>state.objects.get(q.art).scale[0]!==0).length===(index===0?0:1),'surface visibility '+index);
     if(index===2){ts2.tickGame({},350,0);check(state.objects.get(91).scale[0]>.9,'water bubble did not grow');}
   }
+  // Isolate vertical integration away from scenery, with a real live water plane.
+  water.offset=water.target=-64000;ts2.tickGame({},1,0);closeDialogue();
+  for(const [depth,wet,gravity]of [[8192,false,64],[8193,true,16]]){
+    ts2.setPlayerPos(10000000,10000000,water.y+depth);
+    Object.assign(ts2.player,{vx:0,vy:0,vz:0,stomp:0,onGround:false,coyote:0,hitStun:0,contacts:[],climb:0,climbGroup:-1,fallTimer:0});
+    ts2.tickGame({},1,0);check(ts2.player.inWater===wet&&ts2.player.vy===gravity,'live water movement boundary '+depth);
+  }
+  ts2.player.vy=2000;ts2.tickGame({},1,0);check(ts2.player.vy===1024,'live water fall cap');
+  water.offset=water.target=0;ts2.tickGame({},1,0);ts2.player.vy=0;ts2.tickGame({},1,0);
+  check(!ts2.player.inWater&&ts2.player.vy===64,'drained water retained movement override');
   const old=ts2.penthouse;
   await ts2.spawnPlayer();ts2.viewer.stop();
   check(ts2.penthouse!==old&&ts2.penthouse.water.y===null&&ts2.penthouse.water.selected===16,'water restart failed');

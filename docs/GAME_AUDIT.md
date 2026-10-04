@@ -7,6 +7,22 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-03 — Water-aware player movement
+
+The shared player controller now reads a level-supplied water plane. Penthouse
+supplies its live plane, including disabling it when drained.
+
+- `00436220` sets the wet movement flag only when Buzz's origin is strictly
+  more than 8192 game units below the surface. It clears on leaving/draining.
+- Water movement overrides hit-stun values before airborne/skid/launch values,
+  preserving the original order. Gravity is 16, fall cap 1024, ground jump
+  -768, and jump release/double-jump arithmetic uses divisor 4.
+- Depth-boundary, entry/exit/drain, speed, friction and jump probes pass;
+  existing land movement passes 24/24 checks. The browser verifies the live
+  Penthouse plane drives gravity/fall caps and restores land motion on drain.
+- Remaining water presentation includes player entry splashes, bubbles,
+  dripping and underwater camera/audio treatment; these are not yet claimed.
+
 ## 2026-10-03 — Penthouse train routing
 
 `penthouse.ts` now hosts the train route controller `00428e70`, switch-mask
@@ -26,7 +42,7 @@ updates `00428890` and track-indicator flash `00428ba0`.
 - The original enables collision object 27 at completion; the supplied
   Penthouse collision data has no object 27. This optional hull is guarded,
   and no substitute geometry or guessed reward was added.
-- Remaining Penthouse work includes underwater player behavior, the spring,
+- Remaining Penthouse work includes water presentation, the spring,
   opening doors and other ambient helpers; full natural traversal is unverified.
 
 ## 2026-10-03 — Penthouse water selectors and floating props
@@ -47,8 +63,8 @@ The water section of `0042a130`, selector helper `004292c0`, flash helper
   reset, all four real floating-prop stomps, passenger carrying and splashes.
   Browser checks pass all selectors, mesh motion, bubble growth, pause, restart
   and exit. Production build passes.
-- Remaining: player underwater movement/entry/exit behavior and mechanism
-  routing. This checkpoint does not claim swimming or a full-level playthrough.
+- Later checkpoints cover underwater movement and mechanism routing. Water
+  presentation and a full-level playthrough remain open.
 
 ## 2026-10-03 — Penthouse tracking hazards
 
@@ -70,8 +86,8 @@ helper (`00428700`). Model and switch mappings come from the user's executable.
 - Production build and browser checks pass all six rendered hazards, real stomp
   switches, disable bursts/model swaps, pause, restart and exit. Both gunslinger
   fight/reward browser regressions pass with the shared camera-effects change.
-- Remaining Penthouse work: water controls/floating props, mechanism routing
-  and associated moving artwork; natural full-level traversal is unverified.
+- Later checkpoints cover water controls/floating props and mechanism routing;
+  natural full-level traversal remains unverified.
 
 ## 2026-10-03 — Elevator fan scenery and airflow
 
@@ -107,7 +123,7 @@ switches and four floating/bouncing props (`00429fb0`, collision 13–16/artwork
 their stomp switches (`00429910`) and disable effects (`00429800`); the mechanism
 mask/rotations (`00428890`) and moving prop with far artwork (`00428e70`, 38/80).
 The six tracking hazards and their switches are covered in the newer entry above;
-the water and mechanism helpers remain open.
+later checkpoints above also cover water and mechanism helpers.
 
 ## 2026-10-03 — Elevator and Penthouse gunslinger combat
 
@@ -278,7 +294,7 @@ not evidence for untested interactions.
 | 8 | Al's Space Land | BBUGGY and ZGCAR hooks absent; prop-gated texture effect missing. | Buggy challenge, `0052c9b8 & 1` effect trigger and reward paths. |
 | 9 | Toy Barn Encounter | Dedicated pod controller and beam tests exist; ZGCAR hook absent. | Full fight/summon cycles and reward; determine the absent hook's role. |
 | 10 | Elevator Hop | Wire puzzle, compound lifts, GUNSP combat/reward, fan switches/rotation/airflow implemented. | Other ambient effects, exact collision/script/force timing and full-level traversal. |
-| 11 | Al's Penthouse | Shared gun enemy/buzzard handlers, GUNSL combat/reward and six tracking hazards/switches implemented. | Underwater player behavior, spring/doors and other ambient helpers. |
+| 11 | Al's Penthouse | Shared enemies, GUNSL combat/reward, hazards, water/floats, train routing and underwater movement implemented. | Water presentation, spring/doors and other ambient helpers. |
 | 12 | The Evil Emperor Zurg | Entrance, attacks, recovery, defeat, save bit and victory/movie handoff implemented in `zurg-boss.ts`. Installed-data and focused browser checks pass. | Unassisted combat, original-versus-port camera/render comparison and detail-dependent particles. |
 | 13 | Airport Infiltration | Five authored transport routes, shared gun/buzzard handlers and Prospector fight/reward implemented. | Exact collision/script timing comparison and full-level traversal; distinct from Tarmac. |
 | 14 | Tarmac Trouble | Plane motion/collision, wheels/fans, ground/climbing passengers, wheel hazards and helicopter hover/rotors/token motion and light puzzle/lowering implemented and tested. Slinky timed-path rules and retry implemented. Near/far scenery sway, rain/plane sound, rain particles and lightning/thunder restored. Blacksmith recovery, defeat and delayed reward implemented; axe throws implemented; hit flashing missing. Shared gun enemy and buzzard handlers implemented. | Remaining creature hooks and other ambient effects; pitch/roll attachment on other movers. |

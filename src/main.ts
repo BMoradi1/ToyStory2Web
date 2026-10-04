@@ -3552,6 +3552,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   if(aimView.active)viewer.setAimPose(aimModelAngles(aimView));
   if(aimView.active) held={...held,moveX:0,moveY:0,jump:false,spin:false,cameraLeft:false,cameraRight:false};
   const playerGround = groundFromCollision(currentCollisionWorld, levelPoles, levelZipLines);
+  playerGround.waterY = penthouse?.water.y??null;
   playerGround.beforeMove = () => {
     tickPushBlocks(held);
     if(penthouse)movePenthouseFloats(penthouse,currentCollisionWorld!,player!);

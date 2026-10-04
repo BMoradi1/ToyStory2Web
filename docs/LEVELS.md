@@ -1807,3 +1807,18 @@ TERR1.ALL; the controller guards this optional hull rather than inventing one.
 
 `penthouse-train-probe.ts` tests all 12 route settings and actual switch stomps;
 `penthouse-train-flow-check.js` tests rendered route completion and lifecycle.
+
+
+### Penthouse spring and guard doors (2026-10-03)
+
+The spring section of `0042a130` checks grounded contact on collision 12 with
+normal Y strictly below -0.75. Normal landings launch at -2432, stomps at -3072;
+guide 13 is spent and event 0x1c raised. The launched state uses existing shared
+player motion and clears stomp/ground state.
+
+Door triggers read creature health at `0x52ce3a` (slot 9) and `0x52ced6`
+(slot 10), both entity offset `0x7e`. Health other than 1 starts the opening.
+Collision 22 rotates -1060 angle units and 23 rotates +942; artwork pairs
+28/90 and 25/26 use the original sine-driven yaw. Restart restores captured
+collision and phases. Installed and browser checks are in
+`penthouse-doors-probe.ts` and `penthouse-doors-flow-check.js`.

@@ -1,12 +1,12 @@
 /** Penthouse prop controllers, independent of its creature-owned gunslinger. */
 import type {DatLevel,Vec3} from '../formats/dat.ts';
 import {captureCollisionGroup,collisionGroupByObject,transformCollisionGroup,type CollisionWorld} from '../formats/collision.ts';
-import type {PlayerState} from './player.ts';
+import {JumpState,type PlayerState} from './player.ts';
 import type {RandomStream} from './creatures.ts';
 import type {CutHandle} from './tasks.ts';
 import type {ZurgShot} from './zurg-boss.ts';
 import {carryOnYawPlatform} from './moving-platform.ts';
-import {sin,cos,yawOf} from './trig.ts';
+import {sin,cos,yawOf,toRadians} from './trig.ts';
 export function readPenthouseTables(exe:Uint8Array){
   const v=new DataView(exe.buffer,exe.byteOffset,exe.byteLength);
   if(exe.length<0xf4045)throw Error('Executable is missing Penthouse prop tables');
@@ -25,7 +25,7 @@ export function readPenthouseTables(exe:Uint8Array){
   }))};
 }
 export type PenthouseTables=ReturnType<typeof readPenthouseTables>;
-export function penthouseObjects(t:PenthouseTables){return [...new Set([...t.hazards.flatMap(h=>[...h.models,h.button[1]!,h.button[2]!]),...t.waterButtons.map(b=>b.art),...t.waterPlanes.map(p=>p.art),39,40,41,42,44,91,38,80,49,...t.mechanisms.flatMap(m=>m.slice(1,4)),...t.trainButtons.map(b=>b[2]!)])];}
+export function penthouseObjects(t:PenthouseTables){return [...new Set([...t.hazards.flatMap(h=>[...h.models,h.button[1]!,h.button[2]!]),...t.waterButtons.map(b=>b.art),...t.waterPlanes.map(p=>p.art),39,40,41,42,44,91,38,80,49,25,26,28,90,...t.mechanisms.flatMap(m=>m.slice(1,4)),...t.trainButtons.map(b=>b[2]!)])];}
 const near=(a:Vec3,b:Vec3,r:number)=>((a.x-b.x)>>8)**2+((a.y-b.y)>>8)**2+((a.z-b.z)>>8)**2<r*r;
 interface PenthouseObject {id:number;index:number;rest:Vec3;position:Vec3;angles:readonly[number,number,number];scale:readonly[number,number,number]}
 export function createPenthouse(dat:DatLevel,w:CollisionWorld,t:PenthouseTables){
@@ -56,7 +56,9 @@ export function createPenthouse(dat:DatLevel,w:CollisionWorld,t:PenthouseTables)
   objects.get(49)!.scale=[0,0,0];
   const indices=new Set(finish?.polys.map(p=>p.index)??[]);
   for(const [key,cell]of w.cells){const kept=cell.filter(i=>!indices.has(i));if(kept.length)w.cells.set(key,kept);else w.cells.delete(key);}
-  const state={objects,hazards,water,train,clock:0,blinkClock:0,blink:false,disabled:0};
+  const doors=[{collision:23,models:[25,26],slot:10,yaw:942,factor:1/18},{collision:22,models:[28,90],slot:9,yaw:-1060,factor:-2/33}].map(d=>({...d,phase:0,hull:captureCollisionGroup(w,collisionGroupByObject(w,d.collision))}));
+  const spring=captureCollisionGroup(w,collisionGroupByObject(w,12));
+  const state={objects,hazards,water,train,doors,spring,clock:0,blinkClock:0,blink:false,disabled:0};
   selectPenthouseWater(state,w,16);
   setPenthouseTracks(state,0x25);
   drawPenthouseTrain(state);
@@ -64,7 +66,7 @@ export function createPenthouse(dat:DatLevel,w:CollisionWorld,t:PenthouseTables)
 }
 export type Penthouse=ReturnType<typeof createPenthouse>;
 export interface PenthouseWorld {
-  camera?:Vec3;gateFour?:boolean;cameraY?:number;zone:number;rand:RandomStream;gateSeven:boolean;cut?:CutHandle;
+  health?:(slot:number)=>number;camera?:Vec3;gateFour?:boolean;cameraY?:number;zone:number;rand:RandomStream;gateSeven:boolean;cut?:CutHandle;
   sound?:(event:number,at?:Vec3)=>void;touch?:(angle:number,reaction:number)=>void;
   projectile?:(shot:ZurgShot)=>void;effect?:(at:Vec3,kind:number,mode:number,spin:boolean)=>void;
   guide?:(id:number)=>void;
@@ -82,6 +84,7 @@ export function penthouseShot(at:Vec3,yaw:number,p:Vec3,rand:RandomStream):ZurgS
 export function stepPenthouse(s:Penthouse,p:PlayerState,w:CollisionWorld,host:PenthouseWorld){
   stepPenthouseWater(s,p,w,host);
   stepPenthouseTrain(s,p,w,host);
+  stepPenthouseDoors(s,w,host);
   for(const h of s.hazards){
     if(h.timer!==0)continue;
     const button=s.objects.get(h.button[1]!)!,flash=s.objects.get(h.button[2]!)!;
@@ -113,6 +116,12 @@ export function stepPenthouse(s:Penthouse,p:PlayerState,w:CollisionWorld,host:Pe
     }else if(host.gateSeven)host.effect?.({...at,y:at.y-8192},17,26,true);
   }
   if(s.clock>1000)s.clock-=1300;
+  if(p.onGround&&p.contacts.some(c=>c.group===s.spring.groupIndex&&c.normal.y<-.75)){
+    const boosted=p.stomp!==0;p.stomp=0;p.stompImpact=false;
+    p.vy=boosted?-3072:-2432;p.onGround=false;p.coyote=0;p.fallTimer=0;
+    p.jumpState=JumpState.Released;p.animPhase=2;p.launched=true;
+    host.guide?.(13);host.sound?.(0x1c,p);
+  }
   for(let i=0;i<s.hazards.length;i++){
     const h=s.hazards[i]!;if(h.timer<=0||--h.timer>0)continue;
     h.timer=-1;s.disabled|=1<<i;
@@ -124,7 +133,7 @@ export function stepPenthouse(s:Penthouse,p:PlayerState,w:CollisionWorld,host:Pe
   }
 }
 export function restorePenthouse(s:Penthouse,w:CollisionWorld){
-  for(const h of [...s.hazards,...s.water.buttons,...s.water.floats,...(s.train.finish?[{hull:s.train.finish}]:[])])transformCollisionGroup(w,h.hull,h.hull.origin,0);
+  for(const h of [...s.hazards,...s.water.buttons,...s.water.floats,...s.doors,...(s.train.finish?[{hull:s.train.finish}]:[])])transformCollisionGroup(w,h.hull,h.hull.origin,0);
 }
 
 /** 004292c0: one depressed selector at a time; transforms are from captured rest. */
@@ -266,5 +275,16 @@ function stepPenthouseTrain(s:Penthouse,p:PlayerState,w:CollisionWorld,host:Pent
     const button=s.objects.get(t.flashArt)!,flash=s.objects.get(49)!;
     if(t.flash===24){flash.position={...button.position};button.scale=[0,0,0];flash.scale=[1,1,1];}
     if(--t.flash===0){button.scale=[1,1,1];flash.scale=[0,0,0];}
+  }
+}
+
+/** Each door opens after its one-health guard (slots 9/10) is defeated. */
+function stepPenthouseDoors(s:Penthouse,w:CollisionWorld,host:PenthouseWorld){
+  for(const d of s.doors){
+    if(d.phase===0){if((host.health?.(d.slot)??1)!==1)d.phase=1;continue;}
+    if(d.phase===1)transformCollisionGroup(w,d.hull,d.hull.origin,toRadians(d.yaw));
+    const angle=Math.trunc(sin(d.phase)*d.factor);
+    for(const id of d.models)s.objects.get(id)!.angles=[0,angle,0];
+    if(d.phase<1024)d.phase+=16;
   }
 }

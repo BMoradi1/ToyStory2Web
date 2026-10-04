@@ -1,3 +1,4 @@
+import {readPenthouseTables,penthouseObjects,createPenthouse,stepPenthouse,restorePenthouse,type Penthouse} from './sim/penthouse.ts';
 import { createProspector, stepProspector } from './sim/prospector.ts';
 import { createGunslinger, stepGunslinger } from './sim/gunslinger.ts';
 import { enemyGunLife } from './sim/enemy-gun.ts';
@@ -317,6 +318,7 @@ async function showLevel(index: number): Promise<void> {
   pushBlocks = null;
   tarmacPlane = null;
   levelPlatforms = null;
+  penthouse = null;
   tarmacHelicopter = null;
   tarmacLights = null;
   tarmacScenery = null;
@@ -420,6 +422,9 @@ async function showLevel(index: number): Promise<void> {
         const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);
       }
       for(const id of platformObjects(levelNumber(level.id)??0)) {
+        const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);
+      }
+      if(levelNumber(level.id)===11&&exeBytes)for(const id of penthouseObjects(readPenthouseTables(exeBytes))){
         const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);
       }
       const geometry = buildLevelGeometry(parsed, { zones, separate });
@@ -712,6 +717,7 @@ async function open(dir: GameDir): Promise<void> {
       get tarmacWeather() { return tarmacWeather; },
       get tarmacScenery() { return tarmacScenery; },
       get levelPlatforms() { return levelPlatforms; },
+      get penthouse() { return penthouse; },
       get tarmacPlane() { return tarmacPlane; },
       get tarmacHelicopter() { return tarmacHelicopter; },
       get tarmacLights() { return tarmacLights ? {...tarmacLights} : null; },
@@ -1284,6 +1290,7 @@ async function spawnPlayer(): Promise<void> {
   await loadCollision();
   if (!currentCollisionWorld) { infoEl.textContent = 'no collision for this scene'; return; }
 
+  if(penthouse){restorePenthouse(penthouse,currentCollisionWorld);penthouse=null;}
   if(levelPlatforms){restoreLevelPlatforms(levelPlatforms,currentCollisionWorld);levelPlatforms=null;}
   if (tarmacPlane) {
     restorePlaneCollision(tarmacPlane, currentCollisionWorld);
@@ -1329,6 +1336,8 @@ async function spawnPlayer(): Promise<void> {
   drawTarmacPlane();
   levelPlatforms=createLevelPlatforms(level,currentLevel.level,currentCollisionWorld);
   drawLevelPlatforms();
+  penthouse=level===11&&exeBytes?createPenthouse(currentLevel.level,currentCollisionWorld,readPenthouseTables(exeBytes)):null;
+  drawPenthouse();
   tarmacWeather = level === 14 ? createTarmacWeather() : null; setWeatherLight(128);
   tarmacScenery = level === 14 ? createTarmacScenery(currentLevel.level) : null;
   tarmacHelicopter = level === 14 ? createTarmacHelicopter(currentLevel.level) : null;
@@ -1659,7 +1668,8 @@ function spawnCreatureEffects(): void {
 /** What the effect tick needs to know about the rest of the world. */
 function effectWorld(): EffectWorld {
   const S2 = GAME_UNITS_PER_LEVEL_UNIT;
-  const look = camera ? cameraTarget(player!, camera) : { x: 0, y: 0, z: 0 };
+  // Scripted switch cuts must keep effects around the scene being shown alive.
+  const look = cut.ticks > 0 ? cut.look : camera ? cameraTarget(player!, camera) : { x: 0, y: 0, z: 0 };
   return {
     cameraX: look.x, cameraY: look.y, cameraZ: look.z,
     playerX: player!.x, playerY: player!.y, playerZ: player!.z,
@@ -2471,6 +2481,13 @@ function drawTarmacHelicopter(): void {
   viewer.setObjectTransforms(transforms);
 }
 
+function drawPenthouse():void{
+  if(!viewer||!penthouse)return;
+  viewer.setObjectTransforms(new Map([...penthouse.objects.values()].map(o=>[o.index,{
+    angles:o.angles,scale:o.scale,offset:[(o.position.x-o.rest.x)*GAME_TO_RENDER,
+      -(o.position.y-o.rest.y)*GAME_TO_RENDER,-(o.position.z-o.rest.z)*GAME_TO_RENDER] as [number,number,number],
+  }])));
+}
 function drawLevelPlatforms(): void {
   if(!viewer||!levelPlatforms)return;
   const transforms=new Map<number,ObjectTransform>();
@@ -2934,6 +2951,7 @@ function discardLevel(): void {
   pushBlocks = null;
   tarmacPlane = null;
   levelPlatforms = null;
+  penthouse = null;
   tarmacHelicopter = null;
   tarmacLights = null;
   tarmacScenery = null;
@@ -3262,6 +3280,7 @@ let talk: TalkState | null = null;
 let pushBlocks: PushState | null = null;
 let tarmacPlane: TarmacPlane | null = null;
 let levelPlatforms: LevelPlatforms | null = null;
+let penthouse:Penthouse|null=null;
 let tarmacHelicopter: TarmacHelicopter | null = null;
 let tarmacLights: TarmacLights | null = null;
 let tarmacScenery: TarmacScenery | null = null;
@@ -3674,6 +3693,20 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   if(tarmacHelicopter&&camera) {
     const pose=helicopterPoses(tarmacHelicopter).find(o=>o.id===68)!;
     playEvent(0x9b,aircraftSoundPoint({x:pose.position.x*32,y:pose.position.y*32,z:pose.position.z*32},camera));
+  }
+
+  if(penthouse&&creatureSim){
+    stepPenthouse(penthouse,player,currentCollisionWorld,{zone:zones.player,rand:creatureSim.rand,gateSeven:effects?.gate.seven??false,
+      cut:cutHandle,sound:(event,at)=>playEvent(event,at),touch:applyCreatureTouch,
+      guide:id=>spendGuide(guideSparkles,effects,id,true),
+      projectile:shot=>{if(effects&&camera)spawnEffect(effects,effectWorld(),shot.x,shot.y,shot.z,
+        shot.vx,shot.vy,shot.vz,shot.gravity,shot.rotation,shot.spin,shot.kind);},
+      effect:(at,kind,mode,spin)=>{
+        if(!effects||!camera||!creatureSim)return;
+        const e=spawnChild(effects,effectWorld(),at.x,at.y,at.z,kind,mode);
+        if(spin){const value=creatureSim.rand.byte()-128;if(e)e.spin=value;}
+      },
+    });drawPenthouse();
   }
 
   // The level's talkers. Only while nothing else is being said.

@@ -1747,3 +1747,22 @@ is not the already-mapped camera-shake field `0050a510`.
 Installed physics and browser checks are in `elevator-fans-probe.ts` and
 `elevator-fans-flow-check.js`. They cover real stomp landings, continuous shaft
 ascent, field boundaries, actual meshes/effects, pause and lifecycle cleanup.
+
+
+### Penthouse tracking hazards (2026-10-03)
+
+`penthouse.ts` reads six four-model records at executable offset `0xf3e74`
+and six four-byte switch records at `0xf3fb4`. The latter map collision,
+button artwork, flashing artwork and guide. Room gates follow `004295b0`.
+The controller runs after player collision and zone updates. It turns at most
+8 angle units per tick, fires every 300 ticks (first fire on tick 301), and
+retains the original strict distance checks and random aiming offsets.
+
+`00429910` lowers switch collision by 3600 game units on a real stomp and
+starts a 180-tick camera cut; `00429800` disables the hazard after 60 ticks.
+The four explosion particles use kind 35/mode 14; disabled smoke uses kind
+17/mode 26 on the shared seven-tick gate. Restart restores captured hulls
+before constructing fresh state. `penthouse-probe.ts` covers installed
+collision, damage and reset; `penthouse-flow-check.js` exercises rendered
+model motion, switches, particles and lifecycle through positioned scenarios.
+Water/floating props and mechanism routing remain separate open helpers.

@@ -7,6 +7,29 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-03 — Penthouse tracking hazards
+
+`penthouse.ts` implements the six room-gated tracking hazards (`004295b0`),
+their stomp switches (`00429910`), disable sequence (`00429800`) and projectile
+helper (`00428700`). Model and switch mappings come from the user's executable.
+
+- Hazards turn toward Buzz, fire kind 92 projectiles on the shared 300-tick
+  cycle, and apply contact damage. Projectile aim includes the two random
+  offsets visible in the original assembly but omitted by the decompiler.
+- Real stomp contacts lower each switch's collision, squash its artwork,
+  retire its guide and start a camera cut. After 60 ticks the active model pair
+  is replaced with damaged artwork, an explosion and smoke; firing stops.
+- Scripted camera cuts now keep particle spawning/culling around the displayed
+  target, so remote switch explosions remain visible while Buzz stays behind.
+- Restart restores original switch collision and fresh hazard state; exit
+  releases the controller. Installed-data probes exercise all six real stomp
+  landings, room gates, attack arithmetic, projectile damage and reset.
+- Production build and browser checks pass all six rendered hazards, real stomp
+  switches, disable bursts/model swaps, pause, restart and exit. Both gunslinger
+  fight/reward browser regressions pass with the shared camera-effects change.
+- Remaining Penthouse work: water controls/floating props, mechanism routing
+  and associated moving artwork; natural full-level traversal is unverified.
+
 ## 2026-10-03 — Elevator fan scenery and airflow
 
 `elevator-fans.ts` restores the fan portion of `00425f60` and particle helper
@@ -40,7 +63,8 @@ switches and four floating/bouncing props (`00429fb0`, collision 13–16/artwork
 39–42); six tracking hazards (`004295b0`, artwork 50–54/58 plus paired models),
 their stomp switches (`00429910`) and disable effects (`00429800`); the mechanism
 mask/rotations (`00428890`) and moving prop with far artwork (`00428e70`, 38/80).
-These are still open, not covered by the gunslinger controller.
+The six tracking hazards and their switches are covered in the newer entry above;
+the water and mechanism helpers remain open.
 
 ## 2026-10-03 — Elevator and Penthouse gunslinger combat
 
@@ -211,7 +235,7 @@ not evidence for untested interactions.
 | 8 | Al's Space Land | BBUGGY and ZGCAR hooks absent; prop-gated texture effect missing. | Buggy challenge, `0052c9b8 & 1` effect trigger and reward paths. |
 | 9 | Toy Barn Encounter | Dedicated pod controller and beam tests exist; ZGCAR hook absent. | Full fight/summon cycles and reward; determine the absent hook's role. |
 | 10 | Elevator Hop | Wire puzzle, compound lifts, GUNSP combat/reward, fan switches/rotation/airflow implemented. | Other ambient effects, exact collision/script/force timing and full-level traversal. |
-| 11 | Al's Penthouse | Shared gun enemy/buzzard handlers and GUNSL combat/reward implemented. | Water controls/floating props, tracking hazards and disable switches; other level helpers. |
+| 11 | Al's Penthouse | Shared gun enemy/buzzard handlers, GUNSL combat/reward and six tracking hazards/switches implemented. | Water controls/floating props and mechanism routing; other level helpers. |
 | 12 | The Evil Emperor Zurg | Entrance, attacks, recovery, defeat, save bit and victory/movie handoff implemented in `zurg-boss.ts`. Installed-data and focused browser checks pass. | Unassisted combat, original-versus-port camera/render comparison and detail-dependent particles. |
 | 13 | Airport Infiltration | Five authored transport routes, shared gun/buzzard handlers and Prospector fight/reward implemented. | Exact collision/script timing comparison and full-level traversal; distinct from Tarmac. |
 | 14 | Tarmac Trouble | Plane motion/collision, wheels/fans, ground/climbing passengers, wheel hazards and helicopter hover/rotors/token motion and light puzzle/lowering implemented and tested. Slinky timed-path rules and retry implemented. Near/far scenery sway, rain/plane sound, rain particles and lightning/thunder restored. Blacksmith recovery, defeat and delayed reward implemented; axe throws implemented; hit flashing missing. Shared gun enemy and buzzard handlers implemented. | Remaining creature hooks and other ambient effects; pitch/roll attachment on other movers. |

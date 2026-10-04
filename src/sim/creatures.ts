@@ -200,6 +200,8 @@ export interface CreatureSim {
   /** Shared renderer/effect dividers used by creature-owned emitters. */
   effectGates?: {four:boolean;eight:boolean};
   emissions: {x:number;y:number;z:number;kind:number;mode:number}[];
+  /** Local emitter positions resolved through the animated model by the host. */
+  attachedEmissions: {creature:Creature;part:number;offset:{x:number;y:number;z:number};kind:number;mode:number}[];
   /** Level-owned behavior after shared movement/animation, before contacts. */
   levelHandler?: (c: Creature, args: HandlerArgs, player: { x: number; y: number; z: number }) => void;
   creatures: Creature[];
@@ -346,7 +348,7 @@ export function createCreatureSim(
   }
   return {
     creatures, world, rand, level,
-    sounds: [], rescues: [], sparks: [], dust: [], emissions: [], raceState: 0, carFront: 0, carRear: 0, shots: [], beamCasters: [], gunShots: [], deaths: [], defeatBursts: [], near: [],
+    sounds: [], rescues: [], sparks: [], dust: [], emissions: [], attachedEmissions: [], raceState: 0, carFront: 0, carRear: 0, shots: [], beamCasters: [], gunShots: [], deaths: [], defeatBursts: [], near: [],
     foundCount: 0, lastKilled: -1, models: null,
     bossLastHealth: -1, bossSlotEarned: false, smithThrows: [],
   };
@@ -1140,6 +1142,31 @@ const zurgCar:CreatureHandler=(sim,c,args)=>{
   }
 };
 
+/** 004068e0: each box owns the two following plane slots. */
+const planeBox:CreatureHandler=(sim,c)=>{
+  if(c.timer===0)return;
+  c.timer=0;c.wait=0;c.script=AI_SCRIPTS[21]!;
+  const plane=[1,2].map(n=>sim.creatures.find(p=>p.slot===c.slot+n&&p.type===24)).find(p=>p?.health===0);
+  if(plane){plane.respawn=30;c.pc=0x6a/2;}else c.pc=0x76/2;
+};
+
+/** 00406960: take off from the owning box, contact crash and posed exhaust. */
+const boxPlane:CreatureHandler=(sim,c)=>{
+  if(c.deathTimer>=0)sim.sounds.push({event:0x5d,x:c.x,y:c.y,z:c.z});
+  if((c.flags&CREATURE_FLAGS.touched)!==0&&c.health===1)damageCreature(sim,c,(c.heading-0x800)&YAW_MASK,1);
+  if(c.timer!==0){
+    c.timer=0;
+    const box=[1,2].map(n=>sim.creatures.find(p=>p.slot===c.slot-n&&p.type===25)).find(Boolean);
+    if(box){
+      c.homeY=box.y-0x5000;
+      c.x=box.x;c.y=box.y;c.z=box.z;
+      c.targetX=box.x;c.targetY=c.homeY;c.targetZ=box.z;
+    }
+  }
+  if(sim.effectGates?.eight&&(c.flags&CREATURE_FLAGS.awake)!==0)
+    sim.attachedEmissions.push({creature:c,part:0,offset:{x:0,y:-200,z:400},kind:0x58,mode:3});
+};
+
 /** 00406a90: the wordcode sets timer when the gun animation fires. */
 const fatBloke:CreatureHandler=(sim,c,_args,player)=>{
   if(c.timer===0||!player)return;
@@ -1180,6 +1207,8 @@ export const CREATURE_HANDLERS: Record<string, CreatureHandler> = {
   LAB_00406220: hoverBot,
   LAB_004064a0: zurgCar,
   LAB_00406620: laserPod,
+  LAB_004068e0: planeBox,
+  LAB_00406960: boxPlane,
   FUN_00416ab0: tinRobot,
   LAB_00406a60: raceCar,
   LAB_00406a90: fatBloke,
@@ -1206,6 +1235,7 @@ export function stepCreatures(
   sim.gunShots.length = 0;
   sim.smithThrows.length = 0;
   sim.emissions.length = 0;
+  sim.attachedEmissions.length = 0;
   const near: number[] = [];
 
   for (let i = 0; i < sim.creatures.length; i++) {

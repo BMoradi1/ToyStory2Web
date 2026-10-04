@@ -575,3 +575,17 @@ posed mesh bounds rather than the retail hit-radius sphere. This enables
 visibility-gated effects without forcing all creatures visible. Clearing a
 level now clears both model-hit data and artwork caches; previously the retained
 hit-data cache prevented shared creature artwork from loading in later levels.
+
+### Box-launched planes (2026-10-03)
+
+BOX (`004068e0`, type 25) consumes timer +0x8a and checks health at the
+following two 0x9c-byte entities. The first zero-health plane receives respawn
+30; script 21 resumes at word 53, or word 59 when both are occupied. Installed
+levels 5 and 7 contain five consecutive BOX/BPLANE/BPLANE triples.
+
+BPLANE (`00406960`, type 24) consumes its initialization timer, finds its box
+one or two slots earlier, copies its live position and sets home/target Y to
+box Y minus 0x5000. Sound 0x5d runs until the negative death countdown; touched
+one-health planes receive damage kind 1 at heading minus 0x800. Visible planes
+emit kind 88/mode 3 on the eight-tick gate at local part-zero offset
+(0,-200,400), transformed through the current animation by the host.

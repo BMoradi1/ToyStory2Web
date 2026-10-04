@@ -12,9 +12,9 @@ This is static inventory, **not** a completed playthrough or parity score. Missi
 | 2 (2) | andy's neighborhood | yes | LAWN (12), ZKITE (15) | 0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 12 | 6 / 5 | taunt/reward hooks; inspect per-creature combat |
 | 3 (6) | bombs away | yes | — | — | 0 / 0 | tasks.ts stepBossFight |
 | 4 (4) | construction yard | yes | DRILL (22) | 1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 21, 22, 23, 24, 25, 26 | 5 / 0 | taunt/reward hooks; inspect per-creature combat |
-| 5 (5) | alleys and gullies | yes | BOX (25), BPLANE (24), CLOWN (32), ZBOAT (27) | 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 19, 20, 21, 22, 23, 24, 25 | 37 / 11 | taunt/reward hooks; inspect per-creature combat |
+| 5 (5) | alleys and gullies | yes | CLOWN (32), ZBOAT (27) | 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 19, 20, 21, 22, 23, 24, 25 | 37 / 11 | taunt/reward hooks; inspect per-creature combat |
 | 6 (3) | slime time | yes | — | — | 0 / 0 | slime-boss.ts |
-| 7 (7) | al's toy barn | yes | DINO (26), BOX (25), BPLANE (24) | 0, 1, 2, 3, 4, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 | 4 / 1 | taunt/reward hooks; inspect per-creature combat |
+| 7 (7) | al's toy barn | yes | DINO (26) | 0, 1, 2, 3, 4, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 | 4 / 1 | taunt/reward hooks; inspect per-creature combat |
 | 8 (8) | al's space land | yes | BBUGGY (47) | 2 | 9 / 9 | none |
 | 9 (9) | toy barn encounter | yes | — | — | 0 / 0 | pod-boss.ts |
 | 10 (10) | elevator hop | yes | — | 18 | 0 / 1 | gunslinger.ts + tasks.ts reward |
@@ -29,13 +29,9 @@ This is static inventory, **not** a completed playthrough or parity score. Missi
 - andy's neighborhood: LAWN, type 12, slots 0 → FUN_00418ce0.
 - andy's neighborhood: ZKITE, type 15, slots 26 → FUN_004189c0.
 - construction yard: DRILL, type 22, slots 24 → FUN_0041b780.
-- alleys and gullies: BOX, type 25, slots 0, 8, 30 → LAB_004068e0.
-- alleys and gullies: BPLANE, type 24, slots 1, 2, 9, 10, 31, 32 → LAB_00406960.
 - alleys and gullies: CLOWN, type 32, slots 3 → FUN_0041ddb0.
 - alleys and gullies: ZBOAT, type 27, slots 5, 15, 16, 17 → FUN_0041df70.
 - al's toy barn: DINO, type 26, slots 0 → FUN_00420af0.
-- al's toy barn: BOX, type 25, slots 16, 19 → LAB_004068e0.
-- al's toy barn: BPLANE, type 24, slots 17, 18, 20, 21 → LAB_00406960.
 - al's space land: BBUGGY, type 47, slots 40 → FUN_00422660.
 - tarmac trouble: SMITH, type 58, slots 46 → FUN_0042d3e0.
 - andy's house: types without a shared creature definition COTBIT (11), BOPEEP (7), ZURG1 (3), HAMM (10); may be NPCs, props or level-owned, not automatically missing behavior.

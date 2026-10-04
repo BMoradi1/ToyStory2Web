@@ -1586,6 +1586,13 @@ function spawnCreatureEffects(): void {
   const world = effectWorld();
   for(const e of creatureSim.emissions)spawnChild(effects,world,e.x,e.y,e.z,e.kind,e.mode);
   creatureSim.emissions.length=0;
+  for(const e of creatureSim.attachedEmissions){
+    const c=e.creature,art=creatureArt.get(c.type),animation=art?.anm?.animations[c.animState];
+    const pose=art?.anm&&animation?poseBone(art.anm,animation,(c.frame>>>16)%Math.max(1,animation.frameCount),e.part):null;
+    const at=podAttachment(c,pose,e.offset);
+    spawnChild(effects,world,at.x,at.y,at.z,e.kind,e.mode);
+  }
+  creatureSim.attachedEmissions.length=0;
   for (const at of creatureSim.rescues) {
     addPointLight(pointLights, spawnPickupBurst(effects, world, at, 50));
   }
@@ -2209,6 +2216,12 @@ function drawCreatures(): void {
           spin ? spin.map((a) => (a << 4) * (Math.PI * 2 / 4096)) : null,
         ),
         sceneTextures,
+      );
+      // A respawn may have installed its first mesh above; place that new mesh now.
+      viewer.placeCreatureMesh(
+        c.slot,
+        c.x * GAME_TO_RENDER, -c.y * GAME_TO_RENDER, -c.z * GAME_TO_RENDER,
+        toRadians(c.heading), c.drawScale,
       );
     }
     if(tasks?.prospector){

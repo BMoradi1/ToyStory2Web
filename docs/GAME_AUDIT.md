@@ -7,6 +7,23 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-03 — Box-launched planes in Alleys and Toy Barn
+
+- Implemented the shared BOX (`004068e0`) and BPLANE (`00406960`) handlers.
+  Each launcher chooses the first dormant plane in its authored pair, starts
+  its 30-tick spawn countdown and selects the original open/busy script branch.
+- Planes take off from their current parent box, target its elevated flight
+  height, play event 0x5d, crash on one-health contact and emit kind-88 exhaust
+  through animated part zero on the original visibility/eight-tick gates.
+- Newly created posed models now receive their live position immediately,
+  avoiding a frame at the origin on respawn or scripted summons.
+- Probes pass all five installed box/plane pairs (ten plane placements), natural
+  script launches, occupied-pair handling, spawn timing, takeoff, crashes and
+  exhaust gates. Browser checks pass every launcher in levels 5 and 7, live
+  trails/sound, mesh position, pause, restart and exit. Production build passes.
+  Buzz is positioned and protected for these focused checks; full traversal
+  and the levels' other missing handlers remain open.
+
 ## 2026-10-03 — Shared Zurg cars and cross-level creature rendering
 
 - Implemented `004064a0` for all 17 Zurg-car placements in levels 2, 4, 8
@@ -353,9 +370,9 @@ not evidence for untested interactions.
 | 2 | Andy's Neighborhood | LAWN and ZKITE hooks absent; ZGCAR hook implemented. | Lawnmower/kite state machines, moving scenery and race/reset behavior. |
 | 3 | Bombs Away (internal 6) | `stepBossFight` exists. | Complete boss attacks, damage windows, defeat, token and replay. |
 | 4 | Construction Yard | DRILL hook absent; ZGCAR implemented; trailer paint implemented, outdoor cans missing. | Drill, outdoor paint and collision movement, then token routes. |
-| 5 | Alleys and Gullies | BOX, BPLANE, CLOWN and ZBOAT hooks absent. | Boat/plane and clown behavior; 37 poles and 11 zip lines need route checks. |
+| 5 | Alleys and Gullies | CLOWN and ZBOAT hooks absent; BOX/BPLANE launch cycle implemented. | Boat and clown behavior; 37 poles and 11 zip lines need route checks. |
 | 6 | Slime Time (internal 3) | Dedicated slime controller exists. | Full encounter, arena effects, reward and replay comparison. |
-| 7 | Al's Toy Barn | DINO, BOX and BPLANE hooks absent. | Dinosaur encounter and original moving-collision calls. |
+| 7 | Al's Toy Barn | DINO hook absent; BOX/BPLANE launch cycle implemented. | Dinosaur encounter and original moving-collision calls. |
 | 8 | Al's Space Land | BBUGGY hook absent; ZGCAR implemented; prop-gated texture effect missing. | Buggy challenge, `0052c9b8 & 1` effect trigger and reward paths. |
 | 9 | Toy Barn Encounter | Dedicated pod controller, beam tests and ZGCAR hook implemented. | Full natural fight/summon cycles and reward traversal. |
 | 10 | Elevator Hop | Wire puzzle, compound lifts, GUNSP combat/reward, fan switches/rotation/airflow implemented. | Other ambient effects, exact collision/script/force timing and full-level traversal. |

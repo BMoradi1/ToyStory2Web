@@ -58,6 +58,12 @@
     check(Math.abs(mesh.rotation.z-angle)<1e-8,'kite roll not drawn');rolled||=Math.abs(angle)>0.1;moved||=Math.hypot(boss().x-start.x,boss().z-start.z)>1000;
   }
   check(rolled&&moved,'kite movement/roll absent');
+  ts2.viewer.frame(ts2.viewer.lastTime); // Draw the frozen simulation without advancing it.
+  const chain=ts2.tasks.kite.chain,tailDraw=ts2.viewer.kiteTail;
+  check(chain.visible&&chain.points.length===16,'tail chain missing');
+  check(tailDraw.group.visible&&tailDraw.line.geometry.drawRange.count===30,'tail line not drawn');
+  check(tailDraw.bows.mesh.visible&&tailDraw.bows.mesh.geometry.drawRange.count===96,'16 tail bows not drawn');
+  check(chain.points.some((p,i)=>i>0&&Math.abs(p.x-chain.points[0].x)>10),'tail never bends');
   ts2.openMenu();const frozen=JSON.stringify(ts2.tasks.kite);ts2.tickGame({},100,0);check(JSON.stringify(ts2.tasks.kite)===frozen,'paused kite advanced');ts2.pressMenu('back');ts2.tickGame({},1,0);
   let flashed=false;
   for(let hit=0;hit<5;hit++){
@@ -69,7 +75,7 @@
   }
   check(flashed,'kite never flashed');
   let tail=false;for(let i=0;i<120;i++){position();ts2.tickGame({},1,0);tail||=ts2.effects.activeKinds.includes(58);}
-  check(tail,'falling kite tail particles missing');check(token().enabled&&(ts2.tasks.done&16),'kite token missing');
+  check(tail,'falling kite tail particles missing');check(!ts2.viewer.kiteTail.group.visible&&!ts2.tasks.kite.chain.visible,'tail survived reward');check(token().enabled&&(ts2.tasks.done&16),'kite token missing');
   ts2.tickGame({},260,0);
   for(let i=0;i<10&&!(ts2.pickups.tokens&16);i++){const t=token();ts2.setPlayerPos(t.x*32,t.z*32,t.y*32);ts2.tickGame({},1,0);}
   check((ts2.pickups.tokens&16)&&(ts2.save.tokens[level]&16),'kite token collection/save failed');
@@ -80,6 +86,6 @@
   ts2.pressMenu('select');ts2.tickGame({},1);ts2.pressMenu('down');ts2.tickGame({},1);ts2.pressMenu('select');ts2.tickGame({},1);
   await wait(()=>['summary','select'].includes(ts2.front.screen),'exit failed');
   if(ts2.front.screen==='summary'){ts2.frontDrive(0,650);ts2.frontDrive(0x4000);ts2.frontDrive(0,130);}
-  await wait(()=>ts2.front.screen==='select','selector missing');check(ts2.tasks===null&&ts2.effects===null,'Neighborhood state leaked after exit');
-  console.log('PASS mower particles/sound, kite natural intro/movement/roll, injected-hit flash/defeat, tail particles/token/save, pause/restart/exit');
+  await wait(()=>ts2.front.screen==='select','selector missing');check(ts2.tasks===null&&ts2.effects===null,'Neighborhood state leaked after exit');check(!ts2.viewer.kiteTail.group.visible,'tail leaked after exit');
+  console.log('PASS mower particles/sound, kite natural intro/movement/roll, injected-hit flash/defeat, segmented tail/bows/particles/token/save, pause/restart/exit');
 })()

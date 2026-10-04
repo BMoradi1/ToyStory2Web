@@ -807,7 +807,7 @@ async function open(dir: GameDir): Promise<void> {
       get tasks() {
         return tasks ? {
           done: tasks.done, hintIndex: tasks.hintIndex, slime: tasks.slime ? { ...tasks.slime } : null,
-          kite:tasks.kite?{...tasks.kite}:null,
+          kite:tasks.kite?structuredClone(tasks.kite):null,
           buggy:tasks.buggy?{...tasks.buggy}:null,
           dinosaur:tasks.dinosaur?{...tasks.dinosaur}:null,
           drill:tasks.drill?{...tasks.drill}:null,
@@ -1448,6 +1448,7 @@ async function spawnPlayer(): Promise<void> {
   waterEffects=createWaterEffects(player.y);
   pointLights=createPointLights(exeBytes&&level>=1&&level<=15?readCharacterLight(exeBytes,level):null);playerLight=null;
   viewer.setCardSheet(sceneTextures.get(SPRITE_SHEET) ?? null);
+  viewer?.kiteTail.set(null,undefined,null,undefined);
   laserBeams.length = 0;
   aimView = createAimView();
   aimLock = createAimLock();
@@ -1829,6 +1830,8 @@ function drawEffects(): void {
   effectCards.length = 0;
   effectFlat.length = 0;
   if (!viewer || !effects) return;
+  const tailHeader=spriteTable[51];
+  viewer.kiteTail.set(tasks?.kite?.chain??null,tailHeader??undefined,tailHeader?sceneTextures.get(tailHeader.texture)??null:null,tailHeader?sceneSheets.get(tailHeader.texture):undefined);
   const sheet = sceneSheets.get(SPRITE_SHEET);
   if (!sheet) { viewer.setEffectCards(effectCards, effectFlat); return; }
   const pages=new Map<number,{texture:THREE.Texture;cards:WorldSprite[];flat:WorldSprite[]}>();
@@ -3007,6 +3010,7 @@ function discardLevel(): void {
   pickups = null;
   effects = null;
   pointLights=createPointLights();playerLight=null;
+  viewer?.kiteTail.set(null,undefined,null,undefined);
   laserBeams.length = 0;
   aimView = createAimView();
   aimLock = createAimLock();

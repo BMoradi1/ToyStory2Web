@@ -1,3 +1,4 @@
+import {KiteTailRenderer} from './kite-tail.ts';
 import {Backdrop} from './backdrop.ts';
 import type { FlareSprite } from '../sim/lens-flare.ts';
 import type { SpriteHeader } from '../formats/sprite-table.ts';
@@ -713,6 +714,7 @@ export class Viewer {
    * additive, and the rest ride the coins' translucent batch.
    */
   private readonly effectCards = new SpriteBatch(false, 'add');
+  readonly kiteTail=new KiteTailRenderer();
   private readonly effectFlat = new SpriteBatch(true, 'add');
   private cards: readonly WorldSprite[] = [];
   private shadows: readonly WorldSprite[] = [];
@@ -1206,6 +1208,8 @@ export class Viewer {
     }
     this.coinCards.update(this.cards, this.camera);
     this.coinShadows.update(this.shadows, this.camera);
+    if(!this.kiteTail.group.parent)this.scene.add(this.kiteTail.group);
+    this.kiteTail.update(this.camera);
     this.effectCards.update(this.effects, this.camera);
     for(const [page,data] of this.effectPageData){
       const batches=this.effectPages.get(page)!;

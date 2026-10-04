@@ -1,3 +1,4 @@
+import {createKiteTail,stepKiteTail} from './kite-tail.ts';
 /** Neighborhood creature hooks: lawnmower 00418ce0 and kite 004189c0/004190c0. */
 import {CREATURE_FLAGS,type Creature,type HandlerArgs,type RandomStream} from './creatures.ts';
 import type {Effect} from './effects.ts';
@@ -24,7 +25,7 @@ export function updateMowerRange(c:Creature|undefined,p:Point):void{
 }
 export function createKite(c:Creature){
   c.flags|=CREATURE_FLAGS.diedOnce;
-  return {health:c.health,hurt:0,frame:0,flash:false,roll:0,bob:0,spin:0,barTicks:0,tail:{x:c.x,y:c.y,z:c.z}};
+  return {health:c.health,hurt:0,frame:0,flash:false,roll:0,bob:0,spin:0,barTicks:0,chain:createKiteTail(c),tail:{x:c.x,y:c.y,z:c.z}};
 }
 export type Kite=ReturnType<typeof createKite>;
 export function stepKite(s:Kite,c:Creature,args:HandlerArgs,p:Point&{phase:number;rand:RandomStream;sound:(event:number)=>void;lookAt:(at:Point)=>void}):void{
@@ -50,7 +51,7 @@ export function stepKite(s:Kite,c:Creature,args:HandlerArgs,p:Point&{phase:numbe
   c.y=Math.min(c.y,-0x741ad);
 }
 export function stepKiteLevel(s:Kite,c:Creature|undefined,phase:number,w:Point&{
-  gateFour:boolean;attachment?:(c:Creature,part:number,offset:Point)=>Point;
+  cameraEye?:Point;gateFour:boolean;attachment?:(c:Creature,part:number,offset:Point)=>Point;
   effect?:(x:number,y:number,z:number,kind:number,mode:number)=>void;
 },dt=1):number{
   s.barTicks=Math.max(0,s.barTicks-dt);
@@ -62,6 +63,7 @@ export function stepKiteLevel(s:Kite,c:Creature|undefined,phase:number,w:Point&{
     if(w.gateFour&&d2<0x40000)w.effect?.(s.tail.x,s.tail.y,s.tail.z,58,3);
   }else if(phase>=120)phase=200;
   else if(c&&c.type>0)s.tail=w.attachment?.(c,0,{x:0,y:384,z:0})??{x:c.x,y:c.y+12288,z:c.z};
+  stepKiteTail(s.chain,s.tail,w.cameraEye??w,phase,dt);
   return phase;
 }
 export function kiteBar(s:Kite,c:Creature|undefined):number{

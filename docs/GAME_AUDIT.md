@@ -7,6 +7,23 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-03 — Kite tail physics and rendering
+
+- Restored the 16-point chain (`0044e620/0044e710`): 4096-unit initial spacing,
+  signed-short velocities, 30/32 damping, two-sided constraint correction,
+  gravity 96 and the original local roof surface/edge response.
+- The tail follows the animated kite attachment, freezes outside the camera's
+  strict 800-by-256-unit range, falls after defeat and hides at reward phase 200.
+- Restored `0044eb90` rendering: 15 red line segments with decreasing intensity
+  and sixteen 140-by-140 bow cards from the level's sprite 51. No game artwork
+  was added to the repository. The shared viewer clears the tail on restart/exit.
+- Physics probe passes range, movement, signed velocity, roof and defeat
+  boundaries. Neighborhood browser flow passes bent-chain geometry, all bow
+  cards, pause, defeat/reward and exit cleanup. Visual inspection confirms the
+  chain hangs from the kite and rests on the roof. Build passes.
+- Coincident points use a downward fallback instead of the original undefined
+  divide-by-zero result. PC line rasterization/antialiasing differs from WebGL.
+
 ## 2026-10-03 — Tarmac blacksmith presentation and cleanup
 
 - Completed the split blacksmith controller's alternating hit flash and
@@ -47,7 +64,7 @@ a completed original-versus-port playthrough.**
 - Restored kite roll/bob, player-facing steering, dive/retreat behavior, height
   limits, health-change response, camera-look request and 10-health bar.
 - Restored post-removal falling-tail particles and the delayed slot-4 reward.
-  The separate segmented tail mesh remains unimplemented; moving scenery and
+  The segmented tail was restored in the follow-up above; moving scenery and
   the Neighborhood's full natural routes remain open.
 - Applied the already-computed creature roll to drawn models. Previously the
   simulation/attachments leaned while creature meshes stayed upright.
@@ -475,7 +492,7 @@ not evidence for untested interactions.
 | Play order | Level | Confirmed gaps / implementation evidence | Next behavior comparison |
 |---|---|---|---|
 | 1 | Andy's House | Tin intro/fight/reward integration tested; hover wobble/sparks partial. Chair stomp and pushables implemented. | Remaining numbered props and platforms; all five token routes. |
-| 2 | Andy's Neighborhood | Lawnmower effects, kite flight/combat/reward and ZGCAR hook implemented. | Segmented kite tail mesh, moving scenery and natural race/token routes. |
+| 2 | Andy's Neighborhood | Lawnmower effects, kite flight/combat/reward and ZGCAR hook implemented. | Moving scenery and natural race/token routes. |
 | 3 | Bombs Away (internal 6) | `stepBossFight` exists. | Complete boss attacks, damage windows, defeat, token and replay. |
 | 4 | Construction Yard | DRILL combat/reward and ZGCAR implemented; trailer paint implemented, outdoor cans missing. | Outdoor paint and collision movement, then token routes. |
 | 5 | Alleys and Gullies | BOX/BPLANE launch cycle, boat cannon and clown combat/reward implemented. | Moving scenery/collision; 37 poles and 11 zip lines need route checks. |
@@ -487,7 +504,7 @@ not evidence for untested interactions.
 | 11 | Al's Penthouse | Shared enemies, GUNSL combat/reward, hazards, water/floats, train routing and underwater movement implemented. | Underwater camera colour/warp, light/texture helpers and collision 24 review. |
 | 12 | The Evil Emperor Zurg | Entrance, attacks, recovery, defeat, save bit and victory/movie handoff implemented in `zurg-boss.ts`. Installed-data and focused browser checks pass. | Unassisted combat, original-versus-port camera/render comparison and detail-dependent particles. |
 | 13 | Airport Infiltration | Five authored transport routes, shared gun/buzzard handlers and Prospector fight/reward implemented. | Exact collision/script timing comparison and full-level traversal; distinct from Tarmac. |
-| 14 | Tarmac Trouble | Plane motion/collision, wheels/fans, ground/climbing passengers, wheel hazards and helicopter hover/rotors/token motion and light puzzle/lowering implemented and tested. Slinky timed-path rules and retry implemented. Near/far scenery sway, rain/plane sound, rain particles and lightning/thunder restored. Blacksmith recovery, defeat and delayed reward implemented; axe throws implemented; hit flashing missing. Shared gun enemy and buzzard handlers implemented. | Remaining creature hooks and other ambient effects; pitch/roll attachment on other movers. |
+| 14 | Tarmac Trouble | Plane motion/collision, wheels/fans, ground/climbing passengers, wheel hazards and helicopter hover/rotors/token motion and light puzzle/lowering implemented and tested. Slinky timed-path rules and retry implemented. Near/far scenery sway, rain/plane sound, rain particles and lightning/thunder restored. Blacksmith recovery, defeat and delayed reward implemented; axe throws, hit flashing and bar expiry implemented. Shared gun enemy and buzzard handlers implemented. | Other ambient effects and natural token routes; pitch/roll attachment on other movers. |
 | 15 | Final Showdown | Stage and three fighter controllers implemented in `finale.ts`; rendered entrance, attacks, rescue, completion save, ending/credits and replay tested. | Natural combat completion; exact roll/framing and voice/pitch parity. |
 
 ## Prioritized work

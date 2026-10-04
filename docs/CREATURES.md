@@ -616,8 +616,8 @@ the original unsigned comparison. Its final vulnerability write overrides the
 recovery writes: 4 without an active disk or before the fight, 5 otherwise.
 The level adjusts body radius to 3800 above its height threshold, else 1800.
 
-Dust kind 4/mode 9 uses the four-tick gate and period 32. Above the fight-height
-threshold, sixteen-tick debris chooses aimed kind 84 one-quarter of the time,
+Dust kind 4/mode 9 uses the four-tick gate and lifetime 32. Above the fight-height
+threshold, 32-tick debris chooses aimed kind 84 one-quarter of the time,
 else mode 14. The aimed branch uses truncated sqrt distance in 32-unit steps,
 three-quarter distance as horizontal speed and the original ballistic division;
 a zero divisor is guarded. Both branches consume the next random byte for spin

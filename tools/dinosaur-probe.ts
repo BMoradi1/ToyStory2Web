@@ -42,7 +42,7 @@ function fresh(){
  const offset=c.hitShapes![0]!.offset;assert.deepEqual([lights[0].x,lights[0].y,lights[0].z],[c.x+offset.x,c.y+offset.y,c.z+offset.z]);assert(sounds.includes(-2));
  w.phase=3;c.wait=0;stepCreatures(sim,{x:c.x,y:c.y,z:c.z});assert.equal(c.animState,2,'authored collapse animation');
  w.gateSeven=true;c.frame=10*65536;w.rand=new RandomStream(new Uint8Array([1]));stepDinosaur(s,c,w);
- assert.equal(fx.filter(e=>e.kind===35).length,5,'defeat burst occurs once');assert(fx.some(e=>e.kind===17&&e.width===40));assert(fx.some(e=>e.kind===4&&e.period===26));assert.equal(c.record.vulnerable,4,'defeat never reopens combat');
+ assert.equal(fx.filter(e=>e.kind===35).length,5,'defeat burst occurs once');assert(fx.some(e=>e.kind===17&&e.width===40));assert(fx.some(e=>e.kind===4&&e.life===26));assert.equal(c.record.vulnerable,4,'defeat never reopens combat');
 }
 {
  const {c,s,sim}=fresh(),tasks=createTasks();tasks.dinosaur=s;c.flags|=CREATURE_FLAGS.near;

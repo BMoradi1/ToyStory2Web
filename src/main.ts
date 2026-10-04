@@ -3204,7 +3204,7 @@ function startBossFight(level: number): void {
       stepDrill(tasks.drill,c,{...p,phase:tasks.boss,rand:creatureSim.rand,
         disksActive:effects.effects.some(e=>e.life>0&&(e.kind===EFFECT_KIND.diskHoming||e.kind===EFFECT_KIND.diskStraight)),
         shake:camera.shake,setShake:ticks=>{if(camera)camera.shake=ticks;},
-        gateFour:effects.gate.four,gateSixteen:effects.gate.sixteen,
+        gateFour:effects.gate.four,gateThirtyTwo:effects.gate.thirtyTwo,
         sound:event=>playEvent(event,c),effect:(at,kind,mode)=>spawnChild(effects!,world,at.x,at.y,at.z,kind,mode),
         projectile:(at,v,gravity,kind)=>spawnEffect(effects!,world,at.x,at.y,at.z,v.x,v.y,v.z,gravity,0,0,kind),
       },args.dt);

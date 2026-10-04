@@ -51,10 +51,10 @@
   let exposed=false;
   const ammo=ts2.effects.diskAmmo;ts2.player.laser=0;
   for(let i=0;i<60&&!exposed;i++){
-    position(false);ts2.tickGame({fire:ts2.effects.diskAmmo===ammo},1,0);
+    position(false);ts2.player.fallTimer=0;ts2.tickGame({fire:ts2.effects.diskAmmo===ammo},1,0);
     exposed=boss().vulnerable===5&&ts2.effects.disks.length>0;
   }
-  check(exposed&&ts2.effects.diskAmmo<ammo,'real disk did not expose drill '+JSON.stringify({boss:boss(),effects:ts2.effects}));
+  check(exposed&&ts2.effects.diskAmmo<ammo,'real disk did not expose drill '+JSON.stringify({boss:boss(),effects:ts2.effects,player:ts2.player}));
   ts2.hurtCreature(24,2);check(boss().health<health,'spin failed while disk active');
   let flashed=false;
   for(let i=0;i<200;i++){

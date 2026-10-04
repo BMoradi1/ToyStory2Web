@@ -7,6 +7,14 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-03 — Emitter timing cross-check
+
+A follow-up against the documented native divider and effect-record fields
+corrected jackhammer debris to the 32-tick gate, jackhammer dust to lifetime
+32, and dinosaur collapse smoke to lifetime 24..54. These are lifetime writes,
+not animation-period writes. Probes now verify those fields and the actual
+64-tick/two-emission cadence. Both boss browser flows and the build pass.
+
 ## 2026-10-03 — Toy Barn dinosaur
 
 - Restored `00420af0`: animated part-one breath, original random consumption,
@@ -28,7 +36,7 @@ a completed original-versus-port playthrough.**
 - Implemented `0041b780`: arena grid entry constraints from runtime tables,
   floor clamp, contact/engine events, proximity camera shake, alternating hit
   lighting and the original vulnerability rule tied to active disks.
-- Restored four-tick dust and sixteen-tick debris emission, including the
+- Restored four-tick dust and 32-tick debris emission, including the
   aimed ballistic branch, shared random order, sprite size/spin and damage.
   Coincident horizontal positions skip the retail divide-by-zero branch.
 - Matched the level tick's height-dependent update range, 30-health bar,

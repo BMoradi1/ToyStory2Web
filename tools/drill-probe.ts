@@ -8,14 +8,14 @@ import {createDrill,readDrillArena,stepDrill,stepDrillLevel,drillBar,drillDebris
 import {createTasks,stepTasks} from '../src/sim/tasks.ts';
 import {LEVEL_TASKS} from '../src/sim/level-data.ts';
 import {readEffectTable,EFFECT} from '../src/formats/effect-table.ts';
-import {createEffects,spawnEffect,stepEffects,touchPlayer} from '../src/sim/effects.ts';
+import {createEffects,spawnEffect,stepEffects,stepEffectGates,touchPlayer} from '../src/sim/effects.ts';
 const exe=readFileSync('Toy Story 2/toy2.exe'),arena=readDrillArena(exe);
 const raw=unpackRaw(readFileSync('Toy Story 2/data/level04/level.raw'));
 const p=parseCreatureList(raw.find(r=>r.type===35)!.data).find(c=>c.type===22)!;
 function fresh(){
  const sim=createCreatureSim([p],{groundY:()=>null},new RandomStream(new Uint8Array([0,192])),4),c=sim.creatures[0]!,s=createDrill(c,arena);
  const sounds:number[]=[],shakes:number[]=[],fx:any[]=[],shots:any[]=[];
- const w={x:c.x+20000,y:-640000,z:c.z,phase:2,disksActive:false,shake:0,gateFour:false,gateSixteen:false,rand:sim.rand,
+ const w={x:c.x+20000,y:-640000,z:c.z,phase:2,disksActive:false,shake:0,gateFour:false,gateThirtyTwo:false,rand:sim.rand,
   setShake:(n:number)=>shakes.push(n),sound:(n:number)=>sounds.push(n),
   effect:(at:any,kind:number,mode:number)=>{const e:any={...at,kind,mode};fx.push(e);return e;},
   projectile:(at:any,velocity:any,gravity:number,kind:number)=>{const e:any={...at,velocity,gravity,kind};shots.push(e);return e;}};
@@ -37,8 +37,8 @@ for(const prior of [0,1,16,17]){
  w.phase=2;w.shake=10;w.x=c.x;w.y=c.y;w.z=c.z;stepDrill(s,c,w);assert(shakes.includes(40));
  c.flags|=CREATURE_FLAGS.touched;stepDrill(s,c,w);assert(!(c.flags&CREATURE_FLAGS.touched));assert(sounds.includes(0x9a));
  c.y=-639967;stepDrill(s,c,w);assert.equal(c.y,-0x9c3e0);
- w.x=c.x+64000;w.y=-640000;w.z=c.z;w.gateFour=w.gateSixteen=true;stepDrill(s,c,w);
- assert.equal(fx.at(-1).kind,4);assert.equal(fx.at(-1).period,32);assert.equal(shots.length,1);assert.equal(shots[0].kind,84);assert.equal(shots[0].width,100);assert.equal(shots[0].spin,64);
+ w.x=c.x+64000;w.y=-640000;w.z=c.z;w.gateFour=w.gateThirtyTwo=true;stepDrill(s,c,w);
+ assert.equal(fx.at(-1).kind,4);assert.equal(fx.at(-1).life,32);assert.equal(shots.length,1);assert.equal(shots[0].kind,84);assert.equal(shots[0].width,100);assert.equal(shots[0].spin,64);
  w.rand=new RandomStream(new Uint8Array([3,0]));stepDrill(s,c,w);assert.equal(fx.at(-1).kind,84);assert.equal(fx.at(-1).mode,14);assert.equal(fx.at(-1).spin,-128);
  const count=shots.length+fx.length;w.phase=3;stepDrill(s,c,w);assert.equal(shots.length+fx.length,count,'defeat suppresses debris');
 }
@@ -58,4 +58,9 @@ const table=readEffectTable(exe),pool=createEffects(table.kinds,table.modes,new 
 const ew={cameraX:0,cameraY:0,cameraZ:0,playerX:100000,playerY:0,playerZ:0,playerYaw:0,playerVx:0,playerVz:0,groundAt:()=>null,waterY:null};
 const e=spawnEffect(pool,ew,0,0,0,1500,-2730,0,128,0,0,84)!;assert(e);stepEffects(pool,ew);assert(e.x>0&&e.y<0);
 ew.playerX=e.x;ew.playerY=e.y+EFFECT.hitAbove;ew.playerZ=e.z;touchPlayer(pool,ew);assert.notEqual(pool.hurt,null);
+{
+ const {c,s,w,shots}=fresh();
+ for(let i=0;i<64;i++){stepEffectGates(pool);w.gateThirtyTwo=pool.gate.thirtyTwo;stepDrill(s,c,w);}
+ assert.equal(shots.length,2,'native ca divider is 32 ticks, not 16');
+}
 console.log('PASS: installed drill arena entry axes, disk vulnerability, flash/sounds/shake, debris/random branches and damage, intro/bar/height, removal and delayed token');

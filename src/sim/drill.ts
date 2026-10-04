@@ -15,7 +15,7 @@ export function createDrill(c:Creature,arena:DrillArena){
 }
 export type Drill=ReturnType<typeof createDrill>;
 export interface DrillWorld extends Point {
-  phase:number;disksActive:boolean;shake:number;gateFour:boolean;gateSixteen:boolean;rand:RandomStream;
+  phase:number;disksActive:boolean;shake:number;gateFour:boolean;gateThirtyTwo:boolean;rand:RandomStream;
   setShake:(ticks:number)=>void;sound:(event:number)=>void;
   effect:(at:Point,kind:number,mode:number)=>Effect|null;
   projectile:(at:Point,velocity:Point,gravity:number,kind:number)=>Effect|null;
@@ -55,8 +55,8 @@ export function stepDrill(s:Drill,c:Creature,w:DrillWorld,dt=1):void{
   }
   s.cell=cell;
   if((c.y>>>0)>0xfff63c20)c.y=-0x9c3e0;
-  if(w.phase<3&&w.gateFour){const e=w.effect(c,4,9);if(e)e.period=32;}
-  if(w.phase===2&&w.y<-0x7de25&&w.gateSixteen){
+  if(w.phase<3&&w.gateFour){const e=w.effect(c,4,9);if(e)e.life=32;}
+  if(w.phase===2&&w.y<-0x7de25&&w.gateThirtyTwo){
     let e:Effect|null=null;
     if((w.rand.byte()&3)===0){const velocity=drillDebrisVelocity(c,w);if(velocity)e=w.projectile(c,velocity,128,84);}
     else e=w.effect(c,84,14);

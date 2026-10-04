@@ -47,7 +47,7 @@ export function stepDinosaur(s:Dinosaur,c:Creature,w:DinosaurWorld,dt=1):void{
     const dx=sin(c.heading-1024)>>2,dz=sin(c.heading)>>2;
     const at=s.frame?{x:c.x+dx,y:c.y-7424,z:c.z+dz}:{x:c.x-dx*3,y:c.y-1024,z:c.z-dz*3};
     if(w.gateSeven){const e=w.effect(at,17,10),spin=w.rand.byte()-128;if(e){e.spin=spin;e.width=e.height=40;}}
-    if((w.rand.byte()&3)!==0&&(c.frame>>>16)===10){const e=w.effect(at,4,4),period=(w.rand.byte()&15)*2+24;if(e)e.period=period;}
+    if((w.rand.byte()&3)!==0&&(c.frame>>>16)===10){const e=w.effect(at,4,4),life=(w.rand.byte()&15)*2+24;if(e)e.life=life;}
   }
   if(phase===2&&w.cameraZone===4)s.barTicks=90;
 }

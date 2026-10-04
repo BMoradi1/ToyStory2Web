@@ -1822,3 +1822,17 @@ Collision 22 rotates -1060 angle units and 23 rotates +942; artwork pairs
 28/90 and 25/26 use the original sine-driven yaw. Restart restores captured
 collision and phases. Installed and browser checks are in
 `penthouse-doors-probe.ts` and `penthouse-doors-flow-check.js`.
+
+
+### Penthouse collision variants and ambient scenery (2026-10-03)
+
+`0042a130` disables collision 26 initially, swaps 25/26 while player hit stun
+is nonzero, and returns to 25 on recovery. The port removes inactive polygons
+from the query grid and restores from captured geometry on activation/restart.
+Far artwork 64/87 reads the current positions of push-block collision 20/21.
+
+Camera room 2 emits kind 76 at two alternating positions; its timer starts at
+zero, decrements only in that room, and emits when negative before resetting
+to 100. Player room 1 emits kind 101/mode 10 on the two-tick gate, within a
+strict camera radius of 768 shifted units. The installed probes and browser
+checks are `penthouse-scenery-probe.ts` and `penthouse-scenery-flow-check.js`.

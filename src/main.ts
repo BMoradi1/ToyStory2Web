@@ -3698,7 +3698,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   }
 
   if(penthouse&&creatureSim){
-    stepPenthouse(penthouse,player,currentCollisionWorld,{health:slot=>creatureSim!.creatures.find(c=>c.slot===slot)?.health??0,camera:cut.ticks>0?cut.eye:camera??undefined,gateFour:effects?.gate.four??false,cameraY:cut.ticks>0?cut.eye.y:camera?.y,zone:zones.player,rand:creatureSim.rand,gateSeven:effects?.gate.seven??false,
+    stepPenthouse(penthouse,player,currentCollisionWorld,{cameraZone:zones.camera,gateTwo:effects?.gate.two??0,health:slot=>creatureSim!.creatures.find(c=>c.slot===slot)?.health??0,camera:cut.ticks>0?cut.eye:camera??undefined,gateFour:effects?.gate.four??false,cameraY:cut.ticks>0?cut.eye.y:camera?.y,zone:zones.player,rand:creatureSim.rand,gateSeven:effects?.gate.seven??false,
       cut:cutHandle,sound:(event,at)=>playEvent(event,at),touch:applyCreatureTouch,
       guide:id=>spendGuide(guideSparkles,effects,id,true),
       projectile:shot=>{if(effects&&camera)spawnEffect(effects,effectWorld(),shot.x,shot.y,shot.z,

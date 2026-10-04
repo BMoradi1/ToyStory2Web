@@ -7,6 +7,23 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-03 — Penthouse collision variants and ambient scenery
+
+- Collision 25/26 now switches with Buzz's hit-stun state, matching the level
+  tick. The inactive hull leaves the collision grid; recovery and restart
+  restore the appropriate captured geometry without duplicate grid entries.
+- Distant artwork 64/87 follows the two associated push blocks through their
+  live collision positions, keeping near and far models aligned.
+- Camera room 2 emits alternating kind 76 debris on the original timer;
+  player room 1 emits kind 101 particles on the shared gate, with original
+  camera range and random offsets.
+- Installed probes pass collision activation/restoration, both distant poses,
+  emitter timing, alternation and strict room/range boundaries. Browser checks
+  pass hurt/recovery state, distant artwork, both emitters and lifecycle.
+  Production build and existing Penthouse controller probes pass.
+- Remaining: water presentation, light/texture-specific helpers and review of
+  dynamic collision 24. Full natural traversal remains unverified.
+
 ## 2026-10-03 — Penthouse spring and guard doors
 
 - Collision 12 launches Buzz at -2432 on an ordinary landing and -3072 on
@@ -309,7 +326,7 @@ not evidence for untested interactions.
 | 8 | Al's Space Land | BBUGGY and ZGCAR hooks absent; prop-gated texture effect missing. | Buggy challenge, `0052c9b8 & 1` effect trigger and reward paths. |
 | 9 | Toy Barn Encounter | Dedicated pod controller and beam tests exist; ZGCAR hook absent. | Full fight/summon cycles and reward; determine the absent hook's role. |
 | 10 | Elevator Hop | Wire puzzle, compound lifts, GUNSP combat/reward, fan switches/rotation/airflow implemented. | Other ambient effects, exact collision/script/force timing and full-level traversal. |
-| 11 | Al's Penthouse | Shared enemies, GUNSL combat/reward, hazards, water/floats, train routing and underwater movement implemented. | Water presentation, alternate hurt collision, far push-block artwork and ambient helpers. |
+| 11 | Al's Penthouse | Shared enemies, GUNSL combat/reward, hazards, water/floats, train routing and underwater movement implemented. | Water presentation, light/texture helpers and collision 24 review. |
 | 12 | The Evil Emperor Zurg | Entrance, attacks, recovery, defeat, save bit and victory/movie handoff implemented in `zurg-boss.ts`. Installed-data and focused browser checks pass. | Unassisted combat, original-versus-port camera/render comparison and detail-dependent particles. |
 | 13 | Airport Infiltration | Five authored transport routes, shared gun/buzzard handlers and Prospector fight/reward implemented. | Exact collision/script timing comparison and full-level traversal; distinct from Tarmac. |
 | 14 | Tarmac Trouble | Plane motion/collision, wheels/fans, ground/climbing passengers, wheel hazards and helicopter hover/rotors/token motion and light puzzle/lowering implemented and tested. Slinky timed-path rules and retry implemented. Near/far scenery sway, rain/plane sound, rain particles and lightning/thunder restored. Blacksmith recovery, defeat and delayed reward implemented; axe throws implemented; hit flashing missing. Shared gun enemy and buzzard handlers implemented. | Remaining creature hooks and other ambient effects; pitch/roll attachment on other movers. |

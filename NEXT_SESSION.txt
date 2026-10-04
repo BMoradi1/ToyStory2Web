@@ -1,3 +1,18 @@
+CURRENT UPDATE — 2026-10-03: Elevator fan scenery and airflow
+  Added elevator-fans.ts: timed wall fans, fixed/switched shafts, boss arena
+  rotors/updrafts; real stomp switches rotate artwork and collision, retire guides.
+  Wind particles/sound use shared effect gates and original velocity/spin values.
+  Collision transforms now handle pitch/roll with normals and spatial indexing.
+  Installed probes pass airflow bounds/caps, 60-tick shaft ascent, real stomps,
+  switch reset/grid, prior lifts/Airport interactions and Tarmac plane physics.
+  Browser passes actual mesh/switch/airflow/effects and pause/restart/exit.
+  Production build and both gunslinger browser lifecycle regressions pass.
+  Next: Penthouse water controls/floating props and tracking-hazard switches;
+  original function inventory is in docs/GAME_AUDIT.md and /tmp/ts2-zurg/air.c.
+  Elevator ambient debris and exact force-solver parity remain open. The fan
+  feedback field 00830e3c is not yet identified as a camera control.
+  Natural full-level traversal remains unverified; never commit assets/dumps.
+
 CURRENT UPDATE — 2026-10-03: Elevator and Penthouse gunslinger combat
   Implemented level-owned GUNSP/GUNSL in gunslinger.ts; finale stays separate.
   Elevator: 30 HP, homing/arc cycle, spin-driven hover, height/recovery gate,

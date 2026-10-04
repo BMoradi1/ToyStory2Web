@@ -3535,7 +3535,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   const playerGround = groundFromCollision(currentCollisionWorld, levelPoles, levelZipLines);
   playerGround.beforeMove = () => {
     tickPushBlocks(held);
-    if(levelPlatforms){stepLevelPlatforms(levelPlatforms,currentCollisionWorld!,player!,()=>creatureSim?.rand.byte()??0);drawLevelPlatforms();}
+    if(levelPlatforms){stepLevelPlatforms(levelPlatforms,currentCollisionWorld!,player!,()=>creatureSim?.rand.byte()??0,tasks?.gunslinger?.spin??0);drawLevelPlatforms();}
     if (tarmacPlane) {
       stepTarmacPlane(tarmacPlane, currentCollisionWorld!, player!);
       drawTarmacPlane();
@@ -3552,6 +3552,14 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       playEvent(event.event,at);
     }
     for(const guide of levelPlatforms.guidesSpent)spendGuide(guideSparkles,effects,guide,true);
+    if(effects&&camera)for(const emitter of levelPlatforms.fans?.emitters??[]){
+      if(!(emitter.vertical?effects.gate.seven:effects.gate.sixteen))continue;
+      const at=emitter.at,e=spawnChild(effects,effectWorld(),at.x,at.y,at.z,emitter.vertical?0x4f:0x4e,2);
+      if(e){
+        e.vx=emitter.vertical?0:256*emitter.speed;e.vy=emitter.vertical?-256*emitter.speed:0;e.vz=0;
+        e.spin=-256;e.rotation=4095-effects.counter32*64;
+      }
+    }
     if(levelPlatforms.warningLight)addPointLight(pointLights,{x:-64120,y:-918347,z:193996,r:255,g:0,b:0,life:16,owner:-1});
     if(effects&&camera)for(const at of levelPlatforms.exhaust){
       if(Math.hypot(at.x-camera.x,at.y-camera.y,at.z-camera.z)<600*256)spawnChild(effects,effectWorld(),at.x,at.y,at.z,0x73,2);

@@ -354,13 +354,20 @@ export function captureCollisionGroup(world: CollisionWorld, groupIndex: number)
   })) };
 }
 
-/** Absolute yaw + position in collision/level units. Also rotates contact normals
+/** Absolute rotation + position in collision/level units (Rx * Ry * Rz).
+ * Pitch/roll default to zero for existing yaw-only movers. Also rotates contact normals
  * and rebuilds spatial-index membership, including removing vacated cells. */
 export function transformCollisionGroup(
   world: CollisionWorld, rest: ReturnType<typeof captureCollisionGroup>,
-  position: Vec3, radians: number,
+  position: Vec3, radians: number, pitch = 0, roll = 0,
 ): void {
   const c = Math.cos(radians), s = Math.sin(radians);
+  const cx=Math.cos(pitch),sx=Math.sin(pitch),cz=Math.cos(roll),sz=Math.sin(roll);
+  const rotate=(v:Vec3):Vec3=>{
+    const x=v.x*cz-v.y*sz,y=v.x*sz+v.y*cz;
+    const xx=x*c+v.z*s,z=v.z*c-x*s;
+    return {x:xx,y:y*cx-z*sx,z:y*sx+z*cx};
+  };
   world.groups[rest.groupIndex]!.position = { ...position };
   for (const base of rest.polys) {
     const poly = world.polys[base.index]!;
@@ -369,12 +376,10 @@ export function transformCollisionGroup(
       if (at >= 0) cell.splice(at, 1);
     });
     poly.vertices = base.vertices.map(v => {
-      const x = v.x - rest.origin.x, z = v.z - rest.origin.z;
-      return { x: position.x + x * c + z * s, y: position.y + v.y - rest.origin.y,
-        z: position.z + z * c - x * s };
+      const r=rotate({x:v.x-rest.origin.x,y:v.y-rest.origin.y,z:v.z-rest.origin.z});
+      return {x:position.x+r.x,y:position.y+r.y,z:position.z+r.z};
     });
-    poly.normal = { x: base.normal.x * c + base.normal.z * s, y: base.normal.y,
-      z: base.normal.z * c - base.normal.x * s };
+    poly.normal = rotate(base.normal);
     forEachCell(world, poly.vertices.map(v => v.x), poly.vertices.map(v => v.z), cell => cell.push(base.index), true);
     for (const v of poly.vertices) world.lowestY = Math.max(world.lowestY, v.y);
   }

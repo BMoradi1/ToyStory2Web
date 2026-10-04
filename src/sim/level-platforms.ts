@@ -7,6 +7,7 @@ import { carryOnYawPlatform } from './moving-platform.ts';
 import { standingSurface } from './stomp-props.ts';
 import { COLLISION } from './player-constants.ts';
 import { sin, cos, toRadians } from './trig.ts';
+import {createElevatorFans,stepElevatorFans,stepFanSwitches,restoreElevatorFans,ELEVATOR_FAN_OBJECTS} from './elevator-fans.ts';
 const NEAR = [[24,28,29,30,31,49,52,53,54,58,59,60,74], [25,32,33,34,35,51,55,56,57,61,62,63,76]];
 const FAR = [[26,36,37,38,39,48,64,65,66], [27,40,41,42,43,50,67,68,69]];
 const HULLS = [[1,2,3,6,7,8,9,10], [0,11,12,13,14,15,16,17]];
@@ -18,7 +19,7 @@ const AIRPORT = [
   { hull:1, path:5, objects:[11,10], node:0, yaw:-1592 },
 ];
 export function platformObjects(level:number):number[] {
-  return level===10 ? [...NEAR.flat(),...FAR.flat(),18,19,20,75,77,70,71,72,73,78,79,80,81] : level===13 ? [...AIRPORT.flatMap(p=>p.objects),9,28] : [];
+  return level===10 ? [...ELEVATOR_FAN_OBJECTS,...NEAR.flat(),...FAR.flat(),18,19,20,75,77,70,71,72,73,78,79,80,81] : level===13 ? [...AIRPORT.flatMap(p=>p.objects),9,28] : [];
 }
 const game = (p:Vec3):Vec3 => ({x:p.x*32,y:p.y*32,z:p.z*32});
 const minus = (a:Vec3,b:Vec3):Vec3 => ({x:a.x-b.x,y:a.y-b.y,z:a.z-b.z});
@@ -41,7 +42,7 @@ export function createLevelPlatforms(level:number,dat:DatLevel,world:CollisionWo
     position:{...path(dat,a.path)[a.node]!},velocity:{x:0,y:0,z:0},speed:0,phase:0,wait:0,exhaust:true,blocked:false,objects:a.objects})) :
     HULLS.map((ids,i)=>({hulls:ids.map(id=>hull(world,id)),points:[path(dat,3)[i]!,game(hull(world,ids[0]!).origin)],node:0,yaw:0,
       position:game(hull(world,ids[0]!).origin),velocity:{x:0,y:0,z:0},speed:0,phase:0,wait:0,exhaust:true,blocked:false,objects:NEAR[i]!}));
-  const state={level,objects,movers,wires:[0,2,0],solved:false,success:false,barrier:level===10?hull(world,19):null,
+  const state={level,objects,movers,fans:level===10?createElevatorFans(dat,world):null,wires:[0,2,0],solved:false,success:false,barrier:level===10?hull(world,19):null,
     wirePoints:level===10?path(dat,9):[],ticks:0,barrierScale:4096,pulse:0,warning:false,
     springObject:-1,springRoll:0,sounds:[] as {event:number;at:Vec3}[],
     exhaust:[] as Vec3[],guidesSpent:[] as number[],warningLight:false,
@@ -70,6 +71,10 @@ function updatePuzzleArtwork(s:LevelPlatforms) {
 /** Called after physics so a stomp's surface is the newly acquired floor. */
 export function stepPlatformSwitches(s:LevelPlatforms,p:PlayerState,w:CollisionWorld) {
   s.success=false;
+  if(s.fans){
+    stepFanSwitches(s.fans,p,w);s.guidesSpent.push(...s.fans.guides);
+    for(const o of s.objects){const angles=s.fans.angles.get(o.id);if(angles)o.angles=angles;}
+  }
   if(s.level===13){
     if(!p.stompImpact)return;
     const floor=(group:number)=>p.contacts.some(c=>c.group===group&&c.normal.y<-.5);
@@ -100,8 +105,13 @@ export function stepPlatformSwitches(s:LevelPlatforms,p:PlayerState,w:CollisionW
   }
   updatePuzzleArtwork(s);
 }
-export function stepLevelPlatforms(s:LevelPlatforms,w:CollisionWorld,p:PlayerState,randomByte:()=>number=()=>0) {
+export function stepLevelPlatforms(s:LevelPlatforms,w:CollisionWorld,p:PlayerState,randomByte:()=>number=()=>0,spin=0) {
   s.ticks++;s.sounds.length=0;s.exhaust.length=0;s.guidesSpent.length=0;s.warningLight=false;
+  if(s.fans){
+    stepElevatorFans(s.fans,p,spin);
+    for(const o of s.objects){const angles=s.fans.angles.get(o.id);if(angles)o.angles=angles;}
+    for(const at of s.fans.sounds)s.sounds.push({event:0x8c,at});
+  }
   if(s.springRoll<0){s.springRoll=Math.min(0,s.springRoll+32);s.objects.find(o=>o.id===s.springObject)!.roll=s.springRoll;}
   if(s.level===10&&s.solved){
     s.barrierScale=Math.max(0,s.barrierScale-32);s.pulse=(s.pulse+1)&63;
@@ -165,5 +175,6 @@ export function stepLevelPlatforms(s:LevelPlatforms,w:CollisionWorld,p:PlayerSta
   }
 }
 export function restoreLevelPlatforms(s:LevelPlatforms,w:CollisionWorld){
+  if(s.fans)restoreElevatorFans(s.fans,w);
   for(const h of [...s.movers.flatMap(m=>m.hulls),...(s.barrier?[s.barrier]:[])])transformCollisionGroup(w,h,h.origin,0);
 }

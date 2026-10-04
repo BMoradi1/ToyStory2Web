@@ -126,6 +126,8 @@ export interface EffectSim {
   gate: { two: number; three: number; four: boolean; five: boolean; six: boolean; seven: boolean; eight: boolean; sixteen: boolean; thirtyTwo: boolean };
   /** The 1-in-16 counter itself, which one mode reads as a triangle wave. */
   counter16: number;
+  /** Shared 32-tick phase, used by Elevator wind particle rotation. */
+  counter32: number;
   /** Damage the bolt landed: the creature and the angle, for the caller. */
   hits: { target: object; angle: number; kind: number }[];
 }
@@ -147,7 +149,7 @@ export function createEffects(
     cursor: 0, rand, templates, modes,
     marks: [], lights: [], pointLights: [], sounds: [], coins: 0, spinning: false, hurt: null,
     gate: { two: 0, three: 0, four: false, five: false, six: false, seven: false, eight: false, sixteen: false, thirtyTwo: false },
-    counter16: 0,
+    counter16: 0,counter32:0,
     hits: [],
   };
 }
@@ -175,6 +177,7 @@ export function stepEffectGates(sim: EffectSim, dt = 1): void {
   g.sixteen = step('sixteen', 16);
   g.thirtyTwo = step('thirtyTwo', 32);
   sim.counter16 = counters.sixteen;
+  sim.counter32 = counters.thirtyTwo;
 }
 
 /**

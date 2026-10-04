@@ -7,6 +7,41 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-03 — Elevator fan scenery and airflow
+
+`elevator-fans.ts` restores the fan portion of `00425f60` and particle helper
+`00425eb0`, using paired paths 0/1/2/8/10 from the installed scene.
+
+- Four timed wall fans accelerate, coast and stop; switched shaft fans and the
+  continuously running fan rotate; the arena fan group follows the boss spin.
+- Stomps on collision objects 4/5 activate the two shafts and retire guides 0/4.
+  Both the switch artwork and its collision rotate, with spatial-index and normal
+  updates. Restart restores the captured collision and fresh switch state.
+- Fixed shafts accelerate upward by 128 with the original height/radius checks;
+  eight boss columns scale their reach and acceleration with spin. Airflow clears
+  stomp/ground state. Wall wind ramps into the normal player sweep and respects
+  opposing contacts and climbing attachments.
+- Wind particles use kinds 78/79, shared 16/7-tick gates, authored velocities,
+  spin and shared 32-tick orientation. Nearby active vents raise event 0x8c.
+- Installed-data probes pass actual stomp landings, a continuous 60-tick shaft
+  ascent, airflow boundaries/caps, fan timing and collision reset/indexing.
+  Existing lift/Airport interaction and Tarmac plane physics probes pass.
+  Production build and both gunslinger browser lifecycle regressions pass.
+- Browser checks pass actual mesh rotation, both real stomp switches, shafts,
+  particles/sound, boss spin/arena lift, pause, restart and exit. These position
+  Buzz to isolate interactions; full natural level traversal remains unverified.
+- Remaining: exact original external-force/contact solver comparison, ambient
+  zone-specific debris emitters and other Elevator effects. `00830e3c` receives
+  fan feedback values, but its PC consumer is not established; earlier notes
+  calling it camera feedback were premature. No guessed camera shake was added.
+
+Penthouse follow-up now has concrete original routines to work from: water-level
+switches and four floating/bouncing props (`00429fb0`, collision 13–16/artwork
+39–42); six tracking hazards (`004295b0`, artwork 50–54/58 plus paired models),
+their stomp switches (`00429910`) and disable effects (`00429800`); the mechanism
+mask/rotations (`00428890`) and moving prop with far artwork (`00428e70`, 38/80).
+These are still open, not covered by the gunslinger controller.
+
 ## 2026-10-03 — Elevator and Penthouse gunslinger combat
 
 `gunslinger.ts` now implements the level-owned type 31 and type 45 routines
@@ -28,8 +63,8 @@ a completed original-versus-port playthrough.**
   cycles, pause, hit brightness/recovery, defeat/reward collection/save, restart
   and exit. Buzz is positioned/protected and laser hits are injected; attack
   wordcode is not skipped. The emitter check includes invisible live effects.
-- Remaining scope: Elevator spinning scenery, associated arena hazards and
-  camera/sound feedback; Penthouse prop helpers/hazards; exact intro camera
+- Fan scenery/airflow follow-up is recorded above. Remaining scope includes
+  other Elevator effects; Penthouse prop helpers/hazards; exact intro camera
   timing, original-versus-port visual/audio comparison and unassisted traversal.
   These combat hooks do not imply either entire level is complete.
 
@@ -175,8 +210,8 @@ not evidence for untested interactions.
 | 7 | Al's Toy Barn | DINO, BOX and BPLANE hooks absent. | Dinosaur encounter and original moving-collision calls. |
 | 8 | Al's Space Land | BBUGGY and ZGCAR hooks absent; prop-gated texture effect missing. | Buggy challenge, `0052c9b8 & 1` effect trigger and reward paths. |
 | 9 | Toy Barn Encounter | Dedicated pod controller and beam tests exist; ZGCAR hook absent. | Full fight/summon cycles and reward; determine the absent hook's role. |
-| 10 | Elevator Hop | Wire puzzle, both compound lifts and GUNSP combat/reward implemented. | Spinning scenery/arena hazards and feedback, exact collision/script timing and full-level traversal. |
-| 11 | Al's Penthouse | Shared gun enemy/buzzard handlers and GUNSL combat/reward implemented. | Level-local prop helpers, hazards and encounters. |
+| 10 | Elevator Hop | Wire puzzle, compound lifts, GUNSP combat/reward, fan switches/rotation/airflow implemented. | Other ambient effects, exact collision/script/force timing and full-level traversal. |
+| 11 | Al's Penthouse | Shared gun enemy/buzzard handlers and GUNSL combat/reward implemented. | Water controls/floating props, tracking hazards and disable switches; other level helpers. |
 | 12 | The Evil Emperor Zurg | Entrance, attacks, recovery, defeat, save bit and victory/movie handoff implemented in `zurg-boss.ts`. Installed-data and focused browser checks pass. | Unassisted combat, original-versus-port camera/render comparison and detail-dependent particles. |
 | 13 | Airport Infiltration | Five authored transport routes, shared gun/buzzard handlers and Prospector fight/reward implemented. | Exact collision/script timing comparison and full-level traversal; distinct from Tarmac. |
 | 14 | Tarmac Trouble | Plane motion/collision, wheels/fans, ground/climbing passengers, wheel hazards and helicopter hover/rotors/token motion and light puzzle/lowering implemented and tested. Slinky timed-path rules and retry implemented. Near/far scenery sway, rain/plane sound, rain particles and lightning/thunder restored. Blacksmith recovery, defeat and delayed reward implemented; axe throws implemented; hit flashing missing. Shared gun enemy and buzzard handlers implemented. | Remaining creature hooks and other ambient effects; pitch/roll attachment on other movers. |

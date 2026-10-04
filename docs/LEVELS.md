@@ -1712,3 +1712,38 @@ five conditional muzzle puffs. Defeat cancels the burst and starts the same
 `tools/gunslinger-probe.ts` covers installed records/scripts/projectiles and
 boundary timing; `tools/gunslinger-flow-check.js` exercises the browser with
 positioned/protected Buzz and injected hits. Neither is an unassisted playthrough.
+
+### Elevator fan fields and switch collision (2026-10-03)
+
+The fan section of `00425f60` is now in `elevator-fans.ts`, hosted by
+`level-platforms.ts`. Objects 0–3 rotate about X with a six-unit phase and
+speed that ramps by two to 128, then falls back to zero above phase 2560.
+Objects 7–15 rotate about Y with the boss spin clock (object 11 has no installed
+artwork); phase offsets are 768. Objects 4/5 depend on the two stomp switches;
+6 runs continuously. Switch collision IDs 4/5 rotate by 384 about X/Z,
+respectively, paired with artwork 17/16. Collision transforms now support
+pitch/roll with the same Rx*Ry*Rz order as artwork, including rotated normals
+and refreshed grid membership. Captured rest geometry is restored on restart.
+
+Path 8 supplies eight paired boss-column endpoints. A strict 160-unit horizontal
+radius and a spin-scaled height determine lift; vertical velocity decreases by
+128 + spin*128/4096 while above -2048. Fixed shafts use paths 10, 1 and 0,
+radius 96, height minus 192 and acceleration 128 while above -4096. Signed
+coordinate divisions truncate toward zero, matching the original. The two
+switched shafts are enabled by actual stomp contacts and retire guides 0/4.
+
+Path 2 supplies the four timed wall-fan fields. Their force ramps by 256 to
+4096, attenuates along the shaft and is passed through the normal player sphere
+sweep. Opposing contacts reset the ramp; attachments suppress the force. This
+adapts the original `0048b660` force into the port's solver; exact contact-solver
+parity is not claimed. Vertical fans clear stomp and set rising/airborne state.
+
+`00425eb0` emits kind 79 vertically on seven-tick gates, kind 78 horizontally
+on sixteen-tick gates. Velocity overwrites are 256 times strength (five or
+twelve), spin -256, rotation 4095 minus the shared 32-tick phase times 64.
+The original also writes `00830e3c`; its PC consumer remains unidentified and
+is not the already-mapped camera-shake field `0050a510`.
+
+Installed physics and browser checks are in `elevator-fans-probe.ts` and
+`elevator-fans-flow-check.js`. They cover real stomp landings, continuous shaft
+ascent, field boundaries, actual meshes/effects, pause and lifecycle cleanup.

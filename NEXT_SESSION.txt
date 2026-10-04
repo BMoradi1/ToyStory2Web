@@ -1,3 +1,17 @@
+CURRENT UPDATE — 2026-10-03: Elevator and Penthouse gunslinger combat
+  Implemented level-owned GUNSP/GUNSL in gunslinger.ts; finale stays separate.
+  Elevator: 30 HP, homing/arc cycle, spin-driven hover, height/recovery gate,
+  real removal -> homing cleanup -> delayed reward. Penthouse: bone 15/16 burst,
+  height/patrol limits, 20 combat HP, death script and delayed reward.
+  Both use brightness flashes, corrected HUD ranges and clean restart state.
+  Installed-data probe, Prospector/Tarmac/Finale regressions and build pass.
+  Browser passes both actual intros/attack cycles, pause, recovery/flash,
+  defeat/token collection/save, restart/exit using positioned Buzz/injected hits.
+  Next: Elevator rotating arena scenery/hazards/camera feedback and Penthouse
+  props/hazards; earlier-level missing handlers remain in GAME_INVENTORY.md.
+  Exact intro camera, audio/visual parity and natural traversal remain unverified.
+  Local evidence: /tmp/ts2-zurg/{creatures,platforms,guns}.c; never commit dumps/assets.
+
 CURRENT UPDATE — 2026-10-03: Airport Prospector fight
   Implemented level-13 type-61 controller 0042be60, separate from the finale.
   Authored chase/throw, 44-tick pick release, 60-tick recovery, brightness/voices,

@@ -17,8 +17,8 @@ This is static inventory, **not** a completed playthrough or parity score. Missi
 | 7 (7) | al's toy barn | yes | DINO (26), BOX (25), BPLANE (24) | 0, 1, 2, 3, 4, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 | 4 / 1 | taunt/reward hooks; inspect per-creature combat |
 | 8 (8) | al's space land | yes | ZGCAR (14), BBUGGY (47) | 2 | 9 / 9 | none |
 | 9 (9) | toy barn encounter | yes | ZGCAR (14) | — | 0 / 0 | pod-boss.ts |
-| 10 (10) | elevator hop | yes | GUNSP (31) | 4, 5, 18 | 0 / 1 | taunt/reward hooks; inspect per-creature combat |
-| 11 (11) | al's penthouse | yes | GUNSL (45) | 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 22, 23, 24, 25, 26 | 7 / 0 | taunt/reward hooks; inspect per-creature combat |
+| 10 (10) | elevator hop | yes | — | 4, 5, 18 | 0 / 1 | gunslinger.ts + tasks.ts reward |
+| 11 (11) | al's penthouse | yes | — | 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 22, 23, 24, 25, 26 | 7 / 0 | gunslinger.ts + tasks.ts reward |
 | 12 (12) | the evil emperor zurg | yes | — | — | 0 / 0 | zurg-boss.ts |
 | 13 (13) | airport infiltration | yes | — | 0, 3, 4, 6, 9, 12, 13, 14 | 13 / 2 | prospector.ts + tasks.ts reward |
 | 14 (14) | tarmac trouble | yes | SMITH (58) | 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13 | 9 / 1 | taunt/reward hooks; inspect per-creature combat |
@@ -41,8 +41,6 @@ This is static inventory, **not** a completed playthrough or parity score. Missi
 - al's space land: ZGCAR, type 14, slots 12, 23, 28, 29, 30, 31, 35 → LAB_004064a0.
 - al's space land: BBUGGY, type 47, slots 40 → FUN_00422660.
 - toy barn encounter: ZGCAR, type 14, slots 10 → LAB_004064a0.
-- elevator hop: GUNSP, type 31, slots 8 → FUN_00425700.
-- al's penthouse: GUNSL, type 45, slots 11 → FUN_004282d0.
 - tarmac trouble: SMITH, type 58, slots 46 → FUN_0042d3e0.
 - andy's house: types without a shared creature definition COTBIT (11), BOPEEP (7), ZURG1 (3), HAMM (10); may be NPCs, props or level-owned, not automatically missing behavior.
 - andy's neighborhood: types without a shared creature definition ZURG1 (3), HAMM (10); may be NPCs, props or level-owned, not automatically missing behavior.

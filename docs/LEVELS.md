@@ -1680,3 +1680,35 @@ Installed-data and browser checks cover the attack, recovery, defeat, token
 collection/save and restart/re-entry. Browser combat uses positioned Buzz and
 injected hits; full natural combat, exact voice overlap and intro camera timing
 remain unverified. See `GAME_AUDIT.md` for current coverage.
+
+### Elevator and Penthouse gunslingers (2026-10-03)
+
+`src/sim/gunslinger.ts` owns these encounters independently of the finale.
+Elevator type 31, slot 8 (`00425700`, init/tick `00425b60`/`00425f60`) has
+30 combat health, not the nine-point defeat reserve used by other minibosses.
+Its first shot clock is 400, index 5; expiration advances modulo six and loads
+400/40/40/40/40/200. Index zero emits homing kind 0x59 (pitch zero); the other
+five emit kind 0x77 with upward velocity -1024 and gravity 64. Both use part
+zero's local (0,-500,-200) attachment. Buzz above -0x1c2508 is protected from
+boss damage; the shot gate uses the equivalent integer boundary -0x1c2509.
+
+The spin phase starts at 0x3000, increments by 32, and resets after its limit,
+then selects a new limit `(random byte + 320) * 64`. Its ramp/hold/ramp value
+and the central +/-0x7a00 box control the boss's target height and animation.
+This combat clock is implemented; rotating arena artwork/hazards and camera
+feedback remain separate audit work. Once the creature is removed, remaining
+kind-89 emitters expire and reward phase advances from 3+dt to 120, then 200.
+
+Penthouse type 45, slot 11 (`004282d0`, init/tick `00429d70`/`0042a130`) uses
+29 initial health and the last nine for death wordcode at index 52. Recovery
+lasts 60 ticks. Height outside inclusive 0x1bca1..0x22405 closes vulnerability
+and returns its target toward home. The two patrol rectangles change at
+z=-0x5b4f0. A wordcode timer above 20 fires from part 15 and resets to ten;
+expiry fires from part 16. Both use kind 97, vertical velocity 512, and a
++/-256-angle aim cone. Events 0x93 and 0x94 distinguish the two guns, with
+five conditional muzzle puffs. Defeat cancels the burst and starts the same
+120-phase token delay. Both fights have hit brightness, not hit enlargement.
+
+`tools/gunslinger-probe.ts` covers installed records/scripts/projectiles and
+boundary timing; `tools/gunslinger-flow-check.js` exercises the browser with
+positioned/protected Buzz and injected hits. Neither is an unassisted playthrough.

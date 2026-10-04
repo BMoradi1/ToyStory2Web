@@ -1,4 +1,5 @@
 import { createProspector, stepProspector } from './sim/prospector.ts';
+import { createGunslinger, stepGunslinger } from './sim/gunslinger.ts';
 import { enemyGunLife } from './sim/enemy-gun.ts';
 import { createLevelPlatforms, platformObjects, stepLevelPlatforms, stepPlatformSwitches, restoreLevelPlatforms, type LevelPlatforms } from './sim/level-platforms.ts';
 import { createTarmacWeather, stepTarmacWeather, type TarmacWeather } from './sim/tarmac-weather.ts';
@@ -795,6 +796,7 @@ async function open(dir: GameDir): Promise<void> {
           zurg:tasks.zurg?{...tasks.zurg}:null,
           finale:tasks.finale?structuredClone(tasks.finale):null,
           prospector:tasks.prospector?{...tasks.prospector}:null,
+          gunslinger:tasks.gunslinger?{...tasks.gunslinger}:null,
           boss: tasks.boss, potatoPart: tasks.potatoPart, powerUps: tasks.powerUps,
           bossPhase: tasks.bossPhase, bossClock: tasks.bossClock, bossHurt: tasks.bossHurt,
           bossCut: tasks.bossCut, bossRamp: tasks.bossRamp, bossSwing: tasks.bossSwing,
@@ -1005,6 +1007,7 @@ async function open(dir: GameDir): Promise<void> {
             sprite:aimMarker.effect.sprite,width:aimMarker.effect.width,rotation:aimMarker.effect.rotation,
             r:aimMarker.effect.r,g:aimMarker.effect.g}:null,
           kinds: live.map((e) => e.kind),
+          activeKinds: effects.effects.filter(e=>e.life>0).map(e=>e.kind),
           sprites: live.map((e) => e.sprite),
           first: live[0]
             ? {
@@ -2007,7 +2010,7 @@ function hudReadout(level: number): HudReadout {
     const fighting = c && c.type !== 0 && c.health > 0
       && (tasks !== null && tasks.boss >= 2 || c.health < c.record.health);
     if (c && fighting) {
-      bossBar = Math.max(0, Math.min(0x36, (level === 14 || level === 13)
+      bossBar = Math.max(0, Math.min(0x36, level===10?(c.deathTimer<0?0:Math.trunc(c.health*54/30)):(level === 14 || level === 13 || level===11)
         ? Math.trunc(((c.health - 9) * 0x36) / 20)
         : Math.round(((c.health - 9) * 0x36) / 11)));
     }
@@ -2196,6 +2199,10 @@ function drawCreatures(): void {
     if(tasks?.prospector){
       const light=tasks.prospector.flash?2:1;
       viewer.setCreatureAppearance(32,[1,1,1],[light,light,light]);
+    }
+    if(tasks?.gunslinger){
+      const light=tasks.gunslinger.flash?2:1;
+      viewer.setCreatureAppearance(tasks.gunslinger.level===10?8:11,[1,1,1],[light,light,light]);
     }
     if(tasks?.pod){
       const {stretch,flashScale}=tasks.pod;
@@ -3099,6 +3106,35 @@ function saveProgress(): void {
  * `bossFight` have one.
  */
 function startBossFight(level: number): void {
+  if((level===10||level===11)&&creatureSim&&tasks){
+    const slot=level===10?8:11,boss=creatureSim.creatures.find(c=>c.slot===slot);
+    if(!boss)return;
+    tasks.gunslinger=createGunslinger(boss,level);
+    creatureSim.levelHandler=(c,args,p)=>{
+      if(c.slot!==slot||!tasks?.gunslinger||!creatureSim)return;
+      stepGunslinger(tasks.gunslinger,c,args,{...p,phase:tasks.boss,rand:creatureSim.rand,
+        sound:(event,at)=>playEvent(event,at),
+        attachment:(c,part,point)=>{
+          const art=creatureArt.get(c.type),animation=art?.anm?.animations[c.animState];
+          const pose=art?.anm&&animation?poseBone(art.anm,animation,(c.frame>>>16)%Math.max(1,animation.frameCount),part):null;
+          return podAttachment(c,pose,point);
+        },
+        projectile:shot=>{
+          if(!effects||!camera)return;
+          const e=spawnEffect(effects,effectWorld(),shot.x,shot.y,shot.z,
+            shot.vx,shot.vy,shot.vz,shot.gravity,shot.rotation,shot.spin,shot.kind);
+          if(e&&shot.pitch!==undefined)e.pitch=shot.pitch;
+        },
+        spark:p=>{
+          if(!effects||!camera||!creatureSim)return;
+          const e=spawnChild(effects,effectWorld(),p.x,p.y,p.z,100,15);
+          const spin=creatureSim.rand.byte()-128;if(e)e.spin=spin;
+        },
+      });
+      if(tasks.gunslinger.defeated&&tasks.boss===2)tasks.boss=3;
+    };
+    return;
+  }
   if(level===13&&creatureSim&&tasks){
     const boss=creatureSim.creatures.find(c=>c.slot===32);
     if(!boss)return;
@@ -3714,6 +3750,10 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
         },
       );
       if (request) startDialogue(request);
+      if(tasks.gunslinger?.clearHoming){
+        for(const e of effects?.effects??[])if(e.kind===0x59&&e.life>0)e.life=1;
+        tasks.gunslinger.clearHoming=false;
+      }
       if(tasks.finale)drawFinaleStage();
       // Mr Potato Head hands the power-up back inside that step.
       recordPowerUp();

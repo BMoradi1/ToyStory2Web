@@ -7,6 +7,32 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-03 — Elevator and Penthouse gunslinger combat
+
+`gunslinger.ts` now implements the level-owned type 31 and type 45 routines
+(`00425700`, `004282d0`), independently of Final Showdown's gunslinger.
+
+- Elevator Hop: 30-point health bar, 60-tick recovery and height gate, timed
+  homing emitter plus five arcing shots, authored muzzle, hover/ground animation
+  changes driven by the original spin clock and central box. Actual creature
+  removal starts the delayed reward and retires remaining homing emitters.
+- Penthouse: 20 combat health points, recovery/height gates, alternating bone
+  15/16 shots with aim-cone limits, two firing cues and muzzle puffs, changing
+  patrol rectangles, authored defeat and delayed token reward. Defeat cancels
+  a pending burst. Both bosses brighten on hits without changing size.
+- `tools/gunslinger-probe.ts` verifies installed intros, timing and boundary
+  conditions, attack cycles, actual death wordcode/removal, delayed rewards and
+  reset, plus movement/damage from all three installed projectile templates.
+  Prospector, Tarmac Smith and Finale regressions pass, as does production build.
+- `tools/gunslinger-flow-check.js` passes both real intros and authored attack
+  cycles, pause, hit brightness/recovery, defeat/reward collection/save, restart
+  and exit. Buzz is positioned/protected and laser hits are injected; attack
+  wordcode is not skipped. The emitter check includes invisible live effects.
+- Remaining scope: Elevator spinning scenery, associated arena hazards and
+  camera/sound feedback; Penthouse prop helpers/hazards; exact intro camera
+  timing, original-versus-port visual/audio comparison and unassisted traversal.
+  These combat hooks do not imply either entire level is complete.
+
 ## 2026-10-03 — Airport Prospector fight
 
 Airport Infiltration now installs its own `0042be60` controller for type 61,
@@ -25,7 +51,7 @@ slot 32, independently of Final Showdown's Prospector.
   and save, restart, exit and re-entry. It positions Buzz and injects laser hits;
   an unassisted fight and full-level traversal remain unverified. Exact voice
   overlap, intro camera timing and original-versus-port visual parity remain open.
-- Next level-owned boss routines: Elevator Hop GUNSP and Penthouse GUNSL.
+- Elevator Hop and Penthouse follow-up is recorded above.
 
 ## 2026-10-03 — Shared late-game gun enemies and buzzards
 
@@ -46,9 +72,8 @@ Infiltration and Tarmac Trouble (internal levels 11, 13, 14).
   three levels. The browser positions/protects Buzz and seeks the existing firing
   opcode; it does not claim a natural fight or unassisted playthrough.
 - Build and existing ZPOD beam regression pass. Exact acoustic/visual comparison
-  and whole-game random-stream scheduling remain unverified. GUNSP (Elevator Hop),
-  GUNSL (Penthouse) boss routines remain separate open work;
-  their finale-specific controllers do not implement these level encounters.
+  and whole-game random-stream scheduling remain unverified. The separate Elevator
+  Hop and Penthouse boss controllers are covered in the later entry above.
 
 ## 2026-10-01 — Elevator Hop and Airport platforms
 
@@ -150,8 +175,8 @@ not evidence for untested interactions.
 | 7 | Al's Toy Barn | DINO, BOX and BPLANE hooks absent. | Dinosaur encounter and original moving-collision calls. |
 | 8 | Al's Space Land | BBUGGY and ZGCAR hooks absent; prop-gated texture effect missing. | Buggy challenge, `0052c9b8 & 1` effect trigger and reward paths. |
 | 9 | Toy Barn Encounter | Dedicated pod controller and beam tests exist; ZGCAR hook absent. | Full fight/summon cycles and reward; determine the absent hook's role. |
-| 10 | Elevator Hop | Wire puzzle and both compound lifts implemented; GUNSP hook absent. | Exact collision/script timing comparison, gunslinger and full-level traversal completion. |
-| 11 | Al's Penthouse | Shared gun enemy and buzzard handlers implemented; GUNSL boss hook absent. | Level-local prop helpers, hazards and encounters. |
+| 10 | Elevator Hop | Wire puzzle, both compound lifts and GUNSP combat/reward implemented. | Spinning scenery/arena hazards and feedback, exact collision/script timing and full-level traversal. |
+| 11 | Al's Penthouse | Shared gun enemy/buzzard handlers and GUNSL combat/reward implemented. | Level-local prop helpers, hazards and encounters. |
 | 12 | The Evil Emperor Zurg | Entrance, attacks, recovery, defeat, save bit and victory/movie handoff implemented in `zurg-boss.ts`. Installed-data and focused browser checks pass. | Unassisted combat, original-versus-port camera/render comparison and detail-dependent particles. |
 | 13 | Airport Infiltration | Five authored transport routes, shared gun/buzzard handlers and Prospector fight/reward implemented. | Exact collision/script timing comparison and full-level traversal; distinct from Tarmac. |
 | 14 | Tarmac Trouble | Plane motion/collision, wheels/fans, ground/climbing passengers, wheel hazards and helicopter hover/rotors/token motion and light puzzle/lowering implemented and tested. Slinky timed-path rules and retry implemented. Near/far scenery sway, rain/plane sound, rain particles and lightning/thunder restored. Blacksmith recovery, defeat and delayed reward implemented; axe throws implemented; hit flashing missing. Shared gun enemy and buzzard handlers implemented. | Remaining creature hooks and other ambient effects; pitch/roll attachment on other movers. |

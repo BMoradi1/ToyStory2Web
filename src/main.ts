@@ -1,3 +1,4 @@
+import {PAINT_CAN_OBJECTS,createPaintCans,stepPaintCans,restorePaintCans,type PaintCans} from './sim/paint-cans.ts';
 import {createBuggy,stepBuggy,buggyBar} from './sim/buggy.ts';
 import {createKite,stepKite,stepMower,kiteBar} from './sim/neighborhood.ts';
 import {createDinosaur,stepDinosaur,dinosaurBar} from './sim/dinosaur.ts';
@@ -325,6 +326,7 @@ async function showLevel(index: number): Promise<void> {
   tarmacPlane = null;
   levelPlatforms = null;
   penthouse = null;
+  paintCans = null;
   waterEffects=createWaterEffects();
   tarmacHelicopter = null;
   tarmacLights = null;
@@ -430,6 +432,9 @@ async function showLevel(index: number): Promise<void> {
         const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);
       }
       for(const id of platformObjects(levelNumber(level.id)??0)) {
+        const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);
+      }
+      if(levelNumber(level.id)===4)for(const id of PAINT_CAN_OBJECTS){
         const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);
       }
       if(levelNumber(level.id)===11&&exeBytes)for(const id of penthouseObjects(readPenthouseTables(exeBytes))){
@@ -725,6 +730,7 @@ async function open(dir: GameDir): Promise<void> {
       get tarmacWeather() { return tarmacWeather; },
       get tarmacScenery() { return tarmacScenery; },
       get levelPlatforms() { return levelPlatforms; },
+      get paintCans() { return paintCans; },
       get penthouse() { return penthouse; },
       get waterEffects() { return {...waterEffects}; },
       get tarmacPlane() { return tarmacPlane; },
@@ -1304,6 +1310,7 @@ async function spawnPlayer(): Promise<void> {
   await loadCollision();
   if (!currentCollisionWorld) { infoEl.textContent = 'no collision for this scene'; return; }
 
+  if(paintCans){restorePaintCans(paintCans,currentCollisionWorld);paintCans=null;}
   if(penthouse){restorePenthouse(penthouse,currentCollisionWorld);penthouse=null;}
   if(levelPlatforms){restoreLevelPlatforms(levelPlatforms,currentCollisionWorld);levelPlatforms=null;}
   if (tarmacPlane) {
@@ -1352,6 +1359,8 @@ async function spawnPlayer(): Promise<void> {
   drawLevelPlatforms();
   penthouse=level===11&&exeBytes?createPenthouse(currentLevel.level,currentCollisionWorld,readPenthouseTables(exeBytes)):null;
   drawPenthouse();
+  paintCans=level===4?createPaintCans(currentLevel.level,currentCollisionWorld):null;
+  drawPaintCans();
   tarmacWeather = level === 14 ? createTarmacWeather() : null; setWeatherLight(128);
   tarmacScenery = level === 14 ? createTarmacScenery(currentLevel.level) : null;
   tarmacHelicopter = level === 14 ? createTarmacHelicopter(currentLevel.level) : null;
@@ -2549,6 +2558,12 @@ function drawTarmacHelicopter(): void {
   viewer.setObjectTransforms(transforms);
 }
 
+function drawPaintCans():void{
+  if(!viewer||!paintCans)return;
+  viewer.setObjectTransforms(new Map(paintCans.objects.map(o=>[o.index,{angles:o.angles,
+    offset:[(o.position.x-o.rest.x)*GAME_TO_RENDER,-(o.position.y-o.rest.y)*GAME_TO_RENDER,-(o.position.z-o.rest.z)*GAME_TO_RENDER] as [number,number,number],
+  }])));
+}
 function drawPenthouse():void{
   if(!viewer||!penthouse)return;
   viewer.setObjectTransforms(new Map([...penthouse.objects.values()].map(o=>[o.index,{
@@ -3022,6 +3037,7 @@ function discardLevel(): void {
   tarmacPlane = null;
   levelPlatforms = null;
   penthouse = null;
+  paintCans = null;
   waterEffects=createWaterEffects();
   tarmacHelicopter = null;
   tarmacLights = null;
@@ -3445,6 +3461,7 @@ let pushBlocks: PushState | null = null;
 let tarmacPlane: TarmacPlane | null = null;
 let levelPlatforms: LevelPlatforms | null = null;
 let penthouse:Penthouse|null=null;
+let paintCans:PaintCans|null=null;
 let waterEffects=createWaterEffects();
 let tarmacHelicopter: TarmacHelicopter | null = null;
 let tarmacLights: TarmacLights | null = null;
@@ -3862,6 +3879,13 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     playEvent(0x9b,aircraftSoundPoint({x:pose.position.x*32,y:pose.position.y*32,z:pose.position.z*32},camera));
   }
 
+  if(paintCans&&creatureSim&&effects&&camera){
+    const world=effectWorld();
+    stepPaintCans(paintCans,player,currentCollisionWorld,{rand:creatureSim.rand,
+      sound:(event,at)=>playEvent(event,at),shake:ticks=>{if(camera)camera.shake=ticks;},
+      effect:(at,kind,mode)=>spawnChild(effects!,world,at.x,at.y,at.z,kind,mode),
+    });drawPaintCans();
+  }
   if(penthouse&&creatureSim){
     stepPenthouse(penthouse,player,currentCollisionWorld,{cameraZone:zones.camera,gateTwo:effects?.gate.two??0,health:slot=>creatureSim!.creatures.find(c=>c.slot===slot)?.health??0,camera:cut.ticks>0?cut.eye:camera??undefined,gateFour:effects?.gate.four??false,cameraY:cut.ticks>0?cut.eye.y:camera?.y,zone:zones.player,rand:creatureSim.rand,gateSeven:effects?.gate.seven??false,
       cut:cutHandle,sound:(event,at)=>playEvent(event,at),touch:applyCreatureTouch,

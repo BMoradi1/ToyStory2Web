@@ -7,6 +7,22 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-03 — Construction Yard outdoor paint cans
+
+- Restored all three lid controllers from `0041bc20`, with staggered start
+  clocks 0/33/66 and cycle limits 300/327/349. Lids rise, hold at 51200 game
+  units, accelerate down and bounce at one-quarter impact speed.
+- Collision objects 10/12/11 switch on for the closed lid and off while open;
+  their original spatial-index membership is restored before a restart.
+  Artwork 36/37/38 and shadow copies 54/55/56 follow the lid positions.
+- Strong impacts emit kind 25 plus eight randomized kind-66 particles, sound
+  0x69 and distance-scaled camera shake. Reopening emits 0x6a. Controllers
+  freeze beyond the original strict 1152-by-256-unit player distance.
+- Installed probe passes all cycles, collision boundaries and exact restore.
+  Browser checks all three lids, effects/sound, drawn transforms, distance
+  freeze and pause/restart/exit. Existing stomp/paint-mixing probe and build
+  pass. Remaining Construction Yard platforms and debris emitters stay open.
+
 ## 2026-10-03 — Kite tail physics and rendering
 
 - Restored the 16-point chain (`0044e620/0044e710`): 4096-unit initial spacing,
@@ -494,7 +510,7 @@ not evidence for untested interactions.
 | 1 | Andy's House | Tin intro/fight/reward integration tested; hover wobble/sparks partial. Chair stomp and pushables implemented. | Remaining numbered props and platforms; all five token routes. |
 | 2 | Andy's Neighborhood | Lawnmower effects, kite flight/combat/reward and ZGCAR hook implemented. | Moving scenery and natural race/token routes. |
 | 3 | Bombs Away (internal 6) | `stepBossFight` exists. | Complete boss attacks, damage windows, defeat, token and replay. |
-| 4 | Construction Yard | DRILL combat/reward and ZGCAR implemented; trailer paint implemented, outdoor cans missing. | Outdoor paint and collision movement, then token routes. |
+| 4 | Construction Yard | DRILL combat/reward and ZGCAR implemented; trailer paint and outdoor lid/collision cycles implemented. | Remaining collision movement and debris emitters, then natural token routes. |
 | 5 | Alleys and Gullies | BOX/BPLANE launch cycle, boat cannon and clown combat/reward implemented. | Moving scenery/collision; 37 poles and 11 zip lines need route checks. |
 | 6 | Slime Time (internal 3) | Dedicated slime controller exists. | Full encounter, arena effects, reward and replay comparison. |
 | 7 | Al's Toy Barn | Dinosaur breath/combat/defeat/reward and BOX/BPLANE launch cycle implemented. | Original moving-collision calls and full token routes. |

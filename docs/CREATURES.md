@@ -605,3 +605,21 @@ consumes its first tick. It restores vulnerability 7 only below zero, alternatin
 the fight. `0041e880` begins the post-removal phase at 3+dt and awards token
 slot 4 on the update after phase 120. Focused tests inject damage; they do not
 claim a natural player-controlled win or full level traversal.
+
+### Construction Yard jackhammer (2026-10-03)
+
+`drill.ts` implements `0041b780` with the four arena threshold/snap tables at
+`004f1ccc..004f1d0b`, loaded from the supplied executable. The previous grid
+cell preserves the entry axis across alternating walkable strips. The handler
+also raises 0x99/0x9a, shakes within strict 300/100 ranges and clamps Y using
+the original unsigned comparison. Its final vulnerability write overrides the
+recovery writes: 4 without an active disk or before the fight, 5 otherwise.
+The level adjusts body radius to 3800 above its height threshold, else 1800.
+
+Dust kind 4/mode 9 uses the four-tick gate and period 32. Above the fight-height
+threshold, sixteen-tick debris chooses aimed kind 84 one-quarter of the time,
+else mode 14. The aimed branch uses truncated sqrt distance in 32-unit steps,
+three-quarter distance as horizontal speed and the original ballistic division;
+a zero divisor is guarded. Both branches consume the next random byte for spin
+and set width/height 100. The level owns its 30-health HUD and post-removal
+3+dt / 120 / 200 token timing. Full arena traversal and scenery remain unaudited.

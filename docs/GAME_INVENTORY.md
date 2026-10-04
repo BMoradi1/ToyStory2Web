@@ -11,7 +11,7 @@ This is static inventory, **not** a completed playthrough or parity score. Missi
 | 1 (1) | andy's house | yes | — | 8, 9, 10, 12, 13, 14, 15 | 14 / 2 | taunt/reward hooks; inspect per-creature combat |
 | 2 (2) | andy's neighborhood | yes | LAWN (12), ZKITE (15) | 0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 12 | 6 / 5 | taunt/reward hooks; inspect per-creature combat |
 | 3 (6) | bombs away | yes | — | — | 0 / 0 | tasks.ts stepBossFight |
-| 4 (4) | construction yard | yes | DRILL (22) | 1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 21, 22, 23, 24, 25, 26 | 5 / 0 | taunt/reward hooks; inspect per-creature combat |
+| 4 (4) | construction yard | yes | — | 1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 21, 22, 23, 24, 25, 26 | 5 / 0 | drill.ts + tasks.ts reward |
 | 5 (5) | alleys and gullies | yes | — | 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 19, 20, 21, 22, 23, 24, 25 | 37 / 11 | clown.ts + tasks.ts reward |
 | 6 (3) | slime time | yes | — | — | 0 / 0 | slime-boss.ts |
 | 7 (7) | al's toy barn | yes | DINO (26) | 0, 1, 2, 3, 4, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 | 4 / 1 | taunt/reward hooks; inspect per-creature combat |
@@ -28,7 +28,6 @@ This is static inventory, **not** a completed playthrough or parity score. Missi
 
 - andy's neighborhood: LAWN, type 12, slots 0 → FUN_00418ce0.
 - andy's neighborhood: ZKITE, type 15, slots 26 → FUN_004189c0.
-- construction yard: DRILL, type 22, slots 24 → FUN_0041b780.
 - al's toy barn: DINO, type 26, slots 0 → FUN_00420af0.
 - al's space land: BBUGGY, type 47, slots 40 → FUN_00422660.
 - tarmac trouble: SMITH, type 58, slots 46 → FUN_0042d3e0.

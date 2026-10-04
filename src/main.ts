@@ -1,3 +1,4 @@
+import {createDrill,readDrillArena,stepDrill,drillBar} from './sim/drill.ts';
 import {createClown,stepClown,clownBar} from './sim/clown.ts';
 import {createWaterEffects,stepWaterEffects} from './sim/water-effects.ts';
 import {readPenthouseTables,penthouseObjects,createPenthouse,stepPenthouse,movePenthouseFloats,restorePenthouse,type Penthouse} from './sim/penthouse.ts';
@@ -803,6 +804,7 @@ async function open(dir: GameDir): Promise<void> {
       get tasks() {
         return tasks ? {
           done: tasks.done, hintIndex: tasks.hintIndex, slime: tasks.slime ? { ...tasks.slime } : null,
+          drill:tasks.drill?{...tasks.drill}:null,
           clown:tasks.clown?{...tasks.clown}:null,
           pod:tasks.pod?{...tasks.pod}:null,
           zurg:tasks.zurg?{...tasks.zurg}:null,
@@ -2056,6 +2058,7 @@ function hudReadout(level: number): HudReadout {
         Math.round(((c.health - fight.bar.from) * 0x36) / fight.bar.over)));
     }
   }
+  if(tasks?.drill)bossBar=drillBar(tasks.drill,creatureSim?.creatures.find(c=>c.slot===24));
   if(tasks?.clown)bossBar=clownBar(tasks.clown,creatureSim?.creatures.find(c=>c.slot===3));
   if (tasks?.slime && tasks.slime.phase >= 999) bossBar = slimeBossBar(tasks.slime);
   if(tasks?.pod&&tasks.pod.phase>=2)bossBar=podBossBar(tasks.pod);
@@ -2233,6 +2236,10 @@ function drawCreatures(): void {
         c.x * GAME_TO_RENDER, -c.y * GAME_TO_RENDER, -c.z * GAME_TO_RENDER,
         toRadians(c.heading), c.drawScale,
       );
+    }
+    if(tasks?.drill){
+      const light=tasks.drill.flash?2:1;
+      viewer.setCreatureAppearance(24,[1,1,1],[light,light,light]);
     }
     if(tasks?.clown){
       const light=tasks.clown.flash?2:1;
@@ -3158,6 +3165,23 @@ function saveProgress(): void {
  * `bossFight` have one.
  */
 function startBossFight(level: number): void {
+  if(level===4&&creatureSim&&tasks&&exeBytes){
+    const boss=creatureSim.creatures.find(c=>c.slot===24);
+    if(!boss)return;
+    tasks.drill=createDrill(boss,readDrillArena(exeBytes));
+    creatureSim.levelHandler=(c,args,p)=>{
+      if(c.slot!==24||!tasks?.drill||!creatureSim||!effects||!camera)return;
+      const world=effectWorld();
+      stepDrill(tasks.drill,c,{...p,phase:tasks.boss,rand:creatureSim.rand,
+        disksActive:effects.effects.some(e=>e.life>0&&(e.kind===EFFECT_KIND.diskHoming||e.kind===EFFECT_KIND.diskStraight)),
+        shake:camera.shake,setShake:ticks=>{if(camera)camera.shake=ticks;},
+        gateFour:effects.gate.four,gateSixteen:effects.gate.sixteen,
+        sound:event=>playEvent(event,c),effect:(at,kind,mode)=>spawnChild(effects!,world,at.x,at.y,at.z,kind,mode),
+        projectile:(at,v,gravity,kind)=>spawnEffect(effects!,world,at.x,at.y,at.z,v.x,v.y,v.z,gravity,0,0,kind),
+      },args.dt);
+    };
+    return;
+  }
   if(level===5&&creatureSim&&tasks){
     const boss=creatureSim.creatures.find(c=>c.slot===3);
     if(!boss)return;

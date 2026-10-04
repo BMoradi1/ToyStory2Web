@@ -7,6 +7,23 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-03 — Construction Yard jackhammer
+
+- Implemented `0041b780`: arena grid entry constraints from runtime tables,
+  floor clamp, contact/engine events, proximity camera shake, alternating hit
+  lighting and the original vulnerability rule tied to active disks.
+- Restored four-tick dust and sixteen-tick debris emission, including the
+  aimed ballistic branch, shared random order, sprite size/spin and damage.
+  Coincident horizontal positions skip the retail divide-by-zero branch.
+- Matched the level tick's height-dependent update range, 30-health bar,
+  removal delay and slot-4 reward through the existing taunt/collection flow.
+- Probes pass arena entry axes, disk vulnerability, shake thresholds, debris
+  trajectories/damage and reward boundaries. Browser checks pass the natural
+  intro, real disk pickup/fire and spin window, debris, flash, injected defeat,
+  delayed token collection/save, pause, restart and exit. Build passes.
+- This completes known Construction Yard creature dispatch coverage; outdoor
+  paint cans, moving scenery and full natural traversal remain open.
+
 ## 2026-10-03 — Alleys boat cannons and clown combat
 
 - Restored ZBOAT (`0041df70`) shells: first active update, then each strict
@@ -386,7 +403,7 @@ not evidence for untested interactions.
 | 1 | Andy's House | Tin intro/fight/reward integration tested; hover wobble/sparks partial. Chair stomp and pushables implemented. | Remaining numbered props and platforms; all five token routes. |
 | 2 | Andy's Neighborhood | LAWN and ZKITE hooks absent; ZGCAR hook implemented. | Lawnmower/kite state machines, moving scenery and race/reset behavior. |
 | 3 | Bombs Away (internal 6) | `stepBossFight` exists. | Complete boss attacks, damage windows, defeat, token and replay. |
-| 4 | Construction Yard | DRILL hook absent; ZGCAR implemented; trailer paint implemented, outdoor cans missing. | Drill, outdoor paint and collision movement, then token routes. |
+| 4 | Construction Yard | DRILL combat/reward and ZGCAR implemented; trailer paint implemented, outdoor cans missing. | Outdoor paint and collision movement, then token routes. |
 | 5 | Alleys and Gullies | BOX/BPLANE launch cycle, boat cannon and clown combat/reward implemented. | Moving scenery/collision; 37 poles and 11 zip lines need route checks. |
 | 6 | Slime Time (internal 3) | Dedicated slime controller exists. | Full encounter, arena effects, reward and replay comparison. |
 | 7 | Al's Toy Barn | DINO hook absent; BOX/BPLANE launch cycle implemented. | Dinosaur encounter and original moving-collision calls. |

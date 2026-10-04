@@ -7,6 +7,18 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-03 — Tarmac blacksmith presentation and cleanup
+
+- Completed the split blacksmith controller's alternating hit flash and
+  90-tick boss-bar hold/expiry. Defeat clears the pending axe timer immediately.
+- The installed combat/attack probes and browser lifecycle regression pass,
+  including rendered material brightness, actual axe release, reward,
+  pause/restart and exit/re-entry. Production build passes.
+- The static inventory now recognizes the composed Tarmac implementation in
+  `creatures.ts` and `tasks.ts`. No named creature hook remains entirely absent;
+  this does **not** establish complete game parity. Effects, scenery, special
+  tasks and natural progression still need their independent checks below.
+
 ## 2026-10-03 — Space Land buggy fight
 
 - Added the missing slot-40 boss task: grounded player-room-5 taunt, script
@@ -25,7 +37,7 @@ a completed original-versus-port playthrough.**
   This is not a full natural playthrough. Laser visuals use the shared beam
   renderer and wall clipping; incidental damage to other creatures is not yet
   reproduced. Dynamic engine pitch and other Space Land scenery/tasks remain
-  open. The inventory now lists only Tarmac SMITH as an absent complete hook.
+  open. At this checkpoint the inventory listed Tarmac SMITH as the remaining incomplete hook.
 
 ## 2026-10-03 — Neighborhood lawnmower and kite
 
@@ -542,18 +554,19 @@ not evidence for untested interactions.
    `tarmac-smith-attack-probe.ts` checks boundaries, repeat/cancel/reset,
    finale isolation and installed projectile movement/contact damage. The
    browser regression reaches the attack through authored wordcode and checks
-   release/sound, pause during windup and restart cleanup. Hit flashing remains
-   missing; this is not a complete encounter playthrough.
-   The shared SMITH hook stays listed as absent in the generated inventory:
-   recovery/defeat live in the Tarmac task controller; the level-gated attack
-   runs after the shared creature update. The finale controller remains absent.
+   release/sound, pause during windup and restart cleanup. Hit flash and bar
+   expiry now pass too; this is not a complete encounter playthrough.
+   The inventory recognizes this composed implementation; recovery/defeat live
+   in the Tarmac task controller and attack runs after shared movement. The
+   finale has its own controller and remains isolated from this path.
 2. **Other level motion.** Use the original mutation call inventory to account
    for each object/controller, starting with traversal-critical platforms in
    Elevator Hop and both airport scenes. Share transform/collision integration;
    keep authored timing and state transitions specific to each level.
-3. **Progression blockers.** Missing challenge handlers (lawnmower/kite, drill, boat, dinosaur, buggy, gunslingers). There are
-   16 distinct absent shared hooks across the install. Determine what shared
-   wordcode already does before replacing any behavior.
+3. **Progression blockers.** Named creature handlers now have implementations,
+   including mower/kite, drill, boat, dinosaur, buggy and gunslingers. Audit
+   remaining special tasks and natural routes independently; handler coverage
+   does not establish that every token can be earned through normal play.
    Zurg's controller is now implemented from `0042b300/0042b3a0`, including
    entrance and death cuts, both projectile types, 60-tick hit recovery,
    retaliation, inner-radius constraint, falling death, boss-save bit and

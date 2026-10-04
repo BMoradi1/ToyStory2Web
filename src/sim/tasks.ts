@@ -86,6 +86,8 @@ export interface TaskState {
   /** `DAT_0052f9a0`, the lap clock; `DAT_0052f990`, ticks it stays stunned. */
   bossClock: number;
   bossHurt: number;
+  smithFlash: boolean;
+  smithBarTicks: number;
   /** `DAT_0052f98c`, the health it had last tick. */
   bossHealthWas: number;
   /** `DAT_0052f994`, 0..0x800: how far outside its arena it has drifted. */
@@ -178,7 +180,7 @@ export function createTasks(): TaskState {
     done: 0, hammChatter: 0, hintChatter: 0, hintIndex: -1,
     slime: null, pod:null, zurg:null, finale:null, prospector:null, gunslinger:null, clown:null, drill:null, dinosaur:null, kite:null, buggy:null,
     boss: 0, bossGone: 0, reach: 0, pathRun: 0, pathClock: 100, fetch: 0, fetchDone: 0, fetchClock: 100, slowTick: 0, potatoPart: 0, powerUps: 0, potatoChatter: 0, challenge: 0, challengeFrom: 0,
-    bossPhase: 0, bossClock: 0, bossHurt: 0, bossHealthWas: -1, bossRamp: 0, bossSwing: 0,
+    bossPhase: 0, bossClock: 0, bossHurt: 0, smithFlash:false, smithBarTicks:0, bossHealthWas: -1, bossRamp: 0, bossSwing: 0,
     bossTaunt: 0, bossShout: 0, bossYaw: 0, bossFlip: 0, bossCut: 0,
     bossBeaten: false, levelWon: false,
     race: RaceState.Idle, laps: 0, raceQuadrant: 0, checkpoint: 0, raceBlocked: true,
@@ -536,6 +538,8 @@ export function stepTasks(
   },
   dt = 1,
 ): DialogueRequest | null {
+  tasks.smithBarTicks=Math.max(0,tasks.smithBarTicks-dt);
+  if(tasks.boss!==2)tasks.smithFlash=false;
   // The engine's 1-in-64 divider, which is what timed tasks count on.
   tasks.slowTick += dt;
   const slow = tasks.slowTick >= 64;
@@ -818,6 +822,8 @@ export function stepTasks(
     // health points belong to the defeat script, not another round of hits.
     // Keep this level-local: the finale uses a different controller.
     if (world.level === 14 && c && c.type === 58) {
+      tasks.bossFlip=(tasks.bossFlip-1)&1;
+      tasks.smithFlash=false;
       if (tasks.bossHealthWas === -1) tasks.bossHealthWas = c.record.health;
       if (tasks.bossHealthWas !== c.health) {
         tasks.bossHealthWas = c.health;
@@ -825,17 +831,19 @@ export function stepTasks(
         c.record.vulnerable = 4;
       }
       if (tasks.boss === 2) {
+        tasks.smithBarTicks=90;
         tasks.bossHurt -= dt;
         if (tasks.bossHurt < 0) {
           tasks.bossHurt = 0;
           c.record.vulnerable = 6;
-        }
+        } else tasks.smithFlash=tasks.bossFlip!==0;
         if (c.health < 10) {
           c.pc = 45;
           c.wait = 0;
           c.record.vulnerable = 4;
           c.flags &= ~(CREATURE_FLAGS.hurts | CREATURE_FLAGS.chase);
           c.record.speed = 16;
+          c.timer=0; // Defeat cancels the pending hand-attachment release.
           tasks.boss = 3;
           world.sound?.(-2, c);
         }

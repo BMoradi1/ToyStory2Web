@@ -818,7 +818,7 @@ async function open(dir: GameDir): Promise<void> {
           prospector:tasks.prospector?{...tasks.prospector}:null,
           gunslinger:tasks.gunslinger?{...tasks.gunslinger}:null,
           boss: tasks.boss, potatoPart: tasks.potatoPart, powerUps: tasks.powerUps,
-          bossPhase: tasks.bossPhase, bossClock: tasks.bossClock, bossHurt: tasks.bossHurt,
+          bossPhase: tasks.bossPhase, bossClock: tasks.bossClock, bossHurt: tasks.bossHurt, smithFlash:tasks.smithFlash, smithBarTicks:tasks.smithBarTicks,
           bossCut: tasks.bossCut, bossRamp: tasks.bossRamp, bossSwing: tasks.bossSwing,
           bossBeaten: tasks.bossBeaten, levelWon: tasks.levelWon,
           fetch: tasks.fetch, fetchDone: tasks.fetchDone, fetchClock: tasks.fetchClock,
@@ -2064,6 +2064,7 @@ function hudReadout(level: number): HudReadout {
         Math.round(((c.health - fight.bar.from) * 0x36) / fight.bar.over)));
     }
   }
+  if(level===14&&tasks&&tasks.smithBarTicks===0)bossBar=-1;
   if(tasks?.kite)bossBar=kiteBar(tasks.kite,creatureSim?.creatures.find(c=>c.slot===26));
   if(tasks?.buggy)bossBar=buggyBar(tasks.buggy,creatureSim?.creatures.find(c=>c.slot===40));
   if(tasks?.dinosaur)bossBar=dinosaurBar(tasks.dinosaur,creatureSim?.creatures.find(c=>c.slot===0));
@@ -2245,6 +2246,10 @@ function drawCreatures(): void {
         c.x * GAME_TO_RENDER, -c.y * GAME_TO_RENDER, -c.z * GAME_TO_RENDER,
         toRadians(c.heading), c.drawScale, toRadians(c.hover),
       );
+    }
+    if(creatureSim.level===14&&tasks){
+      const light=tasks.smithFlash?2:1;
+      viewer.setCreatureAppearance(46,[1,1,1],[light,light,light]);
     }
     if(tasks?.kite){
       const light=tasks.kite.flash?2:1;

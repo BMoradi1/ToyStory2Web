@@ -73,15 +73,27 @@
   check(throwing&&released,'authored approach did not animate and release axe: '+JSON.stringify(smith()));
   // Move Buzz away to isolate recovery and defeat from player-contact damage.
   Object.assign(ts2.player,{x:smith().x+90000,z:smith().z+90000});
+  let flashed=false;
   for(let hit=0;hit<10;hit++) {
     ts2.hurtCreature(46,4);ts2.tickGame({},1,0);
     check(smith().vulnerable===4,'hit failed to close vulnerability');
-    if(hit<9){ts2.tickGame({},60,0);check(smith().vulnerable===6,'recovery did not reopen');}
+    if(hit<9){
+      for(let i=0;i<60;i++){
+        ts2.tickGame({},1,0);
+        if(ts2.tasks.smithFlash){
+          const mesh=ts2.viewer.creatureMeshes.get(46);
+          check(mesh.material[0].color.r===2&&mesh.scale.x===1,'hit flash not drawn');flashed=true;
+        }
+      }
+      check(smith().vulnerable===6,'recovery did not reopen');
+    }
   }
+  check(flashed,'blacksmith never flashed');
   check(smith().health===9&&ts2.tasks.boss>2,'defeat threshold missed');
   check(!token().enabled,'reward skipped defeat delay');
   ts2.tickGame({},120,0);
   check(token().enabled&&(ts2.tasks.done&16),'reward missing after defeat');
+  check(ts2.tasks.smithBarTicks===0&&!ts2.tasks.smithFlash,'defeat presentation never expired');
   await ts2.spawnPlayer();ts2.viewer.stop();
   check(ts2.tasks.boss===0&&ts2.tasks.bossHurt===0&&smith().health===29&&!token().enabled,'restart retained fight');
   check(!ts2.effects.kinds.includes(0x66),'restart retained axe');

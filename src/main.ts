@@ -122,7 +122,7 @@ import {
 import { AI_SCRIPTS } from './sim/creature-data.ts';
 import {
   RandomStream, attackFromPlayer, contactCreatures, createCreatureSim, damageCreature,
-  creatureWorldFromCollision, killCreature, setCreatureModels, stepCreatures,
+  creatureWorldFromCollision, killCreature, setCreatureModels, stepCreatures, updateCreatureVisibility,
   CREATURE_FLAGS, type Creature, type CreatureModel, type CreatureSim,
   CREATURE_HEALTH,
 } from './sim/creatures.ts';
@@ -337,6 +337,7 @@ async function showLevel(index: number): Promise<void> {
   tasks = null;
   talk = null;
   creatureArt.clear();
+  creatureModels.clear();
   viewer?.clearCreatureMeshes();
   music?.stop();
   currentTerrainFile = level.terrain;
@@ -1583,6 +1584,8 @@ function stepPodBeams():void{
 function spawnCreatureEffects(): void {
   if (!effects || !creatureSim || !player || !camera) return;
   const world = effectWorld();
+  for(const e of creatureSim.emissions)spawnChild(effects,world,e.x,e.y,e.z,e.kind,e.mode);
+  creatureSim.emissions.length=0;
   for (const at of creatureSim.rescues) {
     addPointLight(pointLights, spawnPickupBurst(effects, world, at, 50));
   }
@@ -1717,10 +1720,8 @@ function fireDisk(): void {
     for (const c of creatureSim.creatures) {
       if (c.record.vulnerable === 0 || c.deathTimer < 0 || c.health <= 0) continue;
       // The original wants flags 0x1 and 0x2 together. 0x2 is "in this
-      // tick's near list", which is the part that means "the game is
-      // running this creature"; 0x1 is the always-awake bit a script or a
-      // level rule sets, and requiring it here would leave the homing bolt
-      // with almost nothing to aim at. Near and alive is the test used.
+      // tick's near list"; 0x1 is renderer visibility. Keep the port's existing
+      // near/alive homing selection so camera framing does not drop a target.
       if ((c.flags & CREATURE_FLAGS.near) === 0) continue;
       const dx = (c.x - player.x) >> 5, dy = (c.y - player.y) >> 5, dz = (c.z - player.z) >> 5;
       const d = dx * dx + dy * dy + dz * dz;
@@ -2937,6 +2938,7 @@ function discardLevel(): void {
   currentCreatures = [];
   creatureSim = null;
   creatureArt.clear();
+  creatureModels.clear();
   creaturePosed.clear();
   player = null;
   playerRuntime = null;
@@ -3830,6 +3832,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   }
 
   if (creatureSim) {
+    creatureSim.effectGates={four:effects?.gate.four??false,eight:effects?.gate.eight??false};
     creatureSim.raceState = tasks?.race ?? 0;
     stepCreatures(creatureSim, player);
     // A task may have opened a dialogue above. Do not queue another touch
@@ -3845,6 +3848,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     creatureSim.sounds.length = 0;
     spawnCreatureEffects();
     drawCreatures();
+    if(viewer)updateCreatureVisibility(creatureSim,player,viewer.visibleCreatureSlots());
   }
 
   stepBeams(laserBeams);

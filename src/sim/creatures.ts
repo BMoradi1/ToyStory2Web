@@ -31,7 +31,7 @@ import { cos, idiv, sin, YAW_MASK, yawOf } from './trig.ts';
 
 /** Entity flags at +0x40. The placement's +0x12 word is the initial value. */
 export const CREATURE_FLAGS = {
-  /** Kept in the near list however far away it is (the visibility pass sets it). */
+  /** Visible model within the renderer range; rebuilt by the visibility pass. */
   awake: 0x001,
   /** In this tick's near list; cleared and re-set every tick. */
   near: 0x002,
@@ -197,6 +197,9 @@ export class RandomStream {
 export interface CreatureSound { event: number; x: number; y: number; z: number }
 
 export interface CreatureSim {
+  /** Shared renderer/effect dividers used by creature-owned emitters. */
+  effectGates?: {four:boolean;eight:boolean};
+  emissions: {x:number;y:number;z:number;kind:number;mode:number}[];
   /** Level-owned behavior after shared movement/animation, before contacts. */
   levelHandler?: (c: Creature, args: HandlerArgs, player: { x: number; y: number; z: number }) => void;
   creatures: Creature[];
@@ -343,7 +346,7 @@ export function createCreatureSim(
   }
   return {
     creatures, world, rand, level,
-    sounds: [], rescues: [], sparks: [], dust: [], raceState: 0, carFront: 0, carRear: 0, shots: [], beamCasters: [], gunShots: [], deaths: [], defeatBursts: [], near: [],
+    sounds: [], rescues: [], sparks: [], dust: [], emissions: [], raceState: 0, carFront: 0, carRear: 0, shots: [], beamCasters: [], gunShots: [], deaths: [], defeatBursts: [], near: [],
     foundCount: 0, lastKilled: -1, models: null,
     bossLastHealth: -1, bossSlotEarned: false, smithThrows: [],
   };
@@ -1120,6 +1123,23 @@ function raceCar(sim: CreatureSim, c: Creature, args: HandlerArgs): void {
   }
 }
 
+/** ZGCAR, 004064a0: hurt recovery, engine cues and paired rear-wheel smoke. */
+const zurgCar:CreatureHandler=(sim,c,args)=>{
+  if(c.timer===0)c.timer=c.health;
+  if(c.timer!==c.health&&c.health<101){
+    c.timer=c.health;
+    if(c.animState!==1){c.wait=0;c.script=AI_SCRIPTS[12]!;c.pc=0x7c/2;}
+  }
+  if(sim.effectGates?.eight&&c.record.accelSide===255)sim.sounds.push({event:0x42,x:c.x,y:c.y,z:c.z});
+  if(args.side>0)sim.sounds.push({event:0x41,x:c.x,y:c.y,z:c.z});
+  // 00830e3c also receives side*4; its PC consumer is not established.
+  if((c.flags&CREATURE_FLAGS.awake)!==0&&c.deathTimer>=0&&args.side>256&&sim.effectGates?.four){
+    for(const [x,z]of [[0x7a0,-0x460],[-0x7a0,-0x3a0]])sim.emissions.push({
+      x:c.x+(sin(c.heading+x!)*3>>2),y:c.y-4096,z:c.z+(sin(c.heading+z!)*3>>2),kind:39,mode:2,
+    });
+  }
+};
+
 /** 00406a90: the wordcode sets timer when the gun animation fires. */
 const fatBloke:CreatureHandler=(sim,c,_args,player)=>{
   if(c.timer===0||!player)return;
@@ -1158,6 +1178,7 @@ export const CREATURE_HANDLERS: Record<string, CreatureHandler> = {
   FUN_0042c150: collectable,
   FUN_0042d620: collectable,
   LAB_00406220: hoverBot,
+  LAB_004064a0: zurgCar,
   LAB_00406620: laserPod,
   FUN_00416ab0: tinRobot,
   LAB_00406a60: raceCar,
@@ -1184,6 +1205,7 @@ export function stepCreatures(
   sim.beamCasters.length = 0;
   sim.gunShots.length = 0;
   sim.smithThrows.length = 0;
+  sim.emissions.length = 0;
   const near: number[] = [];
 
   for (let i = 0; i < sim.creatures.length; i++) {
@@ -1304,6 +1326,17 @@ export function killCreature(c: Creature, what: number, sim?: CreatureSim): void
 export interface CreatureModel {
   offsetX: number; offsetY: number; offsetZ: number; hitRadius: number;
   shapes: readonly HitShape[];
+}
+
+/** 00447bd0: visible model plus strict range, with original 250000 hysteresis. */
+export function updateCreatureVisibility(sim:CreatureSim,player:{x:number;y:number;z:number},visible:ReadonlySet<number>):void{
+  for(const c of sim.creatures){
+    const was=(c.flags&CREATURE_FLAGS.awake)!==0;
+    c.flags&=~CREATURE_FLAGS.awake;
+    if((c.flags&CREATURE_FLAGS.near)===0||(c.flags&CREATURE_FLAGS.noModel)!==0||c.health<=0||!visible.has(c.slot))continue;
+    const dx=(player.x-c.x)>>5,dy=(player.y-c.y)>>5,dz=(player.z-c.z)>>5;
+    if(dx*dx+dy*dy+dz*dz<c.bodyRadius*c.bodyRadius*16+(was?250000:0))c.flags|=CREATURE_FLAGS.awake;
+  }
 }
 
 /**

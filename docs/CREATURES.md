@@ -559,3 +559,19 @@ without restarting the shared animation script. The installed-data and browser
 regressions are `shared-enemy-probe.ts` and `shared-enemy-flow-check.js`; see the
 audit for their injected-input scope. Level-owned gunslinger/Prospector fights
 remain separate from these shared routines.
+
+### Zurg cars and renderer visibility (2026-10-03)
+
+ZGCAR (`004064a0`, type 14) is dispatched on levels 2, 4, 8 and 9.
+Health changes below 101 restart script 12 at word 62 unless animation 1 is
+already playing. Positive forward speed raises sound event 0x41; acceleration
+byte 255 raises 0x42 on the eight-tick gate. Visible cars moving faster than
+256 emit paired kind-39/mode-2 wheel smoke on the four-tick gate. The write to
+`00830e3c` is not reproduced: its PC consumer remains unidentified.
+
+The host now maintains renderer-owned flag 0x1, using the documented strict
+player range and 250000 hysteresis. Frustum membership currently uses Three's
+posed mesh bounds rather than the retail hit-radius sphere. This enables
+visibility-gated effects without forcing all creatures visible. Clearing a
+level now clears both model-hit data and artwork caches; previously the retained
+hit-data cache prevented shared creature artwork from loading in later levels.

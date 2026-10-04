@@ -840,6 +840,19 @@ export class Viewer {
   /** Which creatures currently have a model. */
   get drawnCreatures(): number { return this.creatureMeshes.size; }
 
+  /** Model visibility for retail creature flag 0x1 and its gated effects. */
+  visibleCreatureSlots(): Set<number> {
+    this.camera.updateMatrixWorld(true);
+    const frustum=new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(this.camera.projectionMatrix,this.camera.matrixWorldInverse));
+    const visible=new Set<number>();
+    for(const [slot,mesh]of this.creatureMeshes){
+      mesh.updateWorldMatrix(true,false);
+      if(mesh.visible&&frustum.intersectsObject(mesh))visible.add(slot);
+    }
+    return visible;
+  }
+
+
   /** Drop every creature model, for a level change. */
   clearCreatureMeshes(): void {
     for (const id of [...this.creatureMeshes.keys()]) this.setCreatureMesh(id, null);

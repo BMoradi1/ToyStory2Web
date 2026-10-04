@@ -7,6 +7,20 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-03 — Shared Zurg cars and cross-level creature rendering
+
+- Implemented `004064a0` for all 17 Zurg-car placements in levels 2, 4, 8
+  and 9: health-change recovery, original sound events and wheel smoke gates.
+- Restored renderer-owned visibility flag 0x1 with original distance hysteresis.
+  Frustum membership uses posed mesh bounds; the retail hit-radius sphere is
+  not reproduced exactly. The unknown speed-feedback global is still omitted.
+- Fixed shared creatures becoming invisible after a level change: artwork and
+  hit-data caches now clear together so the next level reloads both.
+- Installed-data probes pass handler boundaries and recovery. Browser checks
+  pass four consecutive level visits, live wheel smoke, pause, restart and exit;
+  the boss car test injects damage to advance to its summon wave. Existing gun
+  and buzzard browser checks and the production build pass.
+
 ## 2026-10-03 — Water particles and wet footsteps
 
 `water-effects.ts` implements the water particle section of `004a2d80` using
@@ -336,14 +350,14 @@ not evidence for untested interactions.
 | Play order | Level | Confirmed gaps / implementation evidence | Next behavior comparison |
 |---|---|---|---|
 | 1 | Andy's House | Tin intro/fight/reward integration tested; hover wobble/sparks partial. Chair stomp and pushables implemented. | Remaining numbered props and platforms; all five token routes. |
-| 2 | Andy's Neighborhood | LAWN, ZKITE and ZGCAR hooks absent. | Lawnmower/kite state machines, moving scenery and race/reset behavior. |
+| 2 | Andy's Neighborhood | LAWN and ZKITE hooks absent; ZGCAR hook implemented. | Lawnmower/kite state machines, moving scenery and race/reset behavior. |
 | 3 | Bombs Away (internal 6) | `stepBossFight` exists. | Complete boss attacks, damage windows, defeat, token and replay. |
-| 4 | Construction Yard | DRILL and ZGCAR hooks absent; trailer paint implemented, outdoor cans missing. | Drill, outdoor paint and collision movement, then token routes. |
+| 4 | Construction Yard | DRILL hook absent; ZGCAR implemented; trailer paint implemented, outdoor cans missing. | Drill, outdoor paint and collision movement, then token routes. |
 | 5 | Alleys and Gullies | BOX, BPLANE, CLOWN and ZBOAT hooks absent. | Boat/plane and clown behavior; 37 poles and 11 zip lines need route checks. |
 | 6 | Slime Time (internal 3) | Dedicated slime controller exists. | Full encounter, arena effects, reward and replay comparison. |
 | 7 | Al's Toy Barn | DINO, BOX and BPLANE hooks absent. | Dinosaur encounter and original moving-collision calls. |
-| 8 | Al's Space Land | BBUGGY and ZGCAR hooks absent; prop-gated texture effect missing. | Buggy challenge, `0052c9b8 & 1` effect trigger and reward paths. |
-| 9 | Toy Barn Encounter | Dedicated pod controller and beam tests exist; ZGCAR hook absent. | Full fight/summon cycles and reward; determine the absent hook's role. |
+| 8 | Al's Space Land | BBUGGY hook absent; ZGCAR implemented; prop-gated texture effect missing. | Buggy challenge, `0052c9b8 & 1` effect trigger and reward paths. |
+| 9 | Toy Barn Encounter | Dedicated pod controller, beam tests and ZGCAR hook implemented. | Full natural fight/summon cycles and reward traversal. |
 | 10 | Elevator Hop | Wire puzzle, compound lifts, GUNSP combat/reward, fan switches/rotation/airflow implemented. | Other ambient effects, exact collision/script/force timing and full-level traversal. |
 | 11 | Al's Penthouse | Shared enemies, GUNSL combat/reward, hazards, water/floats, train routing and underwater movement implemented. | Underwater camera colour/warp, light/texture helpers and collision 24 review. |
 | 12 | The Evil Emperor Zurg | Entrance, attacks, recovery, defeat, save bit and victory/movie handoff implemented in `zurg-boss.ts`. Installed-data and focused browser checks pass. | Unassisted combat, original-versus-port camera/render comparison and detail-dependent particles. |

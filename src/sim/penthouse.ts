@@ -5,6 +5,7 @@ import type {PlayerState} from './player.ts';
 import type {RandomStream} from './creatures.ts';
 import type {CutHandle} from './tasks.ts';
 import type {ZurgShot} from './zurg-boss.ts';
+import {carryOnYawPlatform} from './moving-platform.ts';
 import {sin,cos,yawOf} from './trig.ts';
 export function readPenthouseTables(exe:Uint8Array){
   const v=new DataView(exe.buffer,exe.byteOffset,exe.byteLength);
@@ -13,10 +14,15 @@ export function readPenthouseTables(exe:Uint8Array){
     models:Array.from({length:4},(_,j)=>v.getInt32(0xf3e74+i*16+j*4,true)),
     button:Array.from({length:4},(_,j)=>v.getUint8(0xf3fb4+i*4+j)),
     zone:[3,2,2,5,4,1][i]!,
+  })),waterButtons:Array.from({length:4},(_,i)=>({
+    collision:v.getUint8(0xf3fac+i*2),art:v.getUint8(0xf3fad+i*2),
+    bit:v.getUint8(0xf3fcd+i*4),target:-1600*v.getUint8(0xf3fce+i*4)||0,guide:v.getUint8(0xf3fcf+i*4),
+  })),waterPlanes:Array.from({length:5},(_,i)=>({
+    threshold:v.getInt32(0xf3fe8+i*12,true),art:v.getInt32(0xf3fec+i*12,true),
   }))};
 }
 export type PenthouseTables=ReturnType<typeof readPenthouseTables>;
-export function penthouseObjects(t:PenthouseTables){return [...new Set(t.hazards.flatMap(h=>[...h.models,h.button[1]!,h.button[2]!]))];}
+export function penthouseObjects(t:PenthouseTables){return [...new Set([...t.hazards.flatMap(h=>[...h.models,h.button[1]!,h.button[2]!]),...t.waterButtons.map(b=>b.art),...t.waterPlanes.map(p=>p.art),39,40,41,42,44,91])];}
 const near=(a:Vec3,b:Vec3,r:number)=>((a.x-b.x)>>8)**2+((a.y-b.y)>>8)**2+((a.z-b.z)>>8)**2<r*r;
 interface PenthouseObject {id:number;index:number;rest:Vec3;position:Vec3;angles:readonly[number,number,number];scale:readonly[number,number,number]}
 export function createPenthouse(dat:DatLevel,w:CollisionWorld,t:PenthouseTables){
@@ -28,12 +34,21 @@ export function createPenthouse(dat:DatLevel,w:CollisionWorld,t:PenthouseTables)
   const hazards=t.hazards.map(h=>({...h,timer:0,yaw:objects.get(h.models[0]!)!.angles[1],
     hull:captureCollisionGroup(w,collisionGroupByObject(w,h.button[0]!))}));
   for(const h of hazards){for(const id of h.models.slice(2))objects.get(id)!.scale=[0,0,0];objects.get(h.button[2]!)!.scale=[0,0,0];}
-  return {objects,hazards,clock:0,blinkClock:0,blink:false,disabled:0};
+  const water={offset:0,target:0,y:null as number|null,selected:0,clock:0,blink:false,bubble:0,
+    buttons:t.waterButtons.map(b=>({...b,hull:captureCollisionGroup(w,collisionGroupByObject(w,b.collision))})),
+    planes:t.waterPlanes,
+    floats:[13,14,15,16].map((id,i)=>({art:39+i,threshold:i===2?-66600:-2600,
+      hull:captureCollisionGroup(w,collisionGroupByObject(w,id)),velocity:0,displacement:0,step:0,y:w.groups[collisionGroupByObject(w,id)]!.position!.y*32})),
+  };
+  for(const id of [...water.planes.map(p=>p.art),44,91])objects.get(id)!.scale=[0,0,0];
+  const state={objects,hazards,water,clock:0,blinkClock:0,blink:false,disabled:0};
+  selectPenthouseWater(state,w,16);
+  return state;
 }
 export type Penthouse=ReturnType<typeof createPenthouse>;
 export interface PenthouseWorld {
-  zone:number;rand:RandomStream;gateSeven:boolean;cut?:CutHandle;
-  sound?:(event:number,at:Vec3)=>void;touch?:(angle:number,reaction:number)=>void;
+  cameraY?:number;zone:number;rand:RandomStream;gateSeven:boolean;cut?:CutHandle;
+  sound?:(event:number,at?:Vec3)=>void;touch?:(angle:number,reaction:number)=>void;
   projectile?:(shot:ZurgShot)=>void;effect?:(at:Vec3,kind:number,mode:number,spin:boolean)=>void;
   guide?:(id:number)=>void;
 }
@@ -48,6 +63,7 @@ export function penthouseShot(at:Vec3,yaw:number,p:Vec3,rand:RandomStream):ZurgS
 }
 /** Runs after the player's collision pass, so real stomp contacts own switches. */
 export function stepPenthouse(s:Penthouse,p:PlayerState,w:CollisionWorld,host:PenthouseWorld){
+  stepPenthouseWater(s,p,w,host);
   for(const h of s.hazards){
     if(h.timer!==0)continue;
     const button=s.objects.get(h.button[1]!)!,flash=s.objects.get(h.button[2]!)!;
@@ -90,5 +106,69 @@ export function stepPenthouse(s:Penthouse,p:PlayerState,w:CollisionWorld,host:Pe
   }
 }
 export function restorePenthouse(s:Penthouse,w:CollisionWorld){
-  for(const h of s.hazards)transformCollisionGroup(w,h.hull,h.hull.origin,0);
+  for(const h of [...s.hazards,...s.water.buttons,...s.water.floats])transformCollisionGroup(w,h.hull,h.hull.origin,0);
+}
+
+/** 004292c0: one depressed selector at a time; transforms are from captured rest. */
+function selectPenthouseWater(s:Penthouse,w:CollisionWorld,bit:number){
+  const water=s.water;
+  for(const b of water.buttons){
+    const selected=b.bit===bit,was=b.bit===water.selected;
+    if(selected===was)continue;
+    transformCollisionGroup(w,b.hull,{...b.hull.origin,y:b.hull.origin.y+(selected?3600/32:0)},0);
+    s.objects.get(b.art)!.scale=[1,selected?2400/4096:4094/4096,1];
+  }
+  water.selected=bit;
+}
+/** Apply last tick's float velocity before player sweeps, carrying floor passengers. */
+export function movePenthouseFloats(s:Penthouse,w:CollisionWorld,p:PlayerState){
+  for(const f of s.water.floats){
+    const before={x:f.hull.origin.x*32,y:f.y,z:f.hull.origin.z*32};
+    f.y+=f.step;
+    transformCollisionGroup(w,f.hull,{...f.hull.origin,y:f.y/32},0);
+    carryOnYawPlatform(p,f.hull.groupIndex,before,{...before,y:f.y},0);
+  }
+}
+/** Water section of 0042a130, selected-button flash 004293d0, floats 00429fb0. */
+function stepPenthouseWater(s:Penthouse,p:PlayerState,w:CollisionWorld,host:PenthouseWorld){
+  const a=s.water;
+  if(a.offset!==a.target){
+    host.sound?.(0x95);
+    a.offset=a.offset<a.target?Math.min(a.target,a.offset+512):Math.max(a.target,a.offset-64);
+  }
+  a.y=a.offset===0?null:191000+a.offset;
+  const plane=a.y===null?undefined:a.planes.find(q=>q.threshold<=a.offset);
+  for(const q of a.planes){
+    const o=s.objects.get(q.art)!;
+    o.scale=q===plane&&(host.cameraY===undefined||a.y!>=host.cameraY)?[1,1,1]:[0,0,0];
+    if(q===plane)o.position={...o.rest,y:o.rest.y+a.offset};
+  }
+  for(const b of a.buttons)if(p.stompImpact&&p.contacts.some(c=>c.group===b.hull.groupIndex&&c.normal.y<-.5)){
+    selectPenthouseWater(s,w,b.bit);a.target=b.target;host.guide?.(b.guide);
+  }
+  if(a.offset<-64000)a.bubble=0;
+  else if(a.offset===-64000)a.bubble=Math.min(683,a.bubble+2);
+  else a.bubble=Math.max(0,a.bubble-2);
+  const size=a.bubble?(sin(a.bubble+341)>>2)/4096:0;
+  s.objects.get(91)!.scale=[size,size,size];
+  a.clock=(a.clock+32)&1023;
+  const selected=a.buttons.find(b=>b.bit===a.selected)!,button=s.objects.get(selected.art)!,flash=s.objects.get(44)!;
+  if(!a.blink&&a.clock>768){a.blink=true;flash.position={...button.position};button.scale=[0,0,0];flash.scale=[1,.5,1];}
+  else if(a.blink&&a.clock<768){a.blink=false;flash.position={...button.position};button.scale=[1,.5,1];flash.scale=[0,0,0];}
+  if(near(p,{x:0x2cc2e,y:0x2ee2b,z:-0x2fc03},128)){selectPenthouseWater(s,w,16);a.target=0;}
+  for(const f of a.floats){
+    const submerge=Math.min(0,a.offset-f.threshold);
+    if(p.stompImpact&&p.contacts.some(c=>c.group===f.hull.groupIndex&&c.normal.y<-.5))f.velocity=1280;
+    f.velocity+=f.displacement<0?48:-48;
+    const previous=f.displacement;f.displacement+=f.velocity;
+    if(f.displacement>=0&&previous<0){
+      f.velocity=f.velocity<513?512:f.velocity>>1;
+      if(submerge!==0)host.effect?.({x:f.hull.origin.x*32,y:f.y-f.displacement,z:f.hull.origin.z*32},57,2,false);
+    }
+    if(f.displacement>8192||f.displacement<-2048)f.velocity=0;
+    const o=s.objects.get(f.art)!;
+    o.position={x:f.hull.origin.x*32,y:f.y,z:f.hull.origin.z*32};
+    const bounce=submerge<-4095?f.displacement:-Math.trunc(f.displacement*submerge/4096);
+    f.step=Math.max(-2048,Math.min(2048,o.rest.y+submerge+bounce-f.y));
+  }
 }

@@ -1766,3 +1766,24 @@ before constructing fresh state. `penthouse-probe.ts` covers installed
 collision, damage and reset; `penthouse-flow-check.js` exercises rendered
 model motion, switches, particles and lifecycle through positioned scenarios.
 Water/floating props and mechanism routing remain separate open helpers.
+
+
+### Penthouse water and floating props (2026-10-03)
+
+Water selectors read collision/art pairs at executable offset `0xf3fac` and
+bit/height/guide records at `0xf3fcc`. Surface thresholds/artwork come from
+`0xf3fe8`. Offset zero disables water; otherwise its game-space Y is
+`191000 + offset`. Filling subtracts 64 per tick, draining adds 512, clamped
+at the selected target. Surface artwork is hidden when the camera is below it.
+
+`00429fb0` owns collision 13–16/artwork 39–42. Each float has an oscillation
+velocity/displacement, a water threshold and a deferred collision translation.
+The next player sweep applies that translation and carries an existing floor
+or ledge passenger. A stomp sets oscillation velocity 1280; the restoring
+acceleration is 48. Crossing the rest position emits kind 57/mode 2 when wet.
+Collision translation is capped to ±2048 per tick. All captures are restored
+before restart. Water is also supplied to the existing effects simulation.
+
+`penthouse-water-probe.ts` covers installed switches, hulls and player sweeps;
+`penthouse-water-flow-check.js` covers rendered meshes and lifecycle. Player
+underwater movement and the connected mechanism puzzle remain open.

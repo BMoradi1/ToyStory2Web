@@ -1,4 +1,4 @@
-import {readPenthouseTables,penthouseObjects,createPenthouse,stepPenthouse,restorePenthouse,type Penthouse} from './sim/penthouse.ts';
+import {readPenthouseTables,penthouseObjects,createPenthouse,stepPenthouse,movePenthouseFloats,restorePenthouse,type Penthouse} from './sim/penthouse.ts';
 import { createProspector, stepProspector } from './sim/prospector.ts';
 import { createGunslinger, stepGunslinger } from './sim/gunslinger.ts';
 import { enemyGunLife } from './sim/enemy-gun.ts';
@@ -1679,7 +1679,7 @@ function effectWorld(): EffectWorld {
       const hit = groundBelow(currentCollisionWorld, x / S2, y / S2, z / S2);
       return hit ? hit.y * S2 : null;
     },
-    waterY: null,
+    waterY: penthouse?.water.y??null,
   };
 }
 
@@ -3554,6 +3554,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   const playerGround = groundFromCollision(currentCollisionWorld, levelPoles, levelZipLines);
   playerGround.beforeMove = () => {
     tickPushBlocks(held);
+    if(penthouse)movePenthouseFloats(penthouse,currentCollisionWorld!,player!);
     if(levelPlatforms){stepLevelPlatforms(levelPlatforms,currentCollisionWorld!,player!,()=>creatureSim?.rand.byte()??0,tasks?.gunslinger?.spin??0);drawLevelPlatforms();}
     if (tarmacPlane) {
       stepTarmacPlane(tarmacPlane, currentCollisionWorld!, player!);
@@ -3696,7 +3697,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   }
 
   if(penthouse&&creatureSim){
-    stepPenthouse(penthouse,player,currentCollisionWorld,{zone:zones.player,rand:creatureSim.rand,gateSeven:effects?.gate.seven??false,
+    stepPenthouse(penthouse,player,currentCollisionWorld,{cameraY:cut.ticks>0?cut.eye.y:camera?.y,zone:zones.player,rand:creatureSim.rand,gateSeven:effects?.gate.seven??false,
       cut:cutHandle,sound:(event,at)=>playEvent(event,at),touch:applyCreatureTouch,
       guide:id=>spendGuide(guideSparkles,effects,id,true),
       projectile:shot=>{if(effects&&camera)spawnEffect(effects,effectWorld(),shot.x,shot.y,shot.z,

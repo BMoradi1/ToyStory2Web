@@ -1,3 +1,14 @@
+CURRENT UPDATE — 2026-10-03: Shared late-game gun enemy and buzzard handlers
+  Implemented FATBLOKE 00406a90 and BUZZARD 00406c70 across levels 11/13/14.
+  Gun wordcode trigger now fires terrain-limited kind-97 bullets with authored
+  muzzle/aim cone, sound and puffs. Buzzards get chase animation and flight/hurt cues.
+  Probe checks aiming, terrain lifetime, real bullet damage and cue/request state.
+  Browser checks projectile/sound/animation plus restart/exit in all three scenes
+  with positioned/protected Buzz and a seek to the authored firing opcode.
+  Build and ZPOD beam regression pass. No natural-combat/full-playthrough claim.
+  Next: GUNSP (10), GUNSL (11), PROSP (13) level-owned boss state machines.
+  Scratch originals: /tmp/ts2-zurg/creatures.c; never commit executable dumps/assets.
+
 CURRENT UPDATE — 2026-10-01: Platform interaction follow-up
   Added truck/player swept obstruction and paired reversal; corrected acquired
   ledge handling to pause the relevant lift/truck pair. Floor passengers still ride.

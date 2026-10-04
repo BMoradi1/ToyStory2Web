@@ -1,3 +1,4 @@
+import { enemyGunShot, type EnemyGunShot } from './enemy-gun.ts';
 /**
  * Creatures: the entity, the per-tick update and the script interpreter.
  *
@@ -230,6 +231,8 @@ export interface CreatureSim {
   shots: { x: number; y: number; z: number; heading: number }[];
   /** Sustained ZPOD beams requested this tick; resolved against terrain by the host. */
   beamCasters: Creature[];
+  /** FATBLOKE requests; host clips the lifetime against terrain. */
+  gunShots: EnemyGunShot[];
   /** Tarmac blacksmith throws; the host resolves animated hand attachments. */
   smithThrows: Creature[];
   /**
@@ -340,7 +343,7 @@ export function createCreatureSim(
   }
   return {
     creatures, world, rand, level,
-    sounds: [], rescues: [], sparks: [], dust: [], raceState: 0, carFront: 0, carRear: 0, shots: [], beamCasters: [], deaths: [], defeatBursts: [], near: [],
+    sounds: [], rescues: [], sparks: [], dust: [], raceState: 0, carFront: 0, carRear: 0, shots: [], beamCasters: [], gunShots: [], deaths: [], defeatBursts: [], near: [],
     foundCount: 0, lastKilled: -1, models: null,
     bossLastHealth: -1, bossSlotEarned: false, smithThrows: [],
   };
@@ -859,7 +862,7 @@ export function updateCreature(
 
   // 12. The per-type C handler, if this type has one.
   const handler = c.handler ? CREATURE_HANDLERS[c.handler] : undefined;
-  if (handler) handler(sim, c, { bits, chasing, fwd: across, side: along, dt });
+  if (handler) handler(sim, c, { bits, chasing, fwd: across, side: along, dt }, player);
   if (sim.level === 14 && c.type === 58) {
     stepSmithAttack(sim, c, player, chasing, dt);
   }
@@ -922,7 +925,7 @@ export interface HandlerArgs {
   dt: number;
 }
 
-type CreatureHandler = (sim: CreatureSim, c: Creature, args: HandlerArgs) => void;
+type CreatureHandler = (sim: CreatureSim, c: Creature, args: HandlerArgs, player?: {x:number;y:number;z:number}) => void;
 
 /** ZPOD, 00406620: drift for 360 ticks, beam during the inclusive 100..280 window. */
 function laserPod(sim:CreatureSim,c:Creature,args:HandlerArgs):void{
@@ -1117,6 +1120,25 @@ function raceCar(sim: CreatureSim, c: Creature, args: HandlerArgs): void {
   }
 }
 
+/** 00406a90: the wordcode sets timer when the gun animation fires. */
+const fatBloke:CreatureHandler=(sim,c,_args,player)=>{
+  if(c.timer===0||!player)return;
+  const shot=enemyGunShot(c,player);
+  const puffs=(c.flags&CREATURE_FLAGS.awake)!==0?5:0;
+  sim.gunShots.push({...shot,puffs});
+  sim.sounds.push({event:0x56,x:c.x,y:c.y,z:c.z});
+  c.timer=0;
+};
+/** 00406c70: hurt cue on health changes, sustained wings, chase animation. */
+const buzzard:CreatureHandler=(sim,c,args)=>{
+  if(c.timer!==c.health){
+    if(c.timer!==0)sim.sounds.push({event:0x58,x:c.x,y:c.y,z:c.z});
+    c.timer=c.health;
+  }
+  sim.sounds.push({event:0x57,x:c.x,y:c.y,z:c.z});
+  c.animState=args.chasing?1:0;
+};
+
 /**
  * The handlers that are ported, by the name `CREATURE_TYPES` gives them.
  * The rest are per-level work; the tin robot's (`FUN_00416ab0`) drives level
@@ -1139,6 +1161,8 @@ export const CREATURE_HANDLERS: Record<string, CreatureHandler> = {
   LAB_00406620: laserPod,
   FUN_00416ab0: tinRobot,
   LAB_00406a60: raceCar,
+  LAB_00406a90: fatBloke,
+  LAB_00406c70: buzzard,
 };
 
 /**
@@ -1158,6 +1182,7 @@ export function stepCreatures(
   sim.sparks.length = 0;
   sim.shots.length = 0;
   sim.beamCasters.length = 0;
+  sim.gunShots.length = 0;
   sim.smithThrows.length = 0;
   const near: number[] = [];
 

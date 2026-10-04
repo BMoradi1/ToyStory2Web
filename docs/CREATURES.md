@@ -547,3 +547,15 @@ sets flag 0x1 when the player is within `bodyRadius^2 * 16` (plus 250000
 while the flag is already set, a hysteresis; distances in 32-unit steps)
 and the sphere of `hitRadius` at the creature passes the frustum test
 (`FUN_004ba1f0`); a creature with no model gets 0x2000 instead.
+
+
+### Shared late-game handlers (2026-10-03)
+
+FATBLOKE (`00406a90`, type 46) and BUZZARD (`00406c70`, type 41) now have
+shared dispatch entries. Gun requests become terrain-limited kind-97 effects in
+`main.ts`; `enemy-gun.ts` holds the muzzle, aim-cone and lifetime calculations.
+Buzzards cache health in timer +0x8a for the damage cue and select chase animation
+without restarting the shared animation script. The installed-data and browser
+regressions are `shared-enemy-probe.ts` and `shared-enemy-flow-check.js`; see the
+audit for their injected-input scope. Level-owned gunslinger/Prospector fights
+remain separate from these shared routines.

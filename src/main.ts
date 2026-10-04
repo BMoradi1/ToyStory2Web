@@ -1,3 +1,4 @@
+import { enemyGunLife } from './sim/enemy-gun.ts';
 import { createLevelPlatforms, platformObjects, stepLevelPlatforms, stepPlatformSwitches, restoreLevelPlatforms, type LevelPlatforms } from './sim/level-platforms.ts';
 import { createTarmacWeather, stepTarmacWeather, type TarmacWeather } from './sim/tarmac-weather.ts';
 import { setWeatherLight } from './render/weather-light.ts';
@@ -1585,6 +1586,18 @@ function spawnCreatureEffects(): void {
       0x40, 0, 0x80, EFFECT_KIND.hoverShot);
   }
   creatureSim.shots.length = 0;
+  for(const shot of creatureSim.gunShots){
+    const v=shot.velocity,from=shot.trace;
+    const hit=sweepSphere(currentCollisionWorld!,from,{x:v.x*80,y:0,z:v.z*80},256,
+      {passes:1,skin:0,stopAtFirstContact:true});
+    const e=spawnEffect(effects,world,shot.muzzle.x,shot.muzzle.y,shot.muzzle.z,v.x,0,v.z,0,0,0,0x61);
+    if(e)e.life=enemyGunLife(shot,hit);
+    for(let i=0;i<shot.puffs;i++){
+      const puff=spawnChild(effects,world,from.x,from.y,from.z,100,15);
+      const spin=creatureSim.rand.byte()-128;if(puff)puff.spin=spin;
+    }
+  }
+  creatureSim.gunShots.length=0;
   for (const c of creatureSim.smithThrows) {
     const art = creatureArt.get(c.type), animation = art?.anm?.animations[c.animState];
     const pose = art?.anm && animation

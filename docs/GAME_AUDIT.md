@@ -1,11 +1,34 @@
 # Whole-game parity audit
 
-Reviewed 2026-10-01. This is the current audit index; older roadmap entries
+Reviewed 2026-10-03. This is the current audit index; older roadmap entries
 may describe work that has since shipped. The first pass covers all 15 scenes,
 their creature dispatch hooks, authored collision objects, existing task/prop
 controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
+
+## 2026-10-03 — Shared late-game gun enemies and buzzards
+
+Original `00406a90` and `00406c70` now dispatch through `CREATURE_HANDLERS`.
+These cover 30 gun enemies and 26 buzzards across Al's Penthouse, Airport
+Infiltration and Tarmac Trouble (internal levels 11, 13, 14).
+
+- Gun enemies consume the wordcode firing request, use the authored offset muzzle
+  and +/-256-angle aim cone, emit projectile kind 97, derive its lifetime from a
+  terrain cast, and raise sound 0x56 plus five conditional muzzle puffs. Spawn-mode
+  randomness precedes each puff's spin byte, using the existing shared stream.
+- Buzzards switch animation 0/1 with chase state, emit sustained flight event 0x57,
+  and emit 0x58 once per health change after initializing the health cache.
+- `tools/shared-enemy-probe.ts` verifies trigger consumption, aim-cone boundaries
+  and wrap, muzzle/terrain lifetime, installed bullet motion/damage, buzzard state
+  and damage cues, and request cleanup. `tools/shared-enemy-flow-check.js` verifies
+  actual projectile spawning, sounds, buzzard animation, restart and exit in all
+  three levels. The browser positions/protects Buzz and seeks the existing firing
+  opcode; it does not claim a natural fight or unassisted playthrough.
+- Build and existing ZPOD beam regression pass. Exact acoustic/visual comparison
+  and whole-game random-stream scheduling remain unverified. GUNSP (Elevator Hop),
+  GUNSL (Penthouse) and PROSP (Airport) boss routines remain separate open work;
+  their finale-specific controllers do not implement these level encounters.
 
 ## 2026-10-01 — Elevator Hop and Airport platforms
 
@@ -108,10 +131,10 @@ not evidence for untested interactions.
 | 8 | Al's Space Land | BBUGGY and ZGCAR hooks absent; prop-gated texture effect missing. | Buggy challenge, `0052c9b8 & 1` effect trigger and reward paths. |
 | 9 | Toy Barn Encounter | Dedicated pod controller and beam tests exist; ZGCAR hook absent. | Full fight/summon cycles and reward; determine the absent hook's role. |
 | 10 | Elevator Hop | Wire puzzle and both compound lifts implemented; GUNSP hook absent. | Exact collision/script timing comparison, gunslinger and full-level traversal completion. |
-| 11 | Al's Penthouse | BUZZARD, GUNSL and FATBLOKE hooks absent. | Level-local prop helpers, hazards and encounters. |
+| 11 | Al's Penthouse | Shared gun enemy and buzzard handlers implemented; GUNSL boss hook absent. | Level-local prop helpers, hazards and encounters. |
 | 12 | The Evil Emperor Zurg | Entrance, attacks, recovery, defeat, save bit and victory/movie handoff implemented in `zurg-boss.ts`. Installed-data and focused browser checks pass. | Unassisted combat, original-versus-port camera/render comparison and detail-dependent particles. |
-| 13 | Airport Infiltration | Five authored transport routes implemented; FATBLOKE, BUZZARD and PROSP hooks absent. | Exact collision/script timing comparison and full-level traversal; distinct from Tarmac. |
-| 14 | Tarmac Trouble | Plane motion/collision, wheels/fans, ground/climbing passengers, wheel hazards and helicopter hover/rotors/token motion and light puzzle/lowering implemented and tested. Slinky timed-path rules and retry implemented. Near/far scenery sway, rain/plane sound, rain particles and lightning/thunder restored. Blacksmith recovery, defeat and delayed reward implemented; axe throws implemented; hit flashing missing. FATBLOKE and BUZZARD hooks absent. | Remaining creature hooks and other ambient effects; pitch/roll attachment on other movers. |
+| 13 | Airport Infiltration | Five authored transport routes implemented; Shared gun enemy and buzzard handlers implemented; PROSP boss hook absent. | Exact collision/script timing comparison and full-level traversal; distinct from Tarmac. |
+| 14 | Tarmac Trouble | Plane motion/collision, wheels/fans, ground/climbing passengers, wheel hazards and helicopter hover/rotors/token motion and light puzzle/lowering implemented and tested. Slinky timed-path rules and retry implemented. Near/far scenery sway, rain/plane sound, rain particles and lightning/thunder restored. Blacksmith recovery, defeat and delayed reward implemented; axe throws implemented; hit flashing missing. Shared gun enemy and buzzard handlers implemented. | Remaining creature hooks and other ambient effects; pitch/roll attachment on other movers. |
 | 15 | Final Showdown | Stage and three fighter controllers implemented in `finale.ts`; rendered entrance, attacks, rescue, completion save, ending/credits and replay tested. | Natural combat completion; exact roll/framing and voice/pitch parity. |
 
 ## Prioritized work

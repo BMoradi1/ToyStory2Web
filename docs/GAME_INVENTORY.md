@@ -18,10 +18,10 @@ This is static inventory, **not** a completed playthrough or parity score. Missi
 | 8 (8) | al's space land | yes | ZGCAR (14), BBUGGY (47) | 2 | 9 / 9 | none |
 | 9 (9) | toy barn encounter | yes | ZGCAR (14) | — | 0 / 0 | pod-boss.ts |
 | 10 (10) | elevator hop | yes | GUNSP (31) | 4, 5, 18 | 0 / 1 | taunt/reward hooks; inspect per-creature combat |
-| 11 (11) | al's penthouse | yes | BUZZARD (41), GUNSL (45), FATBLOKE (46) | 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 22, 23, 24, 25, 26 | 7 / 0 | taunt/reward hooks; inspect per-creature combat |
+| 11 (11) | al's penthouse | yes | GUNSL (45) | 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 22, 23, 24, 25, 26 | 7 / 0 | taunt/reward hooks; inspect per-creature combat |
 | 12 (12) | the evil emperor zurg | yes | — | — | 0 / 0 | zurg-boss.ts |
-| 13 (13) | airport infiltration | yes | FATBLOKE (46), BUZZARD (41), PROSP (61) | 0, 3, 4, 6, 9, 12, 13, 14 | 13 / 2 | taunt/reward hooks; inspect per-creature combat |
-| 14 (14) | tarmac trouble | yes | FATBLOKE (46), BUZZARD (41), SMITH (58) | 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13 | 9 / 1 | taunt/reward hooks; inspect per-creature combat |
+| 13 (13) | airport infiltration | yes | PROSP (61) | 0, 3, 4, 6, 9, 12, 13, 14 | 13 / 2 | taunt/reward hooks; inspect per-creature combat |
+| 14 (14) | tarmac trouble | yes | SMITH (58) | 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13 | 9 / 1 | taunt/reward hooks; inspect per-creature combat |
 | 15 (15) | final showdown | yes | — | — | 0 / 0 | finale.ts (stage + three fighters) |
 
 ## Missing shared behavior hooks
@@ -42,18 +42,9 @@ This is static inventory, **not** a completed playthrough or parity score. Missi
 - al's space land: BBUGGY, type 47, slots 40 → FUN_00422660.
 - toy barn encounter: ZGCAR, type 14, slots 10 → LAB_004064a0.
 - elevator hop: GUNSP, type 31, slots 8 → FUN_00425700.
-- al's penthouse: BUZZARD, type 41, slots 8, 15, 19, 24, 28, 30, 31 → LAB_00406c70.
 - al's penthouse: GUNSL, type 45, slots 11 → FUN_004282d0.
-- al's penthouse: FATBLOKE, type 46, slots 16, 18, 22, 23, 25, 26, 32 → LAB_00406a90.
-- airport infiltration: FATBLOKE, type 46, slots 9, 10, 11, 17, 21, 22, 23, 25, 26, 27, 28 → LAB_00406a90.
-- airport infiltration: BUZZARD, type 41, slots 15, 16, 19, 20, 24 → LAB_00406c70.
 - airport infiltration: PROSP, type 61, slots 32 → FUN_0042be60.
-- tarmac trouble: FATBLOKE, type 46, slots 0, 1, 3, 8, 10, 11, 15, 16, 27, 28, 29, 30 → LAB_00406a90.
-- tarmac trouble: BUZZARD, type 41, slots 2, 4, 5, 9, 13, 14, 17, 18, 21, 22, 23, 24, 25, 26 → LAB_00406c70.
 - tarmac trouble: SMITH, type 58, slots 46 → FUN_0042d3e0.
-- final showdown: SMITH, type 58, slots 0 → FUN_0042d3e0.
-- final showdown: GUNSL, type 45, slots 1 → FUN_004282d0.
-- final showdown: PROSP, type 61, slots 2 → FUN_0042be60.
 - andy's house: types without a shared creature definition COTBIT (11), BOPEEP (7), ZURG1 (3), HAMM (10); may be NPCs, props or level-owned, not automatically missing behavior.
 - andy's neighborhood: types without a shared creature definition ZURG1 (3), HAMM (10); may be NPCs, props or level-owned, not automatically missing behavior.
 - construction yard: types without a shared creature definition PAINT (17), ZURG1 (3), FTYKE (18), HAMM (10), SLINKY (44); may be NPCs, props or level-owned, not automatically missing behavior.

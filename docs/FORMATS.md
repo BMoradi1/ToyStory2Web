@@ -190,13 +190,15 @@ The consequence matters: **level visual geometry is not in `.ALL` at all.**
 The word-vs-byte distinction is the trap: an earlier pass read the header as a
 byte offset, landed mid-data, and drew wrong conclusions from what it found.
 
-**Hit shapes (type `0x0009`, 2026-09-05).** The last group of every creature
-model (53 of 68; not Buzz or Woody): 16-byte records, one per animation
+**Hit shapes (type `0x0009`, 2026-09-05).** The last group of 53 of the 68 character
+models (not Buzz or Woody): 16-byte records, one per animation
 state, `i16 ox, oy, oz; i16 count (first record only); i16 sx, sy, sz (256 =
 1.0); i16 radius` — the ellipsoid the laser and contact tests use, indexed
 by the creature's `animState` (docs/CREATURES.md). The entry's u16s at
 +0x2c/+0x2e/+0x30 are the entity's coarse-sphere centre offset and +0x32
-its hit radius. `readHitShapes` in `src/formats/all.ts`.
+its hit radius. `readHitShapes` in `src/formats/all.ts`. Models without this
+group use the engine defaults documented in `CREATURES.md`; they are not
+missing models.
 
 **Mesh (type `0x0001`) — CONFIRMED on this build.** Faces run flat while
 `(byte[pos+3] & 0xF0) == 0x30`. Per face:

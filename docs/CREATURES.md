@@ -197,8 +197,8 @@ Flags at +0x40, as far as they are used:
            flags from the placement and adds this bit back if it was set
     0x2000 its model is not loaded (`FUN_00447bd0` sets it): never in the near list
 
-**Where the model-derived fields come from** (found 2026-09-05). Each
-creature type's `.all` ends with a group of type 9 (`GroupType.HitShapes`,
+**Where the model-derived fields come from** (found 2026-09-05). Most
+creature types' `.all` files end with a group of type 9 (`GroupType.HitShapes`,
 53 of the 68 character models; Buzz and Woody have none). Its payload is the
 `+0x84` table, one 16-byte ellipsoid per `animState`, and its group entry
 carries the coarse-sphere numbers: `+0x38/+0x3a/+0x3c` are the entry's
@@ -211,6 +211,16 @@ and the entry words (`DAT_0053eac8[type]`), and then, once every type is
 in, copies them into every entity of that type. `readHitShapes` in
 src/formats/all.ts reads the table; the laser and contact tests index it by
 `animState`.
+
+**Default geometry (2026-10-05).** `0043b9b0` initializes every type's
+coarse sphere to `(0, 500, 0), radius 500` and its hit-table pointer to
+`004f6ea0`: one ellipsoid with offset `(0, -250, 0)`, scale
+`(512, 256, 512)`, radius 250. Loading a trailing type-9 group replaces
+these defaults. A successfully loaded model without that group must remain
+active; treating it as missing disabled all five Construction Yard LTYKE
+rescues. `creatureModelGeometry` now follows this initialization. The
+installed-model probe covers 62 available configured models and 362
+placements across all 15 levels (one configured model is absent).
 
 ## Construction (`FUN_00406cd0(entity, fromList)`)
 

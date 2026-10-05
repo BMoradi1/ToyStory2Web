@@ -1,11 +1,36 @@
 # Whole-game parity audit
 
-Reviewed 2026-10-04. This is the current audit index; older roadmap entries
+Reviewed 2026-10-05. This is the current audit index; older roadmap entries
 may describe work that has since shipped. The first pass covers all 15 scenes,
 their creature dispatch hooks, authored collision objects, existing task/prop
 controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
+
+## 2026-10-05 — Rescue ambience, duck effects and missing hit geometry
+
+Replaced the shared rescue chirp with the ten native handlers' separate idle
+sounds, intervals and health gates. Andy's House and Tarmac remain silent
+while idle. Neighborhood ducks use the shared 32-tick chance and their
+visibility-gated kind-121 emission, including native random-byte consumption,
+velocity, gravity, spin and sound-on-success behavior. Pickup still produces
+one rescue count/burst and its level's cue without enemy death rewards.
+
+The browser audit exposed a shared loading bug: models without a trailing
+hit-shape group were marked unloaded. `0043b9b0` actually supplies a default
+sphere and ellipsoid before optional model-specific geometry replaces them.
+Restoring that fallback makes all five Construction Yard LTYKE rescues active
+and collectible, and prevents the same error for other loaded models.
+
+Validation: installed-model probe covers 62 available configured models and
+362 placements across 15 levels, including actual LTYKE contact. Rescue probes
+cover all ten handlers, timing, health, random consumption and particle motion.
+All ten rescue levels pass browser idle/collection/restart/exit checks;
+neighborhood particles are observed in the live effect pool. The 15-level
+entry/exit regression and production build pass. Browser tests reposition Buzz
+and dismiss dialogue; they do not constitute full mission playthroughs.
+Elevator Hop's special rescue orientation remains open, as does exact native
+ordering between deferred emissions and other users of the random stream.
 
 ## 2026-10-04 — Toy Barn hoops and first-fetch bounce
 

@@ -1,3 +1,4 @@
+import { creatureModelGeometry } from './sim/creature-model.ts';
 import {createToyBarnHoops,stepToyBarnHoops,type ToyBarnHoops} from './sim/toy-barn-hoops.ts';
 import {TOY_BARN_CANNON_OBJECTS,createToyBarnCannon,moveToyBarnCannon,stepToyBarnCannon,restoreToyBarnCannon,toyBarnCannonPoses,type ToyBarnCannon} from './sim/toy-barn-cannon.ts';
 import {TOY_BARN_BARRIER_OBJECT,createToyBarnBarrier,stepToyBarnBarrier,restoreToyBarnBarrier,type ToyBarnBarrier} from './sim/toy-barn-barrier.ts';
@@ -62,7 +63,7 @@ import { CREDIT_SLOTS, CREDIT_TEXT } from './front/endings.ts';
 import { chooseSaveFile } from './front/browser-menu.ts';
 import { movieChoices } from './front/movies.ts';
 import { createSlimeBoss, slimeBossBar, slimeBlobTarget } from './sim/slime-boss.ts';
-import { GroupType, buildMeshData, parseAll, readHitShapes, type AllFile } from './formats/all.ts';
+import { buildMeshData, parseAll, type AllFile } from './formats/all.ts';
 import {
   DEFAULT_ANIMATION_FPS, buildPosedMeshData, parseAnm, poseBone,
   type AnmFile, type Animation,
@@ -1245,7 +1246,7 @@ async function loadCollision(): Promise<CollisionGroup[] | null> {
 
 /**
  * Read the hit geometry of each creature type from its `.all`, caching as it
- * goes. The last group of a creature model is type 9: its entry carries the
+ * goes. A trailing type-9 group, when present, overrides the native defaults; its entry carries the
  * coarse sphere the near and contact tests use, and its payload one hit
  * ellipsoid per animation state (docs/CREATURES.md).
  */
@@ -1267,16 +1268,7 @@ async function loadCreatureModels(types: ReadonlySet<number>): Promise<void> {
         try { anm = parseAnm(await anmFile.read()); } catch { anm = null; }
       }
       creatureArt.set(type, { model, anm });
-      const groups = model.groups;
-      const last = groups[groups.length - 1];
-      if (!last || last.type !== GroupType.HitShapes || !last.hitSphere) continue;
-      const shapes = readHitShapes(last);
-      if (!shapes) continue;
-      creatureModels.set(type, {
-        offsetX: last.hitSphere.x, offsetY: last.hitSphere.y, offsetZ: last.hitSphere.z,
-        hitRadius: last.hitSphere.radius,
-        shapes,
-      });
+      creatureModels.set(type, creatureModelGeometry(model));
     } catch (err) {
       console.warn(`creature type ${type} (${entry.name}): ${(err as Error).message}`);
     }
@@ -1731,6 +1723,11 @@ function stepPodBeams():void{
 function spawnCreatureEffects(): void {
   if (!effects || !creatureSim || !player || !camera) return;
   const world = effectWorld();
+  for(const e of creatureSim.rescueProjectiles){
+    const spawned=spawnEffect(effects,world,e.x,e.y,e.z,e.vx,e.vy,e.vz,e.gravity,0,e.spin,e.kind);
+    if(spawned)playEvent(e.sound,spawned);
+  }
+  creatureSim.rescueProjectiles.length=0;
   for(const e of creatureSim.emissions)spawnChild(effects,world,e.x,e.y,e.z,e.kind,e.mode);
   creatureSim.emissions.length=0;
   for(const e of creatureSim.attachedEmissions){
@@ -4350,7 +4347,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   }
 
   if (creatureSim) {
-    creatureSim.effectGates={four:effects?.gate.four??false,eight:effects?.gate.eight??false};
+    creatureSim.effectGates={four:effects?.gate.four??false,eight:effects?.gate.eight??false,thirtyTwo:effects?.gate.thirtyTwo??false};
     creatureSim.raceState = tasks?.race ?? 0;
     stepCreatures(creatureSim, player);
     // A task may have opened a dialogue above. Do not queue another touch

@@ -198,7 +198,8 @@ export interface CreatureSound { event: number; x: number; y: number; z: number 
 
 export interface CreatureSim {
   /** Shared renderer/effect dividers used by creature-owned emitters. */
-  effectGates?: {four:boolean;eight:boolean};
+  effectGates?: {four:boolean;eight:boolean;thirtyTwo?:boolean};
+  rescueProjectiles: {x:number;y:number;z:number;vx:number;vy:number;vz:number;gravity:number;spin:number;kind:number;sound:number}[];
   emissions: {x:number;y:number;z:number;kind:number;mode:number}[];
   /** Local emitter positions resolved through the animated model by the host. */
   attachedEmissions: {creature:Creature;part:number;offset:{x:number;y:number;z:number};kind:number;mode:number}[];
@@ -349,7 +350,7 @@ export function createCreatureSim(
   }
   return {
     creatures, world, rand, level,
-    sounds: [], rescues: [], sparks: [], dust: [], emissions: [], attachedEmissions: [], attachedProjectiles: [], raceState: 0, carFront: 0, carRear: 0, shots: [], beamCasters: [], gunShots: [], deaths: [], defeatBursts: [], near: [],
+    sounds: [], rescues: [], sparks: [], dust: [], emissions: [], rescueProjectiles: [], attachedEmissions: [], attachedProjectiles: [], raceState: 0, carFront: 0, carRear: 0, shots: [], beamCasters: [], gunShots: [], deaths: [], defeatBursts: [], near: [],
     foundCount: 0, lastKilled: -1, models: null,
     bossLastHealth: -1, bossSlotEarned: false, smithThrows: [],
   };
@@ -948,7 +949,7 @@ function laserPod(sim:CreatureSim,c:Creature,args:HandlerArgs):void{
   if(c.timer>=100&&c.timer<=280)sim.beamCasters.push(c);
 }
 
-/** Pickup cues from the ten retail rescue handlers. Idle chatter is still shared. */
+/** Pickup cues from the ten retail rescue handlers. */
 const RESCUE_SOUNDS: Readonly<Record<string, number>> = {
   FUN_00416a60: 0x20, FUN_00418610: 0x49, FUN_0041bb80: 0x6c,
   FUN_0041dec0: 0xa2, FUN_00420ed0: 0x77, FUN_00422c70: 0xb8,
@@ -956,31 +957,49 @@ const RESCUE_SOUNDS: Readonly<Record<string, number>> = {
   FUN_0042d620: 0x1f,
 };
 
-/**
- * The find-five collectable: the sheep, the troops, the ducklings and the
- * rest. Ten level handlers share this implementation, one per level, with
- * different sound events (`FUN_00416a60`, `FUN_00418610`,
- * `FUN_0041bb80` and so on).
- *
- * It chirps on a timer while it is alive, and touching it counts it toward
- * the level's find-five task and takes it away. The host emits its shared
- * pickup burst (`FUN_00410410`) above the creature origin.
- *
- * The harmless health, 102, is what marks one as still to be collected: the
- * shared handler checks it before counting to prevent duplicate rescues.
- */
+/** Per-handler idle calls from the PC functions. Andy and Tarmac have none.
+ * Gate mode 0 is unconditional, 1 gates the sound on harmless health, and
+ * 2 gates both timer decrement and sound on that health. */
+const RESCUE_IDLE:Readonly<Record<string,{sound:number;base:number;gate:0|1|2}>>={
+  FUN_0041bb80:{sound:0x6b,base:90,gate:0},
+  FUN_0041dec0:{sound:0xa2,base:60,gate:1},
+  FUN_00420ed0:{sound:0x77,base:60,gate:0},
+  FUN_00422c70:{sound:0x80,base:300,gate:0},
+  FUN_004259b0:{sound:0x8e,base:90,gate:2},
+  FUN_00428650:{sound:0x96,base:60,gate:0},
+  FUN_0042c150:{sound:0x6b,base:90,gate:1},
+};
+function rescue(sim:CreatureSim,c:Creature){
+  if(!(c.flags&CREATURE_FLAGS.touched)||c.health!==CREATURE_HEALTH.harmless)return;
+  sim.rescues.push({x:c.x,y:c.y-0x2000,z:c.z});sim.foundCount++;
+  sim.sounds.push({event:RESCUE_SOUNDS[c.handler!]!,x:c.x,y:c.y,z:c.z});killCreature(c,2);
+}
+/** Find-five handlers retain separate idle timing and shared one-shot rescue. */
 function collectable(sim: CreatureSim, c: Creature, args: HandlerArgs): void {
-  c.timer -= args.dt;
-  if (c.timer < 1 && c.health === CREATURE_HEALTH.harmless) {
-    c.timer = (sim.rand.byte() & 0xff7f) + 0x5a;
-    sim.sounds.push({ event: 0x6b, x: c.x, y: c.y, z: c.z });
+  if(c.handler==='FUN_00418610'){
+    if(c.health!==CREATURE_HEALTH.harmless)return;
+    if(sim.effectGates?.thirtyTwo&&(sim.rand.byte()&3)===0)sim.sounds.push({event:0x48,x:c.x,y:c.y,z:c.z});
+    // The pickup precedes the emission check, so collecting a duck removes
+    // its awake bit before the timer can request another projectile.
+    rescue(sim,c);c.timer-=args.dt;
+    if(c.timer<1){
+      c.timer=(sim.rand.byte()&127)+128;
+      if(c.flags&CREATURE_FLAGS.awake){
+        const v=sim.rand.byte()-128;sim.rand.byte();sim.rand.byte();
+        sim.rescueProjectiles.push({x:c.x,y:c.y-4096,z:c.z,vx:v*4,vy:-3072,vz:v,gravity:96,spin:v*4,kind:121,sound:0x60});
+      }
+    }
+    return;
   }
-  if ((c.flags & CREATURE_FLAGS.touched) === 0) return;
-  if (c.health !== CREATURE_HEALTH.harmless) return;
-  sim.rescues.push({ x: c.x, y: c.y - 0x2000, z: c.z });
-  sim.foundCount++;
-  sim.sounds.push({ event: RESCUE_SOUNDS[c.handler!]!, x: c.x, y: c.y, z: c.z });
-  killCreature(c, 2);
+  const idle=RESCUE_IDLE[c.handler!];
+  if(idle&&(idle.gate!==2||c.health===CREATURE_HEALTH.harmless)){
+    c.timer-=args.dt;
+    if(c.timer<1&&(idle.gate===0||c.health===CREATURE_HEALTH.harmless)){
+      c.timer=(sim.rand.byte()&127)+idle.base;
+      sim.sounds.push({event:idle.sound,x:c.x,y:c.y,z:c.z});
+    }
+  }
+  rescue(sim,c);
 }
 
 /**
@@ -1247,6 +1266,7 @@ export function stepCreatures(
   sim.gunShots.length = 0;
   sim.smithThrows.length = 0;
   sim.emissions.length = 0;
+  sim.rescueProjectiles.length = 0;
   sim.attachedEmissions.length = 0;
   sim.attachedProjectiles.length = 0;
   const near: number[] = [];

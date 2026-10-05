@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseAll, readHitShapes } from '../src/formats/all.ts';
+import { parseAll, readHitShapes, buildMeshData } from '../src/formats/all.ts';
 import { CREATURE_LIST_TYPE, parseCreatureList, parseCreatureModels } from '../src/formats/creatures.ts';
 import { unpackRaw } from '../src/formats/rnc.ts';
 import { createCreatureSim, RandomStream, setCreatureModels, stepCreatures, damageCreature } from '../src/sim/creatures.ts';
@@ -24,6 +24,7 @@ const sim = createCreatureSim(placements, { groundY: () => 0 }, new RandomStream
 const path = parseCreatureModels(read('data/creatures.cfg').toString('latin1')).get(16)!.path;
 const model = parseAll(read(path));
 const groups = model.groups;
+const completeMeshSize = buildMeshData(model).positions.length;
 const animations = parseAnm(read(path.replace(/\.all$/, '.anm')));
 for (const slot of [1, 3, 5, 7]) {
   const face = animations.animations[slot]!, body = animations.animations[slot ^ 1]!;
@@ -32,8 +33,13 @@ for (const slot of [1, 3, 5, 7]) {
     const bodyOnly = buildPosedMeshData(model, animations, body, frame);
     const complete = buildPosedMeshData(model, animations, face, frame, { animation: body, frame });
     assert.ok(bodyOnly.positions.length > 0);
-    assert.equal(complete.positions.length, faceOnly.positions.length + bodyOnly.positions.length,
-      'every face and body triangle survives the paired animation');
+    // Seam triangles spanning face/body rings resolve only when both layers
+    // are present. Adding the two incomplete meshes omits those triangles.
+    assert.ok(complete.positions.length > faceOnly.positions.length + bodyOnly.positions.length,
+      'paired layers resolve the cross-layer joint seams');
+    assert.equal(complete.positions.length, completeMeshSize,
+      'paired animation retains every triangle in the installed model');
+    assert.ok(complete.positions.every(Number.isFinite), 'all posed seam vertices are finite');
   }
 }
 const hit = groups.at(-1)!;

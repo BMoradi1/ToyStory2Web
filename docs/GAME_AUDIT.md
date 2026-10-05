@@ -7,6 +7,18 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-04 — Slime encounter regression unblocked
+
+The recorded Slime Time probe failure came from adding the face-only and
+body-only mesh sizes. Joint seams spanning those layers resolve only in the
+combined pose, so that sum omitted 12 triangles (108 position components).
+The probe now compares every paired animation frame with the complete
+installed static model, asserts that cross-layer seams are added and checks
+finite vertices. No production rendering change was needed. The full probe
+now passes entrance, spit, jumps, all five combat stages, regrowth, defeat,
+reward/victory timing and hit-geometry preservation. This remains a scripted
+encounter check, not an unassisted fight.
+
 ## 2026-10-04 — Construction Yard proximity scenery
 
 Restored the object-63/64 height animation at the start of `0041c640`:
@@ -705,9 +717,9 @@ not evidence for untested interactions.
    Buzz and injects damage; natural combat completion remains unverified.
    `zurg-projectile-probe.ts` checks installed bouncing/homing effects, trails,
    spin deflection and contact damage. All 15 scenes still pass entry/exit.
-   Broader validation found a pre-existing `slime-probe.ts` triangle assertion
-   failure (2385 actual versus 2277 expected), reproduced from unchanged commit
-   `fbfaf47`; investigate the probe/model expectation separately.
+   The pre-existing `slime-probe.ts` mesh-size assertion is resolved above:
+   cross-layer seams explain 2385 versus 2277 position components. The full
+   scripted encounter regression now passes.
    Older decode notes incorrectly described descent as rising, the inner
    clamp as an outer bound, and lighting as aiming; these are corrected.
    Final Showdown now ports `0042faa0/0042fc50` and `0042f310/0042f530/0042f7b0`:

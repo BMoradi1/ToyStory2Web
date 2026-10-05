@@ -1,3 +1,4 @@
+import {createConstructionDebris,stepConstructionDebris,type ConstructionDebris} from './sim/construction-debris.ts';
 import {PAINT_CAN_OBJECTS,createPaintCans,stepPaintCans,restorePaintCans,type PaintCans} from './sim/paint-cans.ts';
 import {createBuggy,stepBuggy,buggyBar} from './sim/buggy.ts';
 import {createKite,stepKite,stepMower,kiteBar} from './sim/neighborhood.ts';
@@ -327,6 +328,7 @@ async function showLevel(index: number): Promise<void> {
   levelPlatforms = null;
   penthouse = null;
   paintCans = null;
+  constructionDebris = null;
   waterEffects=createWaterEffects();
   tarmacHelicopter = null;
   tarmacLights = null;
@@ -730,6 +732,7 @@ async function open(dir: GameDir): Promise<void> {
       get tarmacWeather() { return tarmacWeather; },
       get tarmacScenery() { return tarmacScenery; },
       get levelPlatforms() { return levelPlatforms; },
+      get constructionDebris() { return constructionDebris?structuredClone(constructionDebris):null; },
       get paintCans() { return paintCans; },
       get penthouse() { return penthouse; },
       get waterEffects() { return {...waterEffects}; },
@@ -1310,6 +1313,7 @@ async function spawnPlayer(): Promise<void> {
   await loadCollision();
   if (!currentCollisionWorld) { infoEl.textContent = 'no collision for this scene'; return; }
 
+  constructionDebris=null;
   if(paintCans){restorePaintCans(paintCans,currentCollisionWorld);paintCans=null;}
   if(penthouse){restorePenthouse(penthouse,currentCollisionWorld);penthouse=null;}
   if(levelPlatforms){restoreLevelPlatforms(levelPlatforms,currentCollisionWorld);levelPlatforms=null;}
@@ -1361,6 +1365,7 @@ async function spawnPlayer(): Promise<void> {
   drawPenthouse();
   paintCans=level===4?createPaintCans(currentLevel.level,currentCollisionWorld):null;
   drawPaintCans();
+  constructionDebris=level===4?createConstructionDebris(currentLevel.level):null;
   tarmacWeather = level === 14 ? createTarmacWeather() : null; setWeatherLight(128);
   tarmacScenery = level === 14 ? createTarmacScenery(currentLevel.level) : null;
   tarmacHelicopter = level === 14 ? createTarmacHelicopter(currentLevel.level) : null;
@@ -3038,6 +3043,7 @@ function discardLevel(): void {
   levelPlatforms = null;
   penthouse = null;
   paintCans = null;
+  constructionDebris = null;
   waterEffects=createWaterEffects();
   tarmacHelicopter = null;
   tarmacLights = null;
@@ -3462,6 +3468,7 @@ let tarmacPlane: TarmacPlane | null = null;
 let levelPlatforms: LevelPlatforms | null = null;
 let penthouse:Penthouse|null=null;
 let paintCans:PaintCans|null=null;
+let constructionDebris:ConstructionDebris|null=null;
 let waterEffects=createWaterEffects();
 let tarmacHelicopter: TarmacHelicopter | null = null;
 let tarmacLights: TarmacLights | null = null;
@@ -3885,6 +3892,13 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       sound:(event,at)=>playEvent(event,at),shake:ticks=>{if(camera)camera.shake=ticks;},
       effect:(at,kind,mode)=>spawnChild(effects!,world,at.x,at.y,at.z,kind,mode),
     });drawPaintCans();
+  }
+  if(constructionDebris&&creatureSim&&effects&&camera){
+    const world=effectWorld();
+    stepConstructionDebris(constructionDebris,player,{rand:creatureSim.rand,
+      effect:(at,kind,mode)=>spawnChild(effects!,world,at.x,at.y,at.z,kind,mode),
+      projectile:(at,v,gravity,spin,kind)=>spawnEffect(effects!,world,at.x,at.y,at.z,v.x,v.y,v.z,gravity,0,spin,kind),
+    });
   }
   if(penthouse&&creatureSim){
     stepPenthouse(penthouse,player,currentCollisionWorld,{cameraZone:zones.camera,gateTwo:effects?.gate.two??0,health:slot=>creatureSim!.creatures.find(c=>c.slot===slot)?.health??0,camera:cut.ticks>0?cut.eye:camera??undefined,gateFour:effects?.gate.four??false,cameraY:cut.ticks>0?cut.eye.y:camera?.y,zone:zones.player,rand:creatureSim.rand,gateSeven:effects?.gate.seven??false,

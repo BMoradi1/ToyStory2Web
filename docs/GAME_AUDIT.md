@@ -1,11 +1,27 @@
 # Whole-game parity audit
 
-Reviewed 2026-10-03. This is the current audit index; older roadmap entries
+Reviewed 2026-10-04. This is the current audit index; older roadmap entries
 may describe work that has since shipped. The first pass covers all 15 scenes,
 their creature dispatch hooks, authored collision objects, existing task/prop
 controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
+
+## 2026-10-04 — Construction Yard debris emitters
+
+- Restored the rolling kind-67 emitter on path 0 and thrown kind-84 debris
+  on path 1 (`0041cc00..0041cf79`). Both use the installed route coordinates,
+  original range/height gates, random delays and spin, and shared effects.
+- Rolling debris cycles eight endpoint pairs and receives the original stored
+  axis velocity of ±384. Thrown debris randomly selects eight trajectories,
+  with the recovered ballistic velocity and gravity 144 before pool scaling.
+- Preserved the retail rolling loop's extra visit at the path count as an idle
+  step; the port does not read the next path header as an out-of-bounds point.
+  Degenerate throw pairs are skipped instead of dividing by zero.
+- Installed probes pass every route and timing/gating boundary. Browser checks
+  each rolling route on its emission tick, thrown debris, pause/restart/exit.
+  Paint-can and jackhammer regressions and the production build pass.
+  Remaining moving platforms and natural traversal still require review.
 
 ## 2026-10-03 — Construction Yard outdoor paint cans
 
@@ -510,7 +526,7 @@ not evidence for untested interactions.
 | 1 | Andy's House | Tin intro/fight/reward integration tested; hover wobble/sparks partial. Chair stomp and pushables implemented. | Remaining numbered props and platforms; all five token routes. |
 | 2 | Andy's Neighborhood | Lawnmower effects, kite flight/combat/reward and ZGCAR hook implemented. | Moving scenery and natural race/token routes. |
 | 3 | Bombs Away (internal 6) | `stepBossFight` exists. | Complete boss attacks, damage windows, defeat, token and replay. |
-| 4 | Construction Yard | DRILL combat/reward and ZGCAR implemented; trailer paint and outdoor lid/collision cycles implemented. | Remaining collision movement and debris emitters, then natural token routes. |
+| 4 | Construction Yard | DRILL combat/reward and ZGCAR implemented; trailer paint and outdoor lid/collision cycles implemented. | Remaining collision movement, then natural token routes. |
 | 5 | Alleys and Gullies | BOX/BPLANE launch cycle, boat cannon and clown combat/reward implemented. | Moving scenery/collision; 37 poles and 11 zip lines need route checks. |
 | 6 | Slime Time (internal 3) | Dedicated slime controller exists. | Full encounter, arena effects, reward and replay comparison. |
 | 7 | Al's Toy Barn | Dinosaur breath/combat/defeat/reward and BOX/BPLANE launch cycle implemented. | Original moving-collision calls and full token routes. |

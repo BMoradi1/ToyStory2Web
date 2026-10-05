@@ -7,6 +7,24 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-04 — Toy Barn scripted platforms
+
+Restored all six `0048acc0` platforms from the installed scripts at
+`0xf294c..0xf2a00`: collision 7–9/art 15–17 run continuously; collision
+13/12/11 and art 12–14 begin only when creature slots 7/8/9 have health zero.
+The latter start extended by 790 level units while retaining the original
+script target origin. Near artwork and far objects 18–20 follow the moving
+hulls with the native 32/128-game-unit position quantization.
+
+`toy-barn-platforms-probe.ts` checks complete out/back/wait cycles, exact
+health gating, initial extension, near/far poses, standing and climbing carry,
+airborne isolation, restart restoration, and actual collision-solver landing
+and riding on all six hulls. `toy-barn-platforms-flow-check.js` passes full
+cycles, injected enemy defeats, rendered alignment, pause, restart and exit.
+Production build passes. Natural combat to release the three platforms and
+full traversal routes remain unverified; other Toy Barn machinery remains
+open. The preceding all-15-level browser load/simulate/exit check also passed.
+
 ## 2026-10-04 — Space Land buggy projectile model
 
 Connected mode `0x31` to scene object 25 (`004124ba..004124f3`): the live

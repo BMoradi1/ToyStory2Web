@@ -1,3 +1,4 @@
+import {NEIGHBORHOOD_ROPE_OBJECTS,createNeighborhoodRope,stepNeighborhoodRope,restoreNeighborhoodRope,type NeighborhoodRope} from './sim/neighborhood-rope.ts';
 import {NEIGHBORHOOD_BRIDGE_OBJECTS,createNeighborhoodBridges,stepNeighborhoodBridges,restoreNeighborhoodBridges,type NeighborhoodBridges} from './sim/neighborhood-bridges.ts';
 import {createAndyEffects,stepAndyEffects,type AndyEffects} from './sim/andy-effects.ts';
 import {ANDY_ROPE_OBJECT,createAndyRope,stepAndyRope,restoreAndyRope,type AndyRope} from './sim/andy-rope.ts';
@@ -380,6 +381,7 @@ async function showLevel(index: number): Promise<void> {
   andyMachinery = null;
   andyGates = null;
   andyCot = null;
+  neighborhoodRope = null;
   andyRope = null;
   andyEffects = null;
   seesaws = null;
@@ -506,7 +508,7 @@ async function showLevel(index: number): Promise<void> {
       }
       for(const id of seesawObjects(levelNumber(level.id)??0)){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
       if(levelNumber(level.id)===1)for(const id of [...ANDY_MACHINERY_OBJECTS,...ANDY_GATE_OBJECTS,...ANDY_COT_OBJECTS,ANDY_ROPE_OBJECT]){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
-      if(levelNumber(level.id)===2)for(const id of NEIGHBORHOOD_BRIDGE_OBJECTS){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
+      if(levelNumber(level.id)===2)for(const id of [...NEIGHBORHOOD_BRIDGE_OBJECTS,...NEIGHBORHOOD_ROPE_OBJECTS]){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
       if(levelNumber(level.id)===5)for(const id of [...ALLEY_PLATFORM_OBJECTS,...ALLEY_SEESAW_OBJECTS,...ALLEY_BUBBLE_OBJECTS,...ALLEY_BRIDGE_OBJECTS,...ALLEY_WATER_OBJECTS]){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
       if(levelNumber(level.id)===7)for(const id of [...TOY_BARN_PLATFORM_OBJECTS,...TOY_BARN_ROTOR_OBJECTS,...TOY_BARN_SPRING_OBJECTS,...TOY_BARN_LAUNCH_OBJECTS,TOY_BARN_BARRIER_OBJECT,...TOY_BARN_CANNON_OBJECTS]){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
       if(levelNumber(level.id)===4)for(const id of [...PAINT_CAN_OBJECTS,...CONSTRUCTION_BRIDGE_OBJECTS,...CONSTRUCTION_SHUTTLE_OBJECTS,...CONSTRUCTION_LIFT_OBJECTS,...CONSTRUCTION_SCENERY_OBJECTS,...CONSTRUCTION_STOMP_LIFT_OBJECTS]){
@@ -841,6 +843,7 @@ async function open(dir: GameDir): Promise<void> {
       get paintCans() { return paintCans; },
       get seesaws() { return seesaws; },
       get andyEffects() { return andyEffects; },
+      get neighborhoodRope(){return neighborhoodRope;},
       get andyRope() { return andyRope; },
       get andyCot() { return andyCot; },
       get andyGates() { return andyGates; },
@@ -1437,6 +1440,7 @@ async function spawnPlayer(): Promise<void> {
   if(toyBarnLaunchPlatforms){restoreToyBarnLaunchPlatforms(toyBarnLaunchPlatforms,currentCollisionWorld);toyBarnLaunchPlatforms=null;}
   if(toyBarnRotors){restoreToyBarnRotors(toyBarnRotors,currentCollisionWorld);toyBarnRotors=null;}
   if(seesaws){restoreSeesaws(seesaws,currentCollisionWorld);seesaws=null;}
+  if(neighborhoodRope){restoreNeighborhoodRope(neighborhoodRope);neighborhoodRope=null;}
   if(andyRope){restoreAndyRope(andyRope);andyRope=null;}
   if(andyCot){restoreAndyCot(andyCot,currentCollisionWorld);andyCot=null;}
   if(andyGates){restoreAndyGates(andyGates,currentCollisionWorld);andyGates=null;}
@@ -1585,6 +1589,7 @@ async function spawnPlayer(): Promise<void> {
   const S = GAME_UNITS_PER_LEVEL_UNIT;
   levelZipLines = readZipLines(currentLevel!.level.paths.find(p => p.id === 62)?.points ?? []);
   levelPoles = readPoles(currentLevel!.level.paths.find(p => p.id === 61)?.points ?? []);
+  neighborhoodRope=level===2?createNeighborhoodRope(currentLevel.level,levelPoles):null;drawNeighborhoodRope();
   andyRope=level===1?createAndyRope(currentLevel.level,levelPoles):null;drawAndyRope();
   alleyBubbles=level===5?createAlleyBubbles(currentLevel.level,currentCollisionWorld,levelPoles):null;drawAlleyBubbles();
   spaceRockingBlock=level===8?createSpaceRockingBlock():null;
@@ -2879,6 +2884,10 @@ function drawSeesaws():void{
   if(!viewer||!seesaws)return;
   viewer.setObjectTransforms(new Map(seesaws.platforms.flatMap(r=>r.objects.map(o=>[o.index,{angles:o.angles}] as const))));
 }
+function drawNeighborhoodRope():void{
+  if(!viewer||!neighborhoodRope)return;
+  viewer.setObjectTransforms(new Map(neighborhoodRope.objects.map(o=>[o.index,{angles:o.angles,scale:o.scale,offset:[0,-(o.position.y-o.rest.y)*GAME_TO_RENDER,0]}])));
+}
 function drawAndyRope():void{
   if(!viewer||!andyRope)return;
   const s=andyRope;viewer.setObjectTransforms(new Map([[s.index,{angles:s.angles,offset:[0,-(s.position.y-s.rest.y)*GAME_TO_RENDER,0]}]]));
@@ -3393,6 +3402,7 @@ function discardLevel(): void {
   andyMachinery = null;
   andyGates = null;
   andyCot = null;
+  neighborhoodRope = null;
   andyRope = null;
   andyEffects = null;
   seesaws = null;
@@ -3834,6 +3844,7 @@ let tarmacPlane: TarmacPlane | null = null;
 let levelPlatforms: LevelPlatforms | null = null;
 let seesaws:Seesaws|null=null;
 let andyEffects:AndyEffects|null=null;
+let neighborhoodRope:NeighborhoodRope|null=null;
 let andyRope:AndyRope|null=null;
 let andyCot:AndyCot|null=null;
 let andyGates:AndyGates|null=null;
@@ -4294,6 +4305,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       projectile:(at,v,spin)=>spawnEffect(effects!,world,at.x,at.y,at.z,v.x,v.y,v.z,128,0,spin,12),
       child:(at,kind,mode)=>spawnChild(effects!,world,at.x,at.y,at.z,kind,mode),hurt:()=>applyCreatureTouch(0,2)});
   }
+  if(neighborhoodRope){stepNeighborhoodRope(neighborhoodRope,player,(id,at)=>playEvent(id,at));drawNeighborhoodRope();}
   if(andyRope){stepAndyRope(andyRope,player,zones.camera,(id,at)=>playEvent(id,at));drawAndyRope();}
   if(andyCot&&creatureSim){stepAndyCot(andyCot,currentCollisionWorld,player,creatureSim.creatures,zones.camera,(id,at)=>playEvent(id,at));drawAndyCot();}
   if(andyGates&&stepAndySpring(player,currentCollisionWorld,zones.camera)){if(pushBlocks)pushBlocks.held=0;spendGuide(guideSparkles,effects,1,true);playEvent(0x1c,player);}

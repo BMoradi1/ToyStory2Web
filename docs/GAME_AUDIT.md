@@ -7,6 +7,21 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-05 — Neighborhood extending rope
+
+Restored pole 0 and artwork 25/27 from 00418e50/004190c0. Grabbing starts
+sound 0x21 and slide type 2; the bottom lowers with acceleration 16 capped at
+2048 while length grows and the upper endpoint stays fixed. The final bottom
+clamps to -0x2500, restores climb type 0 and retains the native final length
+overshoot. Artwork 25 tracks quantized height and 27 stretches from its
+initial Y scale 280 to 4096. Restart restores the original attachment.
+
+The installed probe passes real pole acquisition/sliding, acceleration, endpoint
+and final clamp arithmetic, scale, one-shot sound and reset. Browser checks pass
+a real grab and long downward ride, rendered extension, sound, pause/restart/exit.
+The browser positions Buzz at the rope first; the natural approach remains open.
+Production build passes.
+
 ## 2026-10-05 — Neighborhood push bridges
 
 Restored both bridges from 00418e50/004190c0. Holding push block 0 lowers

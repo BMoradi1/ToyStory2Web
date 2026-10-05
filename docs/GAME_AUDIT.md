@@ -7,6 +7,24 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-05 — Andy's House room-2 machinery
+
+Restored the five proximity-gated cycles in 00417510/00417380, driven by
+00417680: three spinning/compressing objects (9/17/18), two rolling vertical
+objects (10/16), and timed enable/disable of collision barriers 12/13. The
+shared 8192-phase cycle advances only in camera room 2; artwork, barriers,
+sprays, bursts and sounds update only inside the native strict 640-unit
+shifted-distance sphere. Native sound events 0x24/0x25 and effects 24/25/26
+now run at their authored phases, including sprite rotation/spin bytes.
+
+Installed probes verify phase boundaries, scales, positions, room/proximity
+gates and real collision sweeps before/after both barrier swaps and reset.
+Browser checks pass all five rendered cycles, both barrier states, live
+particles/audio, pause, restart, exit and reentry. The browser uses protected
+teleports near each object; natural obstacle traversal remains unverified.
+Other Andy room scripts remain in the queue. Native object 14 is absent in
+the installed object-ID table, so its unconditional rotation is a no-op here.
+
 ## 2026-10-05 — Shared timed-task divider
 
 All four collect-five tasks, Toy Barn's two-stage fetch and Tarmac's path now
@@ -36,7 +54,7 @@ boundary, partial failure/retry, Penthouse's room rule and one-shot reward.
 `collect-five-flow-check.js` passes actual NPC/item contacts, timeout, retry,
 reward reveal, pause, restart and exit across all four worlds. Contacts use
 protected teleports; this is not a natural timed-route playthrough. The shared
-divider follow-up above replaces the initial local clock phase. Sources: 0041c190/0041e880/0042a130/0042ca60.
+divider follow-up above replaces the initial local clock phase. Sources: 0041c640/0041e880/0042a130/0042ca60.
 
 ## 2026-10-05 — Shared rain and Alley weather
 
@@ -1191,7 +1209,7 @@ not evidence for untested interactions.
 
 | Play order | Level | Confirmed gaps / implementation evidence | Next behavior comparison |
 |---|---|---|---|
-| 1 | Andy's House | Tin intro/fight/reward integration tested; hover wobble/sparks partial. Chair stomp and pushables implemented. | Remaining numbered props and platforms; all five token routes. |
+| 1 | Andy's House | Tin intro/fight/reward integration tested; hover wobble/sparks partial. Chair stomp, pushables and five room-2 machinery cycles with collision gates/effects implemented. | Remaining numbered props and platforms; all five token routes. |
 | 2 | Andy's Neighborhood | Lawnmower effects, kite flight/combat/reward and ZGCAR hook implemented. | Moving scenery and natural race/token routes. |
 | 3 | Bombs Away (internal 6) | `stepBossFight` exists. | Complete boss attacks, damage windows, defeat, token and replay. |
 | 4 | Construction Yard | DRILL combat/reward and ZGCAR implemented; trailer paint, outdoor lids, debris, stomp bridge, four shuttles, four linked tilting lifts, stomp-selected lift, distant crate, proximity scenery/portals and mud movement/effects implemented. | Review collision IDs 13/25; natural traversal/token routes. |

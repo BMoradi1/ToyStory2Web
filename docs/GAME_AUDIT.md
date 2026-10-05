@@ -7,6 +7,15 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-04 — Construction Yard proximity scenery
+
+Restored the object-63/64 height animation at the start of `0041c640`:
+strict 250-unit 3D proximity, eight-tick collapse and eight-tick restoration.
+Installed probes cover all axes, diagonal exclusion, boundary and endpoint
+clamps. Browser checks both artwork scales, repeated approaches, pause,
+restart and exit; production build passes. The companion texture-command
+swap in that native block still needs separate implementation.
+
 ## 2026-10-04 — Push-block distant artwork
 
 The Construction Yard crate moved artwork 12 but left its distant copy 13
@@ -594,7 +603,7 @@ not evidence for untested interactions.
 | 1 | Andy's House | Tin intro/fight/reward integration tested; hover wobble/sparks partial. Chair stomp and pushables implemented. | Remaining numbered props and platforms; all five token routes. |
 | 2 | Andy's Neighborhood | Lawnmower effects, kite flight/combat/reward and ZGCAR hook implemented. | Moving scenery and natural race/token routes. |
 | 3 | Bombs Away (internal 6) | `stepBossFight` exists. | Complete boss attacks, damage windows, defeat, token and replay. |
-| 4 | Construction Yard | DRILL combat/reward and ZGCAR implemented; trailer paint, outdoor lid/collision cycles, debris and stomp drawbridge implemented. | Remaining collision movement, then natural token routes. |
+| 4 | Construction Yard | DRILL combat/reward and ZGCAR implemented; trailer paint, outdoor lids, debris, stomp bridge, four shuttles, four linked tilting lifts, distant crate and proximity scenery implemented. | Review collision IDs 13/21–25 and proximity texture-command swap; natural traversal/token routes. |
 | 5 | Alleys and Gullies | BOX/BPLANE launch cycle, boat cannon and clown combat/reward implemented. | Moving scenery/collision; 37 poles and 11 zip lines need route checks. |
 | 6 | Slime Time (internal 3) | Dedicated slime controller exists. | Full encounter, arena effects, reward and replay comparison. |
 | 7 | Al's Toy Barn | Dinosaur breath/combat/defeat/reward and BOX/BPLANE launch cycle implemented. | Original moving-collision calls and full token routes. |
@@ -710,7 +719,7 @@ not evidence for untested interactions.
    The browser positions/protects Buzz and injects damage. An unassisted win
    remains unverified; dynamic sound pitch, exact camera-roll/framing comparison
    and per-character voice overlap gating remain open.
-4. **Puzzles, hazards and rewards.** Outdoor paint cans, remaining prop flags,
+4. **Puzzles, hazards and rewards.** Remaining prop flags,
    all token routes, power-up unlocks, collectible counts and replay behavior.
 5. **Presentation parity.** Triggered effects and spatial sounds, texture gates,
    Tin cosmetics, camera/cutscene transitions and near/far visibility.

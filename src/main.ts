@@ -1,3 +1,4 @@
+import {TOY_BARN_ROTOR_OBJECTS,createToyBarnRotors,moveToyBarnRotors,stepToyBarnRotors,restoreToyBarnRotors,type ToyBarnRotors} from './sim/toy-barn-rotors.ts';
 import {TOY_BARN_PLATFORM_OBJECTS,createToyBarnPlatforms,moveToyBarnPlatforms,stepToyBarnPlatforms,restoreToyBarnPlatforms,toyBarnPlatformPoses,type ToyBarnPlatforms} from './sim/toy-barn-platforms.ts';
 import {SPACE_BUGGY_MODEL,createSpaceBuggyModel,stepSpaceBuggyModel,type SpaceBuggyModel} from './sim/space-buggy-model.ts';
 import {createSpaceRockingBlock,stepSpaceRockingBlock,type SpaceRockingBlock} from './sim/space-rocking-block.ts';
@@ -346,6 +347,7 @@ async function showLevel(index: number): Promise<void> {
   constructionBridge = null;
   constructionShuttles = null;
   toyBarnPlatforms = null;
+  toyBarnRotors = null;
   constructionLifts = null;
   constructionStompLift = null;
   constructionScenery = null;
@@ -463,7 +465,7 @@ async function showLevel(index: number): Promise<void> {
       for(const id of platformObjects(levelNumber(level.id)??0)) {
         const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);
       }
-      if(levelNumber(level.id)===7)for(const id of TOY_BARN_PLATFORM_OBJECTS){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
+      if(levelNumber(level.id)===7)for(const id of [...TOY_BARN_PLATFORM_OBJECTS,...TOY_BARN_ROTOR_OBJECTS]){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
       if(levelNumber(level.id)===4)for(const id of [...PAINT_CAN_OBJECTS,...CONSTRUCTION_BRIDGE_OBJECTS,...CONSTRUCTION_SHUTTLE_OBJECTS,...CONSTRUCTION_LIFT_OBJECTS,...CONSTRUCTION_SCENERY_OBJECTS,...CONSTRUCTION_STOMP_LIFT_OBJECTS]){
         const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);
       }
@@ -774,6 +776,7 @@ async function open(dir: GameDir): Promise<void> {
       get constructionScenery() { return constructionScenery; },
       get constructionStompLift() { return constructionStompLift; },
       get constructionLifts() { return constructionLifts; },
+      get toyBarnRotors(){return toyBarnRotors;},
       get toyBarnPlatforms(){return toyBarnPlatforms;},
       get constructionShuttles() { return constructionShuttles; },
       get constructionBridge() { return constructionBridge; },
@@ -1370,6 +1373,7 @@ async function spawnPlayer(): Promise<void> {
   spaceBuggyModel=null;
   if(constructionStompLift){restoreConstructionStompLift(constructionStompLift,currentCollisionWorld);constructionStompLift=null;}
   if(constructionLifts){restoreConstructionLifts(constructionLifts,currentCollisionWorld);constructionLifts=null;}
+  if(toyBarnRotors){restoreToyBarnRotors(toyBarnRotors,currentCollisionWorld);toyBarnRotors=null;}
   if(toyBarnPlatforms){restoreToyBarnPlatforms(toyBarnPlatforms,currentCollisionWorld);toyBarnPlatforms=null;}
   if(constructionShuttles){restoreConstructionShuttles(constructionShuttles,currentCollisionWorld);constructionShuttles=null;}
   if(constructionBridge){restoreConstructionBridge(constructionBridge,currentCollisionWorld);constructionBridge=null;}
@@ -1431,6 +1435,8 @@ async function spawnPlayer(): Promise<void> {
   drawConstructionShuttles();
   toyBarnPlatforms=level===7&&exeBytes?createToyBarnPlatforms(currentLevel.level,currentCollisionWorld,exeBytes):null;
   drawToyBarnPlatforms();
+  toyBarnRotors=level===7?createToyBarnRotors(currentLevel.level,currentCollisionWorld):null;
+  drawToyBarnRotors();
   constructionLifts=level===4&&exeBytes?createConstructionLifts(currentLevel.level,currentCollisionWorld,exeBytes):null;
   drawConstructionLifts();
   constructionStompLift=level===4?createConstructionStompLift(currentLevel.level,currentCollisionWorld):null;
@@ -2696,6 +2702,10 @@ function drawConstructionLifts():void{
     offset:[(o.position.x-o.rest.x)*GAME_TO_RENDER,-(o.position.y-o.rest.y)*GAME_TO_RENDER,-(o.position.z-o.rest.z)*GAME_TO_RENDER] as [number,number,number],
   }] as const))));
 }
+function drawToyBarnRotors():void{
+  if(!viewer||!toyBarnRotors)return;
+  viewer.setObjectTransforms(new Map(toyBarnRotors.map(r=>[r.index,{angles:[0,0,r.angle/4] as [number,number,number]}])));
+}
 function drawToyBarnPlatforms():void{
   if(!viewer||!toyBarnPlatforms)return;
   viewer.setObjectTransforms(new Map(toyBarnPlatformPoses(toyBarnPlatforms).map(m=>[m.index,{angles:m.angles,
@@ -3202,6 +3212,7 @@ function discardLevel(): void {
   constructionBridge = null;
   constructionShuttles = null;
   toyBarnPlatforms = null;
+  toyBarnRotors = null;
   constructionLifts = null;
   constructionStompLift = null;
   constructionScenery = null;
@@ -3638,6 +3649,7 @@ let penthouse:Penthouse|null=null;
 let paintCans:PaintCans|null=null;
 let constructionDebris:ConstructionDebris|null=null;
 let constructionBridge:ConstructionBridge|null=null;
+let toyBarnRotors:ToyBarnRotors|null=null;
 let toyBarnPlatforms:ToyBarnPlatforms|null=null;
 let constructionShuttles:ConstructionShuttles|null=null;
 let constructionLifts:ConstructionLifts|null=null;
@@ -3928,6 +3940,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     tickPushBlocks(held);
     if(constructionStompLift)moveConstructionStompLift(constructionStompLift,currentCollisionWorld!,player!);
     if(constructionLifts)moveConstructionLifts(constructionLifts,currentCollisionWorld!,player!);
+    if(toyBarnRotors)moveToyBarnRotors(toyBarnRotors,currentCollisionWorld!,player!);
     if(toyBarnPlatforms)moveToyBarnPlatforms(toyBarnPlatforms,currentCollisionWorld!,player!);
     if(constructionShuttles)moveConstructionShuttles(constructionShuttles,currentCollisionWorld!,player!);
     if(constructionBridge)moveConstructionBridge(constructionBridge,currentCollisionWorld!,player!);
@@ -4106,6 +4119,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   }
   if(constructionStompLift){stepConstructionStompLift(constructionStompLift,currentCollisionWorld,player,id=>spendGuide(guideSparkles,effects,id,true));drawConstructionStompLift();}
   if(constructionLifts&&creatureSim){stepConstructionLifts(constructionLifts,player,()=>creatureSim!.rand.byte());drawConstructionLifts();}
+  if(toyBarnRotors){stepToyBarnRotors(toyBarnRotors);drawToyBarnRotors();}
   if(toyBarnPlatforms&&creatureSim){stepToyBarnPlatforms(toyBarnPlatforms,()=>creatureSim!.rand.byte(),slot=>creatureSim!.creatures.find(c=>c.slot===slot)?.health);drawToyBarnPlatforms();}
   if(constructionShuttles&&creatureSim){stepConstructionShuttles(constructionShuttles,()=>creatureSim!.rand.byte());drawConstructionShuttles();}
   if(constructionBridge){

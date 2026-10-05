@@ -7,6 +7,23 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-04 — Toy Barn rotating machinery
+
+Restored collision objects 1–4 and art 7/6/4/5 from `00421340`, with native
+raw angular velocities 36/44/36/44 (9/11/9/11 artwork angle units per tick).
+Collision vertices and normals rotate from captured rest geometry; grounded
+and attached-ledge passengers move about the pivot. Pause freezes rotation,
+and restart restores the original collision hulls before rebuilding controllers.
+
+`toy-barn-rotors-probe.ts` checks all vertices/normals through 4096 ticks,
+exact speeds/wrap, standing and ledge carry, airborne isolation and restoration.
+The extended Toy Barn browser regression passes rendered rotation/rates,
+pause/restart/exit alongside the six scripted platforms and two real crate
+pushes. Build passes. Sustained natural traversal on these thin rotating rims
+is **not verified**: a centroid-drop experiment produced only 0–2 contact ticks
+before Buzz slipped off. The carry test uses explicit contact states; it does
+not close this traversal gap or prove original-game behavior on the rims.
+
 ## 2026-10-04 — Toy Barn distant crate models
 
 Connected push-crate art 8/9 to far models 21/22, matching `00421340`'s

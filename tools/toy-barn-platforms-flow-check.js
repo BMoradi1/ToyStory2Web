@@ -48,10 +48,15 @@
   for(let i=3;i<6;i++)check(JSON.stringify(ts2.toyBarnPlatforms.movers[i].position)===JSON.stringify(initial[i]),'enemy-gated platform moved early');
   for(const slot of [7,8,9])ts2.killCreature(slot);
   const far=new Set(),back=new Set(),waiting=new Set();
+  const rotorStart=ts2.toyBarnRotors.map(r=>r.angle);
   for(let t=0;t<2400;t++){
     // Keep Buzz safe while the level scripts run normally.
     ts2.setPlayerPos(0,0,-2000000);ts2.player.fallTimer=0;
     ts2.tickGame({},1,0);
+    for(const [i,r] of ts2.toyBarnRotors.entries()){
+      check(r.angle===((rotorStart[i]+r.speed*(t+1))&16383),'rotor rate mismatch');
+      check(ts2.viewer.objectTransforms.get(r.index)?.startsWith('0,0,'+r.angle/4+'|'),'rotor render mismatch');
+    }
     for(const [i,m] of ts2.toyBarnPlatforms.movers.entries()){
       const displacement=i<3?initial[i].y-m.position.y:initial[i].x-m.position.x;
       if(displacement>(i<3?50000:20000))far.add(i);
@@ -64,9 +69,11 @@
     }
   }
   check(far.size===6&&back.size===6&&waiting.size===6,'incomplete shuttle cycles');
-  ts2.openMenu();const frozen=JSON.stringify(ts2.toyBarnPlatforms);ts2.tickGame({},100,0);
+  ts2.openMenu();const frozenRotors=JSON.stringify(ts2.toyBarnRotors);const frozen=JSON.stringify(ts2.toyBarnPlatforms);ts2.tickGame({},100,0);
+  check(JSON.stringify(ts2.toyBarnRotors)===frozenRotors,'paused rotors moved');
   check(JSON.stringify(ts2.toyBarnPlatforms)===frozen,'paused shuttles moved');ts2.pressMenu('back');ts2.tickGame({},1,0);
   await ts2.spawnPlayer();ts2.viewer.stop();
+  check(ts2.toyBarnRotors.every(r=>r.angle===0&&r.velocity===0),'rotor restart mismatch');
   for(const [i,m] of ts2.toyBarnPlatforms.movers.entries()){
     check(JSON.stringify(m.position)===JSON.stringify(initial[i]),'restart retained shuttle position');
     check(m.script.pc===0&&m.script.wait===0&&m.script.ramp===0,'restart retained shuttle script');
@@ -75,6 +82,6 @@
   ts2.pressMenu('select');ts2.tickGame({},1);ts2.pressMenu('down');ts2.tickGame({},1);ts2.pressMenu('select');ts2.tickGame({},1);
   await wait(()=>['summary','select'].includes(ts2.front.screen),'exit failed');
   if(ts2.front.screen==='summary'){ts2.frontDrive(0,650);ts2.frontDrive(0x4000);ts2.frontDrive(0,130);}
-  await wait(()=>ts2.front.screen==='select','selector missing');check(ts2.toyBarnPlatforms===null,'shuttle controller leaked after exit');
-  console.log('PASS Toy Barn two real crate pushes/far art and six platform out/back/wait cycles, artwork alignment, pause/restart/exit');
+  await wait(()=>ts2.front.screen==='select','selector missing');check(ts2.toyBarnPlatforms===null&&ts2.toyBarnRotors===null,'Toy Barn controller leaked after exit');
+  console.log('PASS Toy Barn four rotating platforms, two real crate pushes/far art and six platform out/back/wait cycles, artwork alignment, pause/restart/exit');
 })()

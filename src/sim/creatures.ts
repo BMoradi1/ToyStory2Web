@@ -113,6 +113,8 @@ export interface Creature {
   heading: number;
   /** The heading it is easing toward. */
   wantYaw: number;
+  /** +0x0c: model X rotation in 12-bit turns. */
+  pitch: number;
   /** +0x10: a hover offset the per-type handlers ease; read by the draw code. */
   hover: number;
   /**
@@ -302,6 +304,7 @@ export function buildCreature(record: CreatureRecord, fromList: boolean, previou
     x, y, z,
     heading,
     wantYaw: heading,
+    pitch: 0,
     hover: 0,
     partSpin: null,
     drawScale: 1,
@@ -992,6 +995,9 @@ function collectable(sim: CreatureSim, c: Creature, args: HandlerArgs): void {
     return;
   }
   const idle=RESCUE_IDLE[c.handler!];
+  // Elevator Hop's three sideways mice are selected by placement +0x1c.
+  // The other rescue mice and the two speakers keep their authored pose.
+  if(c.handler==='FUN_004259b0'&&c.record.accel<128){c.pitch=0xc00;c.hover=0x800;}
   if(idle&&(idle.gate!==2||c.health===CREATURE_HEALTH.harmless)){
     c.timer-=args.dt;
     if(c.timer<1&&(idle.gate===0||c.health===CREATURE_HEALTH.harmless)){

@@ -7,6 +7,16 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-05 — Elevator Hop rescue poses
+
+Restored `004259b0`'s placement-selected orientation: slots 1/2/5 set model
+pitch to 0xc00 and roll to 0x800 when placement acceleration is below 128.
+Slots 3/4 and speakers 0/22 remain upright. The shared creature renderer now
+accepts the previously omitted X rotation, with zero preserving other models.
+The installed-record probe and browser checks cover all seven placements,
+rendered angles, pause, restart and exit. Build passes. Exact visual comparison
+against the original camera remains unverified.
+
 ## 2026-10-05 — Rescue ambience, duck effects and missing hit geometry
 
 Replaced the shared rescue chirp with the ten native handlers' separate idle
@@ -29,8 +39,8 @@ All ten rescue levels pass browser idle/collection/restart/exit checks;
 neighborhood particles are observed in the live effect pool. The 15-level
 entry/exit regression and production build pass. Browser tests reposition Buzz
 and dismiss dialogue; they do not constitute full mission playthroughs.
-Elevator Hop's special rescue orientation remains open, as does exact native
-ordering between deferred emissions and other users of the random stream.
+Elevator Hop's special rescue orientation is covered by the follow-up above.
+Still open: exact native ordering between deferred emissions and other users of the random stream.
 
 ## 2026-10-04 — Toy Barn hoops and first-fetch bounce
 

@@ -150,8 +150,9 @@ non-empty slot points entity `+0x98` at the placement and calls the
 constructor. Fields the code uses, by offset:
 
     +0x00 i32 x, y, z     game units
-    +0x0c i16             set by the C handlers (the tin robot's hover)
+    +0x0c i16 pitch       model X rotation, used by Elevator Hop rescue mice
     +0x0e u16 heading     12-bit
+    +0x10 i16 hover       model roll, eased by hover handlers
     +0x12 i16 animState   what the script's `anim` opcode set; C code reads it
     +0x14 i16 type        creatures.cfg index; 0 = empty slot
     +0x18 u32 frame       16.16 animation cursor; the anim script sets the frame

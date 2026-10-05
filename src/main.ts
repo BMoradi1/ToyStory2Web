@@ -2357,7 +2357,7 @@ function drawCreatures(): void {
       viewer.placeCreatureMesh(
         c.slot,
         c.x * GAME_TO_RENDER, -c.y * GAME_TO_RENDER, -c.z * GAME_TO_RENDER,
-        toRadians(c.heading), c.drawScale, toRadians(c.hover),
+        toRadians(c.heading), c.drawScale, toRadians(c.hover), toRadians(c.pitch),
       );
       // Pose it only when something changed, and only while the sim is
       // actually updating it — a creature outside the update radius is frozen
@@ -2388,7 +2388,7 @@ function drawCreatures(): void {
       viewer.placeCreatureMesh(
         c.slot,
         c.x * GAME_TO_RENDER, -c.y * GAME_TO_RENDER, -c.z * GAME_TO_RENDER,
-        toRadians(c.heading), c.drawScale, toRadians(c.hover),
+        toRadians(c.heading), c.drawScale, toRadians(c.hover), toRadians(c.pitch),
       );
     }
     if(creatureSim.level===14&&tasks){

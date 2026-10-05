@@ -1,3 +1,4 @@
+import {waterCameraScale,advanceWaterCameraPhase} from './sim/water-camera.ts';
 import {createNeighborhoodLeaves,stepNeighborhoodLeaves,type NeighborhoodLeaves} from './sim/neighborhood-leaves.ts';
 import {createNeighborhoodHoles,stepNeighborhoodHoles,type NeighborhoodHoles} from './sim/neighborhood-holes.ts';
 import {NEIGHBORHOOD_PUMP_OBJECTS,neighborhoodLiquid,createNeighborhoodPump,moveNeighborhoodPump,stepNeighborhoodPump,restoreNeighborhoodPump,type NeighborhoodPump} from './sim/neighborhood-pump.ts';
@@ -407,7 +408,7 @@ async function showLevel(index: number): Promise<void> {
   spaceBallPit = null;
   spaceRockingBlock = null;
   spaceBuggyModel = null;
-  waterEffects=createWaterEffects();
+  waterEffects=createWaterEffects();viewer?.setCameraScale([1,1,1]);
   tarmacHelicopter = null;
   tarmacLights = null;
   tarmacScenery = null;
@@ -862,6 +863,7 @@ async function open(dir: GameDir): Promise<void> {
       get andyMachinery() { return andyMachinery; },
       get penthouse() { return penthouse; },
       get waterEffects() { return {...waterEffects}; },
+      get waterCamera() { return {phase:waterCameraPhase,scale:[...(viewer?.cameraScale??[1,1,1])]}; },
       get tarmacPlane() { return tarmacPlane; },
       get tarmacHelicopter() { return tarmacHelicopter; },
       get tarmacLights() { return tarmacLights ? {...tarmacLights} : null; },
@@ -1657,7 +1659,7 @@ async function spawnPlayer(): Promise<void> {
     : null;
   neighborhoodLeaves=level===2?createNeighborhoodLeaves(currentLevel.level):null;
   neighborhoodHoles=level===2&&creatureSim?createNeighborhoodHoles(currentLevel.level,creatureSim.creatures):null;
-  waterEffects=createWaterEffects(player.y);
+  waterEffects=createWaterEffects(player.y);viewer?.setCameraScale([1,1,1]);
   pointLights=createPointLights(exeBytes&&level>=1&&level<=15?readCharacterLight(exeBytes,level):null);playerLight=null;
   viewer.setCardSheet(sceneTextures.get(SPRITE_SHEET) ?? null);
   viewer?.kiteTail.set(null,undefined,null,undefined);
@@ -1930,6 +1932,12 @@ function currentLiquidY():number|null{
   if(alleyEffects&&player)return alleyWaterY(player.z);
   if(spaceBallPit&&player)return spaceBallPitY(player);
   return constructionScenery&&player?constructionMudY(player):penthouse?.water.y??null;
+}
+function updateWaterCamera():void{
+  if(!viewer)return;
+  const kind=neighborhoodPump&&player?neighborhoodLiquid(player.x).kind:constructionScenery?2:spaceBallPit?3:1;
+  viewer.setCameraScale(waterCameraScale(waterCameraPhase,currentLiquidY(),kind,-viewer.camera.position.y/GAME_TO_RENDER));
+  waterCameraPhase=advanceWaterCameraPhase(waterCameraPhase);
 }
 function effectWorld(): EffectWorld {
   const S2 = GAME_UNITS_PER_LEVEL_UNIT;
@@ -3453,7 +3461,7 @@ function discardLevel(): void {
   spaceBallPit = null;
   spaceRockingBlock = null;
   spaceBuggyModel = null;
-  waterEffects=createWaterEffects();
+  waterEffects=createWaterEffects();viewer?.setCameraScale([1,1,1]);
   tarmacHelicopter = null;
   tarmacLights = null;
   tarmacScenery = null;
@@ -3916,6 +3924,7 @@ let spaceBallPit:SpaceBallPit|null=null;
 let spaceRockingBlock:SpaceRockingBlock|null=null;
 let spaceBuggyModel:SpaceBuggyModel|null=null;
 let waterEffects=createWaterEffects();
+let waterCameraPhase=0;
 let tarmacHelicopter: TarmacHelicopter | null = null;
 let tarmacLights: TarmacLights | null = null;
 let tarmacScenery: TarmacScenery | null = null;
@@ -4147,6 +4156,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       // Hand the camera back where it is, so it eases rather than snapping.
       if (camera && player) camera = createCamera(player);
     }
+    updateWaterCamera();
     // The world and the HUD keep drawing under the box; the HUD slides out
     // of the way on its own, which is what `talking` does to its phases.
     drawCoins();
@@ -4726,6 +4736,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   poseAnimation(Math.hypot(held.moveX, held.moveY) > 0);
   if(effects&&camera)stepWaterEffects(waterEffects,effects,effectWorld(),player,playerAnim?.footfallMask??0,
     standingSurface(player,currentCollisionWorld),cut.ticks>0?cut.eye.y:camera.y,event=>playEvent(event,event===0x5f?undefined:player!));
+  updateWaterCamera();
   drawCoins();
   drawEffects();
   drawHud(levelNow);
@@ -4782,7 +4793,7 @@ async function respawn(): Promise<void> {
   const back = spawnPoint && !Number.isFinite(safe.x) ? spawnPoint : safe;
   const died = player.dying;
   Object.assign(player, createPlayer(back.x, back.y, back.z, safe.yaw));
-  waterEffects=createWaterEffects(player.y);
+  waterEffects=createWaterEffects(player.y);viewer?.setCameraScale([1,1,1]);
   pointLights=createPointLights(pointLights.profile);playerLight=null;
   playerRuntime = createRuntime();
   // The engine's own player reset fills the health bar back up.

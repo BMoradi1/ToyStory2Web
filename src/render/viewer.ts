@@ -1,3 +1,5 @@
+import {applyCameraScale} from './camera-scale.ts';
+import type {CameraScale} from '../sim/water-camera.ts';
 import {KiteTailRenderer} from './kite-tail.ts';
 import {Backdrop} from './backdrop.ts';
 import type { FlareSprite } from '../sim/lens-flare.ts';
@@ -694,6 +696,7 @@ export class Viewer {
   set playMode(on: boolean) {
     this.play = on;
     this.controls.enabled = !on;
+    if(!on)this.setCameraScale([1,1,1]);
   }
 
   get playMode(): boolean { return this.play; }
@@ -932,6 +935,12 @@ export class Viewer {
     this.shadows = shadows;
   }
 
+  cameraScale:CameraScale=[1,1,1];
+  setCameraScale(scale:CameraScale):void{
+    this.cameraScale=[...scale];
+    applyCameraScale(this.camera,this.cameraScale);
+  }
+
   /**
    * Put the camera somewhere and point it somewhere, both in renderer units.
    *
@@ -1158,7 +1167,7 @@ export class Viewer {
       height: Math.round(height),
     };
     this.camera.aspect = NATIVE_ASPECT;
-    this.camera.updateProjectionMatrix();
+    applyCameraScale(this.camera,this.cameraScale);
     this.onResize?.(this.pictureRect);
   }
 

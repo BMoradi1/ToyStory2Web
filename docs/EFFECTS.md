@@ -1104,7 +1104,7 @@ Emerging sets 180 ticks of wet footsteps. Animation playback exposes a left/
 right footfall mask; eligible dry surfaces -1/13 receive kind 32/mode 2 at the
 original side offset, rotated opposite Buzz's heading. Respawn resets wet state.
 An underwater camera raises global event 0x5f and kind 57/mode 2 surface
-particles on the four-tick gate. Camera colour/warp remains separate work.
+particles on the four-tick gate. Camera colour remains separate work; underwater view distortion is described below.
 
 `water-effects-probe.ts` checks the installed effects and footfall script;
 `penthouse-water-flow-check.js` verifies live movement, particles and lifecycle.
@@ -1115,3 +1115,24 @@ Mode `0x31` now drives scene object 25 through `space-buggy-model.ts`, including
 position quantization, `(yaw + 1024) & 4095`, pitch as roll, final live pool-slot
 precedence and the original off-world idle pose. Its trail inherits quarter
 XZ velocity, correcting the missing division at `00412524..00412549`.
+
+## Underwater camera distortion
+
+`004a328e` computes `((waterY - cameraY) >> 4) + 128`, clamps it
+at zero and enables `0044f820` only when the result is zero. The signed
+shift makes the first distorted position **2033 game units below water**;
+at 2032 the camera stays normal. Mud and the Space Land ball pit do not
+activate this water-only branch.
+
+The PC renderer (`004ce050`, `004bbab0`, `004a9860`) scales view-space
+X/Y/Z by `1 + .05 * sin(phase)`, `1 + .05 * sin(phase - 32768)` and
+`1 + .05 * sin(phase * 2)`. This uses the PC's 65536-entry float sine
+table, not the gameplay fixed-point table. `00441917` advances phase by
+`trunc(dt * 65536 / 360)`. The port preserves the resulting projection by
+multiplying the projection by this diagonal scale, leaving the camera's
+world basis unchanged for billboard orientation and movement controls.
+
+Simulation-driven waves freeze under pause and remain through viewport
+resize; emerging, restart and scene exit restore unit scale. The renderer's
+separate underwater colour registers and exact original pause/menu phase
+alignment remain unaudited; this change restores camera distortion only.

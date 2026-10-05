@@ -7,6 +7,24 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-05 — Shared underwater camera distortion
+
+Restored the original PC view-space scale waves for Neighborhood, Alley and
+Penthouse water. The shared water-depth expression enables distortion at
+2033 game units below the plane (signed-shift boundary), excludes mud/balls,
+and uses the original float sine-table resolution, 5% amplitude and phase
+increment. Projection scaling preserves billboard and movement camera bases.
+
+The probe checks boundaries, phase wrapping, wave bounds, projection/inverse
+math and exact restoration. The three-level browser flow verifies dive/emerge,
+mud exclusion, pause/resume, viewport resize, restart and exit. It also compares
+actual framebuffers at a fixed authored scene: distortion changes geometry;
+unit scale restores the original pixels. Depth fixtures supply positions away
+from the floor and clear queued fall respawns; this is not a swimming route.
+All four water probes, the existing Penthouse water puzzle flow, three aim
+flows, all-15-level load/simulate/exit flow and production build pass.
+Underwater colour and exact original pause/menu phase alignment remain open.
+
 ## 2026-10-05 — Complete browser regression runner
 
 Added `npm run audit:browser`: discovers every `*-flow-check.js`, starts
@@ -1478,16 +1496,16 @@ not evidence for untested interactions.
 | Play order | Level | Confirmed gaps / implementation evidence | Next behavior comparison |
 |---|---|---|---|
 | 1 | Andy's House | Tin intro/fight/reward integration tested; hover wobble/sparks partial. Cot support/drop puzzle, chair stomp, pushables, five room-2 machinery cycles, growing doorway, falling hatch, lowering rope, attic bounce, biased seesaw and room-4 environmental hazards implemented. | Remaining numbered props and platforms; all five token routes. |
-| 2 | Andy's Neighborhood | Lawnmower/kite, seesaws, both push bridges, extending rope, stomp structure/launcher, pump/floating prop, water/mud, burrowing soldier rescue and leaves implemented with focused browser checks. | Full natural race/token routes, remaining collision inventory and underwater presentation. |
+| 2 | Andy's Neighborhood | Lawnmower/kite, seesaws, both push bridges, extending rope, stomp structure/launcher, pump/floating prop, water/mud, burrowing soldier rescue and leaves implemented with focused browser checks. | Full natural race/token routes, remaining collision inventory and underwater colour. |
 | 3 | Bombs Away (internal 6) | `stepBossFight` exists. | Complete boss attacks, damage windows, defeat, token and replay. |
 | 4 | Construction Yard | DRILL combat/reward and ZGCAR implemented; trailer paint, outdoor lids, debris, stomp bridge, four shuttles, four linked tilting lifts, stomp-selected lift, distant crate, proximity scenery/portals, mud movement/effects and timed collect-five retry implemented. | Review collision IDs 13/25; natural traversal/token routes. |
-| 5 | Alleys and Gullies | BOX/BPLANE launch cycle, boat cannon, clown combat/reward, eight lane platforms, two seesaws, spring, bubble machine, moving bubble attachments, push-triggered bridge, distant crates, water, rain, timed environmental emitters and timed collect-five retry implemented. | Underwater camera treatment and remaining scenery/effects and natural pole/zip-line routes. |
+| 5 | Alleys and Gullies | BOX/BPLANE launch cycle, boat cannon, clown combat/reward, eight lane platforms, two seesaws, spring, bubble machine, moving bubble attachments, push-triggered bridge, distant crates, water, rain, timed environmental emitters and timed collect-five retry implemented. | Underwater colour and remaining scenery/effects and natural pole/zip-line routes. |
 | 6 | Slime Time (internal 3) | Dedicated slime controller exists. | Full encounter, arena effects, reward and replay comparison. |
 | 7 | Al's Toy Barn | Dinosaur/BOX-BPLANE combat, six scripted platforms, rotors, boarding rides, springs, far crates, hoops, fetch barrier/retry, timed cannon and path emitters implemented with focused probes/browser checks. | Remaining collision IDs 16/17/19/20, natural token routes and timing comparison. |
 | 8 | Al's Space Land | Buggy fight/reward/projectile model, ZGCAR, claw puzzle/token delivery, saucer course/deadline/retry, hanging toys/display motion/sounds, paired laser hazards, projectile volley, ball-pit movement/scatter, rocking-block trigger/far crates and visibility-gated Mother texture animation implemented. | Remaining ambient/projectile effects and natural route validation. |
 | 9 | Toy Barn Encounter | Dedicated pod controller, beam tests and ZGCAR hook implemented. | Full natural fight/summon cycles and reward traversal. |
 | 10 | Elevator Hop | Wire puzzle, compound lifts, GUNSP combat/reward, fan switches/rotation/airflow implemented. | Other ambient effects, exact collision/script/force timing and full-level traversal. |
-| 11 | Al's Penthouse | Shared enemies, GUNSL combat/reward, hazards, water/floats, train routing, underwater movement and room-constrained timed collect-five retry implemented. | Underwater camera colour/warp, light/texture helpers and collision 24 review. |
+| 11 | Al's Penthouse | Shared enemies, GUNSL combat/reward, hazards, water/floats, train routing, underwater movement and room-constrained timed collect-five retry implemented. | Underwater camera colour, light/texture helpers and collision 24 review. |
 | 12 | The Evil Emperor Zurg | Entrance, attacks, recovery, defeat, save bit and victory/movie handoff implemented in `zurg-boss.ts`. Installed-data and focused browser checks pass. | Unassisted combat, original-versus-port camera/render comparison and detail-dependent particles. |
 | 13 | Airport Infiltration | Five authored transport routes, two near/far seesaws, five stomp-only springs, timed collect-five retry, shared gun/buzzard handlers and Prospector fight/reward implemented. | Exact collision/script timing comparison and full-level traversal; distinct from Tarmac. |
 | 14 | Tarmac Trouble | Plane motion/collision, wheels/fans, ground/climbing passengers, wheel hazards and helicopter hover/rotors/token motion and light puzzle/lowering implemented and tested. Slinky timed-path rules and retry implemented. Near/far scenery sway, rain/plane sound, rain particles and lightning/thunder restored. Blacksmith recovery, defeat and delayed reward implemented; axe throws, hit flashing and bar expiry implemented. Shared gun enemy and buzzard handlers implemented. | Other ambient effects and natural token routes; pitch/roll attachment on other movers. |

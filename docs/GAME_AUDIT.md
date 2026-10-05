@@ -7,6 +7,24 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-05 — Alleys and Gullies lane platforms
+
+Restored eight platforms from `0041e390/0041e150/0041e020`: collision 5–12,
+authored paths 0/5/2/3, initial 0/60-node spacing, separate lane speeds and
+12 artwork objects. The shared helper's signed-X advance condition is verified
+against `0041e204` (JGE); it is deliberately not a distance threshold. Each
+pair freezes its next velocity while either ledge is held. Platforms carry
+standing passengers, leave airborne Buzz independent and recycle at the
+native path limit. Reset restores original collision geometry before rebuilding.
+
+The installed probe covers 6,000 ticks/full cycles on all eight paths, speed
+bounds, interpolation, paired ledge freeze, carry and restoration. Physical
+collision checks land and ride all eight for over 100 ticks. The browser
+checks full cycles, all 12 artwork offsets, pause, restart, exit and reentry.
+Build passes. Tests position/protect Buzz; water interactions and an unassisted
+crossing remain unverified. The level's seesaws, bubble machine, spring,
+bridge and remaining effects are separate open audit items.
+
 ## 2026-10-05 — Elevator Hop rescue poses
 
 Restored `004259b0`'s placement-selected orientation: slots 1/2/5 set model

@@ -490,6 +490,8 @@ export function stepTasks(
     burstBlobs?: SlimeWorld['burstBlobs'];
     touch?: SlimeWorld['touch'];
     shake?: SlimeWorld['shake'];
+    /** Toy Barn cannon owns the shared timed-task slot while running. */
+    cannonActive?: boolean;
     coins: number; found: number; rand: RandomStream; talking: boolean;
     /** Where Buzz is, for the race's lap box and the boss's height band. */
     x: number; y: number; z: number;
@@ -556,7 +558,7 @@ export function stepTasks(
     const giver = creatureAt(fetch.creature);
     let request: DialogueRequest | null = null;
     if (giver && tookTalk(giver)) {
-      if (tasks.fetch !== 0) {
+      if (tasks.fetch !== 0 || world.cannonActive) {
         // A run is already going: he only tells Buzz to get on with it.
         request = {
           creature: fetch.creature, pathTag: fetch.pathTag, text: fetch.hurryText,

@@ -7,6 +7,28 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-04 — Toy Barn timed stomp cannon
+
+Restored switch collision 15/art 33 and cannon collision 0/art 0/1 from
+`00421340`. A stomp starts 2700 ticks, presses the switch and retires guide 0.
+Motor speed ramps to 512, then coasts down after expiry; the phase drives
+vertical motion and roll. Landing on the active cannon launches Buzz at yaw
+`0xb90`, vertical impulse -3072 and sine/cosine velocity divided by 7, with
+recoil and recovery. Near/far art uses native 32/128-unit quantization.
+Crossing Z `-0x11202` ends the timer and restores the button immediately.
+The HUD uses the cannon's 60-tick clock; an active fetch blocks its switch,
+and the fetch task cannot claim the timed slot while the cannon is active.
+
+`toy-barn-cannon-probe.ts` checks the full countdown, spin up/down, fetch gate,
+collision/art motion, launch/recoil/recovery, early termination and restoration.
+It also physically stomps the installed switch and lands on the moving cannon.
+The browser check passes those physical triggers, controller clock, rendered
+poses, pause, region exit, the subsequent real NPC offer, restart and exit.
+The NPC is outside the cannon region, so reaching him first ends its timer;
+the synthetic task probe separately verifies the shared-slot exclusion rule.
+Build passes. Dynamic pitch, full destination traversal and exact launch
+camera/input-lock parity remain open.
+
 ## 2026-10-04 — Toy Barn fetch failure and retry
 
 Fixed three shared-fetch state rules against `00421340`: the offer stays in
@@ -22,8 +44,8 @@ retry and success using installed creatures/pickups. The expanded barrier
 browser regression passes withdrawal after an actual deadline, a new offer,
 actual token collection, both barrier completion states and lifecycle cleanup.
 Tarmac timed-path and Space Land saucer probes still pass; build passes.
-First-stage completion's native small bounce and interaction with the separate
-stomp-cannon timer remain open.
+First-stage completion's native small bounce remains open. The later cannon
+entry above covers its shared-timer interaction.
 
 ## 2026-10-04 — Toy Barn timed-fetch barrier
 

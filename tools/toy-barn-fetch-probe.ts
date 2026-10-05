@@ -12,7 +12,7 @@ const sim=createCreatureSim(parseCreatureList(raw.find(r=>r.type===35)!.data),{g
 const config=LEVEL_TASKS[7]!.fetch!,tasks=createTasks(),pickups=createPickups(parseDat(readFileSync('Toy Story 2/data/level07/level.dat')),7);
 const at=(slot:number)=>sim.creatures.find(c=>c.slot===slot),giver=at(config.creature)!,egg=at(config.watch)!,token=pickups.items.find(i=>i.tokenSlot===2)!;
 let hides=0;
-const world={coins:0,found:0,rand:sim.rand,talking:false,x:0,y:0,z:0,level:7,items:0,tokens:0,onGround:true,pathPoints:()=>null,cameraZone:0,playerZone:0,hideToken:(slot:number)=>{hides++;hideToken(pickups,slot);}};
+const world={cannonActive:false,coins:0,found:0,rand:sim.rand,talking:false,x:0,y:0,z:0,level:7,items:0,tokens:0,onGround:true,pathPoints:()=>null,cameraZone:0,playerZone:0,hideToken:(slot:number)=>{hides++;hideToken(pickups,slot);}};
 const tick=()=>stepTasks(tasks,{fetch:config},at,world);
 function offer(second:boolean){
  giver.flags|=CREATURE_FLAGS.touched;const request=tick()!;
@@ -22,6 +22,7 @@ function offer(second:boolean){
  if(second){markSlotDone(tasks,2);revealToken(pickups,2,false);}
  world.talking=false;tick();assert.equal(tasks.fetch,2);
 }
+world.cannonActive=true;giver.flags|=CREATURE_FLAGS.touched;assert.equal(tick()!.text,config.hurryText);assert.equal(tasks.fetch,0);world.cannonActive=false;
 offer(false);
 egg.health=999;tick();assert.equal(tasks.fetchDone,0,'dying sentinel completed first run early');
 egg.health=0;tick();assert.equal(tasks.fetchDone,1);assert.equal(tasks.fetch,0);assert.equal(hides,0);

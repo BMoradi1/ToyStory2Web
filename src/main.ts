@@ -1,3 +1,4 @@
+import {TOY_BARN_BARRIER_OBJECT,createToyBarnBarrier,stepToyBarnBarrier,restoreToyBarnBarrier,type ToyBarnBarrier} from './sim/toy-barn-barrier.ts';
 import {TOY_BARN_LAUNCH_OBJECTS,createToyBarnLaunchPlatforms,moveToyBarnLaunchPlatforms,stepToyBarnLaunchPlatforms,restoreToyBarnLaunchPlatforms,type ToyBarnLaunchPlatforms} from './sim/toy-barn-launch-platforms.ts';
 import {TOY_BARN_SPRING_OBJECTS,createToyBarnSprings,stepToyBarnSprings,type ToyBarnSprings} from './sim/toy-barn-springs.ts';
 import {createToyBarnEffects,stepToyBarnEffects,type ToyBarnEffects} from './sim/toy-barn-effects.ts';
@@ -354,6 +355,7 @@ async function showLevel(index: number): Promise<void> {
   toyBarnPlatforms = null;
   toyBarnRotors = null;
   toyBarnLaunchPlatforms = null;
+  toyBarnBarrier = null;
   constructionLifts = null;
   constructionStompLift = null;
   constructionScenery = null;
@@ -471,7 +473,7 @@ async function showLevel(index: number): Promise<void> {
       for(const id of platformObjects(levelNumber(level.id)??0)) {
         const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);
       }
-      if(levelNumber(level.id)===7)for(const id of [...TOY_BARN_PLATFORM_OBJECTS,...TOY_BARN_ROTOR_OBJECTS,...TOY_BARN_SPRING_OBJECTS,...TOY_BARN_LAUNCH_OBJECTS]){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
+      if(levelNumber(level.id)===7)for(const id of [...TOY_BARN_PLATFORM_OBJECTS,...TOY_BARN_ROTOR_OBJECTS,...TOY_BARN_SPRING_OBJECTS,...TOY_BARN_LAUNCH_OBJECTS,TOY_BARN_BARRIER_OBJECT]){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
       if(levelNumber(level.id)===4)for(const id of [...PAINT_CAN_OBJECTS,...CONSTRUCTION_BRIDGE_OBJECTS,...CONSTRUCTION_SHUTTLE_OBJECTS,...CONSTRUCTION_LIFT_OBJECTS,...CONSTRUCTION_SCENERY_OBJECTS,...CONSTRUCTION_STOMP_LIFT_OBJECTS]){
         const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);
       }
@@ -782,6 +784,7 @@ async function open(dir: GameDir): Promise<void> {
       get constructionScenery() { return constructionScenery; },
       get constructionStompLift() { return constructionStompLift; },
       get constructionLifts() { return constructionLifts; },
+      get toyBarnBarrier(){return toyBarnBarrier;},
       get toyBarnLaunchPlatforms(){return toyBarnLaunchPlatforms;},
       get toyBarnRotors(){return toyBarnRotors;},
       get toyBarnPlatforms(){return toyBarnPlatforms;},
@@ -1384,6 +1387,7 @@ async function spawnPlayer(): Promise<void> {
   spaceBuggyModel=null;
   if(constructionStompLift){restoreConstructionStompLift(constructionStompLift,currentCollisionWorld);constructionStompLift=null;}
   if(constructionLifts){restoreConstructionLifts(constructionLifts,currentCollisionWorld);constructionLifts=null;}
+  if(toyBarnBarrier){restoreToyBarnBarrier(toyBarnBarrier,currentCollisionWorld);toyBarnBarrier=null;}
   if(toyBarnLaunchPlatforms){restoreToyBarnLaunchPlatforms(toyBarnLaunchPlatforms,currentCollisionWorld);toyBarnLaunchPlatforms=null;}
   if(toyBarnRotors){restoreToyBarnRotors(toyBarnRotors,currentCollisionWorld);toyBarnRotors=null;}
   if(toyBarnPlatforms){restoreToyBarnPlatforms(toyBarnPlatforms,currentCollisionWorld);toyBarnPlatforms=null;}
@@ -1454,6 +1458,8 @@ async function spawnPlayer(): Promise<void> {
   drawToyBarnRotors();
   toyBarnLaunchPlatforms=level===7?createToyBarnLaunchPlatforms(currentLevel.level,currentCollisionWorld):null;
   drawToyBarnLaunchPlatforms();
+  toyBarnBarrier=level===7?createToyBarnBarrier(currentLevel.level,currentCollisionWorld):null;
+  drawToyBarnBarrier();
   constructionLifts=level===4&&exeBytes?createConstructionLifts(currentLevel.level,currentCollisionWorld,exeBytes):null;
   drawConstructionLifts();
   constructionStompLift=level===4?createConstructionStompLift(currentLevel.level,currentCollisionWorld):null;
@@ -2719,6 +2725,10 @@ function drawConstructionLifts():void{
     offset:[(o.position.x-o.rest.x)*GAME_TO_RENDER,-(o.position.y-o.rest.y)*GAME_TO_RENDER,-(o.position.z-o.rest.z)*GAME_TO_RENDER] as [number,number,number],
   }] as const))));
 }
+function drawToyBarnBarrier():void{
+  if(!viewer||!toyBarnBarrier)return;
+  const s=toyBarnBarrier;viewer.setObjectTransforms(new Map([[s.index,{angles:s.angles,offset:[0,s.height*GAME_TO_RENDER,0] as [number,number,number]}]]));
+}
 function drawToyBarnLaunchPlatforms():void{
   if(!viewer||!toyBarnLaunchPlatforms)return;
   viewer.setObjectTransforms(new Map(toyBarnLaunchPlatforms.map(r=>[r.index,{angles:[0,0,0] as [number,number,number],
@@ -3243,6 +3253,7 @@ function discardLevel(): void {
   toyBarnPlatforms = null;
   toyBarnRotors = null;
   toyBarnLaunchPlatforms = null;
+  toyBarnBarrier = null;
   constructionLifts = null;
   constructionStompLift = null;
   constructionScenery = null;
@@ -3681,6 +3692,7 @@ let toyBarnSprings:ToyBarnSprings|null=null;
 let toyBarnEffects:ToyBarnEffects|null=null;
 let constructionDebris:ConstructionDebris|null=null;
 let constructionBridge:ConstructionBridge|null=null;
+let toyBarnBarrier:ToyBarnBarrier|null=null;
 let toyBarnLaunchPlatforms:ToyBarnLaunchPlatforms|null=null;
 let toyBarnRotors:ToyBarnRotors|null=null;
 let toyBarnPlatforms:ToyBarnPlatforms|null=null;
@@ -4153,6 +4165,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   }
   if(constructionStompLift){stepConstructionStompLift(constructionStompLift,currentCollisionWorld,player,id=>spendGuide(guideSparkles,effects,id,true));drawConstructionStompLift();}
   if(constructionLifts&&creatureSim){stepConstructionLifts(constructionLifts,player,()=>creatureSim!.rand.byte());drawConstructionLifts();}
+  if(toyBarnBarrier&&tasks){stepToyBarnBarrier(toyBarnBarrier,currentCollisionWorld,tasks.fetch,tasks.fetchDone);drawToyBarnBarrier();}
   if(toyBarnLaunchPlatforms){stepToyBarnLaunchPlatforms(toyBarnLaunchPlatforms,player,{guide:id=>spendGuide(guideSparkles,effects,id,true),sound:(id,at)=>playEvent(id,at)});drawToyBarnLaunchPlatforms();}
   if(toyBarnSprings){stepToyBarnSprings(toyBarnSprings,player,currentCollisionWorld,{guide:()=>spendGuide(guideSparkles,effects,1,true),sound:()=>playEvent(0x1c,player!)});drawToyBarnSprings();}
   if(toyBarnRotors){stepToyBarnRotors(toyBarnRotors);drawToyBarnRotors();}

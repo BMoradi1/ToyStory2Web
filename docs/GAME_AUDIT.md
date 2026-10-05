@@ -7,6 +7,24 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-04 — Toy Barn timed-fetch barrier
+
+Restored collision 18/art 31 from `00421340`: starting a fetch run raises
+artwork 16384 game units in 512-unit steps. Collision is disabled as soon as
+height leaves zero and restored only once fully closed. First-run completion
+and either timeout close it; second-run success leaves the height target open.
+The init call `0043d9d0(19,18)` is a PC no-op (`ret`), so it does not justify
+an inferred portal or collision replacement.
+
+`toy-barn-barrier-probe.ts` verifies actual sphere sweeps against the installed
+hull, opening/closing timing, both success states and restoration. The browser
+check follows NPC offers/dialogue, injected first objective removal, a full
+second-run timeout, retry, actual token collection, rendered motion, pause,
+restart and exit. Build passes. It positions Buzz for NPC/token contacts;
+unassisted challenge traversal remains open. This pass also identified that
+the shared fetch task fails to withdraw its second-run token on timeout; that
+progression issue is the next fix, separate from barrier motion.
+
 ## 2026-10-04 — Toy Barn boarding rides
 
 Restored collision 10/art 11's accelerating, bouncing one-way ride and

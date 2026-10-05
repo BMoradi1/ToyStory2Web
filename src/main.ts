@@ -4332,6 +4332,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
           rand: creatureSim.rand,
           // `DAT_0050a1f8`: a task that has just been accepted waits for the
           // box to close before its clock starts.
+          timerGate: effects?.gate.sixtyFour,
           cannonActive:!!toyBarnCannon?.timer,
           bouncePlayer:vy=>{if(player)Object.assign(player,{vy,stomp:0,stompImpact:false,onGround:false,coyote:0,fallTimer:0,jumpState:JumpState.Released,animPhase:2,launched:false});},
           talking: talk !== null,

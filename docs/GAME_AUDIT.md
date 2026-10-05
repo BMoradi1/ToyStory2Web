@@ -7,6 +7,18 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-05 — Shared timed-task divider
+
+All four collect-five tasks, Toy Barn's two-stage fetch and Tarmac's path now
+consume the existing global 64-tick effect gate (DAT_0052f1cb). Recreating a
+level's task state no longer restarts a private timer phase. Standalone task
+simulations retain the local counter only when no host gate is supplied.
+`task-timer-gate-probe.ts` verifies all six clocks obey true/false host gates
+and that recreating effect/task state preserves the divider phase. Existing
+fetch, path and collect-five probes pass. Browser regressions pass all four
+collect-five flows and the Tarmac path's pause, failure, retry and collection
+lifecycle; production build passes.
+
 ## 2026-10-05 — All four timed collect-five challenges
 
 Construction Yard, Alleys and Gullies, Al's Penthouse and Airport Infiltration
@@ -24,8 +36,7 @@ boundary, partial failure/retry, Penthouse's room rule and one-shot reward.
 `collect-five-flow-check.js` passes actual NPC/item contacts, timeout, retry,
 reward reveal, pause, restart and exit across all four worlds. Contacts use
 protected teleports; this is not a natural timed-route playthrough. The shared
-task divider still uses its existing level-local 64-tick phase rather than
-the original global divider phase. Sources: 0041c190/0041e880/0042a130/0042ca60.
+divider follow-up above replaces the initial local clock phase. Sources: 0041c190/0041e880/0042a130/0042ca60.
 
 ## 2026-10-05 — Shared rain and Alley weather
 

@@ -126,8 +126,8 @@ export interface TaskState {
   /** Its clock, counting down to the floor of 100 that means failure. */
   fetchClock: number;
   /**
-   * The engine's 1-in-64 frame divider (`DAT_0052ad63` / `DAT_0052f1cb`).
-   * Timed tasks step their clocks on it, so a "second" is 64 ticks.
+   * Standalone simulation fallback for the engine's 1-in-64 divider.
+   * The live game supplies its shared DAT_0052f1cb gate instead.
    */
   slowTick: number;
   /**
@@ -503,6 +503,8 @@ export function stepTasks(
     /** Category-9 objects collected, for the challenge. */
     items: number;
     challengeItems?: (enabled: boolean) => void;
+    /** Shared native 64-tick gate; omitted only by standalone simulations. */
+    timerGate?: boolean;
     /** Bit per token slot already taken, for the timed runs. */
     tokens: number;
     /** `DAT_0052f38e`: most boss taunts will not fire while Buzz is airborne. */
@@ -549,10 +551,13 @@ export function stepTasks(
 ): DialogueRequest | null {
   tasks.smithBarTicks=Math.max(0,tasks.smithBarTicks-dt);
   if(tasks.boss!==2)tasks.smithFlash=false;
-  // The engine's 1-in-64 divider, which is what timed tasks count on.
-  tasks.slowTick += dt;
-  const slow = tasks.slowTick >= 64;
-  if (slow) tasks.slowTick -= 64;
+  // Level changes must not restart the native global divider's phase.
+  let slow = world.timerGate;
+  if (slow === undefined) {
+    tasks.slowTick += dt;
+    slow = tasks.slowTick >= 64;
+    if (slow) tasks.slowTick -= 64;
+  }
 
   if(world.level===2)updateMowerRange(creatureAt(0),world);
 

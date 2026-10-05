@@ -7,6 +7,27 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-05 — Complete browser regression runner
+
+Added `npm run audit:browser`: discovers every `*-flow-check.js`, starts
+isolated Chromium sessions sequentially against the local development server,
+keeps per-flow logs/screenshots, updates a JSON report after each result and
+continues after failed checks. Filtering, listing, custom output directories,
+server preflight and launch-error reporting make the audit repeatable.
+
+The first full run found three failures. The actual particle-distance bug
+is fixed in the entry below. The Airport check now expects a vertical spring
+bounce with normal air control and samples its sound before the rolling log
+expires. The settings flow supplies its synthetic file without opening a
+headless OS picker, avoiding a cancellation race while reading the file.
+It still exercises the real import handler, preview, delayed load and failed
+save/retry paths. The corrected full run passed all 97 browser checks.
+
+These remain focused regressions, often with supplied positions or disposable
+save changes. They do not establish unassisted all-token completion or exact
+original-versus-port visual parity. The separate full simulation run passes
+124/124; production build passes.
+
 ## 2026-10-05 — Shared particle distance correction
 
 The complete browser baseline (94/97 passing) exposed a lock marker that
@@ -20,7 +41,7 @@ the original camera-marker-before-effects update order.
 The new installed-template probe covers all three axes, ordinary/extended
 spawn boundaries, inclusive live boundaries and a persistent distant marker.
 The aim-marker/disk browser flow now passes. All 124 simulation probes and
-the production build pass; the complete browser rerun is in progress.
+the production build pass; the complete browser rerun passes 97/97.
 
 ## 2026-10-05 — Repeatable complete simulation regression command
 

@@ -61,7 +61,12 @@
   await choose(2);
   if(document.querySelector('dialog'))throw Error('replacement dialog remains');
   // Import is a native file picker, while preview/confirmation stays on canvas.
-  [...document.querySelectorAll('button')].find(b=>b.textContent==='Import save file').click();
+  // Supply the file below; opening a headless OS picker can emit cancel while
+  // File.arrayBuffer() is pending and settle the picker promise first.
+  const nativeClick=HTMLInputElement.prototype.click;
+  HTMLInputElement.prototype.click=function(){if(this.type!=='file')nativeClick.call(this);};
+  try{[...document.querySelectorAll('button')].find(b=>b.textContent==='Import save file').click();}
+  finally{HTMLInputElement.prototype.click=nativeClick;}
   const fileInput=document.querySelector('input[aria-label="Import save file"]');
   const bytes=ts2.exportSave();const offset=4+new DataView(bytes.buffer,bytes.byteOffset).getUint32(0,true);
   bytes[offset+0x138]=7;bytes[offset+0x144]=6;bytes[offset+0x145]=0;

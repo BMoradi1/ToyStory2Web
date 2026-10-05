@@ -264,6 +264,20 @@ permission error stops the run and reports the remaining probes as not run.
 Reports contain test results; game assets stay local. Simulation checks
 complement the browser flows and natural-play checklist in the whole-game audit.
 
+Run the browser regression set against a running development server:
+
+    npm run audit:browser
+    BASE_URL=http://127.0.0.1:5177/ npm run audit:browser -- --filter neighborhood
+    npm run audit:browser -- --list
+    npm run audit:browser -- --output /tmp/toystory-browser-audit
+
+Each `tools/*-flow-check.js` runs in a disposable Chromium session, sequentially.
+The runner saves per-flow logs/screenshots and updates `report.json` after each
+check. The default artifact directory is temporary; `--output` selects one.
+Set `CHROMIUM` if the executable is not named `chromium`. These tests use the
+supplied local install and may position Buzz or alter the disposable save;
+consult each flow and the audit index for its limits.
+
 `tools/ghidra/` rebuilds a greppable decompile of either executable, which is
 where the gameplay constants come from.
 

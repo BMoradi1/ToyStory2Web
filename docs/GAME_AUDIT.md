@@ -7,6 +7,21 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-04 — Construction Yard scripted shuttles
+
+- Restored all four shuttles (artwork 41–44, collision 14–17) using the
+  installed movement wordcode and recovered shared interpreter `0048acc0`.
+  Acceleration, braking, endpoint waits and random timing follow the scripts.
+- Moving hulls carry standing/climbing passengers; artwork follows the same
+  positions. Restart restores the captured collision and resets the scripts.
+- Installed probes verify all four out/back/wait cycles, collision alignment,
+  passenger versus airborne motion, exact restore and shared flag/wait timing.
+  Browser checks all four cycles, artwork alignment, pause, restart and exit.
+  Production build passes.
+- The four connected tilting lift assemblies still need implementation.
+  General crush/contact response remains shared mover behavior, not proven
+  frame-for-frame retail parity. These checks are not a natural playthrough.
+
 ## 2026-10-04 — Construction Yard stomp drawbridge
 
 - Restored surface-36 stomp activation, guide 3 retirement, lowering, hold,

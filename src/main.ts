@@ -1,3 +1,4 @@
+import {seesawObjects,createSeesaws,moveSeesaws,stepSeesaws,restoreSeesaws,type Seesaws} from './sim/seesaws.ts';
 import {ANDY_GATE_OBJECTS,createAndyGates,stepAndyGates,restoreAndyGates,type AndyGates} from './sim/andy-gates.ts';
 import {ANDY_MACHINERY_OBJECTS,createAndyMachinery,stepAndyMachinery,restoreAndyMachinery,type AndyMachinery} from './sim/andy-machinery.ts';
 import {stepAlleyWeather} from './sim/alley-weather.ts';
@@ -372,6 +373,7 @@ async function showLevel(index: number): Promise<void> {
   alleyEffects = null;
   andyMachinery = null;
   andyGates = null;
+  seesaws = null;
   toyBarnRotors = null;
   toyBarnLaunchPlatforms = null;
   toyBarnBarrier = null;
@@ -493,6 +495,7 @@ async function showLevel(index: number): Promise<void> {
       for(const id of platformObjects(levelNumber(level.id)??0)) {
         const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);
       }
+      for(const id of seesawObjects(levelNumber(level.id)??0)){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
       if(levelNumber(level.id)===1)for(const id of [...ANDY_MACHINERY_OBJECTS,...ANDY_GATE_OBJECTS]){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
       if(levelNumber(level.id)===5)for(const id of [...ALLEY_PLATFORM_OBJECTS,...ALLEY_SEESAW_OBJECTS,...ALLEY_BUBBLE_OBJECTS,...ALLEY_BRIDGE_OBJECTS,...ALLEY_WATER_OBJECTS]){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
       if(levelNumber(level.id)===7)for(const id of [...TOY_BARN_PLATFORM_OBJECTS,...TOY_BARN_ROTOR_OBJECTS,...TOY_BARN_SPRING_OBJECTS,...TOY_BARN_LAUNCH_OBJECTS,TOY_BARN_BARRIER_OBJECT,...TOY_BARN_CANNON_OBJECTS]){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
@@ -825,6 +828,7 @@ async function open(dir: GameDir): Promise<void> {
       get toyBarnEffects(){return toyBarnEffects;},
       get constructionDebris() { return constructionDebris?structuredClone(constructionDebris):null; },
       get paintCans() { return paintCans; },
+      get seesaws() { return seesaws; },
       get andyGates() { return andyGates; },
       get andyMachinery() { return andyMachinery; },
       get penthouse() { return penthouse; },
@@ -1417,6 +1421,7 @@ async function spawnPlayer(): Promise<void> {
   if(toyBarnBarrier){restoreToyBarnBarrier(toyBarnBarrier,currentCollisionWorld);toyBarnBarrier=null;}
   if(toyBarnLaunchPlatforms){restoreToyBarnLaunchPlatforms(toyBarnLaunchPlatforms,currentCollisionWorld);toyBarnLaunchPlatforms=null;}
   if(toyBarnRotors){restoreToyBarnRotors(toyBarnRotors,currentCollisionWorld);toyBarnRotors=null;}
+  if(seesaws){restoreSeesaws(seesaws,currentCollisionWorld);seesaws=null;}
   if(andyGates){restoreAndyGates(andyGates,currentCollisionWorld);andyGates=null;}
   if(andyMachinery){restoreAndyMachinery(andyMachinery,currentCollisionWorld);andyMachinery=null;}
   if(alleyBridge){restoreAlleyBridge(alleyBridge,currentCollisionWorld);alleyBridge=null;}
@@ -1480,6 +1485,7 @@ async function spawnPlayer(): Promise<void> {
   toyBarnSprings=level===7?createToyBarnSprings(currentLevel.level):null;
   drawToyBarnSprings();
   toyBarnHoops=level===7?createToyBarnHoops():null;
+  seesaws=createSeesaws(level,currentLevel.level,currentCollisionWorld);drawSeesaws();
   andyGates=level===1?createAndyGates(currentLevel.level,currentCollisionWorld):null;drawAndyGates();
   andyMachinery=level===1?createAndyMachinery(currentLevel.level,currentCollisionWorld):null;drawAndyMachinery();
   alleyEffects=level===5?createAlleyEffects(currentLevel.level):null;
@@ -2843,6 +2849,10 @@ function drawPaintCans():void{
     offset:[(o.position.x-o.rest.x)*GAME_TO_RENDER,-(o.position.y-o.rest.y)*GAME_TO_RENDER,-(o.position.z-o.rest.z)*GAME_TO_RENDER] as [number,number,number],
   }])));
 }
+function drawSeesaws():void{
+  if(!viewer||!seesaws)return;
+  viewer.setObjectTransforms(new Map(seesaws.platforms.flatMap(r=>r.objects.map(o=>[o.index,{angles:o.angles}] as const))));
+}
 function drawAndyGates():void{
   if(!viewer||!andyGates)return;
   viewer.setObjectTransforms(new Map(andyGates.objects.map(o=>[o.index,{angles:o.angles,scale:o.scale,
@@ -3346,6 +3356,7 @@ function discardLevel(): void {
   alleyEffects = null;
   andyMachinery = null;
   andyGates = null;
+  seesaws = null;
   toyBarnRotors = null;
   toyBarnLaunchPlatforms = null;
   toyBarnBarrier = null;
@@ -3782,6 +3793,7 @@ let talk: TalkState | null = null;
 let pushBlocks: PushState | null = null;
 let tarmacPlane: TarmacPlane | null = null;
 let levelPlatforms: LevelPlatforms | null = null;
+let seesaws:Seesaws|null=null;
 let andyGates:AndyGates|null=null;
 let andyMachinery:AndyMachinery|null=null;
 let penthouse:Penthouse|null=null;
@@ -4093,6 +4105,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     if(toyBarnCannon)moveToyBarnCannon(toyBarnCannon,currentCollisionWorld!,player!);
     if(toyBarnLaunchPlatforms)moveToyBarnLaunchPlatforms(toyBarnLaunchPlatforms,currentCollisionWorld!,player!);
     if(toyBarnRotors)moveToyBarnRotors(toyBarnRotors,currentCollisionWorld!,player!);
+    if(seesaws)moveSeesaws(seesaws,currentCollisionWorld!,player!);
     if(alleyTraversal)moveAlleyTraversal(alleyTraversal,currentCollisionWorld!,player!);
     if(alleyPlatforms)moveAlleyPlatforms(alleyPlatforms,currentCollisionWorld!,player!);
     if(toyBarnPlatforms)moveToyBarnPlatforms(toyBarnPlatforms,currentCollisionWorld!,player!);
@@ -4296,6 +4309,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     }
   }
   if(alleyBubbles){stepAlleyBubbles(alleyBubbles,currentCollisionWorld!,player);if(alleyBubbles.guide)spendGuide(guideSparkles,effects,0,true);for(const sound of alleyBubbles.sounds)playEvent(sound.event,sound.at);drawAlleyBubbles();}
+  if(seesaws){stepSeesaws(seesaws,player,zones.camera,zones.player);drawSeesaws();}
   if(alleyTraversal){stepAlleyTraversal(alleyTraversal,player);if(alleyTraversal.launched){spendGuide(guideSparkles,effects,1,true);playEvent(0x1c,player);}drawAlleyTraversal();}
   if(alleyPlatforms){stepAlleyPlatforms(alleyPlatforms,currentCollisionWorld!,player);drawAlleyPlatforms();}
   if(toyBarnPlatforms&&creatureSim){updateToyBarnGuards(creatureSim.creatures,effects?.effects.some(e=>e.life>0&&(e.kind===EFFECT_KIND.diskHoming||e.kind===EFFECT_KIND.diskStraight))??false);stepToyBarnPlatforms(toyBarnPlatforms,()=>creatureSim!.rand.byte(),slot=>creatureSim!.creatures.find(c=>c.slot===slot)?.health);drawToyBarnPlatforms();}

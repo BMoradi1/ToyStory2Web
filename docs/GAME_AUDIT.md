@@ -7,6 +7,26 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-05 — Five more seesaws across three worlds
+
+Added shared 0049ec00 profiles for Andy's House collision/artwork 15,
+Neighborhood collision/artwork 0/1 and Airport collision 3/4 with near/far
+artwork 4/6 and 5/7. The profiles preserve the House's positive return force,
+Neighborhood's free settling and asymmetric second limit, Airport's centering
+force and slower response, native yaw, landing impact and friction/rebound.
+House force updates require camera room 5; Airport uses player rooms 2/4/5.
+Collision rotation runs before player physics and carries standing/ledge
+passengers about the pivot; artwork copies the native quarter-angle values.
+
+Installed probes cover all five platforms, both weight directions, limits,
+rebound, idle modes, room-source gates, passenger radius, ledge force freeze,
+near/far angle agreement and collision restoration. All five also pass real
+player-physics landings. Browser checks pass protected approaches followed by
+actual landings/weight response, rendered near/far poses, pause/restart/exit in
+all three worlds. Construction lift and Elevator/Airport route regressions
+and the production build pass. This is focused traversal evidence, not full
+natural routes.
+
 ## 2026-10-05 — Andy's doorway and falling hatch
 
 Restored 00417680's strict doorway trigger, grounded-grace requirement,
@@ -1229,8 +1249,8 @@ not evidence for untested interactions.
 
 | Play order | Level | Confirmed gaps / implementation evidence | Next behavior comparison |
 |---|---|---|---|
-| 1 | Andy's House | Tin intro/fight/reward integration tested; hover wobble/sparks partial. Chair stomp, pushables, five room-2 machinery cycles, growing doorway and falling hatch with collision gates/effects implemented. | Remaining numbered props and platforms; all five token routes. |
-| 2 | Andy's Neighborhood | Lawnmower effects, kite flight/combat/reward and ZGCAR hook implemented. | Moving scenery and natural race/token routes. |
+| 1 | Andy's House | Tin intro/fight/reward integration tested; hover wobble/sparks partial. Chair stomp, pushables, five room-2 machinery cycles, growing doorway, falling hatch and biased seesaw with collision gates/effects implemented. | Remaining numbered props and platforms; all five token routes. |
+| 2 | Andy's Neighborhood | Lawnmower effects, kite flight/combat/reward, ZGCAR hook and two weight-driven seesaws implemented. | Moving scenery and natural race/token routes. |
 | 3 | Bombs Away (internal 6) | `stepBossFight` exists. | Complete boss attacks, damage windows, defeat, token and replay. |
 | 4 | Construction Yard | DRILL combat/reward and ZGCAR implemented; trailer paint, outdoor lids, debris, stomp bridge, four shuttles, four linked tilting lifts, stomp-selected lift, distant crate, proximity scenery/portals and mud movement/effects implemented. | Review collision IDs 13/25; natural traversal/token routes. |
 | 5 | Alleys and Gullies | BOX/BPLANE launch cycle, boat cannon, clown combat/reward, eight lane platforms, two seesaws, spring, bubble machine, moving bubble attachments, push-triggered bridge, distant crates, water, rain and timed environmental emitters implemented. | Underwater camera treatment and remaining scenery/effects and natural pole/zip-line routes. |
@@ -1241,7 +1261,7 @@ not evidence for untested interactions.
 | 10 | Elevator Hop | Wire puzzle, compound lifts, GUNSP combat/reward, fan switches/rotation/airflow implemented. | Other ambient effects, exact collision/script/force timing and full-level traversal. |
 | 11 | Al's Penthouse | Shared enemies, GUNSL combat/reward, hazards, water/floats, train routing and underwater movement implemented. | Underwater camera colour/warp, light/texture helpers and collision 24 review. |
 | 12 | The Evil Emperor Zurg | Entrance, attacks, recovery, defeat, save bit and victory/movie handoff implemented in `zurg-boss.ts`. Installed-data and focused browser checks pass. | Unassisted combat, original-versus-port camera/render comparison and detail-dependent particles. |
-| 13 | Airport Infiltration | Five authored transport routes, shared gun/buzzard handlers and Prospector fight/reward implemented. | Exact collision/script timing comparison and full-level traversal; distinct from Tarmac. |
+| 13 | Airport Infiltration | Five authored transport routes, two near/far seesaws, shared gun/buzzard handlers and Prospector fight/reward implemented. | Exact collision/script timing comparison and full-level traversal; distinct from Tarmac. |
 | 14 | Tarmac Trouble | Plane motion/collision, wheels/fans, ground/climbing passengers, wheel hazards and helicopter hover/rotors/token motion and light puzzle/lowering implemented and tested. Slinky timed-path rules and retry implemented. Near/far scenery sway, rain/plane sound, rain particles and lightning/thunder restored. Blacksmith recovery, defeat and delayed reward implemented; axe throws, hit flashing and bar expiry implemented. Shared gun enemy and buzzard handlers implemented. | Other ambient effects and natural token routes; pitch/roll attachment on other movers. |
 | 15 | Final Showdown | Stage and three fighter controllers implemented in `finale.ts`; rendered entrance, attacks, rescue, completion save, ending/credits and replay tested. | Natural combat completion; exact roll/framing and voice/pitch parity. |
 

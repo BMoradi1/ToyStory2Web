@@ -1341,7 +1341,7 @@ review checklist are in [GAME_AUDIT.md](GAME_AUDIT.md).
 |---|---|---|
 | Tarmac Trouble (14) | Plane movement and moving ledge attachment implemented | `tarmac-plane.ts` ports `0042dcb0`: near/far meshes, collision 0, wheels/fans, wheel hazards, grounded riders and moving ledge attachment. Node and browser regressions pass. Helicopter hover/rotors and token motion are now ported separately; the light puzzle/lowering and helicopter sound are now implemented too. |
 | Construction Yard | Outdoor paint cans | The trailer paint puzzle is ported; its implementation explicitly does not cover the outdoor cans. |
-| Al's Space Land (8) | Prop-controlled texture effect | Call `00424227` waits on the unimplemented `0052c9b8 & 1` prop flag; see docs/EFFECTS.md. |
+| Al's Space Land (8) | Mother visibility texture effect | Implemented: `0052c9b8 & 1` is slot-2 MOTHER's render visibility flag; see docs/GAME_AUDIT.md. |
 | Moving platforms | Broader controller coverage | Translation/yaw attachment during ledge climbing is implemented and tested on Tarmac. Other level controllers, pitch/roll attachment and the climb-camera transition still need work. |
 | Other scripted props | Motion and interaction feedback | Per-level object scripts remain only partly covered. Guide sparkles have retirement hooks for the chair, pushables and trailer controls, but not all other props. |
 

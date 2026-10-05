@@ -1,3 +1,4 @@
+import {SPACE_CLAW_OBJECTS,createSpaceClaw,stepSpaceClaw,syncSpaceClawPrize,type SpaceClaw} from './sim/space-claw.ts';
 import {constructionMudY} from './sim/construction-mud.ts';
 import {CONSTRUCTION_STOMP_LIFT_OBJECTS,createConstructionStompLift,moveConstructionStompLift,stepConstructionStompLift,restoreConstructionStompLift,type ConstructionStompLift} from './sim/construction-stomp-lift.ts';
 import {CONSTRUCTION_SCENERY_OBJECTS,createConstructionScenery,stepConstructionScenery,constructionPortals,type ConstructionScenery} from './sim/construction-scenery.ts';
@@ -340,6 +341,7 @@ async function showLevel(index: number): Promise<void> {
   constructionLifts = null;
   constructionStompLift = null;
   constructionScenery = null;
+  spaceClaw = null;
   waterEffects=createWaterEffects();
   tarmacHelicopter = null;
   tarmacLights = null;
@@ -448,6 +450,9 @@ async function showLevel(index: number): Promise<void> {
         const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);
       }
       if(levelNumber(level.id)===4)for(const id of [...PAINT_CAN_OBJECTS,...CONSTRUCTION_BRIDGE_OBJECTS,...CONSTRUCTION_SHUTTLE_OBJECTS,...CONSTRUCTION_LIFT_OBJECTS,...CONSTRUCTION_SCENERY_OBJECTS,...CONSTRUCTION_STOMP_LIFT_OBJECTS]){
+        const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);
+      }
+      if(levelNumber(level.id)===8)for(const id of SPACE_CLAW_OBJECTS){
         const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);
       }
       if(levelNumber(level.id)===11&&exeBytes)for(const id of penthouseObjects(readPenthouseTables(exeBytes))){
@@ -743,6 +748,8 @@ async function open(dir: GameDir): Promise<void> {
       get tarmacWeather() { return tarmacWeather; },
       get tarmacScenery() { return tarmacScenery; },
       get levelPlatforms() { return levelPlatforms; },
+      get spaceClaw(){return spaceClaw;},
+      get clawPrize(){return pickups?.items.find(i=>i.id===53);},
       get constructionScenery() { return constructionScenery; },
       get constructionStompLift() { return constructionStompLift; },
       get constructionLifts() { return constructionLifts; },
@@ -1331,6 +1338,7 @@ async function spawnPlayer(): Promise<void> {
 
   constructionDebris=null;
   constructionScenery=null;
+  spaceClaw=null;
   if(constructionStompLift){restoreConstructionStompLift(constructionStompLift,currentCollisionWorld);constructionStompLift=null;}
   if(constructionLifts){restoreConstructionLifts(constructionLifts,currentCollisionWorld);constructionLifts=null;}
   if(constructionShuttles){restoreConstructionShuttles(constructionShuttles,currentCollisionWorld);constructionShuttles=null;}
@@ -1513,6 +1521,8 @@ async function spawnPlayer(): Promise<void> {
   startBossFight(level);
   revealedSlots = new Set();
   pickups = createPickups(currentLevel.level, level);
+  spaceClaw=level===8?createSpaceClaw(currentLevel.level):null;
+  if(spaceClaw){syncSpaceClawPrize(spaceClaw,pickups);drawSpaceClaw();}
   tokenRevealProfile=exeBytes?readTokenReveal(exeBytes):null;
   // Lives and health carry over from the record, as `FUN_004a2cc0` copies
   // them in. Whether a token already held shows up in the level again is
@@ -1993,9 +2003,11 @@ function drawCoins(): void {
       const scale=item.tokenSlot>=0?pickups.revealScales[item.tokenSlot]??1:1;
       const helicopterToken = tarmacHelicopter && item.id === 116
         ? tarmacHelicopter.objects.find(o=>o.id===116) : null;
+      const clawToken=spaceClaw&&item.id===53?spaceClaw.objects.find(o=>o.id===53):null;
       pickupAngleMap.set(item.objectIndex, {angles:a,scale:[scale,scale,scale],
         offset: helicopterToken ? [(item.x-helicopterToken.rest.x)/WORLD_SCALE,
-          -(item.y-helicopterToken.rest.y)/WORLD_SCALE, -(item.z-helicopterToken.rest.z)/WORLD_SCALE] : undefined});
+          -(item.y-helicopterToken.rest.y)/WORLD_SCALE, -(item.z-helicopterToken.rest.z)/WORLD_SCALE] : clawToken ? [(item.x*32-clawToken.rest.x)*GAME_TO_RENDER,
+          -(item.y*32-clawToken.rest.y)*GAME_TO_RENDER,-(item.z*32-clawToken.rest.z)*GAME_TO_RENDER] : undefined});
       continue;
     }
     // Every coin in the list advances the phase, taken or not, so collecting
@@ -2598,6 +2610,14 @@ function drawTarmacHelicopter(): void {
   viewer.setObjectTransforms(transforms);
 }
 
+function drawSpaceClaw():void{
+  if(!viewer||!spaceClaw)return;
+  viewer.setObjectTransforms(new Map(spaceClaw.objects.map(o=>[o.index,{angles:o.angles,
+    scale:[o.scale,o.scale,o.scale] as [number,number,number],
+    offset:[(o.position.x-o.rest.x)*GAME_TO_RENDER,-(o.position.y-o.rest.y)*GAME_TO_RENDER,
+      -(o.position.z-o.rest.z)*GAME_TO_RENDER] as [number,number,number],
+  }])));
+}
 function activePortals(){
   return constructionScenery?constructionPortals(constructionScenery):currentLevel?.level.zones??[];
 }
@@ -3123,6 +3143,7 @@ function discardLevel(): void {
   constructionLifts = null;
   constructionStompLift = null;
   constructionScenery = null;
+  spaceClaw = null;
   waterEffects=createWaterEffects();
   tarmacHelicopter = null;
   tarmacLights = null;
@@ -3553,6 +3574,7 @@ let constructionShuttles:ConstructionShuttles|null=null;
 let constructionLifts:ConstructionLifts|null=null;
 let constructionStompLift:ConstructionStompLift|null=null;
 let constructionScenery:ConstructionScenery|null=null;
+let spaceClaw:SpaceClaw|null=null;
 let waterEffects=createWaterEffects();
 let tarmacHelicopter: TarmacHelicopter | null = null;
 let tarmacLights: TarmacLights | null = null;
@@ -3977,6 +3999,11 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     playEvent(0x9b,aircraftSoundPoint({x:pose.position.x*32,y:pose.position.y*32,z:pose.position.z*32},camera));
   }
 
+  if(spaceClaw&&creatureSim&&pickups){
+    stepSpaceClaw(spaceClaw,player,{zone:zones.player,stomp:!!player.stompImpact&&standingSurface(player,currentCollisionWorld)===8,
+      randomByte:()=>creatureSim!.rand.byte(),sound:(id,at)=>playEvent(id,at),guide:()=>spendGuide(guideSparkles,effects,0,true)});
+    syncSpaceClawPrize(spaceClaw,pickups);drawSpaceClaw();
+  }
   if(constructionStompLift){stepConstructionStompLift(constructionStompLift,currentCollisionWorld,player,id=>spendGuide(guideSparkles,effects,id,true));drawConstructionStompLift();}
   if(constructionLifts&&creatureSim){stepConstructionLifts(constructionLifts,player,()=>creatureSim!.rand.byte());drawConstructionLifts();}
   if(constructionShuttles&&creatureSim){stepConstructionShuttles(constructionShuttles,()=>creatureSim!.rand.byte());drawConstructionShuttles();}

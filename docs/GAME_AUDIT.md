@@ -7,6 +7,23 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-05 — Andy's lowering rope
+
+Restored room-2 artwork 6 and path-61 pole index 8 from 004171d0/00417680.
+The native pole word 0x30 is index 8 times its six-word stride, not an
+animation ID. Grabbing that rope starts speed 2 and event 0x21, then adds
+32 per tick until the 0xb800 downward limit. Both attachment endpoints move
+while their separation stays fixed; normal pole top-clamping lowers an
+attached rider. Artwork uses 32-unit quantization. The native clamp writes
+-1 then still adds 32, leaving terminal speed 31 while position stays clamped;
+the controller preserves that ordering and cannot replay the start cue.
+
+The installed probe uses real pole acquisition and top-clamp movement, checks
+room/index gates, first-tick arithmetic, endpoint distance, limit, sound and
+reset. Browser checks pass an actual grab and lowering ride, rendered artwork,
+audio, pause/restart/exit. It positions Buzz near the rope before acquisition;
+natural approach traversal remains open. Production build passes.
+
 ## 2026-10-05 — Andy's cot puzzle
 
 Restored the room-1 COTBIT controller from 00417680. Intact supports at
@@ -1285,7 +1302,7 @@ not evidence for untested interactions.
 
 | Play order | Level | Confirmed gaps / implementation evidence | Next behavior comparison |
 |---|---|---|---|
-| 1 | Andy's House | Tin intro/fight/reward integration tested; hover wobble/sparks partial. Cot support/drop puzzle, chair stomp, pushables, five room-2 machinery cycles, growing doorway, falling hatch, attic bounce and biased seesaw with collision gates/effects implemented. | Remaining numbered props and platforms; all five token routes. |
+| 1 | Andy's House | Tin intro/fight/reward integration tested; hover wobble/sparks partial. Cot support/drop puzzle, chair stomp, pushables, five room-2 machinery cycles, growing doorway, falling hatch, lowering rope, attic bounce and biased seesaw with collision gates/effects implemented. | Remaining numbered props and platforms; all five token routes. |
 | 2 | Andy's Neighborhood | Lawnmower effects, kite flight/combat/reward, ZGCAR hook and two weight-driven seesaws implemented. | Moving scenery and natural race/token routes. |
 | 3 | Bombs Away (internal 6) | `stepBossFight` exists. | Complete boss attacks, damage windows, defeat, token and replay. |
 | 4 | Construction Yard | DRILL combat/reward and ZGCAR implemented; trailer paint, outdoor lids, debris, stomp bridge, four shuttles, four linked tilting lifts, stomp-selected lift, distant crate, proximity scenery/portals and mud movement/effects implemented. | Review collision IDs 13/25; natural traversal/token routes. |

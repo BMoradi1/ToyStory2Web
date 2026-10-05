@@ -54,7 +54,7 @@
       projectile ||= ts2.effects.activeKinds.includes(121);
     }
     check(idle===null||heard,'native idle sound absent '+level+' '+JSON.stringify({creature:get(),talk:ts2.talk,menu:ts2.menu,player:ts2.player,sounds:ts2.sound.raised}));
-    if(level===2)check(projectile,'visible duck projectile absent');
+    if(level===2)check(projectile,'visible soldier projectile absent');
     for(let t=0;t<2000&&ts2.talk;t++)ts2.tickGame({jump:(t&1)===0},1,0);
     let pickupSound=false;
     for(let t=0;t<100&&get().health!==0;t++){
@@ -65,5 +65,5 @@
     await ts2.spawnPlayer();ts2.viewer.stop();check(get().health===102,'rescue restart failed '+level);
     await leave();console.log('PASS rescue idle/collection/restart level '+level);
   }
-  console.log('PASS all ten rescue levels: native idle cues, visible duck effect, actual collection cues, restart and exit');
+  console.log('PASS all ten rescue levels: native idle cues, visible soldier effect, actual collection cues, restart and exit');
 })()

@@ -7,6 +7,26 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-05 — Neighborhood burrowing soldier rescue
+
+Restored slot-4 ARMY's seven-hole path-2 puzzle from 00418e50/004190c0.
+Nearby Buzz makes the soldier retreat; it relocates while excluding the last
+hole and sealed holes. The 100-tick window emits warning kind 59 / sequence
+-3 at 79, permits a grounded late-stomp near the vacated hole, and cancels
+warning particles/audio on success. Six sealed holes remove the flight flag
+and free the soldier for normal rescue. Sealed holes cycle kind-58 dust near
+the camera. Initialization sets the soldier's handler timer to 100; mutable
+closure state is kept separate from the source path and resets on restart.
+
+Installed probes check strict scare range, warning/deadline boundaries,
+occupied-hole rejection, six unique closures, released flags and reset.
+Browser checks pass six actual retreats and physics stomps, warning effects,
+normal contact rescue, pause/restart/exit. The browser positions approaches
+and chooses landing offsets clear of nearby enemies; no closure or creature
+damage injection is used. All ten rescue levels' idle/collection/restart/exit
+regressions and production build pass. Natural uninterrupted route remains open.
+Corrected older audit/test wording: Neighborhood type 13 is ARMY, not DUCKS.
+
 ## 2026-10-05 — Neighborhood pump, floating prop and liquids
 
 Restored the surface-11 pump and artwork 6/7 from 00418e50/004190c0:
@@ -359,11 +379,11 @@ The installed-record probe and browser checks cover all seven placements,
 rendered angles, pause, restart and exit. Build passes. Exact visual comparison
 against the original camera remains unverified.
 
-## 2026-10-05 — Rescue ambience, duck effects and missing hit geometry
+## 2026-10-05 — Rescue ambience, soldier effects and missing hit geometry
 
 Replaced the shared rescue chirp with the ten native handlers' separate idle
 sounds, intervals and health gates. Andy's House and Tarmac remain silent
-while idle. Neighborhood ducks use the shared 32-tick chance and their
+while idle. Neighborhood Army soldiers use the shared 32-tick chance and their
 visibility-gated kind-121 emission, including native random-byte consumption,
 velocity, gravity, spin and sound-on-success behavior. Pickup still produces
 one rescue count/burst and its level's cue without enemy death rewards.

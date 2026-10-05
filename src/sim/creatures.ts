@@ -982,7 +982,7 @@ function collectable(sim: CreatureSim, c: Creature, args: HandlerArgs): void {
   if(c.handler==='FUN_00418610'){
     if(c.health!==CREATURE_HEALTH.harmless)return;
     if(sim.effectGates?.thirtyTwo&&(sim.rand.byte()&3)===0)sim.sounds.push({event:0x48,x:c.x,y:c.y,z:c.z});
-    // The pickup precedes the emission check, so collecting a duck removes
+    // The pickup precedes the emission check, so collecting a soldier removes
     // its awake bit before the timer can request another projectile.
     rescue(sim,c);c.timer-=args.dt;
     if(c.timer<1){

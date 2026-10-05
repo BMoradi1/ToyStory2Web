@@ -1,3 +1,4 @@
+import {createNeighborhoodHoles,stepNeighborhoodHoles,type NeighborhoodHoles} from './sim/neighborhood-holes.ts';
 import {NEIGHBORHOOD_PUMP_OBJECTS,neighborhoodLiquid,createNeighborhoodPump,moveNeighborhoodPump,stepNeighborhoodPump,restoreNeighborhoodPump,type NeighborhoodPump} from './sim/neighborhood-pump.ts';
 import {NEIGHBORHOOD_STRUCTURE_OBJECTS,createNeighborhoodStructure,stepNeighborhoodStructure,restoreNeighborhoodStructure,type NeighborhoodStructure} from './sim/neighborhood-structure.ts';
 import {NEIGHBORHOOD_ROPE_OBJECTS,createNeighborhoodRope,stepNeighborhoodRope,restoreNeighborhoodRope,type NeighborhoodRope} from './sim/neighborhood-rope.ts';
@@ -383,6 +384,7 @@ async function showLevel(index: number): Promise<void> {
   andyMachinery = null;
   andyGates = null;
   andyCot = null;
+  neighborhoodHoles = null;
   neighborhoodPump = null;
   neighborhoodStructure = null;
   neighborhoodRope = null;
@@ -847,6 +849,7 @@ async function open(dir: GameDir): Promise<void> {
       get paintCans() { return paintCans; },
       get seesaws() { return seesaws; },
       get andyEffects() { return andyEffects; },
+      get neighborhoodHoles(){return neighborhoodHoles;},
       get neighborhoodPump(){return neighborhoodPump;},
       get neighborhoodStructure(){return neighborhoodStructure;},
       get neighborhoodRope(){return neighborhoodRope;},
@@ -1428,6 +1431,7 @@ async function spawnPlayer(): Promise<void> {
   constructionDebris=null;
   toyBarnEffects=null;
   alleyEffects=null;
+  neighborhoodHoles=null;
   andyEffects=null;
   toyBarnHoops=null;
   toyBarnSprings=null;
@@ -1647,6 +1651,7 @@ async function spawnPlayer(): Promise<void> {
       return createEffects(table.kinds, table.modes, creatureSim!.rand);
     })()
     : null;
+  neighborhoodHoles=level===2&&creatureSim?createNeighborhoodHoles(currentLevel.level,creatureSim.creatures):null;
   waterEffects=createWaterEffects(player.y);
   pointLights=createPointLights(exeBytes&&level>=1&&level<=15?readCharacterLight(exeBytes,level):null);playerLight=null;
   viewer.setCardSheet(sceneTextures.get(SPRITE_SHEET) ?? null);
@@ -3421,6 +3426,7 @@ function discardLevel(): void {
   andyMachinery = null;
   andyGates = null;
   andyCot = null;
+  neighborhoodHoles = null;
   neighborhoodPump = null;
   neighborhoodStructure = null;
   neighborhoodRope = null;
@@ -3865,6 +3871,7 @@ let tarmacPlane: TarmacPlane | null = null;
 let levelPlatforms: LevelPlatforms | null = null;
 let seesaws:Seesaws|null=null;
 let andyEffects:AndyEffects|null=null;
+let neighborhoodHoles:NeighborhoodHoles|null=null;
 let neighborhoodPump:NeighborhoodPump|null=null;
 let neighborhoodStructure:NeighborhoodStructure|null=null;
 let neighborhoodRope:NeighborhoodRope|null=null;
@@ -4329,6 +4336,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       projectile:(at,v,spin)=>spawnEffect(effects!,world,at.x,at.y,at.z,v.x,v.y,v.z,128,0,spin,12),
       child:(at,kind,mode)=>spawnChild(effects!,world,at.x,at.y,at.z,kind,mode),hurt:()=>applyCreatureTouch(0,2)});
   }
+  if(neighborhoodHoles&&creatureSim&&camera){stepNeighborhoodHoles(neighborhoodHoles,creatureSim.creatures,player,{focus:cameraTarget(player,camera),sound:(id,at)=>playEvent(id,at),stopSequence:()=>{sequenceVoice=null;},effect:(at,kind,mode)=>{if(effects)spawnChild(effects,effectWorld(),at.x,at.y,at.z,kind,mode);},clearWarning:()=>{for(const e of effects?.effects??[])if(e.kind===59&&e.life>0)e.life=1;}});}
   if(neighborhoodPump&&camera){stepNeighborhoodPump(neighborhoodPump,currentCollisionWorld,player,{cameraZone:zones.camera,cameraY:camera.y,guide:()=>spendGuide(guideSparkles,effects,3,true),sound:(id,at)=>playEvent(id,at),splash:at=>{if(effects)spawnChild(effects,effectWorld(),at.x,at.y,at.z,0x39,2);}});drawNeighborhoodPump();}
   if(neighborhoodStructure){
     stepNeighborhoodStructure(neighborhoodStructure,currentCollisionWorld,player,{guide:id=>spendGuide(guideSparkles,effects,id,true),sound:(id,at)=>playEvent(id,at),release:()=>{if(pushBlocks)pushBlocks.held=0;},refreshFloors:()=>{

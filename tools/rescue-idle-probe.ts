@@ -53,4 +53,4 @@ for(const awake of [false,true]){
 for(const level of [5,10,13]){
  const entry=cases.find(c=>c[0]===level)!,{sim,c,run,bytes}=fresh(level,entry[1]);c.health=999;run();assert.equal(bytes(),0);assert.equal(sim.sounds.length,0);assert.equal(c.timer,level===10?1:0);
 }
-console.log('PASS ten installed rescue types: native idle cues/timers/silence, health gates, duck 32-tick chance, visibility/RNG/projectile and collection ordering');
+console.log('PASS ten installed rescue types: native idle cues/timers/silence, health gates, soldier 32-tick chance, visibility/RNG/projectile and collection ordering');

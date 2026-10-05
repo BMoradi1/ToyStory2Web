@@ -69,8 +69,9 @@ billboard, 0x60 the blend (0 translucent at alpha 0x40, 0x20 additive,
 
 ## Spawning
 
-The spawner refuses anything further than 800 x 256 game units from the
-camera target (`DAT_0052adc0`), or 400 for kinds 0x37, 0x43 and 0x50. It
+The spawner refuses anything at or beyond 800 x 256 game units from the
+camera target (`DAT_0052adc0`), or 1280 for kinds 0x37, 0x43 and 0x50.
+The extended squared threshold is `0x190000` (1280 squared). It
 takes the next slot round-robin, but skips a live record with `protect`
 set, settling for the protected one with the least life if it has gone all
 the way round. Position is copied, velocity halved, gravity quartered,
@@ -139,7 +140,7 @@ For each live record, in this order:
    sit it on the floor and add a ground mark. Otherwise add a ground mark
    anyway (the list at `DAT_0054f098`, 47 slots: x, floor y, z, width — the
    drop shadows `FUN_00445720` draws).
-6. Cull: further than 400 x 256 game units from the camera target, life 0
+6. Cull: further than 1280 x 256 game units from the camera target, life 0
    and death code 0. A record with neither `keep` nor `drawn` dies: the
    drawer sets `drawn` each frame it draws the record and skips one with
    life 0 or sprite 0.

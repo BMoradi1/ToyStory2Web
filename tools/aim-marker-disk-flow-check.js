@@ -89,7 +89,7 @@
   window.dispatchEvent(new KeyboardEvent('keyup',{code:'KeyE',key:'e'}));
   if(!ts2.aimView.lock.locked)throw Error('E did not acquire a real creature '+JSON.stringify(ts2.aimView));
   const target=ts2.aimView.lock.target;
-  if(ts2.effects.aimMarker?.sprite!==23||ts2.effects.aimMarker.r!==255)throw Error('retail locked marker missing');
+  if(ts2.effects.aimMarker?.sprite!==23||ts2.effects.aimMarker.r!==255)throw Error('retail locked marker missing '+JSON.stringify({aim:ts2.aimView,marker:ts2.effects.aimMarker,target:ts2.creatures.find(c=>c.slot===target)}));
   ts2.tickGame({cameraRight:true},5);
   if(ts2.aimView.lock.target!==target)throw Error('held E cycled repeatedly');
   ts2.openMenu();const frozenLock=JSON.stringify(ts2.aimView);

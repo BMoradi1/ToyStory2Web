@@ -7,6 +7,21 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-05 — Shared particle distance correction
+
+The complete browser baseline (94/97 passing) exposed a lock marker that
+vanished while its target was still in lock range. Native `0040fae0` uses
+strict squared spawn bounds of 640000 for ordinary kinds and `0x190000`
+for kinds 55, 67 and 80; `00410f40` removes live records only above
+`0x190000`. The latter value is 1280 squared, not 400 squared. Corrected
+both the extended spawn radius and shared live removal radius, preserving
+the original camera-marker-before-effects update order.
+
+The new installed-template probe covers all three axes, ordinary/extended
+spawn boundaries, inclusive live boundaries and a persistent distant marker.
+The aim-marker/disk browser flow now passes. All 124 simulation probes and
+the production build pass; the complete browser rerun is in progress.
+
 ## 2026-10-05 — Repeatable complete simulation regression command
 
 Added `npm run audit:sim`, which discovers all `tools/*-probe.ts`, gives each
@@ -1444,16 +1459,16 @@ not evidence for untested interactions.
 | 1 | Andy's House | Tin intro/fight/reward integration tested; hover wobble/sparks partial. Cot support/drop puzzle, chair stomp, pushables, five room-2 machinery cycles, growing doorway, falling hatch, lowering rope, attic bounce, biased seesaw and room-4 environmental hazards implemented. | Remaining numbered props and platforms; all five token routes. |
 | 2 | Andy's Neighborhood | Lawnmower/kite, seesaws, both push bridges, extending rope, stomp structure/launcher, pump/floating prop, water/mud, burrowing soldier rescue and leaves implemented with focused browser checks. | Full natural race/token routes, remaining collision inventory and underwater presentation. |
 | 3 | Bombs Away (internal 6) | `stepBossFight` exists. | Complete boss attacks, damage windows, defeat, token and replay. |
-| 4 | Construction Yard | DRILL combat/reward and ZGCAR implemented; trailer paint, outdoor lids, debris, stomp bridge, four shuttles, four linked tilting lifts, stomp-selected lift, distant crate, proximity scenery/portals and mud movement/effects implemented. | Review collision IDs 13/25; natural traversal/token routes. |
-| 5 | Alleys and Gullies | BOX/BPLANE launch cycle, boat cannon, clown combat/reward, eight lane platforms, two seesaws, spring, bubble machine, moving bubble attachments, push-triggered bridge, distant crates, water, rain and timed environmental emitters implemented. | Underwater camera treatment and remaining scenery/effects and natural pole/zip-line routes. |
+| 4 | Construction Yard | DRILL combat/reward and ZGCAR implemented; trailer paint, outdoor lids, debris, stomp bridge, four shuttles, four linked tilting lifts, stomp-selected lift, distant crate, proximity scenery/portals, mud movement/effects and timed collect-five retry implemented. | Review collision IDs 13/25; natural traversal/token routes. |
+| 5 | Alleys and Gullies | BOX/BPLANE launch cycle, boat cannon, clown combat/reward, eight lane platforms, two seesaws, spring, bubble machine, moving bubble attachments, push-triggered bridge, distant crates, water, rain, timed environmental emitters and timed collect-five retry implemented. | Underwater camera treatment and remaining scenery/effects and natural pole/zip-line routes. |
 | 6 | Slime Time (internal 3) | Dedicated slime controller exists. | Full encounter, arena effects, reward and replay comparison. |
-| 7 | Al's Toy Barn | Dinosaur breath/combat/defeat/reward and BOX/BPLANE launch cycle implemented. | Original moving-collision calls and full token routes. |
+| 7 | Al's Toy Barn | Dinosaur/BOX-BPLANE combat, six scripted platforms, rotors, boarding rides, springs, far crates, hoops, fetch barrier/retry, timed cannon and path emitters implemented with focused probes/browser checks. | Remaining collision IDs 16/17/19/20, natural token routes and timing comparison. |
 | 8 | Al's Space Land | Buggy fight/reward/projectile model, ZGCAR, claw puzzle/token delivery, saucer course/deadline/retry, hanging toys/display motion/sounds, paired laser hazards, projectile volley, ball-pit movement/scatter, rocking-block trigger/far crates and visibility-gated Mother texture animation implemented. | Remaining ambient/projectile effects and natural route validation. |
 | 9 | Toy Barn Encounter | Dedicated pod controller, beam tests and ZGCAR hook implemented. | Full natural fight/summon cycles and reward traversal. |
 | 10 | Elevator Hop | Wire puzzle, compound lifts, GUNSP combat/reward, fan switches/rotation/airflow implemented. | Other ambient effects, exact collision/script/force timing and full-level traversal. |
-| 11 | Al's Penthouse | Shared enemies, GUNSL combat/reward, hazards, water/floats, train routing and underwater movement implemented. | Underwater camera colour/warp, light/texture helpers and collision 24 review. |
+| 11 | Al's Penthouse | Shared enemies, GUNSL combat/reward, hazards, water/floats, train routing, underwater movement and room-constrained timed collect-five retry implemented. | Underwater camera colour/warp, light/texture helpers and collision 24 review. |
 | 12 | The Evil Emperor Zurg | Entrance, attacks, recovery, defeat, save bit and victory/movie handoff implemented in `zurg-boss.ts`. Installed-data and focused browser checks pass. | Unassisted combat, original-versus-port camera/render comparison and detail-dependent particles. |
-| 13 | Airport Infiltration | Five authored transport routes, two near/far seesaws, shared gun/buzzard handlers and Prospector fight/reward implemented. | Exact collision/script timing comparison and full-level traversal; distinct from Tarmac. |
+| 13 | Airport Infiltration | Five authored transport routes, two near/far seesaws, five stomp-only springs, timed collect-five retry, shared gun/buzzard handlers and Prospector fight/reward implemented. | Exact collision/script timing comparison and full-level traversal; distinct from Tarmac. |
 | 14 | Tarmac Trouble | Plane motion/collision, wheels/fans, ground/climbing passengers, wheel hazards and helicopter hover/rotors/token motion and light puzzle/lowering implemented and tested. Slinky timed-path rules and retry implemented. Near/far scenery sway, rain/plane sound, rain particles and lightning/thunder restored. Blacksmith recovery, defeat and delayed reward implemented; axe throws, hit flashing and bar expiry implemented. Shared gun enemy and buzzard handlers implemented. | Other ambient effects and natural token routes; pitch/roll attachment on other movers. |
 | 15 | Final Showdown | Stage and three fighter controllers implemented in `finale.ts`; rendered entrance, attacks, rescue, completion save, ending/credits and replay tested. | Natural combat completion; exact roll/framing and voice/pitch parity. |
 

@@ -180,11 +180,11 @@ export const EFFECT = {
   recordSize: 0x3c,
   /** Spawn only within this many 256-game-unit steps of the camera target. */
   spawnRange: 800,
-  /** ...except these three kinds, which use the shorter range. */
-  nearRange: 400,
-  nearKinds: [0x37, 0x43, 0x50] as readonly number[],
+  /** ...except these three kinds, which use the extended range (squared threshold 0x190000). */
+  extendedRange: 1280,
+  extendedKinds: [0x37, 0x43, 0x50] as readonly number[],
   /** A live record further than this from the camera target dies. */
-  cullRange: 400,
+  cullRange: 1280,
   /** An effect with `hurts` touches Buzz within its width plus this, in level units. */
   hitSlack: 100,
   /** Buzz's centre for that test is this far above his position, game units. */

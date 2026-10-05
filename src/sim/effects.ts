@@ -199,7 +199,7 @@ export function spawnEffect(
   const template = sim.templates[kind];
   if (!template) return null;
 
-  const range = EFFECT.nearKinds.includes(kind) ? EFFECT.nearRange : EFFECT.spawnRange;
+  const range = EFFECT.extendedKinds.includes(kind) ? EFFECT.extendedRange : EFFECT.spawnRange;
   const dx = (world.cameraX - x) >> 8, dy = (world.cameraY - y) >> 8, dz = (world.cameraZ - z) >> 8;
   if (dx * dx + dy * dy + dz * dz >= range * range) return null;
 

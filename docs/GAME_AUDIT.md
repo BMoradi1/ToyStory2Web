@@ -37,6 +37,8 @@ regression and the production build pass.
   damping, empty-platform restoring force and ±224-angle bounce limits.
 - Installed probes cover all routes, synchronization, linked positions,
   ledge pause, tilt limits/landing force, airborne independence and restore.
+  All four platforms also pass 180-tick physical landing/ride simulations
+  using the real player solver without injected contacts or mover state.
   Browser checks all routes, flag changes, all 28 artwork transforms/cable
   scales, pause, restart and exit. Production build passes.
 - Natural traversal, edge/crush response and retail visual comparison remain

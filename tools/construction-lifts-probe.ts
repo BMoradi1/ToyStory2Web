@@ -3,7 +3,7 @@ import {readFileSync} from 'node:fs';
 import {parseDat} from '../src/formats/dat.ts';
 import {parseAll} from '../src/formats/all.ts';
 import {buildCollisionWorld,parseCollision} from '../src/formats/collision.ts';
-import {createPlayer} from '../src/sim/player.ts';
+import {createPlayer,createRuntime,groundFromCollision,stepPlayer,NO_INPUT} from '../src/sim/player.ts';
 import {createConstructionLifts,moveConstructionLifts,stepConstructionLifts,restoreConstructionLifts} from '../src/sim/construction-lifts.ts';
 const dat=parseDat(readFileSync('Toy Story 2/data/level04/level.dat'));
 const w=buildCollisionWorld(parseCollision(parseAll(readFileSync('Toy Story 2/data/level04/TERRAIN.ALL'))).groups);
@@ -47,4 +47,22 @@ p.x=tilt.position.x-32768;tilt.rockSpeed=0;stepConstructionLifts(s,p,()=>0);asse
 p.onGround=false;p.contacts=[];tilt.angle=400;tilt.rockSpeed=0;stepConstructionLifts(s,p,()=>0);assert.equal(tilt.rockSpeed,-1);
 
 restoreConstructionLifts(s,w);for(const l of s.lifts)for(const h of [l.hull,l.partner])for(const base of h.polys)assert.deepEqual(w.polys[base.index]!.vertices,base.vertices);
-console.log('PASS: four installed lift routes, synchronized flags/waits, linked supports, collision motion, ledge pause, player tilt limits, airborne isolation and restore');
+// Land and ride all four installed hulls through the actual collision solver.
+// No contacts, angular state or velocity are injected in these runs.
+for(let id=0;id<4;id++){
+ const world=buildCollisionWorld(parseCollision(parseAll(readFileSync('Toy Story 2/data/level04/TERRAIN.ALL'))).groups);
+ const lifts=createConstructionLifts(dat,world,readFileSync('Toy Story 2/toy2.exe')),lift=lifts.lifts[id]!;
+ const floor=world.groups[lift.hull.groupIndex]!.polys.map(i=>world.polys[i]!).find(p=>p.normal.y<-.9)!;
+ const at=floor.vertices.reduce((a,v)=>({x:a.x+v.x/3,y:a.y+v.y/3,z:a.z+v.z/3}),{x:0,y:0,z:0});
+ const rider=createPlayer(at.x*32,at.y*32-2000,at.z*32),runtime=createRuntime(),ground=groundFromCollision(world);
+ ground.beforeMove=()=>moveConstructionLifts(lifts,world,rider);
+ let contactTicks=0,maxRoll=0;
+ for(let t=0;t<180;t++){
+  stepPlayer(rider,NO_INPUT,runtime,ground,0);stepConstructionLifts(lifts,rider,()=>0);
+  if(rider.onGround&&rider.contacts.some(c=>c.group===lift.hull.groupIndex))contactTicks++;
+  maxRoll=Math.max(maxRoll,Math.abs(lift.angle));
+ }
+ assert(contactTicks>100,`lift ${id}: rider lost moving floor prematurely (${contactTicks} contacts)`);
+ assert(maxRoll>0&&maxRoll<=896,`lift ${id}: physical passenger did not produce bounded tilt`);
+}
+console.log('PASS: four installed lift routes, synchronized flags/waits, linked supports, collision motion, ledge pause, player tilt limits, airborne isolation, restore and all four physical landing/ride simulations');

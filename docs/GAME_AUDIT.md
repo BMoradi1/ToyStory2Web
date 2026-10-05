@@ -7,6 +7,27 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-05 — Broader original-behavior inventory
+
+The static audit previously recognized only four mutation functions and
+`FUN_address` calls. It now accepts both Ghidra dump headers and both
+`FUN_address` / `func_0xaddress` call spellings, covering nine collision and
+render mutation families. Missing or failed level-local helper decompiles
+are explicit report entries instead of silently disappearing.
+
+Added `tools/ghidra/DumpLevelMotion.java`, which seeds all 15 level ticks and
+recursively exports their direct level-local helpers. A real executable run
+visited 45 functions; all 15 scenes parse with no unavailable helpers in this
+bounded graph. The regenerated inventory contains 315 unique mutation targets
+versus 171 in the earlier snapshot. This is broader evidence, not 144 newly
+proven bugs: conditions, indirect calls, initializers and port parity still
+require review. No executable dumps or assets are committed.
+
+Synthetic probes cover dump/call formats, all nine operations, recursion cycles,
+computed IDs, missing/failed helpers and the graph boundary. The actual Ghidra
+export, JSON and Markdown generation, no-decompile inventory and production
+build pass. Both complete regression commands are now in the audit checklist.
+
 ## 2026-10-05 — Footsteps and animation audio
 
 Connected previously discarded animation sound events to positional audio,
@@ -1480,19 +1501,22 @@ covering reset and level exit. Keep copyrighted executable dumps outside git.
 ```sh
 node --import tsx tools/game-audit.ts 'Toy Story 2'
 node --import tsx tools/game-audit.ts 'Toy Story 2' --json
-# Optional original-motion inventory from tools/ghidra/DumpAll.java output:
+# Optional original-motion inventory from tools/ghidra/DumpLevelMotion.java output:
 node --import tsx tools/game-audit.ts 'Toy Story 2' --decompile /tmp/toy2_levels.c
+npm run audit:sim -- --report /tmp/toystory-sim.json
 npm run build
 # With the development server running:
+npm run audit:browser -- --output /tmp/toystory-browser
 node --import tsx tools/browser-shot.ts 'Toy Story 2' /tmp/game-audit.png --eval-file tools/game-audit-flow-check.js
 ```
 
 The install is read-only. JSON output supports comparing inventories as handlers
 are added. Parse failures produce a nonzero exit. Missing handlers remain an
 explicit backlog, not a scene-load failure. Optional decompile mode follows
-available level-local helpers and lists position/rotation mutation call sites;
-it cannot establish branch reachability, timing or indirect calls. Seed all 15
-tick addresses listed in the JSON when preparing a Ghidra dump.
+available level-local helpers and lists nine mutation families, including scale
+and collision enable/disable; unavailable helpers are explicitly reported.
+It cannot establish branch reachability, timing or indirect calls. The focused
+`DumpLevelMotion.java` exporter seeds all 15 ticks and discovers direct helpers.
 
 [Generated inventory](GAME_INVENTORY.md) records this pass, including original
 function addresses, creature slots, unmapped collision IDs and task controllers.

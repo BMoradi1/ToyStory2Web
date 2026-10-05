@@ -68,3 +68,24 @@ Notes:
   PE loads fine.
 - Decompiled text is derived from the copyrighted executables. Keep the dumps
   in scratch space; do not commit them.
+
+### Repeatable level-motion inventory
+
+After importing the PC executable, `DumpLevelMotion.java` defines all 15
+level ticks, follows direct calls within the known level-local range
+`00417000..0042ffff`, and writes a focused decompile. It accepts one output
+path; keep that file in scratch space. Unlike a full dump, this does not
+require manually discovering or seeding each helper first.
+
+    $HL $SCR/pc toy2 -process toy2.exe -noanalysis \
+        -scriptPath $SCRIPTS \
+        -postScript DumpLevelMotion.java $SCR/toy2_motion.c
+    node --import tsx tools/game-audit.ts "$GAME" --decompile $SCR/toy2_motion.c
+
+The inventory accepts both `//// FUNC ... @ ... size=...` and focused
+`// address` headers, and both `FUN_address` and `func_0xaddress` calls.
+Nine mutation families cover collision position, rotation, velocities and
+enable/disable, plus render position, rotation and scale/visibility.
+Unavailable or failed level helpers appear explicitly in the report. This
+is a bounded static graph of tick code; initializers, indirect calls and
+actual gameplay parity still need review.

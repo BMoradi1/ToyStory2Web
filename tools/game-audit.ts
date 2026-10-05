@@ -1,3 +1,4 @@
+import {parseNativeFunctions,inspectNativeMotion} from './lib/native-motion.ts';
 import {GUNSLINGER_HANDLERS} from '../src/sim/gunslinger.ts';
 /** Reproducible inventory of all playable scenes. Reads an install; ships no assets.
  * node --import tsx tools/game-audit.ts 'Toy Story 2' [--json] [--decompile /tmp/toy2_levels.c]
@@ -26,41 +27,8 @@ const originalTicks = ['', '00417680', '004190c0', '0041aa10', '0041c640',
   '0041e880', '00420060', '00421340', '00423200', '00424490', '00425f60',
   '0042a130', '0042b3a0', '0042ca60', '0042e790', '0042fc50'];
 const decompileArg = process.argv.indexOf('--decompile');
-if (decompileArg >= 0 && !process.argv[decompileArg + 1]) throw Error('--decompile requires a DumpAll.java output file');
-const originalFunctions = new Map<string, string>();
-if (decompileArg >= 0) {
-  const source = readFileSync(process.argv[decompileArg + 1]!, 'utf8');
-  for (const block of source.split(/^\/\/\/\/ FUNC /m).slice(1)) {
-    const address = /^[^\n]+ @ ([0-9a-f]+)/.exec(block)?.[1];
-    if (address) originalFunctions.set(address, block.slice(block.indexOf('\n')));
-  }
-}
-const mutations = new Map([
-  ['00487900', 'collision translation velocity'], ['00487970', 'collision angular velocity'],
-  ['004ccc70', 'render rotation'], ['004cce30', 'render position'],
-]);
-function originalMotion(tick: string) {
-  if (decompileArg < 0) return undefined;
-  if (!originalFunctions.has(tick)) throw Error(`Original tick ${tick} missing from decompile; define it before dumping`);
-  const visited = new Set<string>();
-  const found: { caller: string; operation: string; object: string }[] = [];
-  const inspect = (address: string) => {
-    if (visited.has(address)) return;
-    visited.add(address);
-    for (const call of (originalFunctions.get(address) ?? '').matchAll(/FUN_([0-9a-f]{8})\(\s*([^,\n)]*)/g)) {
-      const target = call[1]!;
-      if (mutations.has(target)) {
-        const arg = call[2]!.trim();
-        found.push({ caller: address, operation: mutations.get(target)!,
-          object: /^(0x[\da-f]+|\d+)$/.test(arg) ? String(Number(arg)) : 'computed: inspect original' });
-      }
-      // Follow level-local helpers only; this is deliberately not a whole-program call graph.
-      if (target >= '00417000' && target < '00430000') inspect(target);
-    }
-  };
-  inspect(tick);
-  return [...new Map(found.map(f => [JSON.stringify(f), f])).values()];
-}
+if (decompileArg >= 0 && !process.argv[decompileArg + 1]) throw Error('--decompile requires a DumpLevelMotion.java or DumpAll.java output file');
+const originalFunctions=decompileArg>=0?parseNativeFunctions(readFileSync(process.argv[decompileArg+1]!, 'utf8')):null;
 const exe = readFileSync(`${root}/toy2.exe`);
 const names = parseCreatureNames(readFileSync(`${root}/data/creatures.cfg`, 'latin1'));
 const strings = readFrontStrings(exe, exeString);
@@ -87,10 +55,12 @@ const rows = LEVEL_SELECT_ORDER.map((level, index) => {
     const dynamic = collision.groups.filter(g => g.dynamic && g.objectNumber >= 0).map(g => g.objectNumber);
     const tasks = LEVEL_TASKS[level];
     const paths = (id: number) => dat.paths.find(p => p.id === id)?.points ?? [];
+    const motion=originalFunctions?inspectNativeMotion(originalFunctions,originalTicks[level]!):undefined;
     return {
       position: index + 1, level, name: strings.levelNames[index + 1], scene,
       originalTick: originalTicks[level],
-      originalMotion: originalMotion(originalTicks[level]!),
+      originalMotion: motion?.calls,
+      originalMotionMissingHelpers: motion?.missingHelpers,
       parsed: true, objects: dat.objects.length, creatures: creatures.length, typesWithoutSharedDefinition,
       handlers, unimplementedHandlers: handlers.filter(h => !h.implemented),
       dynamicCollision: [...new Set(dynamic)],
@@ -112,7 +82,7 @@ if (process.argv.includes('--json')) console.log(JSON.stringify(rows, null, 2));
 else {
   console.log('# Generated game coverage inventory\n');
   console.log('Regenerate: `node --import tsx tools/game-audit.ts "Toy Story 2"`. Internal level IDs 3 and 6 differ from play order.\n');
-  if (decompileArg >= 0) console.log('This snapshot includes `--decompile /path/to/toy2_levels.c` motion evidence. Supply a fresh local DumpAll.java output to regenerate that section.\n');
+  if (decompileArg >= 0) console.log('This snapshot includes `--decompile /path/to/toy2_levels.c` motion evidence. Supply fresh local DumpLevelMotion.java or DumpAll.java output to regenerate that section.\n');
   console.log('This is static inventory, **not** a completed playthrough or parity score. Missing handlers are absent shared or known level-owned dispatch entries; level controllers may own related behavior. Unmapped dynamic collision objects need review, not automatic movement. Mapped controllers currently include push blocks, the Tarmac plane, Elevator Hop lifts/barrier, and Airport routes.\n');
   console.log('| Play order | Level | Scene parses | Creature hooks absent | Dynamic collision IDs without mapped controller | Poles / zip lines | Boss controller |');
   console.log('|---|---|---|---|---|---|---|');
@@ -128,9 +98,10 @@ else {
   for (const r of rows) console.log(`- ${r.name}: tasks ${r.taskFeatures?.join(', ') || 'none'}; ${r.pushBlocks ?? 0} push blocks; motion ${r.motionControllers?.join(', ') || 'none mapped'}; stomp-driven object IDs ${r.stompObjectIds?.join(', ') || 'none'}.`);
   if (decompileArg >= 0) {
     console.log('\n## Original motion call inventory\n');
-    console.log('Static call sites from each tick and available level-local helpers. Conditions, speed, timing, indirect calls and port parity require review. Zero calls does not prove no movement.\n');
+    console.log('Unique mutation targets from each tick and available level-local helpers: collision position/rotation/velocities/enable/disable and render position/rotation/scale. Initializers, conditions, speed, timing, indirect calls and port parity require separate review. Unavailable helpers are reported. Zero calls does not prove no movement.\n');
     for (const r of rows) {
       console.log(`\n### ${r.name} (tick ${r.originalTick})\n`);
+      if(r.originalMotionMissingHelpers?.length)console.log(`- Unavailable level-local helpers: ${r.originalMotionMissingHelpers.join(', ')}. This tick's inventory is incomplete.`);
       for (const m of r.originalMotion ?? []) console.log(`- ${m.caller}: ${m.operation}; object ${m.object}.`);
     }
   }

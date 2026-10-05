@@ -2,7 +2,7 @@
 
 Regenerate: `node --import tsx tools/game-audit.ts "Toy Story 2"`. Internal level IDs 3 and 6 differ from play order.
 
-The original motion call inventory below is retained from the prior decompile snapshot; regenerate that section with `--decompile /path/to/toy2_levels.c`.
+This snapshot includes `--decompile /path/to/toy2_levels.c` motion evidence. Supply fresh local DumpLevelMotion.java or DumpAll.java output to regenerate that section.
 
 This is static inventory, **not** a completed playthrough or parity score. Missing handlers are absent shared or known level-owned dispatch entries; level controllers may own related behavior. Unmapped dynamic collision objects need review, not automatic movement. Mapped controllers currently include push blocks, the Tarmac plane, Elevator Hop lifts/barrier, and Airport routes.
 
@@ -58,19 +58,29 @@ This is static inventory, **not** a completed playthrough or parity score. Missi
 
 ## Original motion call inventory
 
-Static call sites from each tick and available level-local helpers. Conditions, speed, timing, indirect calls and port parity require review. Zero calls does not prove no movement.
+Unique mutation targets from each tick and available level-local helpers: collision position/rotation/velocities/enable/disable and render position/rotation/scale. Initializers, conditions, speed, timing, indirect calls and port parity require separate review. Unavailable helpers are reported. Zero calls does not prove no movement.
 
 
 ### andy's house (tick 00417680)
 
+- 00417680: collision disable; object 9.
+- 00417680: collision enable; object 9.
 - 00417680: render position; object 19.
 - 00417680: render position; object 20.
 - 00417680: render position; object 26.
+- 00417680: collision enable; object 14.
+- 00417680: collision disable; object 1.
 - 00417680: render rotation; object 4.
+- 00417680: collision enable; object 8.
+- 00417680: render scale / visibility; object 21.
 - 00417680: render position; object 6.
 - 00417510: render rotation; object computed: inspect original.
+- 00417510: render scale / visibility; object computed: inspect original.
+- 00417380: collision disable; object computed: inspect original.
+- 00417380: collision enable; object computed: inspect original.
 - 00417380: render rotation; object computed: inspect original.
 - 00417380: render position; object computed: inspect original.
+- 00417680: render scale / visibility; object 23.
 - 00417680: render rotation; object 23.
 - 00417680: render rotation; object 14.
 
@@ -78,16 +88,35 @@ Static call sites from each tick and available level-local helpers. Conditions, 
 
 - 004190c0: render position; object 6.
 - 004190c0: collision translation velocity; object 7.
+- 004190c0: render scale / visibility; object 6.
+- 004190c0: render scale / visibility; object 7.
+- 004190c0: render scale / visibility; object 32.
+- 004190c0: render scale / visibility; object 34.
+- 004190c0: render scale / visibility; object 33.
+- 004190c0: render scale / visibility; object 35.
+- 004190c0: render scale / visibility; object 2.
+- 004190c0: render scale / visibility; object 3.
 - 004190c0: render rotation; object 4.
 - 004190c0: render rotation; object 8.
 - 004190c0: render rotation; object 9.
 - 004190c0: render rotation; object 10.
+- 004190c0: collision enable; object 5.
+- 004190c0: collision disable; object 6.
+- 004190c0: render scale / visibility; object 21.
+- 004190c0: render scale / visibility; object 4.
 - 004190c0: render rotation; object 21.
+- 004190c0: collision disable; object 2.
+- 004190c0: collision disable; object 3.
+- 004190c0: collision enable; object 4.
 - 004190c0: render rotation; object 5.
 - 004190c0: render rotation; object 11.
+- 004190c0: collision disable; object 11.
+- 004190c0: collision enable; object 12.
 - 004190c0: render rotation; object 30.
 - 004190c0: render rotation; object 31.
+- 004190c0: render scale / visibility; object 20.
 - 004190c0: render position; object 25.
+- 004190c0: render scale / visibility; object 27.
 
 ### bombs away (tick 00420060)
 
@@ -95,8 +124,11 @@ Static call sites from each tick and available level-local helpers. Conditions, 
 ### construction yard (tick 0041c640)
 
 - 0041c640: render position; object 13.
+- 0041c640: render scale / visibility; object 63.
+- 0041c640: render scale / visibility; object 64.
 - 0041c640: collision translation velocity; object 1.
 - 0041c640: collision translation velocity; object 7.
+- 0041bee0: render scale / visibility; object computed: inspect original.
 - 0041bee0: render position; object computed: inspect original.
 - 0041bee0: collision translation velocity; object computed: inspect original.
 - 0041c640: collision translation velocity; object 2.
@@ -109,8 +141,14 @@ Static call sites from each tick and available level-local helpers. Conditions, 
 - 0041c640: render rotation; object 28.
 - 0041c640: render rotation; object 29.
 - 0041bc20: render position; object computed: inspect original.
+- 0041bc20: collision enable; object computed: inspect original.
+- 0041bc20: collision disable; object computed: inspect original.
+- 0041c640: render scale / visibility; object computed: inspect original.
+- 0041c640: collision rotation; object 22.
 - 0041c640: render rotation; object 65.
+- 0041c640: collision rotation; object 23.
 - 0041c640: render rotation; object 66.
+- 0041c640: collision rotation; object 24.
 - 0041c640: render rotation; object 67.
 - 0041c640: render position; object 68.
 - 0041c640: collision translation velocity; object 21.
@@ -119,6 +157,7 @@ Static call sites from each tick and available level-local helpers. Conditions, 
 
 - 0041e880: collision translation velocity; object 5.
 - 0041e880: collision translation velocity; object 8.
+- 0041e150: collision position; object computed: inspect original.
 - 0041e150: collision translation velocity; object computed: inspect original.
 - 0041e150: render position; object computed: inspect original.
 - 0041e880: collision translation velocity; object 7.
@@ -129,42 +168,65 @@ Static call sites from each tick and available level-local helpers. Conditions, 
 - 0041e880: collision translation velocity; object 12.
 - 0041e880: render rotation; object 5.
 - 0041e880: render rotation; object 7.
+- 0041e880: collision position; object 4.
+- 0041e880: render scale / visibility; object 16.
+- 0041e880: render scale / visibility; object 17.
 - 0041e880: render rotation; object 10.
 - 0041e880: render rotation; object 11.
 - 0041e880: render rotation; object 20.
+- 0041e880: render scale / visibility; object 12.
+- 0041e880: render scale / visibility; object 13.
 - 0041e880: render position; object 12.
 - 0041e880: render position; object 13.
 - 0041e880: render rotation; object 12.
 - 0041e880: render rotation; object 13.
+- 0041e880: render scale / visibility; object 18.
+- 0041e880: render scale / visibility; object 19.
 - 0041e880: render position; object 18.
 - 0041e880: render position; object 19.
 - 0041e880: render rotation; object 18.
 - 0041e880: render rotation; object 19.
 - 0041e880: render position; object 15.
+- 0041e880: collision disable; object 18.
+- 0041e880: collision enable; object 19.
+- 0041e880: render scale / visibility; object 41.
+- 0041e880: render scale / visibility; object 42.
 - 0041e880: render rotation; object 2.
 - 0041e880: render rotation; object 3.
 - 0041e880: render position; object 1.
 - 0041e880: render position; object 52.
+- 0041e880: render scale / visibility; object computed: inspect original.
+- 0041e880: render scale / visibility; object 39.
+- 0041e880: render scale / visibility; object 40.
+- 0041e880: render scale / visibility; object 44.
+- 0041e880: render scale / visibility; object 49.
+- 0041e880: render scale / visibility; object 50.
 
 ### slime time (tick 0041aa10)
 
 - 0041aa10: render rotation; object 0.
+- 0041aa10: render scale / visibility; object 50.
 - 0041aa10: render position; object 0.
 
 ### al's toy barn (tick 00421340)
 
+- 00421340: collision rotation; object 15.
 - 00421340: render rotation; object 33.
 - 00421340: collision translation velocity; object 0.
 - 00421340: collision angular velocity; object 0.
 - 00421340: render position; object 0.
 - 00421340: render position; object 1.
 - 00421340: render rotation; object 1.
+- 00421340: collision enable; object computed: inspect original.
+- 00421340: collision disable; object 18.
 - 00421340: render position; object 31.
 - 00421340: collision angular velocity; object 1.
 - 00421340: collision angular velocity; object 2.
 - 00421340: collision angular velocity; object 3.
 - 00421340: collision angular velocity; object 4.
+- 00421340: render scale / visibility; object 30.
 - 00421340: render rotation; object 2.
+- 00421340: render scale / visibility; object 3.
 - 00421340: render position; object 21.
 - 00421340: render position; object 22.
 - 00421340: render position; object 11.
@@ -178,6 +240,10 @@ Static call sites from each tick and available level-local helpers. Conditions, 
 ### al's space land (tick 00423200)
 
 - 00423200: render rotation; object computed: inspect original.
+- 00423200: render scale / visibility; object 13.
+- 00423200: render scale / visibility; object 14.
+- 00423200: render scale / visibility; object 11.
+- 00423200: render scale / visibility; object 10.
 - 00423200: render position; object 10.
 - 00423200: render position; object 11.
 - 00423200: render position; object 12.
@@ -203,38 +269,83 @@ Static call sites from each tick and available level-local helpers. Conditions, 
 - 00425f60: render rotation; object 4.
 - 00425f60: render rotation; object 6.
 - 00425f60: render rotation; object 5.
+- 00425f60: collision disable; object 19.
+- 00425f60: render scale / visibility; object 70.
+- 00425f60: render scale / visibility; object 71.
+- 00425f60: render scale / visibility; object 72.
+- 00425f60: render scale / visibility; object 73.
+- 00425f60: render scale / visibility; object 78.
+- 00425f60: render scale / visibility; object 79.
+- 00425f60: render scale / visibility; object 80.
+- 00425f60: render scale / visibility; object 81.
 - 00425680: render position; object 18.
 - 00425680: render position; object 19.
 - 00425680: render position; object 20.
 - 00425f60: collision translation velocity; object computed: inspect original.
 - 00425f60: collision translation velocity; object 1.
+- 00425f60: collision position; object computed: inspect original.
 - 00425f60: render position; object computed: inspect original.
+- 00425f60: render scale / visibility; object 75.
 - 00425f60: collision translation velocity; object 0.
+- 00425f60: render scale / visibility; object 77.
+- 00425f60: collision rotation; object 4.
 - 00425f60: render rotation; object 17.
+- 00425f60: collision rotation; object 5.
 - 00425f60: render rotation; object 16.
 - 00425f60: render position; object 110.
 
 ### al's penthouse (tick 0042a130)
 
+- 0042a130: collision disable; object 26.
+- 0042a130: collision enable; object 25.
+- 0042a130: collision disable; object 25.
+- 0042a130: collision enable; object 26.
+- 00428c80: render scale / visibility; object 43.
+- 00428c80: render scale / visibility; object 20.
+- 00428c80: render scale / visibility; object 21.
+- 00428c80: render scale / visibility; object 22.
+- 00428c80: render scale / visibility; object 23.
 - 0042a130: render position; object computed: inspect original.
+- 00428890: render scale / visibility; object computed: inspect original.
 - 00428890: render rotation; object computed: inspect original.
+- 00428890: render scale / visibility; object 36.
+- 00428890: render scale / visibility; object 37.
+- 00428890: render scale / visibility; object 31.
+- 00428890: render scale / visibility; object 32.
+- 00428890: render scale / visibility; object 33.
+- 00428890: render scale / visibility; object 34.
+- 00428890: render scale / visibility; object 35.
+- 004292c0: collision position; object computed: inspect original.
+- 004292c0: render scale / visibility; object computed: inspect original.
+- 00429910: render scale / visibility; object computed: inspect original.
 - 00429910: render position; object computed: inspect original.
+- 00429910: collision position; object computed: inspect original.
+- 00428ba0: render scale / visibility; object computed: inspect original.
+- 0042a130: render scale / visibility; object 91.
 - 004293d0: render position; object 44.
+- 004293d0: render scale / visibility; object computed: inspect original.
+- 004293d0: render scale / visibility; object 44.
 - 00429fb0: render position; object computed: inspect original.
 - 00429fb0: collision translation velocity; object computed: inspect original.
 - 00428e70: render rotation; object 38.
 - 00428e70: render rotation; object 80.
 - 00428e70: render position; object 38.
 - 00428e70: render position; object 80.
+- 00428e70: collision enable; object 27.
 - 0042a130: render position; object 49.
+- 0042a130: render scale / visibility; object computed: inspect original.
+- 0042a130: render scale / visibility; object 49.
 - 004295b0: render rotation; object computed: inspect original.
+- 0042a130: collision rotation; object 23.
 - 0042a130: render rotation; object 25.
 - 0042a130: render rotation; object 26.
+- 0042a130: collision rotation; object 22.
 - 0042a130: render rotation; object 28.
 - 0042a130: render rotation; object 90.
 - 0042a130: render position; object 87.
 - 0042a130: render position; object 64.
 - 00429800: render rotation; object computed: inspect original.
+- 00429800: render scale / visibility; object computed: inspect original.
 
 ### the evil emperor zurg (tick 0042b3a0)
 
@@ -245,8 +356,10 @@ Static call sites from each tick and available level-local helpers. Conditions, 
 - 0042ca60: render rotation; object 1.
 - 0042ca60: render rotation; object 2.
 - 0042ca60: render rotation; object 3.
+- 0042c3e0: collision position; object computed: inspect original.
 - 0042c3e0: collision translation velocity; object computed: inspect original.
 - 0042c3e0: render position; object computed: inspect original.
+- 0042ca60: render scale / visibility; object computed: inspect original.
 
 ### tarmac trouble (tick 0042e790)
 
@@ -257,6 +370,37 @@ Static call sites from each tick and available level-local helpers. Conditions, 
 - 0042dcb0: render rotation; object 10.
 - 0042dcb0: render rotation; object 11.
 - 0042dcb0: render rotation; object 13.
+- 0042d710: render scale / visibility; object 81.
+- 0042d710: render scale / visibility; object computed: inspect original.
+- 0042d710: render scale / visibility; object 82.
+- 0042db10: render scale / visibility; object 76.
+- 0042db10: render scale / visibility; object 77.
+- 0042db10: render scale / visibility; object 78.
+- 0042db10: render scale / visibility; object 79.
+- 0042db10: render scale / visibility; object 80.
+- 0042db10: render scale / visibility; object 81.
+- 0042db10: render scale / visibility; object 82.
+- 0042db10: render scale / visibility; object 83.
+- 0042d8b0: render scale / visibility; object 35.
+- 0042d8b0: render scale / visibility; object 43.
+- 0042d8b0: render scale / visibility; object computed: inspect original.
+- 0042d8b0: render scale / visibility; object 36.
+- 0042d8b0: render scale / visibility; object 44.
+- 0042d8b0: render scale / visibility; object 37.
+- 0042d8b0: render scale / visibility; object 51.
+- 0042d8b0: render scale / visibility; object 52.
+- 0042d8b0: render scale / visibility; object 38.
+- 0042d9c0: render scale / visibility; object 31.
+- 0042d9c0: render scale / visibility; object 39.
+- 0042d9c0: render scale / visibility; object computed: inspect original.
+- 0042d9c0: render scale / visibility; object 32.
+- 0042d9c0: render scale / visibility; object 40.
+- 0042d9c0: render scale / visibility; object 33.
+- 0042d9c0: render scale / visibility; object 41.
+- 0042d9c0: render scale / visibility; object 42.
+- 0042d9c0: render scale / visibility; object 34.
+- 0042db10: render scale / visibility; object computed: inspect original.
+- 0042e790: render scale / visibility; object computed: inspect original.
 - 0042e1d0: render position; object 3.
 - 0042e1d0: render position; object 48.
 - 0042e1d0: render position; object 66.
@@ -276,7 +420,3 @@ Static call sites from each tick and available level-local helpers. Conditions, 
 - 0042fc50: render position; object 1.
 - 0042fc50: render position; object 3.
 - 0042fc50: render position; object 4.
-
-Platform coverage update (2026-10-01): levels 10 and 13 now use `level-platforms.ts`; original-motion evidence above is preserved. Controller mapping does not imply complete parity; see `GAME_AUDIT.md`.
-
-Platform follow-up: random waits, ledge pauses, truck reversal, spring/exhaust and lift feedback now implemented; mapping is unchanged. See the interaction probes and audit for verification limits.

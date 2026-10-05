@@ -7,6 +7,26 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-05 — Andy's doorway and falling hatch
+
+Restored 00417680's strict doorway trigger, grounded-grace requirement,
+8-then-64 growth sequence and collision-8 activation. Artwork 21 starts with
+zero X scale; 004ccff0 moves artwork 22 about its parent without scaling the
+child's mesh. Push block 3's tipping/falling state enables collision 14,
+disables its own collision 1, and drives artwork 4's pitch up to 512. Ordinary
+sliding does not trigger it. Collision 8/14 start disabled as in 004171d0.
+
+Added persistent collision enable state: a disabled hull can still translate
+or rotate without re-entering the spatial index. This is needed while the
+hatch continues falling. Installed probes verify strict trigger boundaries,
+growth, child placement, both falling triggers, real collision swaps,
+translation/rotation while disabled, idempotent enable and reset. Browser
+checks pass the doorway trigger and rendered growth, an actual push-to-fall
+hatch, pitch, pause/restart/exit. The doorway check positions Buzz with the
+grounded-grace counter set; it does not establish natural route traversal.
+Push-block and Tarmac-plane collision regressions and the production build
+pass. All fifteen scenes pass selector entry, simulation and exit cleanup.
+
 ## 2026-10-05 — Andy's House room-2 machinery
 
 Restored the five proximity-gated cycles in 00417510/00417380, driven by
@@ -1209,7 +1229,7 @@ not evidence for untested interactions.
 
 | Play order | Level | Confirmed gaps / implementation evidence | Next behavior comparison |
 |---|---|---|---|
-| 1 | Andy's House | Tin intro/fight/reward integration tested; hover wobble/sparks partial. Chair stomp, pushables and five room-2 machinery cycles with collision gates/effects implemented. | Remaining numbered props and platforms; all five token routes. |
+| 1 | Andy's House | Tin intro/fight/reward integration tested; hover wobble/sparks partial. Chair stomp, pushables, five room-2 machinery cycles, growing doorway and falling hatch with collision gates/effects implemented. | Remaining numbered props and platforms; all five token routes. |
 | 2 | Andy's Neighborhood | Lawnmower effects, kite flight/combat/reward and ZGCAR hook implemented. | Moving scenery and natural race/token routes. |
 | 3 | Bombs Away (internal 6) | `stepBossFight` exists. | Complete boss attacks, damage windows, defeat, token and replay. |
 | 4 | Construction Yard | DRILL combat/reward and ZGCAR implemented; trailer paint, outdoor lids, debris, stomp bridge, four shuttles, four linked tilting lifts, stomp-selected lift, distant crate, proximity scenery/portals and mud movement/effects implemented. | Review collision IDs 13/25; natural traversal/token routes. |

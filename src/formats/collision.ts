@@ -267,7 +267,7 @@ export interface CollisionWorld {
    * level code moves a dynamic group by (docs/FORMATS.md); `polys` lets a
    * whole group be moved, which is what a pushed block does.
    */
-  groups: { position?: Vec3; surface?: number; objectNumber: number; dynamic: boolean; polys: number[] }[];
+  groups: { enabled?: boolean; position?: Vec3; surface?: number; objectNumber: number; dynamic: boolean; polys: number[] }[];
   /** Poly indices by grid cell, keyed `gx,gz`. */
   cells: Map<string, number[]>;
   cellSize: number;
@@ -383,7 +383,8 @@ export function transformCollisionGroup(
     // Pitch and roll can turn a floor into a wall, or a wall into a floor.
     // Ground queries use this cache in addition to the transformed normal.
     poly.walkable = poly.normal.y <= -Math.cos((60 * Math.PI) / 180);
-    forEachCell(world, poly.vertices.map(v => v.x), poly.vertices.map(v => v.z), cell => cell.push(base.index), true);
+    if (world.groups[rest.groupIndex]!.enabled !== false)
+      forEachCell(world, poly.vertices.map(v => v.x), poly.vertices.map(v => v.z), cell => cell.push(base.index), true);
     for (const v of poly.vertices) world.lowestY = Math.max(world.lowestY, v.y);
   }
 }
@@ -412,8 +413,23 @@ export function moveCollisionGroup(
     });
     for (const v of poly.vertices) { v.x += dx; v.y += dy; v.z += dz; }
     const xs = poly.vertices.map((v) => v.x), zs = poly.vertices.map((v) => v.z);
-    forEachCell(world, xs, zs, (cell) => cell.push(index), true);
+    if (group.enabled !== false) forEachCell(world, xs, zs, (cell) => cell.push(index), true);
     for (const v of poly.vertices) if (v.y > world.lowestY) world.lowestY = v.y;
+  }
+}
+
+/** Native 004878a0/004878d0: visibility survives subsequent hull movement. */
+export function setCollisionGroupEnabled(world: CollisionWorld, groupIndex: number, enabled: boolean): void {
+  const group = world.groups[groupIndex];
+  if (!group || (group.enabled !== false) === enabled) return;
+  group.enabled = enabled;
+  for (const index of group.polys) {
+    const poly = world.polys[index]!;
+    forEachCell(world, poly.vertices.map(v => v.x), poly.vertices.map(v => v.z), cell => {
+      const at = cell.indexOf(index);
+      if (enabled && at < 0) cell.push(index);
+      else if (!enabled && at >= 0) cell.splice(at, 1);
+    }, enabled);
   }
 }
 

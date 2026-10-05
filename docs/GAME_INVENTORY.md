@@ -8,7 +8,7 @@ This is static inventory, **not** a completed playthrough or parity score. Missi
 
 | Play order | Level | Scene parses | Creature hooks absent | Dynamic collision IDs without mapped controller | Poles / zip lines | Boss controller |
 |---|---|---|---|---|---|---|
-| 1 (1) | andy's house | yes | — | 8, 9, 10, 14, 15 | 14 / 2 | taunt/reward hooks; inspect per-creature combat |
+| 1 (1) | andy's house | yes | — | 9, 10, 15 | 14 / 2 | taunt/reward hooks; inspect per-creature combat |
 | 2 (2) | andy's neighborhood | yes | — | 0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 12 | 6 / 5 | neighborhood.ts + tasks.ts reward |
 | 3 (6) | bombs away | yes | — | — | 0 / 0 | tasks.ts stepBossFight |
 | 4 (4) | construction yard | yes | — | 13, 25 | 5 / 0 | drill.ts + tasks.ts reward |
@@ -40,7 +40,7 @@ This is static inventory, **not** a completed playthrough or parity score. Missi
 
 ## Existing task and prop coverage (implementation presence only)
 
-- andy's house: tasks potato, hamm, boss, race, hintNpc, findFive; 7 push blocks; motion andy-machinery.ts (five room-2 cycles, collision gates 12/13); stomp-driven object IDs 23.
+- andy's house: tasks potato, hamm, boss, race, hintNpc, findFive; 7 push blocks; motion andy-machinery.ts (five room-2 cycles, collision gates 12/13), andy-gates.ts (growing doorway and falling hatch, collision 8/14/1); stomp-driven object IDs 23.
 - andy's neighborhood: tasks boss, race, hamm, hintNpc, findFive; 2 push blocks; motion none mapped; stomp-driven object IDs none.
 - bombs away: tasks bossFight; 0 push blocks; motion none mapped; stomp-driven object IDs none.
 - construction yard: tasks boss, challenge, potato, hamm, hintNpc, findFive; 2 push blocks; motion paint-cans.ts (outdoor lids, collision 10/11/12), construction-bridge.ts (stomp drawbridge, collision 26), construction-shuttles.ts (scripted shuttles, collision 14–17), construction-lifts.ts (linked tilting lifts, collision 1–4/6–9), construction-scenery.ts (proximity artwork/portals), construction-stomp-lift.ts (switches 22–24 and lift 21); stomp-driven object IDs 33, 34, 35, 48, 49, 50, 51, 52, 53.

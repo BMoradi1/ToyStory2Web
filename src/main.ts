@@ -4735,7 +4735,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   playerLight=stepPointLights(pointLights,player);
   poseAnimation(Math.hypot(held.moveX, held.moveY) > 0);
   if(effects&&camera)stepWaterEffects(waterEffects,effects,effectWorld(),player,playerAnim?.footfallMask??0,
-    standingSurface(player,currentCollisionWorld),cut.ticks>0?cut.eye.y:camera.y,event=>playEvent(event,event===0x5f?undefined:player!));
+    standingSurface(player,currentCollisionWorld),cut.ticks>0?cut.eye.y:camera.y,(event,at)=>playEvent(event,event===0x5f?undefined:at??player!));
   updateWaterCamera();
   drawCoins();
   drawEffects();
@@ -4760,6 +4760,7 @@ function poseAnimation(hasInput: boolean): void {
   const speed = Math.hypot(player.vx, player.vz);
   const { slotA, slotB, frame, frameB } = stepAnimation(playerAnim, player, hasInput, speed);
 
+  for(const event of playerAnim.sounds)playEvent(event,player);
   const anm = playerModel.anm;
   const primary = anm.animations[slotA];
   if (!primary) return;

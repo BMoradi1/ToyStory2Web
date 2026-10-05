@@ -1136,3 +1136,22 @@ Simulation-driven waves freeze under pause and remain through viewport
 resize; emerging, restart and scene exit restore unit scale. The renderer's
 separate underwater colour registers and exact original pause/menu phase
 alignment remain unaudited; this change restores camera distortion only.
+
+## Surface footfalls and sound
+
+The dry surface branch of `004a2d80` treats an individual animation footfall
+as a burst: surface 0 emits four kind-30/mode-4 particles and carries residue
+kind 31; surface 4 emits kind 28/mode 2 and carries kind 32; surface 5 emits
+four kind-29/mode-4 particles and carries kind 33. All seed the shared
+180-tick residue record. Footprints on surfaces -1/13 use its carried kind.
+
+The final sound selector (`004a3680..004a3741`) requires ground grace and a
+left/right footfall bit. Surface -1 forces event 0. Other surfaces select
+1/3/4/5 for residue kinds 31/32/33/54, otherwise 0. Audio comes from the
+foot offset multiplied by eight; particle offsets use the unmultiplied value.
+The right foot wins when both bits are present. `poseAnimation` also forwards
+its script sound opcodes, including event 0x43 during pole climbing.
+
+This covers footfalls; the native skid, idle and landing surface-particle
+branches remain separate work. The installed probe checks all 15 audio banks
+and source files; the browser flow uses actual walk and pole-climb input.

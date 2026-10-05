@@ -852,5 +852,6 @@ The level also starts muddy footprints when leaving the active region.
 `construction-mud-probe.ts` covers region/depth boundaries, speed/sinking,
 escape jumps, installed effects and footprint expiry; the browser regression
 checks movement, particles, sound, pause/restart/exit. Native model clipping
-at the liquid surface and the full surface-dependent footstep-sound selector
-remain separate presentation work.
+at the liquid surface remains separate presentation work. Surface-dependent
+footstep sounds and pole-climbing animation audio are now connected; see
+`docs/EFFECTS.md`, "Surface footfalls and sound".

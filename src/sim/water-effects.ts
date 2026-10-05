@@ -1,21 +1,27 @@
 /** Water and mud presentation from 004a2d80. Shared effects use the live level water plane. */
 import type {PlayerState} from './player.ts';
 import {spawnChild,type EffectSim,type EffectWorld} from './effects.ts';
-import {sin,cos} from './trig.ts';
+import {footOffset,playerFootstep} from './player-footsteps.ts';
 export function createWaterEffects(y=0){return {previousY:y,dripTicks:0,dripKind:32,previousKind:0};}
 export type WaterEffects=ReturnType<typeof createWaterEffects>;
 export function stepWaterEffects(state:WaterEffects,sim:EffectSim,world:EffectWorld,p:PlayerState,
-  footfallMask:number,surface:number,cameraY:number,sound:(event:number)=>void){
+  footfallMask:number,surface:number,cameraY:number,sound:(event:number,at?:{x:number;y:number;z:number})=>void){
+  const stepSound=()=>{const step=playerFootstep(p,footfallMask,surface,state);if(step)sound(step.event,step.at);};
   // Type 3 uses the level's coloured ball scatter, never splash/ripple/drips.
-  if(world.waterKind===3){state.previousY=p.y;state.previousKind=3;state.dripTicks=0;return;}
+  if(world.waterKind===3){state.previousY=p.y;state.previousKind=3;state.dripTicks=0;stepSound();return;}
   const water=world.waterY,wet=water!==null&&p.y>water,mud=world.waterKind===2;
   // Construction's level script also marks muddy feet on leaving its volume.
   if(water===null&&state.previousKind===2){state.dripTicks=180;state.dripKind=54;}
+  // Authored dry surface rows seed the same residue record as liquid exits.
+  // This restores animation footfalls; skid/idle/landing emitters are separate.
+  if(!wet&&p.coyote>0&&(footfallMask===1||footfallMask===2)&&(surface===0||surface===4||surface===5)){
+    const offset=footOffset(p.yaw,footfallMask);
+    state.dripTicks=180;state.dripKind=surface===0?31:surface===4?32:33;
+    for(let i=0;i<(surface===4?1:4);i++)spawnChild(sim,world,p.x+offset.x,p.y,p.z+offset.z,surface===0?30:surface===4?28:29,surface===4?2:4);
+  }
   // Dry footsteps can leave liquid marks for 180 ticks after emerging.
   if(!wet&&state.dripTicks>0&&p.coyote>0&&footfallMask>0&&footfallMask<4&&(surface===-1||surface===13)){
-    const right=(footfallMask&2)!==0;
-    const x=(right?sin(p.yaw-1024):cos(p.yaw))>>4;
-    const z=(right?sin(p.yaw):sin(p.yaw-2048))>>4;
+    const {x,z}=footOffset(p.yaw,footfallMask);
     const e=spawnChild(sim,world,p.x+x,p.y,p.z+z,state.dripKind,2);
     if(e)e.rotation=(-p.yaw-1024)&4095;
   }
@@ -49,5 +55,6 @@ export function stepWaterEffects(state:WaterEffects,sim:EffectSim,world:EffectWo
       if(sim.gate.four){const off=(sim.rand.byte()-128)*256;sim.rand.byte();spawnChild(sim,world,p.x+off,water,p.z+off,57,2);}
     }
   }
+  stepSound();
   state.previousY=p.y;state.previousKind=water===null?0:mud?2:1;
 }

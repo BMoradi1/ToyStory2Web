@@ -7,6 +7,25 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-05 — Footsteps and animation audio
+
+Connected previously discarded animation sound events to positional audio,
+restoring event 0x43 during real pole climbing. Ordinary walk footfalls now
+raise event 0, while native surface/residue selection uses events 1/3/4/5.
+The sound source follows the authored left/right foot offset; both bits use
+one right-foot event. Airborne frames and frames without footfalls are silent.
+Untagged surface -1 always selects the normal sound, even with wet residue.
+
+Surface rows 0/4/5 now emit their footfall particles and seed the existing
+180-tick residue record, including later footprints on eligible floors.
+Installed checks cover all 15 sound banks and files, particles, residue,
+positions, expiry and real animation cadence. The browser uses real walking
+and pole-climbing inputs and checks pause/restart. Both moving-rope flows,
+Penthouse water, shared water camera and Construction mud flows pass.
+The complete simulation suite passes 126/126; production build passes.
+Skid/idle/landing surface particle triggers and natural surface routes remain
+open; this change restores the footfall branch rather than claiming them.
+
 ## 2026-10-05 — Shared underwater camera distortion
 
 Restored the original PC view-space scale waves for Neighborhood, Alley and

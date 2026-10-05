@@ -7,6 +7,26 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-05 — Neighborhood pump, floating prop and liquids
+
+Restored the surface-11 pump and artwork 6/7 from 00418e50/004190c0:
+landing/grace triggers, 30-tick cooldown, smoothed compression, inflation and
+launch cue. The inflated prop drifts with decaying horizontal speed and native
+water-plane buoyancy, creates kind-57 splashes / event 0x39 on downward
+crossings, and moves collision 7 with standing/ledge passenger support. Artwork
+preserves the native pre-motion position and normalized authored scale.
+
+Neighborhood now supplies the native X boundary selecting water Y 0x4400 /
+type 1 versus mud Y 0x1800 / type 2. Room-1 water artwork hides below the
+camera's water plane, and page-5 texture phase only advances in camera room 1.
+The installed probe uses actual pump landings/jumps and checks inflation,
+motion, rider carry, splashes, boundary/visibility and reset. Browser checks
+pass real pumping, rendered inflation/motion, splash effects/audio, liquid
+states, pause/restart/exit. Build, texture pixel/bounds probes, all-fifteen-level
+entry/exit and the Neighborhood bridges/rope/structure browser regressions pass.
+Browser routes use positioned approaches; full natural traversal and exact
+underwater camera presentation remain open.
+
 ## 2026-10-05 — Neighborhood collapsing structure and launcher
 
 Restored the surface-8/9 stomp supports and surface-10 launcher from

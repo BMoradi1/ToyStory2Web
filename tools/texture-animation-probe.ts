@@ -19,7 +19,7 @@ for(const level of [1,2,3,5,8,11,13]){
  const textures=new Map(parseNgn(readFileSync(`${root}/data/${name}/${level>10?'level1':'level'}.ngn`)).map(t=>[t.slot,decodeBmp(t.bmp)]));
  const s=createTextureAnimation();let changes=0;
  for(let i=0;i<256;i++){
-  const scrolls=stepTextureAnimation(s,level,6,level===8?4:5);assert.equal(scrolls.length,1);
+  const scrolls=stepTextureAnimation(s,level,level===2?1:6,level===8?4:5);assert.equal(scrolls.length,1);
   for(const scroll of scrolls){
    const t=textures.get(scroll.page)!;assert(t,`level ${level} page ${scroll.page}`);
    const old=t.rgba.slice();assert(copyScrolledTexture({data:t.rgba,width:t.width,height:t.height},scroll),`valid bounds level ${level}`);
@@ -35,7 +35,7 @@ for(const level of [1,2,3,5,8,11,13]){
  if(level===1)assert(changes>1);
  console.log(`PASS level ${level}: authored texture bounds, scrolling and untouched surroundings (${changes} changed frames)`);
 }
-for(const [level,camera,player] of [[1,5,5],[11,6,4],[8,4,3]] as const){
+for(const [level,camera,player] of [[1,5,5],[2,2,1],[11,6,4],[8,4,3]] as const){
  const s=createTextureAnimation();for(let i=0;i<10;i++)assert.deepEqual(stepTextureAnimation(s,level,camera,player),[]);
  assert.equal(s.phase,0,'zone-gated phase holds');
 }

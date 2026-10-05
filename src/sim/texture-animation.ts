@@ -29,6 +29,7 @@ export function stepTextureAnimation(s:ReturnType<typeof createTextureAnimation>
       if(cameraZone!==6)return [];
       {const r=scroll(8,128,128,64,64,0,(sin(s.phase)>>11)&63,64,0);s.phase=(s.phase+32)&4095;return [r];}
     case 2:
+      if(cameraZone!==1)return [];
       {const r=scroll(5,128,192,64,64,0,(sin(s.phase)>>9)&63,64,0);s.phase=(s.phase+8)&4095;return [r];}
     case 3:
       {const r=scroll(24,0,64,64,64,0,s.phase,0,64);s.phase=(s.phase-1)&63;return [r];}

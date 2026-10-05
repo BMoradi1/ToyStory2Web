@@ -1,3 +1,4 @@
+import {NEIGHBORHOOD_PUMP_OBJECTS,neighborhoodLiquid,createNeighborhoodPump,moveNeighborhoodPump,stepNeighborhoodPump,restoreNeighborhoodPump,type NeighborhoodPump} from './sim/neighborhood-pump.ts';
 import {NEIGHBORHOOD_STRUCTURE_OBJECTS,createNeighborhoodStructure,stepNeighborhoodStructure,restoreNeighborhoodStructure,type NeighborhoodStructure} from './sim/neighborhood-structure.ts';
 import {NEIGHBORHOOD_ROPE_OBJECTS,createNeighborhoodRope,stepNeighborhoodRope,restoreNeighborhoodRope,type NeighborhoodRope} from './sim/neighborhood-rope.ts';
 import {NEIGHBORHOOD_BRIDGE_OBJECTS,createNeighborhoodBridges,stepNeighborhoodBridges,restoreNeighborhoodBridges,type NeighborhoodBridges} from './sim/neighborhood-bridges.ts';
@@ -382,6 +383,7 @@ async function showLevel(index: number): Promise<void> {
   andyMachinery = null;
   andyGates = null;
   andyCot = null;
+  neighborhoodPump = null;
   neighborhoodStructure = null;
   neighborhoodRope = null;
   andyRope = null;
@@ -510,7 +512,7 @@ async function showLevel(index: number): Promise<void> {
       }
       for(const id of seesawObjects(levelNumber(level.id)??0)){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
       if(levelNumber(level.id)===1)for(const id of [...ANDY_MACHINERY_OBJECTS,...ANDY_GATE_OBJECTS,...ANDY_COT_OBJECTS,ANDY_ROPE_OBJECT]){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
-      if(levelNumber(level.id)===2)for(const id of [...NEIGHBORHOOD_BRIDGE_OBJECTS,...NEIGHBORHOOD_ROPE_OBJECTS,...NEIGHBORHOOD_STRUCTURE_OBJECTS]){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
+      if(levelNumber(level.id)===2)for(const id of [...NEIGHBORHOOD_BRIDGE_OBJECTS,...NEIGHBORHOOD_ROPE_OBJECTS,...NEIGHBORHOOD_STRUCTURE_OBJECTS,...NEIGHBORHOOD_PUMP_OBJECTS]){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
       if(levelNumber(level.id)===5)for(const id of [...ALLEY_PLATFORM_OBJECTS,...ALLEY_SEESAW_OBJECTS,...ALLEY_BUBBLE_OBJECTS,...ALLEY_BRIDGE_OBJECTS,...ALLEY_WATER_OBJECTS]){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
       if(levelNumber(level.id)===7)for(const id of [...TOY_BARN_PLATFORM_OBJECTS,...TOY_BARN_ROTOR_OBJECTS,...TOY_BARN_SPRING_OBJECTS,...TOY_BARN_LAUNCH_OBJECTS,TOY_BARN_BARRIER_OBJECT,...TOY_BARN_CANNON_OBJECTS]){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
       if(levelNumber(level.id)===4)for(const id of [...PAINT_CAN_OBJECTS,...CONSTRUCTION_BRIDGE_OBJECTS,...CONSTRUCTION_SHUTTLE_OBJECTS,...CONSTRUCTION_LIFT_OBJECTS,...CONSTRUCTION_SCENERY_OBJECTS,...CONSTRUCTION_STOMP_LIFT_OBJECTS]){
@@ -845,6 +847,7 @@ async function open(dir: GameDir): Promise<void> {
       get paintCans() { return paintCans; },
       get seesaws() { return seesaws; },
       get andyEffects() { return andyEffects; },
+      get neighborhoodPump(){return neighborhoodPump;},
       get neighborhoodStructure(){return neighborhoodStructure;},
       get neighborhoodRope(){return neighborhoodRope;},
       get andyRope() { return andyRope; },
@@ -1443,6 +1446,7 @@ async function spawnPlayer(): Promise<void> {
   if(toyBarnLaunchPlatforms){restoreToyBarnLaunchPlatforms(toyBarnLaunchPlatforms,currentCollisionWorld);toyBarnLaunchPlatforms=null;}
   if(toyBarnRotors){restoreToyBarnRotors(toyBarnRotors,currentCollisionWorld);toyBarnRotors=null;}
   if(seesaws){restoreSeesaws(seesaws,currentCollisionWorld);seesaws=null;}
+  if(neighborhoodPump){restoreNeighborhoodPump(neighborhoodPump,currentCollisionWorld);neighborhoodPump=null;}
   if(neighborhoodStructure){restoreNeighborhoodStructure(neighborhoodStructure,currentCollisionWorld);neighborhoodStructure=null;}
   if(neighborhoodRope){restoreNeighborhoodRope(neighborhoodRope);neighborhoodRope=null;}
   if(andyRope){restoreAndyRope(andyRope);andyRope=null;}
@@ -1618,6 +1622,7 @@ async function spawnPlayer(): Promise<void> {
   }
   drawPushBlocks();
 
+  neighborhoodPump=level===2?createNeighborhoodPump(currentLevel.level,currentCollisionWorld):null;drawNeighborhoodPump();
   neighborhoodStructure=level===2?createNeighborhoodStructure(currentLevel.level,currentCollisionWorld):null;drawNeighborhoodStructure();
   neighborhoodBridges=level===2?createNeighborhoodBridges(currentLevel.level,currentCollisionWorld):null;drawNeighborhoodBridges();
   alleyBridge=level===5?createAlleyBridge(currentLevel.level,currentCollisionWorld):null;drawAlleyBridge();
@@ -1911,6 +1916,7 @@ function spawnCreatureEffects(): void {
 
 /** What the effect tick needs to know about the rest of the world. */
 function currentLiquidY():number|null{
+  if(neighborhoodPump&&player)return neighborhoodLiquid(player.x).y;
   if(alleyEffects&&player)return alleyWaterY(player.z);
   if(spaceBallPit&&player)return spaceBallPitY(player);
   return constructionScenery&&player?constructionMudY(player):penthouse?.water.y??null;
@@ -2889,6 +2895,10 @@ function drawSeesaws():void{
   if(!viewer||!seesaws)return;
   viewer.setObjectTransforms(new Map(seesaws.platforms.flatMap(r=>r.objects.map(o=>[o.index,{angles:o.angles}] as const))));
 }
+function drawNeighborhoodPump():void{
+  if(!viewer||!neighborhoodPump)return;
+  viewer.setObjectTransforms(new Map(neighborhoodPump.objects.map(o=>[o.index,{angles:o.angles,scale:o.scale,offset:[(o.position.x-o.rest.x)*GAME_TO_RENDER,-(o.position.y-o.rest.y)*GAME_TO_RENDER,-(o.position.z-o.rest.z)*GAME_TO_RENDER]}])));
+}
 function drawNeighborhoodStructure():void{
   if(!viewer||!neighborhoodStructure)return;
   viewer.setObjectTransforms(new Map(neighborhoodStructure.objects.map(o=>[o.index,{angles:o.angles,scale:o.scale}])));
@@ -3411,6 +3421,7 @@ function discardLevel(): void {
   andyMachinery = null;
   andyGates = null;
   andyCot = null;
+  neighborhoodPump = null;
   neighborhoodStructure = null;
   neighborhoodRope = null;
   andyRope = null;
@@ -3854,6 +3865,7 @@ let tarmacPlane: TarmacPlane | null = null;
 let levelPlatforms: LevelPlatforms | null = null;
 let seesaws:Seesaws|null=null;
 let andyEffects:AndyEffects|null=null;
+let neighborhoodPump:NeighborhoodPump|null=null;
 let neighborhoodStructure:NeighborhoodStructure|null=null;
 let neighborhoodRope:NeighborhoodRope|null=null;
 let andyRope:AndyRope|null=null;
@@ -4162,9 +4174,10 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   if(aimView.active) held={...held,moveX:0,moveY:0,jump:false,spin:false,cameraLeft:false,cameraRight:false};
   const playerGround = groundFromCollision(currentCollisionWorld, levelPoles, levelZipLines);
   playerGround.waterY = currentLiquidY();
-  playerGround.waterKind = constructionScenery?2:spaceBallPit?3:1;
+  playerGround.waterKind = neighborhoodPump?neighborhoodLiquid(player.x).kind:constructionScenery?2:spaceBallPit?3:1;
   playerGround.beforeMove = () => {
     tickPushBlocks(held);
+    if(neighborhoodPump)moveNeighborhoodPump(neighborhoodPump,currentCollisionWorld!,player!);
     if(constructionStompLift)moveConstructionStompLift(constructionStompLift,currentCollisionWorld!,player!);
     if(constructionLifts)moveConstructionLifts(constructionLifts,currentCollisionWorld!,player!);
     if(toyBarnCannon)moveToyBarnCannon(toyBarnCannon,currentCollisionWorld!,player!);
@@ -4316,6 +4329,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       projectile:(at,v,spin)=>spawnEffect(effects!,world,at.x,at.y,at.z,v.x,v.y,v.z,128,0,spin,12),
       child:(at,kind,mode)=>spawnChild(effects!,world,at.x,at.y,at.z,kind,mode),hurt:()=>applyCreatureTouch(0,2)});
   }
+  if(neighborhoodPump&&camera){stepNeighborhoodPump(neighborhoodPump,currentCollisionWorld,player,{cameraZone:zones.camera,cameraY:camera.y,guide:()=>spendGuide(guideSparkles,effects,3,true),sound:(id,at)=>playEvent(id,at),splash:at=>{if(effects)spawnChild(effects,effectWorld(),at.x,at.y,at.z,0x39,2);}});drawNeighborhoodPump();}
   if(neighborhoodStructure){
     stepNeighborhoodStructure(neighborhoodStructure,currentCollisionWorld,player,{guide:id=>spendGuide(guideSparkles,effects,id,true),sound:(id,at)=>playEvent(id,at),release:()=>{if(pushBlocks)pushBlocks.held=0;},refreshFloors:()=>{
       if(pickups)pickupFloor=pickups.items.map((item,i)=>item.id<0x30?(groundBelow(currentCollisionWorld!,item.x,item.y-10,item.z)?.y??item.y):pickupFloor[i]!);

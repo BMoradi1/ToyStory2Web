@@ -139,10 +139,11 @@ export interface TaskState {
   /** Power-up bits earned (`DAT_0052f2d8`). */
   powerUps: number;
   potatoChatter: number;
-  /** The collect-five challenge: 0 not offered, 1 running, 3 done. */
+  /** The collect-five challenge: 0 not offered, 1 dialogue, 2 running, 3 done. */
   challenge: number;
   /** What the item counter read when the challenge was accepted. */
   challengeFrom: number;
+  challengeClock: number;
   /** The race. */
   race: RaceState;
   laps: number;
@@ -180,7 +181,7 @@ export function createTasks(): TaskState {
   return {
     done: 0, hammChatter: 0, hintChatter: 0, hintIndex: -1,
     slime: null, pod:null, zurg:null, finale:null, prospector:null, gunslinger:null, clown:null, drill:null, dinosaur:null, kite:null, buggy:null,
-    boss: 0, bossGone: 0, saucer:createSpaceSaucer(), pathRun: 0, pathClock: 100, fetch: 0, fetchDone: 0, fetchClock: 100, slowTick: 0, potatoPart: 0, powerUps: 0, potatoChatter: 0, challenge: 0, challengeFrom: 0,
+    boss: 0, bossGone: 0, saucer:createSpaceSaucer(), pathRun: 0, pathClock: 100, fetch: 0, fetchDone: 0, fetchClock: 100, slowTick: 0, potatoPart: 0, powerUps: 0, potatoChatter: 0, challenge: 0, challengeFrom: 0, challengeClock: 100,
     bossPhase: 0, bossClock: 0, bossHurt: 0, smithFlash:false, smithBarTicks:0, bossHealthWas: -1, bossRamp: 0, bossSwing: 0,
     bossTaunt: 0, bossShout: 0, bossYaw: 0, bossFlip: 0, bossCut: 0,
     bossBeaten: false, levelWon: false,
@@ -501,6 +502,7 @@ export function stepTasks(
     level: number;
     /** Category-9 objects collected, for the challenge. */
     items: number;
+    challengeItems?: (enabled: boolean) => void;
     /** Bit per token slot already taken, for the timed runs. */
     tokens: number;
     /** `DAT_0052f38e`: most boss taunts will not fire while Buzz is airborne. */
@@ -679,32 +681,37 @@ export function stepTasks(
     }
   }
 
-  // --- the collect-five challenge, where a level has one instead of a race.
+  // Native collect-five tasks: accept, wait for dialogue, then return before expiry.
   const challenge = level.challenge;
-  if (challenge && !slotDone(tasks, challenge.slot)) {
+  if (challenge && !slotDone(tasks, challenge.slot) && tasks.challenge !== 3 && !world.talking) {
     const c = creatureAt(challenge.creature);
     if (c && tookTalk(c)) {
+      let text = challenge.hurryText, slot = -1, sound = challenge.hurrySound;
       if (tasks.challenge === 0) {
-        // Accepting it starts the count from wherever it stands.
         tasks.challenge = 1;
         tasks.challengeFrom = world.items;
-        return {
-          creature: challenge.creature, pathTag: challenge.pathTag, text: challenge.askText,
-          playerYaw: -1, creatureYaw: 0, slot: -1,
-        };
+        world.challengeItems?.(true);
+        text = challenge.askText; sound = challenge.askSound;
+      } else if (world.items - tasks.challengeFrom >= challenge.needed) {
+        tasks.challenge = 3;
+        text = challenge.doneText; slot = challenge.slot; sound = challenge.doneSound;
       }
-      const got = world.items - tasks.challengeFrom;
-      if (got < challenge.needed) {
-        return {
-          creature: challenge.creature, pathTag: challenge.pathTag, text: challenge.hurryText,
-          playerYaw: -1, creatureYaw: 0, slot: -1,
-        };
+      if (sound !== undefined) world.sound?.(sound, c);
+      return {creature: challenge.creature, pathTag: challenge.pathTag, text,
+        playerYaw: -1, creatureYaw: 0, slot};
+    }
+    if (tasks.challenge === 1) {
+      tasks.challenge = 2;
+      tasks.challengeClock = challenge.clock;
+    }
+    if (tasks.challenge === 2) {
+      if (challenge.cameraZones && !challenge.cameraZones.includes(world.cameraZone)) tasks.challengeClock = 99;
+      if (slow) tasks.challengeClock--;
+      if (tasks.challengeClock < 100) {
+        tasks.challengeClock = 100;
+        tasks.challenge = 0;
+        world.challengeItems?.(false);
       }
-      tasks.challenge = 3;
-      return {
-        creature: challenge.creature, pathTag: challenge.pathTag, text: challenge.doneText,
-        playerYaw: -1, creatureYaw: 0, slot: challenge.slot,
-      };
     }
   }
 

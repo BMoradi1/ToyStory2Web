@@ -122,7 +122,7 @@ import { readDioramaLists, type DioramaLists } from './front/diorama.ts';
 import { SAVE, LEVEL_SELECT_ORDER, selectIndexOf, tokenCount } from './formats/save-file.ts';
 import { MUSIC, MUSIC_SLIDER_MAX, MUSIC_TRACKS, MUSIC_VOLUME_CURVE, MusicPlayer, trackForLevel } from './audio/music.ts';
 import {
-  PICKUP, createPickups, pickupObjects, PickupKind, revealToken, hideToken, stepPickups, type PickupState,
+  PICKUP, createPickups, setChallengeItems, pickupObjects, PickupKind, revealToken, hideToken, stepPickups, type PickupState,
 } from './sim/pickups.ts';
 import {
   COIN_DRAW, SPRITE, SPRITE_SHEET, readSpriteTable, type SpriteHeader,
@@ -639,6 +639,8 @@ async function open(dir: GameDir): Promise<void> {
       get pickups() {
         return pickups ? {
           total: pickups.items.length, taken: pickups.taken, coins: pickups.coins,
+          itemsFound: pickups.itemsFound,
+          challengeItems: pickups.items.filter(i => i.kind === PickupKind.Kind9).map(i => ({id:i.id,x:i.x,y:i.y,z:i.z,enabled:i.enabled,collected:i.collected})),
           reappearing:{index:pickups.reappearIndex,ticks:pickups.reappearTicks},
           health: pickups.health, lives: pickups.lives, tokens: pickups.tokens,
           tokenItems: pickups.items.filter(i => i.tokenSlot >= 0).map(i => ({
@@ -919,7 +921,7 @@ async function open(dir: GameDir): Promise<void> {
           slowTick: tasks.slowTick, pathRun: tasks.pathRun, pathClock: tasks.pathClock,
           race: tasks.race, laps: tasks.laps, quadrant: tasks.raceQuadrant,
           carNode: tasks.carNode, carLaps: tasks.carLaps,
-          checkpoint: tasks.checkpoint, challenge: tasks.challenge, blocked: tasks.raceBlocked,
+          checkpoint: tasks.checkpoint, challenge: tasks.challenge, challengeClock: tasks.challengeClock, challengeFrom: tasks.challengeFrom, blocked: tasks.raceBlocked,
         } : null;
       },
       get talk() {
@@ -2255,9 +2257,10 @@ function hudReadout(level: number): HudReadout {
     else if (toyBarnCannon&&toyBarnCannon.timer>0) clock=toyBarnCannon.clock;
     else if (tasks.fetch === 2) clock = tasks.fetchClock;
     else if (tasks.pathRun === 2) clock = tasks.pathClock;
+    else if (tasks.challenge === 2) clock = tasks.challengeClock;
   }
   const challenge = LEVEL_TASKS[level]?.challenge;
-  const collected = tasks && challenge && tasks.challenge === 1
+  const collected = tasks && challenge && (tasks.challenge === 1 || tasks.challenge === 2)
     ? Math.min(5, (pickups?.itemsFound ?? 0) - tasks.challengeFrom)
     : -1;
   return {
@@ -4341,6 +4344,9 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
           coyote: player.coyote,
           jumpState: player.jumpState,
           standingSurface: standingSurface(player, currentCollisionWorld),
+          challengeItems: enabled => {
+            if (pickups) { setChallengeItems(pickups, level, enabled); drawPickups(); }
+          },
           hideToken: (slot) => {
             if (!pickups) return;
             hideToken(pickups, slot);

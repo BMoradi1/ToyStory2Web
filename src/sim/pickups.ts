@@ -37,7 +37,7 @@
  * in game units and is converted at the test.
  */
 import { objectPolyCount, type DatLevel } from '../formats/dat.ts';
-import { firstPickupId, TOKEN_LISTS } from './level-data.ts';
+import { firstPickupId, TOKEN_LISTS, LEVEL_TASKS } from './level-data.ts';
 import { GAME_UNITS_PER_LEVEL_UNIT } from './player-constants.ts';
 import type { PlayerState } from './player.ts';
 
@@ -170,6 +170,7 @@ export function createPickups(dat: DatLevel, level: number): PickupState {
     });
   }
 
+  const challenge = LEVEL_TASKS[level]?.challenge;
   const tokens = TOKEN_LISTS[level];
   const first = firstPickupId(level);
   for (let id = first; id < dat.objectIds.length; id++) {
@@ -184,7 +185,7 @@ export function createPickups(dat: DatLevel, level: number): PickupState {
       x: placement.position.x, y: placement.position.y, z: placement.position.z,
       id, kind, reach: placement.param >> 3,
       objectIndex: placement.objectIndex, tokenSlot: slot,
-      enabled: slot < 0 && !spare, collected: false,
+      enabled: slot < 0 && !spare && !(challenge && id >= challenge.firstItem && id < challenge.firstItem + challenge.needed), collected: false,
     });
   }
 
@@ -314,4 +315,15 @@ export function stepPickups(state: PickupState, p: PlayerState, dt = 1): PickupE
 /** Player-space centre of the reach sphere, for tools and debugging. Game units. */
 export function pickupCentre(p: PlayerState): { x: number; y: number; z: number } {
   return { x: p.x, y: p.y - PICKUP.centreAbove * S, z: p.z };
+}
+
+/** Native task scripts hide all five on failure and restore every item on retry. */
+export function setChallengeItems(state: PickupState, level: number, enabled: boolean): void {
+  const challenge = LEVEL_TASKS[level]?.challenge;
+  if (!challenge) return;
+  for (const item of state.items) {
+    if (item.id < challenge.firstItem || item.id >= challenge.firstItem + challenge.needed) continue;
+    item.enabled = enabled;
+    if (enabled) item.collected = false;
+  }
 }

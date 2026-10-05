@@ -7,6 +7,26 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-05 — All four timed collect-five challenges
+
+Construction Yard, Alleys and Gullies, Al's Penthouse and Airport Infiltration
+now hide their five category-9 items until acceptance. Dialogue closes before
+the countdown starts; native clock values are 150/130/127/160, with failure
+strictly below 100. Penthouse also fails outside camera rooms 1/4/8. Failure
+hides the items, retry restores all five, and collecting the fifth still
+requires returning to the giver before expiry. Restored the offer/completion
+sound events and Penthouse's hurry cue, and connected the shared HUD clock.
+Completed challenges cannot issue another reward while its reveal is pending.
+
+`collect-five-probe.ts` checks all four installed sets through real pickup
+collision, initial hiding, dialogue delay, full timeout including the zero
+boundary, partial failure/retry, Penthouse's room rule and one-shot reward.
+`collect-five-flow-check.js` passes actual NPC/item contacts, timeout, retry,
+reward reveal, pause, restart and exit across all four worlds. Contacts use
+protected teleports; this is not a natural timed-route playthrough. The shared
+task divider still uses its existing level-local 64-tick phase rather than
+the original global divider phase. Sources: 0041c190/0041e880/0042a130/0042ca60.
+
 ## 2026-10-05 — Shared rain and Alley weather
 
 Extracted the existing native `0044ed90` drop pool into `rain.ts` and reused
@@ -29,7 +49,7 @@ Connected `0041e880`'s water heights to player physics and shared liquid
 effects: 0x10000 normally, 0x70000 strictly beyond Z 0xf329f. This restores
 swimming gravity, entry splashes, ripples and bubbles through existing shared
 controllers. Artwork 39/40/44/49/50 hides below the camera's water plane and
-returns above it. Underwater camera tint/warp and Alley rain remain open.
+returns above it. Underwater camera tint/warp remains open; Alley rain is covered above.
 
 Restored paired path-14 projectiles: advance two nodes before emission, use
 the next point for velocity, force lifetime 128, then wait 20 ticks (21 ticks

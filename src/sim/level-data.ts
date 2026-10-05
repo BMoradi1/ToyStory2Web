@@ -513,6 +513,9 @@ export interface LevelTasks {
     creature: number; pathTag: number;
     askText: number; hurryText: number; doneText: number;
     needed: number; slot: number;
+    clock: number; firstItem: number;
+    cameraZones?: readonly number[];
+    askSound: number; doneSound: number; hurrySound?: number;
   };
   /** The find-five owner: their two lines and the slot the second one reveals. */
   findFive?: {
@@ -621,7 +624,7 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
         grounded: true, yMax: -0x9bfc5, nearBoss: 300,
       },
     },
-    challenge: { creature: 0x1a, pathTag: 0x1f, askText: 0x4f1710, hurryText: 0x4f178c, doneText: 0x4f17c0, needed: 5, slot: 2 },
+    challenge: { creature: 0x1a, pathTag: 0x1f, askText: 0x4f1710, hurryText: 0x4f178c, doneText: 0x4f17c0, needed: 5, slot: 2, clock: 150, firstItem: 110, askSound: 0xb6, doneSound: 0xb7 },
     potato: { creature: 0x15, pathTag: 0x1e, askText: 0x4f1818, thanksText: 0x4f18a0, explainText: 0x4f192c, playerYaw: 0x440, creatureYaw: 0xc40 },
     hamm: { creature: 0x14, pathTag: 0x1d, playerYaw: 0xe10, creatureYaw: 0x6e0, slot: 0 },
     hintNpc: {
@@ -643,7 +646,7 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
         grounded: true, zone: 2,
       },
     },
-    challenge: { creature: 0x12, pathTag: 0x0e, askText: 0x4f1e3c, hurryText: 0x4f1eb0, doneText: 0x4f1ed4, needed: 5, slot: 2 },
+    challenge: { creature: 0x12, pathTag: 0x0e, askText: 0x4f1e3c, hurryText: 0x4f1eb0, doneText: 0x4f1ed4, needed: 5, slot: 2, clock: 130, firstItem: 97, askSound: 0xb6, doneSound: 0xb7 },
     hamm: { creature: 0x14, pathTag: 0xf, playerYaw: -1, creatureYaw: 0x0, slot: 0 },
     hintNpc: {
       creature: 0x22, pathTag: 0x14,
@@ -755,7 +758,7 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
         box: { xMin: -728526, xMax: -659150, zMin: -241532, zMax: -177452 },
       },
     },
-    challenge: { creature: 2, pathTag: 0x12, askText: 0x4f3948, hurryText: 0x4f39c0, doneText: 0x4f39ec, needed: 5, slot: 2 },
+    challenge: { creature: 2, pathTag: 0x12, askText: 0x4f3948, hurryText: 0x4f39c0, doneText: 0x4f39ec, needed: 5, slot: 2, clock: 127, firstItem: 101, cameraZones: [1,4,8], askSound: 0x91, doneSound: 0x91, hurrySound: 0x91 },
     hamm: { creature: 0x0, pathTag: 0xf, playerYaw: -1, creatureYaw: 0x0, slot: 0 },
     hintNpc: {
       creature: 0xc, pathTag: 0x14,
@@ -777,7 +780,7 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
         grounded: true, yMax: -0x3660e, nearBoss: 300,
       },
     },
-    challenge: { creature: 5, pathTag: 0x1e, askText: 0x4f40b4, hurryText: 0x4f4124, doneText: 0x4f414c, needed: 5, slot: 2 },
+    challenge: { creature: 5, pathTag: 0x1e, askText: 0x4f40b4, hurryText: 0x4f4124, doneText: 0x4f414c, needed: 5, slot: 2, clock: 160, firstItem: 56, askSound: 0xb6, doneSound: 0xb7 },
     potato: { creature: 8, pathTag: 0x1f, askText: 0x4f4268, thanksText: 0x4f42b8, explainText: 0x4f4384, playerYaw: -1, creatureYaw: 0xe00 },
     hamm: { creature: 0x6, pathTag: 0x1d, playerYaw: -1, creatureYaw: 0x0, slot: 0 },
     hintNpc: {

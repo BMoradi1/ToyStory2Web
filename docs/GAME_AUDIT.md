@@ -7,6 +7,24 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-04 — Construction Yard stomp drawbridge
+
+- Restored surface-36 stomp activation, guide 3 retirement, lowering, hold,
+  return and repeat activation from `0041c640`. Collision 26 and artwork 28/29
+  follow the recovered angular speed and angle conversion; the small native
+  lower-stop overshoot is retained.
+- Moving collision carries standing/climbing passengers through the same roll;
+  airborne Buzz remains independent. Restart restores the captured hull and
+  initial near/far artwork angle. Start/stop and motor sounds use the original
+  camera-relative sound position.
+- Installed probe triggers through an actual stomp collision and checks cycle
+  boundaries, passenger motion and exact hull restore. Browser checks real
+  stomp activation, both artwork transforms, sound/guide, repeat use, pause,
+  restart and exit. Rotating-floor regression and production build pass.
+- Remaining Construction Yard scripted movers still require porting. General
+  crush/contact response is the shared mover implementation, not a proven
+  frame-for-frame reproduction of retail collision.
+
 ## 2026-10-04 — Rotating collision slope cache
 
 `transformCollisionGroup` now recomputes walkability from the transformed
@@ -535,7 +553,7 @@ not evidence for untested interactions.
 | 1 | Andy's House | Tin intro/fight/reward integration tested; hover wobble/sparks partial. Chair stomp and pushables implemented. | Remaining numbered props and platforms; all five token routes. |
 | 2 | Andy's Neighborhood | Lawnmower effects, kite flight/combat/reward and ZGCAR hook implemented. | Moving scenery and natural race/token routes. |
 | 3 | Bombs Away (internal 6) | `stepBossFight` exists. | Complete boss attacks, damage windows, defeat, token and replay. |
-| 4 | Construction Yard | DRILL combat/reward and ZGCAR implemented; trailer paint and outdoor lid/collision cycles implemented. | Remaining collision movement, then natural token routes. |
+| 4 | Construction Yard | DRILL combat/reward and ZGCAR implemented; trailer paint, outdoor lid/collision cycles, debris and stomp drawbridge implemented. | Remaining collision movement, then natural token routes. |
 | 5 | Alleys and Gullies | BOX/BPLANE launch cycle, boat cannon and clown combat/reward implemented. | Moving scenery/collision; 37 poles and 11 zip lines need route checks. |
 | 6 | Slime Time (internal 3) | Dedicated slime controller exists. | Full encounter, arena effects, reward and replay comparison. |
 | 7 | Al's Toy Barn | Dinosaur breath/combat/defeat/reward and BOX/BPLANE launch cycle implemented. | Original moving-collision calls and full token routes. |

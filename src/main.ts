@@ -1,3 +1,4 @@
+import {CONSTRUCTION_BRIDGE_OBJECTS,createConstructionBridge,moveConstructionBridge,stepConstructionBridge,restoreConstructionBridge,constructionBridgeRoll,type ConstructionBridge} from './sim/construction-bridge.ts';
 import {createConstructionDebris,stepConstructionDebris,type ConstructionDebris} from './sim/construction-debris.ts';
 import {PAINT_CAN_OBJECTS,createPaintCans,stepPaintCans,restorePaintCans,type PaintCans} from './sim/paint-cans.ts';
 import {createBuggy,stepBuggy,buggyBar} from './sim/buggy.ts';
@@ -329,6 +330,7 @@ async function showLevel(index: number): Promise<void> {
   penthouse = null;
   paintCans = null;
   constructionDebris = null;
+  constructionBridge = null;
   waterEffects=createWaterEffects();
   tarmacHelicopter = null;
   tarmacLights = null;
@@ -436,7 +438,7 @@ async function showLevel(index: number): Promise<void> {
       for(const id of platformObjects(levelNumber(level.id)??0)) {
         const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);
       }
-      if(levelNumber(level.id)===4)for(const id of PAINT_CAN_OBJECTS){
+      if(levelNumber(level.id)===4)for(const id of [...PAINT_CAN_OBJECTS,...CONSTRUCTION_BRIDGE_OBJECTS]){
         const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);
       }
       if(levelNumber(level.id)===11&&exeBytes)for(const id of penthouseObjects(readPenthouseTables(exeBytes))){
@@ -732,6 +734,7 @@ async function open(dir: GameDir): Promise<void> {
       get tarmacWeather() { return tarmacWeather; },
       get tarmacScenery() { return tarmacScenery; },
       get levelPlatforms() { return levelPlatforms; },
+      get constructionBridge() { return constructionBridge; },
       get constructionDebris() { return constructionDebris?structuredClone(constructionDebris):null; },
       get paintCans() { return paintCans; },
       get penthouse() { return penthouse; },
@@ -754,7 +757,7 @@ async function open(dir: GameDir): Promise<void> {
       get soundSequence() { return sequenceVoice; },
       get stompSurfaces() {
         return currentCollisionWorld?.groups.flatMap((g, group) => {
-          if (![8, 32, 33, 34, 35].includes(g.surface ?? -1)) return [];
+          if (![8, 32, 33, 34, 35, 36].includes(g.surface ?? -1)) return [];
           const vertices = g.polys.flatMap(i => currentCollisionWorld!.polys[i]!.vertices);
           return [{ group, surface: g.surface, vertices, tops: g.polys.map(i => currentCollisionWorld!.polys[i]!).filter(p => p.normal.y < -0.99).map(p => p.vertices) }];
         });
@@ -1314,6 +1317,7 @@ async function spawnPlayer(): Promise<void> {
   if (!currentCollisionWorld) { infoEl.textContent = 'no collision for this scene'; return; }
 
   constructionDebris=null;
+  if(constructionBridge){restoreConstructionBridge(constructionBridge,currentCollisionWorld);constructionBridge=null;}
   if(paintCans){restorePaintCans(paintCans,currentCollisionWorld);paintCans=null;}
   if(penthouse){restorePenthouse(penthouse,currentCollisionWorld);penthouse=null;}
   if(levelPlatforms){restoreLevelPlatforms(levelPlatforms,currentCollisionWorld);levelPlatforms=null;}
@@ -1366,6 +1370,8 @@ async function spawnPlayer(): Promise<void> {
   paintCans=level===4?createPaintCans(currentLevel.level,currentCollisionWorld):null;
   drawPaintCans();
   constructionDebris=level===4?createConstructionDebris(currentLevel.level):null;
+  constructionBridge=level===4?createConstructionBridge(currentLevel.level,currentCollisionWorld):null;
+  drawConstructionBridge();
   tarmacWeather = level === 14 ? createTarmacWeather() : null; setWeatherLight(128);
   tarmacScenery = level === 14 ? createTarmacScenery(currentLevel.level) : null;
   tarmacHelicopter = level === 14 ? createTarmacHelicopter(currentLevel.level) : null;
@@ -2563,6 +2569,11 @@ function drawTarmacHelicopter(): void {
   viewer.setObjectTransforms(transforms);
 }
 
+function drawConstructionBridge():void{
+  if(!viewer||!constructionBridge)return;
+  const roll=constructionBridgeRoll(constructionBridge);
+  viewer.setObjectTransforms(new Map(constructionBridge.objects.map(o=>[o.index,{angles:[0,0,roll] as [number,number,number]}])));
+}
 function drawPaintCans():void{
   if(!viewer||!paintCans)return;
   viewer.setObjectTransforms(new Map(paintCans.objects.map(o=>[o.index,{angles:o.angles,
@@ -3044,6 +3055,7 @@ function discardLevel(): void {
   penthouse = null;
   paintCans = null;
   constructionDebris = null;
+  constructionBridge = null;
   waterEffects=createWaterEffects();
   tarmacHelicopter = null;
   tarmacLights = null;
@@ -3469,6 +3481,7 @@ let levelPlatforms: LevelPlatforms | null = null;
 let penthouse:Penthouse|null=null;
 let paintCans:PaintCans|null=null;
 let constructionDebris:ConstructionDebris|null=null;
+let constructionBridge:ConstructionBridge|null=null;
 let waterEffects=createWaterEffects();
 let tarmacHelicopter: TarmacHelicopter | null = null;
 let tarmacLights: TarmacLights | null = null;
@@ -3744,6 +3757,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   playerGround.waterY = penthouse?.water.y??null;
   playerGround.beforeMove = () => {
     tickPushBlocks(held);
+    if(constructionBridge)moveConstructionBridge(constructionBridge,currentCollisionWorld!,player!);
     if(penthouse)movePenthouseFloats(penthouse,currentCollisionWorld!,player!);
     if(levelPlatforms){stepLevelPlatforms(levelPlatforms,currentCollisionWorld!,player!,()=>creatureSim?.rand.byte()??0,tasks?.gunslinger?.spin??0);drawLevelPlatforms();}
     if (tarmacPlane) {
@@ -3886,6 +3900,11 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     playEvent(0x9b,aircraftSoundPoint({x:pose.position.x*32,y:pose.position.y*32,z:pose.position.z*32},camera));
   }
 
+  if(constructionBridge){
+    stepConstructionBridge(constructionBridge,player,currentCollisionWorld,{camera:camera??undefined,
+      sound:(event,at)=>playEvent(event,at),guide:id=>spendGuide(guideSparkles,effects,id,true),
+    });drawConstructionBridge();
+  }
   if(paintCans&&creatureSim&&effects&&camera){
     const world=effectWorld();
     stepPaintCans(paintCans,player,currentCollisionWorld,{rand:creatureSim.rand,

@@ -4148,7 +4148,8 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   stepBeams(laserBeams);
   // Beams hit immediately; disks move in the effect pool.
   if (player.laserFired !== null) fireLaser();
-  const textureScrolls=stepTextureAnimation(textureAnimation,levelNow,zones.camera,zones.player);
+  const textureScrolls=stepTextureAnimation(textureAnimation,levelNow,zones.camera,zones.player,
+    slot=>!!creatureSim?.creatures.some(c=>c.slot===slot&&(c.flags&CREATURE_FLAGS.awake)!==0));
   if(levelNow===4&&creatureSim)stepFlareFlicker(flareFlicker,creatureSim.rand);
   if(animatedTextures)for(const scroll of textureScrolls){
     const texture=sceneTextures.get(scroll.page);

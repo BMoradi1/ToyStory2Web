@@ -40,3 +40,27 @@ for(const [level,camera,player] of [[1,5,5],[11,6,4]] as const){
  assert.equal(s.phase,0,'zone-gated phase holds');
 }
 console.log('PASS: rectangle wrapping, PC axis precedence, overlap, invalid bounds and zone gates.');
+
+// Space Land's extra strip follows the actual slot-2 visible flag, while the
+// base scroll and the global byte phase continue on hidden frames.
+{
+ const textures=new Map(parseNgn(readFileSync(`${root}/data/level08/level.ngn`)).map(t=>[t.slot,decodeBmp(t.bmp)]));
+ const image=textures.get(18)!;assert(image,'installed Mother texture page');
+ const state=createTextureAnimation();let changed=0;
+ for(let i=1;i<=300;i++){
+  const visible=i%3===0;
+  const rows=stepTextureAnimation(state,8,0,0,slot=>visible&&slot===2);
+  assert.equal(rows.length,visible?2:1);assert.equal(rows[0]!.page,5);
+  if(!visible)continue;
+  const strip=rows[1]!;assert.equal(strip.scrollY,i&255);
+  const before=image.rgba.slice();assert(copyScrolledTexture({data:image.rgba,width:image.width,height:image.height},strip));
+  if(!before.every((v,i)=>v===image.rgba[i]))changed++;
+  for(let y=0;y<image.height;y++)for(let x=0;x<image.width;x++){
+   if(x>=64&&x<84&&y<64)continue;
+   const at=(y*image.width+x)*4;assert.deepEqual(image.rgba.slice(at,at+4),before.slice(at,at+4));
+  }
+ }
+ assert(changed>0,'installed strip produces changing pixels');
+ assert.equal(stepTextureAnimation(state,8,0,0,slot=>slot===1).length,1,'other visible slots cannot activate Mother scroll');
+ console.log(`PASS Space Land Mother: visible-slot gate, global byte wrap, exact strip bounds and ${changed} changed frames`);
+}

@@ -20,7 +20,8 @@ export function copyScrolledTexture(image: TexturePixels, r: TextureScroll): boo
   return true;
 }
 export function createTextureAnimation(){return {ticks:0,phase:0};}
-export function stepTextureAnimation(s:ReturnType<typeof createTextureAnimation>, level:number, cameraZone:number, playerZone:number):TextureScroll[]{
+export function stepTextureAnimation(s:ReturnType<typeof createTextureAnimation>, level:number, cameraZone:number, playerZone:number,
+  visibleCreature:(slot:number)=>boolean=()=>false):TextureScroll[]{
   const scroll=(page:number,x:number,y:number,width:number,height:number,scrollX:number,scrollY:number,dx:number,dy:number):TextureScroll=>({page,x,y,width,height,scrollX,scrollY,dx,dy});
   s.ticks++;
   switch(level){
@@ -32,8 +33,13 @@ export function stepTextureAnimation(s:ReturnType<typeof createTextureAnimation>
     case 3:
       {const r=scroll(24,0,64,64,64,0,s.phase,0,64);s.phase=(s.phase-1)&63;return [r];}
     case 5:return [scroll(5,192,128,64,64,0,s.ticks&63,0,64)];
-    case 8:
-      {const r=scroll(5,0,0,64,64,0,s.phase>>1,0,64);s.phase=(s.phase+1)&127;return [r];}
+    case 8: {
+      const rows=[scroll(5,0,0,64,64,0,s.phase>>1,0,64)];s.phase=(s.phase+1)&127;
+      // 00424206: 0052c9b8 is entity slot 2's flags (base + 2*0x9c + 0x40).
+      // The MOTHER NPC's visible bit gates this additional texture region.
+      if(visibleCreature(2))rows.push(scroll(18,64,0,20,64,0,s.ticks&255,20,0));
+      return rows;
+    }
     case 11:
       if(playerZone!==5)return [];
       {const r=scroll(7,128,160,32,32,0,(sin(s.phase)>>9)&31,32,0);s.phase=(s.phase+8)&4095;return [r];}

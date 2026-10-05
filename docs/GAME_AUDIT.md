@@ -7,6 +7,20 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-04 — Space Land Mother texture animation
+
+- Identified `0052c9b8 & 1` as entity slot 2's visible flag: runtime entity
+  base `0052c840`, stride `0x9c`, flags offset `0x40`. The installed slot is
+  MOTHER. Unlike the Construction portal table, this call really is a
+  texture-region scroll (`00424206..0042422c`, calling `0049b260`).
+- Added the gated page-18 strip (destination 64/0, size 20×64, source offset
+  20/0) alongside Space Land's existing page-5 scroll. Its byte-wrapped tick
+  phase continues while hidden; the NPC visibility flag controls copying.
+- Installed texture probe checks the gate, byte wrap, changing pixels and
+  untouched surroundings. Browser checks actual visible/hidden NPC states,
+  GPU texture updates, exact pixel bounds, pause/restart/exit. Build passes.
+  Exact phase alignment against a retail capture remains unverified.
+
 ## 2026-10-04 — Construction Yard mud mechanics
 
 - Added the native ground-level mud region, including strict X/Z edges and
@@ -669,7 +683,7 @@ not evidence for untested interactions.
 | 5 | Alleys and Gullies | BOX/BPLANE launch cycle, boat cannon and clown combat/reward implemented. | Moving scenery/collision; 37 poles and 11 zip lines need route checks. |
 | 6 | Slime Time (internal 3) | Dedicated slime controller exists. | Full encounter, arena effects, reward and replay comparison. |
 | 7 | Al's Toy Barn | Dinosaur breath/combat/defeat/reward and BOX/BPLANE launch cycle implemented. | Original moving-collision calls and full token routes. |
-| 8 | Al's Space Land | Buggy fight/reward and ZGCAR implemented; prop-gated texture effect missing. | Claw machine, saucer course, `0052c9b8 & 1` effect trigger and natural route validation. |
+| 8 | Al's Space Land | Buggy fight/reward, ZGCAR and visibility-gated Mother texture animation implemented. | Claw machine, saucer course and natural route validation. |
 | 9 | Toy Barn Encounter | Dedicated pod controller, beam tests and ZGCAR hook implemented. | Full natural fight/summon cycles and reward traversal. |
 | 10 | Elevator Hop | Wire puzzle, compound lifts, GUNSP combat/reward, fan switches/rotation/airflow implemented. | Other ambient effects, exact collision/script/force timing and full-level traversal. |
 | 11 | Al's Penthouse | Shared enemies, GUNSL combat/reward, hazards, water/floats, train routing and underwater movement implemented. | Underwater camera colour/warp, light/texture helpers and collision 24 review. |

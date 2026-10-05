@@ -7,6 +7,21 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-04 — Toy Barn disk-gated locks
+
+Resolved `00882968` as the six shared disk permits. `00421340` sets lock
+slots 7–9 to vulnerability 4 when no disk is active, and 5 while a disk is
+in flight. Restored this rule before the platform scripts and creature update.
+Installed-data checks use real spin damage: closed locks reject it, open locks
+enter health 999/death animation, and the shared death timer reaches health
+zero, which releases their platform. Other creatures' masks stay unchanged.
+
+`toy-barn-guards-flow-check.js` collects and fires real disk ammo, observes
+all three locks opening, injects the three spin hits, follows their authored
+deaths and checks platform activation, disk expiry, restart and exit. Build
+passes. This verifies the combat gate and death handoff, not an unassisted
+three-lock traversal or naturally landed attacks.
+
 ## 2026-10-04 — Toy Barn rotating machinery
 
 Restored collision objects 1–4 and art 7/6/4/5 from `00421340`, with native

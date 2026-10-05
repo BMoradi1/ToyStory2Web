@@ -44,3 +44,9 @@ export function toyBarnPlatformPoses(s:ToyBarnPlatforms){
   return [...s.movers.map(m=>({index:m.index,rest:m.rest,position:{x:(m.position.x>>5)*32,y:(m.position.y>>5)*32,z:(m.position.z>>5)*32},angles:m.angles})),
     ...s.followers.map((f,i)=>{const p=s.movers[i]!.position;return {...f,position:{x:(p.x>>7)*128,y:(p.y>>7)*128,z:(p.z>>7)*128}};})];
 }
+
+/** 00421340: six unused disk permits means guards are closed (mask 4).
+ * Any disk in flight opens mask 5, including its spin-vulnerability bit. */
+export function updateToyBarnGuards(creatures:readonly {slot:number;record:{vulnerable:number}}[],disksActive:boolean){
+  for(const c of creatures)if(c.slot>=7&&c.slot<=9)c.record.vulnerable=disksActive?5:4;
+}

@@ -4,7 +4,7 @@ import {parseDat} from '../src/formats/dat.ts';
 import {parseAll} from '../src/formats/all.ts';
 import {buildCollisionWorld,parseCollision} from '../src/formats/collision.ts';
 import {createPlayer,createRuntime,groundFromCollision,stepPlayer,NO_INPUT} from '../src/sim/player.ts';
-import {createToyBarnPlatforms,moveToyBarnPlatforms,stepToyBarnPlatforms,restoreToyBarnPlatforms,toyBarnPlatformPoses} from '../src/sim/toy-barn-platforms.ts';
+import {updateToyBarnGuards,createToyBarnPlatforms,moveToyBarnPlatforms,stepToyBarnPlatforms,restoreToyBarnPlatforms,toyBarnPlatformPoses} from '../src/sim/toy-barn-platforms.ts';
 const dat=parseDat(readFileSync('Toy Story 2/data/level07/level.dat'));
 const w=buildCollisionWorld(parseCollision(parseAll(readFileSync('Toy Story 2/data/level07/TERRAIN.ALL'))).groups);
 const exe=readFileSync('Toy Story 2/toy2.exe'),s=createToyBarnPlatforms(dat,w,exe),p=createPlayer(1e8,0,1e8);
@@ -50,3 +50,29 @@ for(let i=0;i<6;i++){
  assert(contactTicks>100,`platform ${i}: physical rider lost floor (${contactTicks} contacts)`);
 }
 console.log('PASS actual collision landing and riding on all six installed platforms');
+
+// Installed guards reject spin until the disk-permit gate opens. Actual damage
+// and shared creature death feed the existing exact-health platform gate.
+const {unpackRaw}=await import('../src/formats/rnc.ts');
+const {parseCreatureList}=await import('../src/formats/creatures.ts');
+const {createCreatureSim,RandomStream,damageCreature,stepCreatures}=await import('../src/sim/creatures.ts');
+const raw=unpackRaw(readFileSync('Toy Story 2/data/level07/level.raw'));
+const records=parseCreatureList(raw.find(r=>r.type===35)!.data);
+const sim=createCreatureSim(records,{groundY:()=>null},new RandomStream(new Uint8Array([128])),7);
+const others=sim.creatures.filter(c=>c.slot<7||c.slot>9).map(c=>c.record.vulnerable);
+updateToyBarnGuards(sim.creatures,false);
+for(const slot of [7,8,9]){
+ const c=sim.creatures.find(c=>c.slot===slot)!;assert.equal(c.health,1);
+ damageCreature(sim,c,0,2);assert.equal(c.health,1,'spin bypassed closed guard');
+}
+updateToyBarnGuards(sim.creatures,true);
+for(const slot of [7,8,9]){
+ const c=sim.creatures.find(c=>c.slot===slot)!;c.stun=0;damageCreature(sim,c,0,2);
+ assert.equal(c.health,999,'disk-open spin did not start guard death');
+ for(let t=0;t<120&&Number(c.health)!==0;t++)stepCreatures(sim,{x:c.x,y:c.y,z:c.z});
+ assert.equal(c.health,0,'authored guard death did not release platform');
+}
+updateToyBarnGuards(sim.creatures,false);
+assert(sim.creatures.filter(c=>c.slot>=7&&c.slot<=9).every(c=>c.record.vulnerable===4));
+assert.deepEqual(sim.creatures.filter(c=>c.slot<7||c.slot>9).map(c=>c.record.vulnerable),others);
+console.log('PASS installed guards reject closed spin, accept disk-open damage, reset vulnerability and leave other creatures untouched');

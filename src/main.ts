@@ -1,5 +1,5 @@
 import {TOY_BARN_ROTOR_OBJECTS,createToyBarnRotors,moveToyBarnRotors,stepToyBarnRotors,restoreToyBarnRotors,type ToyBarnRotors} from './sim/toy-barn-rotors.ts';
-import {TOY_BARN_PLATFORM_OBJECTS,createToyBarnPlatforms,moveToyBarnPlatforms,stepToyBarnPlatforms,restoreToyBarnPlatforms,toyBarnPlatformPoses,type ToyBarnPlatforms} from './sim/toy-barn-platforms.ts';
+import {TOY_BARN_PLATFORM_OBJECTS,updateToyBarnGuards,createToyBarnPlatforms,moveToyBarnPlatforms,stepToyBarnPlatforms,restoreToyBarnPlatforms,toyBarnPlatformPoses,type ToyBarnPlatforms} from './sim/toy-barn-platforms.ts';
 import {SPACE_BUGGY_MODEL,createSpaceBuggyModel,stepSpaceBuggyModel,type SpaceBuggyModel} from './sim/space-buggy-model.ts';
 import {createSpaceRockingBlock,stepSpaceRockingBlock,type SpaceRockingBlock} from './sim/space-rocking-block.ts';
 import {createSpaceBallPit,spaceBallPitY,stepSpaceBallPit,type SpaceBallPit} from './sim/space-ball-pit.ts';
@@ -4120,7 +4120,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   if(constructionStompLift){stepConstructionStompLift(constructionStompLift,currentCollisionWorld,player,id=>spendGuide(guideSparkles,effects,id,true));drawConstructionStompLift();}
   if(constructionLifts&&creatureSim){stepConstructionLifts(constructionLifts,player,()=>creatureSim!.rand.byte());drawConstructionLifts();}
   if(toyBarnRotors){stepToyBarnRotors(toyBarnRotors);drawToyBarnRotors();}
-  if(toyBarnPlatforms&&creatureSim){stepToyBarnPlatforms(toyBarnPlatforms,()=>creatureSim!.rand.byte(),slot=>creatureSim!.creatures.find(c=>c.slot===slot)?.health);drawToyBarnPlatforms();}
+  if(toyBarnPlatforms&&creatureSim){updateToyBarnGuards(creatureSim.creatures,effects?.effects.some(e=>e.life>0&&(e.kind===EFFECT_KIND.diskHoming||e.kind===EFFECT_KIND.diskStraight))??false);stepToyBarnPlatforms(toyBarnPlatforms,()=>creatureSim!.rand.byte(),slot=>creatureSim!.creatures.find(c=>c.slot===slot)?.health);drawToyBarnPlatforms();}
   if(constructionShuttles&&creatureSim){stepConstructionShuttles(constructionShuttles,()=>creatureSim!.rand.byte());drawConstructionShuttles();}
   if(constructionBridge){
     stepConstructionBridge(constructionBridge,player,currentCollisionWorld,{camera:camera??undefined,

@@ -843,6 +843,7 @@ async function open(dir: GameDir): Promise<void> {
         return tasks ? {
           done: tasks.done, hintIndex: tasks.hintIndex, slime: tasks.slime ? { ...tasks.slime } : null,
           kite:tasks.kite?structuredClone(tasks.kite):null,
+          saucer:{...tasks.saucer},
           buggy:tasks.buggy?{...tasks.buggy}:null,
           dinosaur:tasks.dinosaur?{...tasks.dinosaur}:null,
           drill:tasks.drill?{...tasks.drill}:null,
@@ -4082,6 +4083,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
           cameraZone: zones.camera,
           playerZone: zones.player,
           onGround: player.onGround,
+          coyote: player.coyote,
           jumpState: player.jumpState,
           standingSurface: standingSurface(player, currentCollisionWorld),
           hideToken: (slot) => {

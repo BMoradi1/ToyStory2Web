@@ -1,3 +1,4 @@
+import {createSpaceSaucer,acceptSpaceSaucer,stepSpaceSaucer,type SpaceSaucer} from './space-saucer.ts';
 import {stepBuggyLevel,type Buggy} from './buggy.ts';
 import {stepKiteLevel,updateMowerRange,type Kite} from './neighborhood.ts';
 import {stepDinosaurLevel,type Dinosaur} from './dinosaur.ts';
@@ -113,8 +114,8 @@ export interface TaskState {
   levelWon: boolean;
   /** Counts up once the boss is gone, to the delay before its token. */
   bossGone: number;
-  /** The reach-a-box challenge: 0 not offered, 1 accepted, 2 running. */
-  reach: number;
+  /** Space Land: idle, dialogue, running, won, failed. */
+  saucer: SpaceSaucer;
   /** Timed path: 0 idle, 1 dialogue, 2 running. Clock uses the same 100 floor as fetch. */
   pathRun: number;
   pathClock: number;
@@ -179,7 +180,7 @@ export function createTasks(): TaskState {
   return {
     done: 0, hammChatter: 0, hintChatter: 0, hintIndex: -1,
     slime: null, pod:null, zurg:null, finale:null, prospector:null, gunslinger:null, clown:null, drill:null, dinosaur:null, kite:null, buggy:null,
-    boss: 0, bossGone: 0, reach: 0, pathRun: 0, pathClock: 100, fetch: 0, fetchDone: 0, fetchClock: 100, slowTick: 0, potatoPart: 0, powerUps: 0, potatoChatter: 0, challenge: 0, challengeFrom: 0,
+    boss: 0, bossGone: 0, saucer:createSpaceSaucer(), pathRun: 0, pathClock: 100, fetch: 0, fetchDone: 0, fetchClock: 100, slowTick: 0, potatoPart: 0, powerUps: 0, potatoChatter: 0, challenge: 0, challengeFrom: 0,
     bossPhase: 0, bossClock: 0, bossHurt: 0, smithFlash:false, smithBarTicks:0, bossHealthWas: -1, bossRamp: 0, bossSwing: 0,
     bossTaunt: 0, bossShout: 0, bossYaw: 0, bossFlip: 0, bossCut: 0,
     bossBeaten: false, levelWon: false,
@@ -500,6 +501,8 @@ export function stepTasks(
     tokens: number;
     /** `DAT_0052f38e`: most boss taunts will not fire while Buzz is airborne. */
     onGround: boolean;
+    /** Player +0x9c: saucer course checks the six-tick grounded grace counter. */
+    coyote?: number;
     /** Original player +0x8c and collision surface, used by the timed path. */
     jumpState?: number;
     standingSurface?: number;
@@ -639,28 +642,17 @@ export function stepTasks(
     }
   }
 
-  // --- beat me to the top: accept, then get into the box.
+  // --- Space Land's saucer keeps following its path after success/failure.
   const reach = level.reachBox;
-  if (reach && !slotDone(tasks, reach.slot)) {
-    const c = creatureAt(reach.creature);
-    if (tasks.reach === 0) {
-      if (c && tookTalk(c)) {
-        tasks.reach = 1;
-        return {
-          creature: reach.creature, pathTag: reach.pathTag, text: reach.text,
-          playerYaw: -1, creatureYaw: 0, slot: -1,
-        };
+  if (reach) {
+    const c=creatureAt(reach.creature),points=world.pathPoints(13);
+    if(c&&points){
+      if(tasks.saucer.phase===0&&!slotDone(tasks,reach.slot)&&tookTalk(c)){
+        acceptSpaceSaucer(tasks.saucer,c);
+        return {creature:reach.creature,pathTag:reach.pathTag,text:reach.text,playerYaw:-1,creatureYaw:0,slot:-1};
       }
-    } else if (tasks.reach === 1 && !world.talking) {
-      tasks.reach = 2;
-    } else if (tasks.reach === 2) {
-      const inside = world.x > reach.xMin && world.x < reach.xMax
-        && world.z > reach.zMin && world.z < reach.zMax
-        && world.y < reach.yMax;
-      if (inside) {
-        tasks.reach = 3;
-        markSlotDone(tasks, reach.slot);
-      }
+      stepSpaceSaucer(tasks.saucer,c,points,{player:world,coyote:world.coyote??(world.onGround?6:0),
+        talking:world.talking,sound:world.sound,finish:reach,reward:()=>markSlotDone(tasks,reach.slot)},dt);
     }
   }
 

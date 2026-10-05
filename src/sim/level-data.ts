@@ -492,9 +492,9 @@ export interface LevelTasks {
     clock: number; failSurface: number; slot: number; startSound: number;
   };
   /**
-   * "Beat me to the top": accept the challenge, then get inside a box. The
-   * engine's own test is an axis-aligned box in x and z with a height to be
-   * under (`FUN_0049f460`), which is level 8's slot 2.
+   * Space Land's saucer course: dialogue and finish bounds. The controller
+   * also drives path 13, tests the starting box/coyote word, and resets a
+   * failed run once the saucer leaves the near list (`00423303..004235db`).
    */
   reachBox?: {
     creature: number; pathTag: number; text: number;

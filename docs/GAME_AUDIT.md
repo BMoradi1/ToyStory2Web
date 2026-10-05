@@ -7,6 +7,15 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-04 — Rotating collision slope cache
+
+`transformCollisionGroup` now recomputes walkability from the transformed
+normal. Previously pitch/roll changed the geometry while ground queries kept
+the rest pose's floor classification. The regression checks floor-to-wall and
+wall-to-floor transitions through actual ground queries, plus yaw and restore.
+Platform interaction and paint-can regressions and the build pass. This shared
+fix prepares rotating-platform work; it does not itself add the drawbridge.
+
 ## 2026-10-04 — Construction Yard debris emitters
 
 - Restored the rolling kind-67 emitter on path 0 and thrown kind-84 debris

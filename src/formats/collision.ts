@@ -380,6 +380,9 @@ export function transformCollisionGroup(
       return {x:position.x+r.x,y:position.y+r.y,z:position.z+r.z};
     });
     poly.normal = rotate(base.normal);
+    // Pitch and roll can turn a floor into a wall, or a wall into a floor.
+    // Ground queries use this cache in addition to the transformed normal.
+    poly.walkable = poly.normal.y <= -Math.cos((60 * Math.PI) / 180);
     forEachCell(world, poly.vertices.map(v => v.x), poly.vertices.map(v => v.z), cell => cell.push(base.index), true);
     for (const v of poly.vertices) world.lowestY = Math.max(world.lowestY, v.y);
   }

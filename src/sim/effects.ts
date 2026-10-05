@@ -664,7 +664,8 @@ function behave(sim: EffectSim, world: EffectWorld, e: Effect, dt: number): numb
     case 0x31:
       sound(sim, 0x40, e);
       if (e.life > 4 && sim.gate.two > 0) {
-        spawnEffect(sim, world, e.x, e.y, e.z, e.vx, 0, e.vz, 0, 0,
+        // 00412524 halves these before the spawn helper halves them again.
+        spawnEffect(sim, world, e.x, e.y, e.z, idiv(e.vx,2), 0, idiv(e.vz,2), 0, 0,
           sim.rand.byte() - 0x80, 0x2e);
       }
       return 0;

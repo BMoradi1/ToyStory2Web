@@ -212,7 +212,7 @@ mark at the record's floor. `sound N` is the sound event N at the record.
 | 0x2e | grow `per`/tick; light (b, b/2, 0) | 1 |
 | 0x2f | level 12's ball (`FUN_0042b090`): trail 0x6e in 2 behind it on 1-in-4 ticks; inside the pit x (-0x256d6, 0xe0aa) z (-0x1b3e9, 0x1b297) it has a floor at y -0x12bd3 which it lands on and bounces off at 7/8, outside it none; the room's walls x (-0x29b56, 0x2a62a) z (-0x230e9, 0x22b97) reflect it; within 1,024 level units of (-0xbd7c, 0x99) in x/z it dies; any bounce sounds 0x43 | — |
 | 0x30 | level 12's other ball (`FUN_0042b250`): the same "dies near (-0xbd7c, 0x99)" test, trail 0x6f in 2 | — |
-| 0x31 | sound 0x40; place object 0x19 at the record and face it along the yaw (`FUN_004cce30`, `FUN_004ccc70`); on `c2` ticks while L > 4 spawn 0x2e with its own velocity | — |
+| 0x31 | sound 0x40; place object 0x19 at the record and face it along the yaw (`FUN_004cce30`, `FUN_004ccc70`); on `c2` ticks while L > 4 spawn 0x2e with quarter XZ velocity after caller/spawner halves | — |
 | 0x32 | colour ramps up over the first 0x12 ticks (from L 0x52) | 2 |
 | 0x33 | on 1-in-4 ticks while L > 4 spawn kind `per/2` in 2 with random spin; `per` == 0x76 fades | 2 if per == 0x76 |
 | 0x34 | level 10's bouncer (`FUN_00425ad0`): kept inside x (-0x169eb, 0x16915) z (-0x16cef, 0x16991), each wall reflecting it with sound 0x4a | — |
@@ -1107,3 +1107,10 @@ particles on the four-tick gate. Camera colour/warp remains separate work.
 
 `water-effects-probe.ts` checks the installed effects and footfall script;
 `penthouse-water-flow-check.js` verifies live movement, particles and lifecycle.
+
+### Space Land projectile artwork (2026-10-04)
+
+Mode `0x31` now drives scene object 25 through `space-buggy-model.ts`, including
+position quantization, `(yaw + 1024) & 4095`, pitch as roll, final live pool-slot
+precedence and the original off-world idle pose. Its trail inherits quarter
+XZ velocity, correcting the missing division at `00412524..00412549`.

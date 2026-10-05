@@ -1,3 +1,4 @@
+import {SPACE_BUGGY_MODEL,createSpaceBuggyModel,stepSpaceBuggyModel,type SpaceBuggyModel} from './sim/space-buggy-model.ts';
 import {createSpaceRockingBlock,stepSpaceRockingBlock,type SpaceRockingBlock} from './sim/space-rocking-block.ts';
 import {createSpaceBallPit,spaceBallPitY,stepSpaceBallPit,type SpaceBallPit} from './sim/space-ball-pit.ts';
 import {createSpaceProjectiles,stepSpaceProjectiles,type SpaceProjectiles} from './sim/space-projectiles.ts';
@@ -352,6 +353,7 @@ async function showLevel(index: number): Promise<void> {
   spaceProjectiles = null;
   spaceBallPit = null;
   spaceRockingBlock = null;
+  spaceBuggyModel = null;
   waterEffects=createWaterEffects();
   tarmacHelicopter = null;
   tarmacLights = null;
@@ -462,7 +464,7 @@ async function showLevel(index: number): Promise<void> {
       if(levelNumber(level.id)===4)for(const id of [...PAINT_CAN_OBJECTS,...CONSTRUCTION_BRIDGE_OBJECTS,...CONSTRUCTION_SHUTTLE_OBJECTS,...CONSTRUCTION_LIFT_OBJECTS,...CONSTRUCTION_SCENERY_OBJECTS,...CONSTRUCTION_STOMP_LIFT_OBJECTS]){
         const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);
       }
-      if(levelNumber(level.id)===8)for(const id of [...SPACE_CLAW_OBJECTS,...SPACE_SCENERY_OBJECTS]){
+      if(levelNumber(level.id)===8)for(const id of [...SPACE_CLAW_OBJECTS,...SPACE_SCENERY_OBJECTS,SPACE_BUGGY_MODEL]){
         const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);
       }
       if(levelNumber(level.id)===11&&exeBytes)for(const id of penthouseObjects(readPenthouseTables(exeBytes))){
@@ -758,6 +760,7 @@ async function open(dir: GameDir): Promise<void> {
       get tarmacWeather() { return tarmacWeather; },
       get tarmacScenery() { return tarmacScenery; },
       get levelPlatforms() { return levelPlatforms; },
+      get spaceBuggyModel(){return spaceBuggyModel;},
       get spaceRockingBlock(){return spaceRockingBlock;},
       get spaceBallPit(){return spaceBallPit;},
       get spaceProjectiles(){return spaceProjectiles;},
@@ -1360,6 +1363,7 @@ async function spawnPlayer(): Promise<void> {
   spaceProjectiles=null;
   spaceBallPit=null;
   spaceRockingBlock=null;
+  spaceBuggyModel=null;
   if(constructionStompLift){restoreConstructionStompLift(constructionStompLift,currentCollisionWorld);constructionStompLift=null;}
   if(constructionLifts){restoreConstructionLifts(constructionLifts,currentCollisionWorld);constructionLifts=null;}
   if(constructionShuttles){restoreConstructionShuttles(constructionShuttles,currentCollisionWorld);constructionShuttles=null;}
@@ -1549,6 +1553,8 @@ async function spawnPlayer(): Promise<void> {
   spaceLasers=level===8?createSpaceLasers(currentLevel.level):null;
   spaceProjectiles=level===8?createSpaceProjectiles(currentLevel.level):null;
   spaceBallPit=level===8&&exeBytes?createSpaceBallPit(exeBytes):null;
+  spaceBuggyModel=level===8?createSpaceBuggyModel(currentLevel.level):null;
+  drawSpaceBuggyModel();
   if(spaceClaw){syncSpaceClawPrize(spaceClaw,pickups);drawSpaceClaw();}
   tokenRevealProfile=exeBytes?readTokenReveal(exeBytes):null;
   // Lives and health carry over from the record, as `FUN_004a2cc0` copies
@@ -1606,6 +1612,7 @@ function stepEffectsNow(): void {
   stepEffects(effects, world);
   stepGuideSparkles(guideSparkles, effects, world);
   touchPlayer(effects, world);
+  if(spaceBuggyModel){stepSpaceBuggyModel(spaceBuggyModel,effects.effects);drawSpaceBuggyModel();}
   for(const light of effects.pointLights.splice(0))addPointLight(pointLights,light);
 
   // Damage the laser landed. The creature port already knows what kind 4 is.
@@ -2638,6 +2645,12 @@ function drawTarmacHelicopter(): void {
   viewer.setObjectTransforms(transforms);
 }
 
+function drawSpaceBuggyModel():void{
+  if(!viewer||!spaceBuggyModel)return;const s=spaceBuggyModel;
+  viewer.setObjectTransforms(new Map([[s.index,{angles:s.angles,
+    offset:[(s.position.x-s.rest.x)*GAME_TO_RENDER,-(s.position.y-s.rest.y)*GAME_TO_RENDER,-(s.position.z-s.rest.z)*GAME_TO_RENDER],
+  }]]));
+}
 function drawSpaceScenery():void{
   if(!viewer||!spaceScenery)return;
   viewer.setObjectTransforms(new Map(spaceScenery.objects.map(o=>[o.index,{angles:o.angles,
@@ -3184,6 +3197,7 @@ function discardLevel(): void {
   spaceProjectiles = null;
   spaceBallPit = null;
   spaceRockingBlock = null;
+  spaceBuggyModel = null;
   waterEffects=createWaterEffects();
   tarmacHelicopter = null;
   tarmacLights = null;
@@ -3620,6 +3634,7 @@ let spaceLasers:SpaceLasers|null=null;
 let spaceProjectiles:SpaceProjectiles|null=null;
 let spaceBallPit:SpaceBallPit|null=null;
 let spaceRockingBlock:SpaceRockingBlock|null=null;
+let spaceBuggyModel:SpaceBuggyModel|null=null;
 let waterEffects=createWaterEffects();
 let tarmacHelicopter: TarmacHelicopter | null = null;
 let tarmacLights: TarmacLights | null = null;

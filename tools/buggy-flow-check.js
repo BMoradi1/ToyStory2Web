@@ -43,13 +43,22 @@
   for(let i=0;i<2000&&ts2.talk;i++)ts2.tickGame({jump:(i&1)===0},1,0);
   ts2.tickGame({},1,0);check(ts2.tasks.boss===2,'buggy did not wake');check(!token().enabled,'early buggy reward');
   const position=()=>{const c=boss();ts2.setPlayerPos(c.x+16000,c.z,0);ts2.player.hitStun=1000;};
-  let dropped=false,laser=false;
-  for(let i=0;i<1200&&!(dropped&&laser);i++){
+  check(!ts2.spaceBuggyModel.active,'projectile model starts active');
+  const hidden=JSON.stringify(ts2.spaceBuggyModel.position);
+  let dropped=false,laser=false,model=false;
+  for(let i=0;i<1200&&!(dropped&&laser&&model);i++){
     position();ts2.tickGame({},1,0);
     dropped ||= ts2.effects.activeKinds.includes(114);
+    const m=ts2.spaceBuggyModel;
+    if(m.active){
+      const [angles,offset]=ts2.viewer.objectTransforms.get(m.index).split('|');
+      check(angles===m.angles.join(','),'projectile model orientation missing');
+      const p=offset.split(',').map(Number),delta=[m.position.x-m.rest.x,-(m.position.y-m.rest.y),-(m.position.z-m.rest.z)];
+      check(p.every((n,i)=>Math.abs(n*8192-delta[i])<1),'projectile model position missing');model=true;
+    }
     laser ||= ts2.effects.beams.some(b=>b.life>0&&b.colour[0]===1&&b.colour[1]===0);
   }
-  check(dropped&&laser,'natural buggy attacks absent '+JSON.stringify({dropped,laser,boss:boss(),zones:ts2.zones,buggy:ts2.tasks.buggy}));
+  check(dropped&&laser&&model,'natural buggy attacks/model absent '+JSON.stringify({dropped,laser,boss:boss(),zones:ts2.zones,buggy:ts2.tasks.buggy}));
   ts2.openMenu();const frozen=JSON.stringify(ts2.tasks.buggy);ts2.tickGame({},100,0);check(JSON.stringify(ts2.tasks.buggy)===frozen,'paused buggy advanced');ts2.pressMenu('back');ts2.tickGame({},1,0);
   let flashed=false;
   for(let hit=0;hit<10;hit++){
@@ -75,10 +84,11 @@
   await ts2.spawnPlayer();ts2.viewer.stop();
   check(ts2.tasks.boss===0&&!ts2.tasks.buggy.defeated&&ts2.tasks.buggy.hurt===0&&boss().health===29&&!token().enabled,'buggy state survived restart');
   check(!ts2.effects.kinds.includes(114),'hazard survived restart');
+  check(!ts2.spaceBuggyModel.active&&JSON.stringify(ts2.spaceBuggyModel.position)===hidden,'projectile model survived restart');
   ts2.openMenu();for(let i=0;i<3;i++){ts2.pressMenu('down');ts2.tickGame({},1);}
   ts2.pressMenu('select');ts2.tickGame({},1);ts2.pressMenu('down');ts2.tickGame({},1);ts2.pressMenu('select');ts2.tickGame({},1);
   await wait(()=>['summary','select'].includes(ts2.front.screen),'exit failed');
   if(ts2.front.screen==='summary'){ts2.frontDrive(0,650);ts2.frontDrive(0x4000);ts2.frontDrive(0,130);}
   await wait(()=>ts2.front.screen==='select','selector missing');check(ts2.tasks===null&&ts2.effects===null,'buggy combat leaked after exit');
-  console.log('PASS buggy natural intro/laser/dropped hazard, injected-hit recovery/flash, nine-health collapse/light, delayed token/save, pause/restart/exit');
+  console.log('PASS buggy natural intro/laser/dropped hazard/model, injected-hit recovery/flash, nine-health collapse/light, delayed token/save, pause/restart/exit');
 })()

@@ -9,7 +9,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "extract": "tsx tools/ngn-extract.ts"
+    "extract": "tsx tools/ngn-extract.ts",
+    "audit:sim": "node --import tsx tools/audit-sim.ts"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",

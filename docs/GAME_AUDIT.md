@@ -7,6 +7,24 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-05 — Repeatable complete simulation regression command
+
+Added `npm run audit:sim`, which discovers all `tools/*-probe.ts`, gives each
+its own Node process with a two-minute limit, continues after assertion
+failures, and exits nonzero when any probe fails. `--filter`, `--list` and
+optional JSON `--report` support focused runs and reviewable results. Process
+launch permission failures stop the run and mark remaining probes not run.
+The local install is read in place; no game assets are uploaded or generated.
+
+The full discovered suite passed 123/123 in 60 seconds. It caught an obsolete
+Airport assertion expecting directional launch mode; that probe now verifies
+the real vertical bounce, normal air control and fixed/vehicle recoil timing.
+The general creature sweep now uses the shared model geometry loader, including
+native fallback shapes, and separately passes all 373 placement runs of 300
+ticks. Seven-probe filtering/report output, empty-filter failure, launch-error
+reporting and production build pass. These checks supplement the browser
+flows and natural-play audit; they do not establish full game parity.
+
 ## 2026-10-05 — Neighborhood falling leaves
 
 Restored path-0 leaves from 004190c0: height selects the shared four- or

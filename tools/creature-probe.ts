@@ -29,7 +29,8 @@
  */
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { GroupType, parseAll, readHitShapes } from '../src/formats/all.ts';
+import { parseAll } from '../src/formats/all.ts';
+import { creatureModelGeometry } from '../src/sim/creature-model.ts';
 import { buildCollisionWorld, groundBelow, parseCollision } from '../src/formats/collision.ts';
 import { unpackRaw } from '../src/formats/rnc.ts';
 import {
@@ -68,15 +69,7 @@ function modelFor(type: number): CreatureModel | null {
   if (!entry) return null;
   const path = join(root, entry.path);
   if (!existsSync(path)) return null;
-  const groups = parseAll(readFileSync(path)).groups;
-  const last = groups[groups.length - 1];
-  if (!last || last.type !== GroupType.HitShapes || !last.hitSphere) return null;
-  const shapes = readHitShapes(last);
-  if (!shapes) return null;
-  const model: CreatureModel = {
-    offsetX: last.hitSphere.x, offsetY: last.hitSphere.y, offsetZ: last.hitSphere.z,
-    hitRadius: last.hitSphere.radius, shapes,
-  };
+  const model = creatureModelGeometry(parseAll(readFileSync(path)));
   models.set(type, model);
   return model;
 }

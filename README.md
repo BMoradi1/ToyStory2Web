@@ -249,6 +249,21 @@ Everything here reads an install and writes nothing into it.
     # step the character controller and check it against the constants
     npx tsx tools/player-probe.ts
 
+Run the complete simulation regression set with the game installed locally at
+`Toy Story 2/`:
+
+    npm run audit:sim
+    npm run audit:sim -- --filter neighborhood
+    npm run audit:sim -- --list
+    npm run audit:sim -- --report /tmp/toystory-audit.json
+
+The runner discovers every `tools/*-probe.ts`, including new probes, and returns
+a failing exit code if any check fails. It keeps running after test failures,
+prints their diagnostics, and limits each probe to two minutes. A process-launch
+permission error stops the run and reports the remaining probes as not run.
+Reports contain test results; game assets stay local. Simulation checks
+complement the browser flows and natural-play checklist in the whole-game audit.
+
 `tools/ghidra/` rebuilds a greppable decompile of either executable, which is
 where the gameplay constants come from.
 

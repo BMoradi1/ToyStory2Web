@@ -68,10 +68,11 @@ for(const which of [0,1,2,3,4]){
  // Freeze translation for this focused real collision landing/launch test.
  let launched=false;
  for(let t=0;t<100&&!launched;t++){
-  stepPlayer(p,NO_INPUT,rt,ground,0);stepPlatformSwitches(s,p,world);launched=p.launched;
+  stepPlayer(p,NO_INPUT,rt,ground,0);stepPlatformSwitches(s,p,world);launched=s.sounds.some(cue=>cue.event===0x1c);
  }
  assert(launched,`spring ${which} launch from real stomp impact`);assert.equal(p.vy,-3072);assert(!p.onGround);assert.equal(p.stomp,0);
- assert.equal(s.springRoll,-512);assert(s.sounds.some(cue=>cue.event===0x1c));
+ assert(!p.launched,'vertical spring must preserve normal air control');
+ assert.equal(s.springRoll,spring?-480:-512);assert(s.sounds.some(cue=>cue.event===0x1c));
  if(vehicle)assert(!vehicle.exhaust,'stomp turns off vehicle exhaust');
  if(spring)assert(s.guidesSpent.includes(spring.guide));
  p.x=1e8;p.z=1e8;

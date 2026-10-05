@@ -7,6 +7,28 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-05 — Alley water and environmental emitters
+
+Connected `0041e880`'s water heights to player physics and shared liquid
+effects: 0x10000 normally, 0x70000 strictly beyond Z 0xf329f. This restores
+swimming gravity, entry splashes, ripples and bubbles through existing shared
+controllers. Artwork 39/40/44/49/50 hides below the camera's water plane and
+returns above it. Underwater camera tint/warp and Alley rain remain open.
+
+Restored paired path-14 projectiles: advance two nodes before emission, use
+the next point for velocity, force lifetime 128, then wait 20 ticks (21 ticks
+between emissions). Room 2's kind-93 emitter uses the camera zone and shared
+32-tick gate, with five active counts per eleven-gate cycle. Both raise event
+0xa4 only after a successful spawn.
+
+Installed probes cover all nine path pairs, cadence, successful/culled sound
+gates, strict water boundaries, swimming gravity, shared splash entry and
+underwater artwork. Browser checks observe live projectiles, room-2 effects,
+audio, both water branches and pause/restart/exit. The second height is tested
+at a protected out-of-route position with the stale fall-out flag cleared;
+this is not natural traversal evidence. All eight real collision platform
+landing/riding probes still pass with water enabled. Build passes.
+
 ## 2026-10-05 — Alley bridge and distant crates
 
 Restored the bridge gate in `0041e880`: push block 2's nonzero run disables
@@ -1126,7 +1148,7 @@ not evidence for untested interactions.
 | 2 | Andy's Neighborhood | Lawnmower effects, kite flight/combat/reward and ZGCAR hook implemented. | Moving scenery and natural race/token routes. |
 | 3 | Bombs Away (internal 6) | `stepBossFight` exists. | Complete boss attacks, damage windows, defeat, token and replay. |
 | 4 | Construction Yard | DRILL combat/reward and ZGCAR implemented; trailer paint, outdoor lids, debris, stomp bridge, four shuttles, four linked tilting lifts, stomp-selected lift, distant crate, proximity scenery/portals and mud movement/effects implemented. | Review collision IDs 13/25; natural traversal/token routes. |
-| 5 | Alleys and Gullies | BOX/BPLANE launch cycle, boat cannon, clown combat/reward, eight lane platforms, two seesaws, spring, bubble machine, moving bubble attachments, push-triggered bridge and distant crates implemented. | Remaining scenery/effects and natural pole/zip-line routes. |
+| 5 | Alleys and Gullies | BOX/BPLANE launch cycle, boat cannon, clown combat/reward, eight lane platforms, two seesaws, spring, bubble machine, moving bubble attachments, push-triggered bridge, distant crates, water and timed environmental emitters implemented. | Rain, underwater camera treatment and remaining scenery/effects and natural pole/zip-line routes. |
 | 6 | Slime Time (internal 3) | Dedicated slime controller exists. | Full encounter, arena effects, reward and replay comparison. |
 | 7 | Al's Toy Barn | Dinosaur breath/combat/defeat/reward and BOX/BPLANE launch cycle implemented. | Original moving-collision calls and full token routes. |
 | 8 | Al's Space Land | Buggy fight/reward/projectile model, ZGCAR, claw puzzle/token delivery, saucer course/deadline/retry, hanging toys/display motion/sounds, paired laser hazards, projectile volley, ball-pit movement/scatter, rocking-block trigger/far crates and visibility-gated Mother texture animation implemented. | Remaining ambient/projectile effects and natural route validation. |

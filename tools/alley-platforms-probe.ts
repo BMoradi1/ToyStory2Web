@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {alleyWaterY} from '../src/sim/alley-effects.ts';
 import {readFileSync} from 'node:fs';
 import {parseDat} from '../src/formats/dat.ts';
 import {parseAll} from '../src/formats/all.ts';
@@ -37,7 +38,7 @@ for(let i=0;i<8;i++){
  const at=floor.vertices.reduce((a,v)=>({x:a.x+v.x/3,y:a.y+v.y/3,z:a.z+v.z/3}),{x:0,y:0,z:0});
  const rider=createPlayer(at.x*32,at.y*32-2000,at.z*32),runtime=createRuntime(),ground=groundFromCollision(w);ground.beforeMove=()=>moveAlleyPlatforms(s,w,rider);
  let contacts=0;
- for(let t=0;t<180;t++){stepPlayer(rider,NO_INPUT,runtime,ground,0);stepAlleyPlatforms(s,w,rider);if(rider.onGround&&rider.contacts.some(c=>c.group===m.hull.groupIndex))contacts++;}
+ for(let t=0;t<180;t++){ground.waterY=alleyWaterY(rider.z);stepPlayer(rider,NO_INPUT,runtime,ground,0);stepAlleyPlatforms(s,w,rider);if(rider.onGround&&rider.contacts.some(c=>c.group===m.hull.groupIndex))contacts++;}
  assert(contacts>100,`platform ${i}: physical rider lost floor (${contacts} contacts)`);
 }
 console.log('PASS actual collision landing/riding on all eight Alley platforms');

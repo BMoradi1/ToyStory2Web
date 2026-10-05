@@ -1,3 +1,4 @@
+import {ANDY_COT_OBJECTS,createAndyCot,stepAndyCot,restoreAndyCot,type AndyCot} from './sim/andy-cot.ts';
 import {stepAndySpring} from './sim/spring-launch.ts';
 import {seesawObjects,createSeesaws,moveSeesaws,stepSeesaws,restoreSeesaws,type Seesaws} from './sim/seesaws.ts';
 import {ANDY_GATE_OBJECTS,createAndyGates,stepAndyGates,restoreAndyGates,type AndyGates} from './sim/andy-gates.ts';
@@ -374,6 +375,7 @@ async function showLevel(index: number): Promise<void> {
   alleyEffects = null;
   andyMachinery = null;
   andyGates = null;
+  andyCot = null;
   seesaws = null;
   toyBarnRotors = null;
   toyBarnLaunchPlatforms = null;
@@ -497,7 +499,7 @@ async function showLevel(index: number): Promise<void> {
         const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);
       }
       for(const id of seesawObjects(levelNumber(level.id)??0)){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
-      if(levelNumber(level.id)===1)for(const id of [...ANDY_MACHINERY_OBJECTS,...ANDY_GATE_OBJECTS]){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
+      if(levelNumber(level.id)===1)for(const id of [...ANDY_MACHINERY_OBJECTS,...ANDY_GATE_OBJECTS,...ANDY_COT_OBJECTS]){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
       if(levelNumber(level.id)===5)for(const id of [...ALLEY_PLATFORM_OBJECTS,...ALLEY_SEESAW_OBJECTS,...ALLEY_BUBBLE_OBJECTS,...ALLEY_BRIDGE_OBJECTS,...ALLEY_WATER_OBJECTS]){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
       if(levelNumber(level.id)===7)for(const id of [...TOY_BARN_PLATFORM_OBJECTS,...TOY_BARN_ROTOR_OBJECTS,...TOY_BARN_SPRING_OBJECTS,...TOY_BARN_LAUNCH_OBJECTS,TOY_BARN_BARRIER_OBJECT,...TOY_BARN_CANNON_OBJECTS]){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
       if(levelNumber(level.id)===4)for(const id of [...PAINT_CAN_OBJECTS,...CONSTRUCTION_BRIDGE_OBJECTS,...CONSTRUCTION_SHUTTLE_OBJECTS,...CONSTRUCTION_LIFT_OBJECTS,...CONSTRUCTION_SCENERY_OBJECTS,...CONSTRUCTION_STOMP_LIFT_OBJECTS]){
@@ -667,7 +669,7 @@ async function open(dir: GameDir): Promise<void> {
           return creatureSim.creatures.map((c) => ({
             slot: c.slot, type: c.type, name: creatureNames.get(c.type) ?? null,
             script: c.record.script, scriptWords: c.script.length,
-            x: c.x, y: c.y, z: c.z, heading: c.heading, health: c.health,
+            x: c.x, y: c.y, z: c.z, heading: c.heading, pitch:c.pitch, roll:c.hover, health: c.health,
             flags: c.flags, near: (c.flags & CREATURE_FLAGS.near) !== 0,
             vulnerable: c.record.vulnerable,
             pc: c.pc, wait: c.wait, animState: c.animState, frame: c.frame >>> 16,
@@ -830,6 +832,7 @@ async function open(dir: GameDir): Promise<void> {
       get constructionDebris() { return constructionDebris?structuredClone(constructionDebris):null; },
       get paintCans() { return paintCans; },
       get seesaws() { return seesaws; },
+      get andyCot() { return andyCot; },
       get andyGates() { return andyGates; },
       get andyMachinery() { return andyMachinery; },
       get penthouse() { return penthouse; },
@@ -1423,6 +1426,7 @@ async function spawnPlayer(): Promise<void> {
   if(toyBarnLaunchPlatforms){restoreToyBarnLaunchPlatforms(toyBarnLaunchPlatforms,currentCollisionWorld);toyBarnLaunchPlatforms=null;}
   if(toyBarnRotors){restoreToyBarnRotors(toyBarnRotors,currentCollisionWorld);toyBarnRotors=null;}
   if(seesaws){restoreSeesaws(seesaws,currentCollisionWorld);seesaws=null;}
+  if(andyCot){restoreAndyCot(andyCot,currentCollisionWorld);andyCot=null;}
   if(andyGates){restoreAndyGates(andyGates,currentCollisionWorld);andyGates=null;}
   if(andyMachinery){restoreAndyMachinery(andyMachinery,currentCollisionWorld);andyMachinery=null;}
   if(alleyBridge){restoreAlleyBridge(alleyBridge,currentCollisionWorld);alleyBridge=null;}
@@ -1487,6 +1491,7 @@ async function spawnPlayer(): Promise<void> {
   drawToyBarnSprings();
   toyBarnHoops=level===7?createToyBarnHoops():null;
   seesaws=createSeesaws(level,currentLevel.level,currentCollisionWorld);drawSeesaws();
+  andyCot=level===1?createAndyCot(currentLevel.level,currentCollisionWorld):null;drawAndyCot();
   andyGates=level===1?createAndyGates(currentLevel.level,currentCollisionWorld):null;drawAndyGates();
   andyMachinery=level===1?createAndyMachinery(currentLevel.level,currentCollisionWorld):null;drawAndyMachinery();
   alleyEffects=level===5?createAlleyEffects(currentLevel.level):null;
@@ -2854,6 +2859,11 @@ function drawSeesaws():void{
   if(!viewer||!seesaws)return;
   viewer.setObjectTransforms(new Map(seesaws.platforms.flatMap(r=>r.objects.map(o=>[o.index,{angles:o.angles}] as const))));
 }
+function drawAndyCot():void{
+  if(!viewer||!andyCot)return;
+  viewer.setObjectTransforms(new Map(andyCot.objects.map(o=>[o.index,{angles:o.angles,
+    offset:[(o.position.x-o.rest.x)*GAME_TO_RENDER,-(o.position.y-o.rest.y)*GAME_TO_RENDER,-(o.position.z-o.rest.z)*GAME_TO_RENDER] as [number,number,number]}])));
+}
 function drawAndyGates():void{
   if(!viewer||!andyGates)return;
   viewer.setObjectTransforms(new Map(andyGates.objects.map(o=>[o.index,{angles:o.angles,scale:o.scale,
@@ -3357,6 +3367,7 @@ function discardLevel(): void {
   alleyEffects = null;
   andyMachinery = null;
   andyGates = null;
+  andyCot = null;
   seesaws = null;
   toyBarnRotors = null;
   toyBarnLaunchPlatforms = null;
@@ -3795,6 +3806,7 @@ let pushBlocks: PushState | null = null;
 let tarmacPlane: TarmacPlane | null = null;
 let levelPlatforms: LevelPlatforms | null = null;
 let seesaws:Seesaws|null=null;
+let andyCot:AndyCot|null=null;
 let andyGates:AndyGates|null=null;
 let andyMachinery:AndyMachinery|null=null;
 let penthouse:Penthouse|null=null;
@@ -4247,6 +4259,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   // table, which is what lets the spin's whine and whirl hold rather than
   // restart every tick.
   for (const event of player.events) playEvent(event, player);
+  if(andyCot&&creatureSim){stepAndyCot(andyCot,currentCollisionWorld,player,creatureSim.creatures,zones.camera,(id,at)=>playEvent(id,at));drawAndyCot();}
   if(andyGates&&stepAndySpring(player,currentCollisionWorld,zones.camera)){if(pushBlocks)pushBlocks.held=0;spendGuide(guideSparkles,effects,1,true);playEvent(0x1c,player);}
   if(andyGates&&pushBlocks){stepAndyGates(andyGates,currentCollisionWorld,player,pushBlocks);drawAndyGates();if(andyGates.hatchAngle>0)drawPushBlocks();}
   if(andyMachinery&&effects&&creatureSim){

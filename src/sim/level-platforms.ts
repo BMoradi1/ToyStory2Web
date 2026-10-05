@@ -1,8 +1,9 @@
+import {springLaunch} from './spring-launch.ts';
 /** Level-owned movers: 00425f60/0048acc0 (lifts), 0042c2b0/0042c3e0 (airport).
  * Coordinates stay in game units until the collision/render boundary. */
 import type { DatLevel, Vec3 } from '../formats/dat.ts';
 import { sweepSphere, captureCollisionGroup, collisionGroupByObject, transformCollisionGroup, type CollisionWorld } from '../formats/collision.ts';
-import { JumpState, type PlayerState } from './player.ts';
+import type { PlayerState } from './player.ts';
 import { carryOnYawPlatform } from './moving-platform.ts';
 import { standingSurface } from './stomp-props.ts';
 import { COLLISION } from './player-constants.ts';
@@ -81,10 +82,10 @@ export function stepPlatformSwitches(s:LevelPlatforms,p:PlayerState,w:CollisionW
     const fixed=s.springs.find(a=>floor(a.group));
     const vehicle=s.movers.find(m=>m.yaw!==1024&&floor(m.hulls[0]!.groupIndex));
     if(!fixed&&!vehicle)return;
-    p.stomp=0;p.stompImpact=false;p.vy=-0xc00;p.onGround=false;p.coyote=0;
-    p.jumpState=JumpState.Released;p.animPhase=2;p.fallTimer=0;p.launched=true;
+    springLaunch(p,-3072);
     if(s.springObject>=0)s.objects.find(o=>o.id===s.springObject)!.roll=0;
-    s.springObject=fixed?.object??vehicle!.objects[0]!;s.springRoll=-512;
+    // Fixed launchers precede the native recoil update; vehicles follow it.
+    s.springObject=fixed?.object??vehicle!.objects[0]!;s.springRoll=fixed?-480:-512;
     s.objects.find(o=>o.id===s.springObject)!.roll=s.springRoll;
     if(vehicle)vehicle.exhaust=false;
     if(fixed)s.guidesSpent.push(fixed.guide);

@@ -20,7 +20,7 @@ This is static inventory, **not** a completed playthrough or parity score. Missi
 | 10 (10) | elevator hop | yes | — | 18 | 0 / 1 | gunslinger.ts + tasks.ts reward |
 | 11 (11) | al's penthouse | yes | — | 24 | 7 / 0 | gunslinger.ts + tasks.ts reward |
 | 12 (12) | the evil emperor zurg | yes | — | — | 0 / 0 | zurg-boss.ts |
-| 13 (13) | airport infiltration | yes | — | 0, 6, 9, 12, 13, 14 | 13 / 2 | prospector.ts + tasks.ts reward |
+| 13 (13) | airport infiltration | yes | — | 6, 9, 12, 13 | 13 / 2 | prospector.ts + tasks.ts reward |
 | 14 (14) | tarmac trouble | yes | — | 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13 | 9 / 1 | creatures.ts Smith attack + tasks.ts combat/reward |
 | 15 (15) | final showdown | yes | — | — | 0 / 0 | finale.ts (stage + three fighters) |
 
@@ -40,7 +40,7 @@ This is static inventory, **not** a completed playthrough or parity score. Missi
 
 ## Existing task and prop coverage (implementation presence only)
 
-- andy's house: tasks potato, hamm, boss, race, hintNpc, findFive; 7 push blocks; motion andy-machinery.ts (five room-2 cycles, collision gates 12/13), andy-gates.ts (growing doorway and falling hatch, collision 8/14/1), seesaws.ts (biased seesaw, collision 15); stomp-driven object IDs 23.
+- andy's house: tasks potato, hamm, boss, race, hintNpc, findFive; 7 push blocks; motion andy-machinery.ts (five room-2 cycles, collision gates 12/13), andy-gates.ts (growing doorway and falling hatch, collision 8/14/1), seesaws.ts (biased seesaw, collision 15), spring-launch.ts (attic bounce on push collision 3); stomp-driven object IDs 23.
 - andy's neighborhood: tasks boss, race, hamm, hintNpc, findFive; 2 push blocks; motion seesaws.ts (two weight-driven platforms, collision 0/1); stomp-driven object IDs none.
 - bombs away: tasks bossFight; 0 push blocks; motion none mapped; stomp-driven object IDs none.
 - construction yard: tasks boss, challenge, potato, hamm, hintNpc, findFive; 2 push blocks; motion paint-cans.ts (outdoor lids, collision 10/11/12), construction-bridge.ts (stomp drawbridge, collision 26), construction-shuttles.ts (scripted shuttles, collision 14–17), construction-lifts.ts (linked tilting lifts, collision 1–4/6–9), construction-scenery.ts (proximity artwork/portals), construction-stomp-lift.ts (switches 22–24 and lift 21); stomp-driven object IDs 33, 34, 35, 48, 49, 50, 51, 52, 53.
@@ -52,7 +52,7 @@ This is static inventory, **not** a completed playthrough or parity score. Missi
 - elevator hop: tasks potato, offer, boss, hamm, hintNpc, findFive; 0 push blocks; motion level-platforms.ts (lifts), elevator-fans.ts (rotors, switches, airflow); stomp-driven object IDs none.
 - al's penthouse: tasks boss, challenge, hamm, hintNpc, findFive; 3 push blocks; motion penthouse.ts (hazards, water / floats, train, spring / doors, scenery); stomp-driven object IDs none.
 - the evil emperor zurg: tasks none; 0 push blocks; motion none mapped; stomp-driven object IDs none.
-- airport infiltration: tasks boss, challenge, potato, hamm, hintNpc, findFive; 1 push blocks; motion level-platforms.ts (lifts / airport routes; partial parity), seesaws.ts (two linked near/far platforms, collision 3/4); stomp-driven object IDs none.
+- airport infiltration: tasks boss, challenge, potato, hamm, hintNpc, findFive; 1 push blocks; motion level-platforms.ts (airport routes and stomp springs 0/14; partial parity), seesaws.ts (two linked near/far platforms, collision 3/4); stomp-driven object IDs none.
 - tarmac trouble: tasks timedPath, boss, hamm, hintNpc, findFive; 0 push blocks; motion tarmac-plane.ts (collision 0), tarmac-helicopter.ts (artwork/pickup motion), tarmac-lights.ts (pads/lowering), tarmac-scenery.ts (near/far sway), tarmac-weather.ts (rain/lightning/thunder); stomp-driven object IDs none.
 - final showdown: tasks none; 0 push blocks; motion finale.ts (entrance bounce/rotation); stomp-driven object IDs none.
 

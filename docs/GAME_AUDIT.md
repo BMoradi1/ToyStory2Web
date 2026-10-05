@@ -7,6 +7,24 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-05 — Andy and Airport spring launches
+
+Restored Andy's camera-room-4 spring on push block 4 / collision 3: ordinary
+landings bounce at -2432 and stomps at -3072, retire guide 1 and raise event
+0x1c. Airport correctly remains stomp-only, but its two fixed launchers and
+three eligible vehicles no longer enable directional/frictionless air control.
+Both use a shared vertical bounce helper matching 00434090. Fixed Airport
+spring artwork starts at -480 because the same native tick advances recoil;
+vehicle springs start at -512 because their trigger follows that update.
+
+`spring-launch-probe.ts` passes real ordinary/stomp Andy landings and room
+gating, plus all five Airport ordinary-landing rejections and stomp launches,
+normal air control, guide/exhaust changes and recoil recovery. The browser
+passes both Andy launches and all five Airport launches with sound, rendered
+compression, pause/recovery/restart/exit. Approaches are positioned/protected;
+these checks do not establish natural full-level routes. Production build
+passes. Inventory now accounts for Airport's fixed spring collisions 0/14.
+
 ## 2026-10-05 — Five more seesaws across three worlds
 
 Added shared 0049ec00 profiles for Andy's House collision/artwork 15,
@@ -1249,7 +1267,7 @@ not evidence for untested interactions.
 
 | Play order | Level | Confirmed gaps / implementation evidence | Next behavior comparison |
 |---|---|---|---|
-| 1 | Andy's House | Tin intro/fight/reward integration tested; hover wobble/sparks partial. Chair stomp, pushables, five room-2 machinery cycles, growing doorway, falling hatch and biased seesaw with collision gates/effects implemented. | Remaining numbered props and platforms; all five token routes. |
+| 1 | Andy's House | Tin intro/fight/reward integration tested; hover wobble/sparks partial. Chair stomp, pushables, five room-2 machinery cycles, growing doorway, falling hatch, attic bounce and biased seesaw with collision gates/effects implemented. | Remaining numbered props and platforms; all five token routes. |
 | 2 | Andy's Neighborhood | Lawnmower effects, kite flight/combat/reward, ZGCAR hook and two weight-driven seesaws implemented. | Moving scenery and natural race/token routes. |
 | 3 | Bombs Away (internal 6) | `stepBossFight` exists. | Complete boss attacks, damage windows, defeat, token and replay. |
 | 4 | Construction Yard | DRILL combat/reward and ZGCAR implemented; trailer paint, outdoor lids, debris, stomp bridge, four shuttles, four linked tilting lifts, stomp-selected lift, distant crate, proximity scenery/portals and mud movement/effects implemented. | Review collision IDs 13/25; natural traversal/token routes. |

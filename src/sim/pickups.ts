@@ -30,8 +30,8 @@
  *
  * **Tokens start hidden.** `FUN_004a0c80` disables every token in the level's
  * list (src/sim/level-data.ts) at load and its five spares outright; each is
- * revealed by its task through `FUN_004a0db0`. The tasks are not implemented,
- * so the caller reveals them itself (`revealToken`).
+ * revealed by its task through `FUN_004a0db0` (`revealToken`). Timed
+ * collect-five items also stay hidden until their challenge is accepted.
  *
  * Positions here are LEVEL units, as the engine stores them; the player is
  * in game units and is converted at the test.

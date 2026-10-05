@@ -1,3 +1,4 @@
+import {stepAndySpring} from './sim/spring-launch.ts';
 import {seesawObjects,createSeesaws,moveSeesaws,stepSeesaws,restoreSeesaws,type Seesaws} from './sim/seesaws.ts';
 import {ANDY_GATE_OBJECTS,createAndyGates,stepAndyGates,restoreAndyGates,type AndyGates} from './sim/andy-gates.ts';
 import {ANDY_MACHINERY_OBJECTS,createAndyMachinery,stepAndyMachinery,restoreAndyMachinery,type AndyMachinery} from './sim/andy-machinery.ts';
@@ -1471,8 +1472,8 @@ async function spawnPlayer(): Promise<void> {
   // Coins from the markers, everything else from the object-id list. See
   // src/sim/pickups.ts. The five tokens start hidden in the original and are
   // revealed one by one as the level's tasks are done (docs/LEVELS.md). Only
-  // the one the level's own init reveals is shown; the tasks are not
-  // implemented, so the rest stay hidden until `ts2.revealTokens()`.
+  // the one the level's own init reveals is shown; the remaining tasks
+  // reveal their slots when their dialogue or progression condition completes.
   const level = levelNumber(sceneId) ?? 0;
   tarmacPlane = level === 14 ? createTarmacPlane(currentLevel.level, currentCollisionWorld) : null;
   drawTarmacPlane();
@@ -4246,6 +4247,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   // table, which is what lets the spin's whine and whirl hold rather than
   // restart every tick.
   for (const event of player.events) playEvent(event, player);
+  if(andyGates&&stepAndySpring(player,currentCollisionWorld,zones.camera)){if(pushBlocks)pushBlocks.held=0;spendGuide(guideSparkles,effects,1,true);playEvent(0x1c,player);}
   if(andyGates&&pushBlocks){stepAndyGates(andyGates,currentCollisionWorld,player,pushBlocks);drawAndyGates();if(andyGates.hatchAngle>0)drawPushBlocks();}
   if(andyMachinery&&effects&&creatureSim){
     stepAndyMachinery(andyMachinery,currentCollisionWorld,player,{cameraZone:zones.camera,gateTwo:effects.gate.two,byte:()=>creatureSim!.rand.byte(),

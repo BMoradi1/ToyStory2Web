@@ -7,6 +7,23 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-05 — Neighborhood collapsing structure and launcher
+
+Restored the surface-8/9 stomp supports and surface-10 launcher from
+00418e50/004190c0. Each support shrinks, swaps its intact/broken artwork and
+retires its guide; one broken support rocks the structure with side-dependent
+pitch. Breaking both swaps collision 6 for 5, refreshes pickup shadow floors,
+and settles artwork 4/8/9/10 before replacing 4 with launcher 21. The launcher
+only activates after the swap, waits until timer 7, then applies the authored
+-4224 vertical / 16384 forward directional launch and recovers its artwork.
+
+Installed probes use real physics landings/stomps in both orders and check
+ordinary-landing rejection, locked spring, collision flags, timing, wobble,
+visibility, one-shot floor refresh/guides/sounds and reset. Browser checks pass
+actual support stomps, rendered collapse, delayed directional launch, guide
+retirement, audio, pause/restart/exit. These checks use positioned approaches;
+a full natural traversal remains open. Production build passes.
+
 ## 2026-10-05 — Neighborhood extending rope
 
 Restored pole 0 and artwork 25/27 from 00418e50/004190c0. Grabbing starts

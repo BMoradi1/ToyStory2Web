@@ -1,3 +1,4 @@
+import {CONSTRUCTION_STOMP_LIFT_OBJECTS,createConstructionStompLift,moveConstructionStompLift,stepConstructionStompLift,restoreConstructionStompLift,type ConstructionStompLift} from './sim/construction-stomp-lift.ts';
 import {CONSTRUCTION_SCENERY_OBJECTS,createConstructionScenery,stepConstructionScenery,constructionPortals,type ConstructionScenery} from './sim/construction-scenery.ts';
 import {CONSTRUCTION_LIFT_OBJECTS,createConstructionLifts,moveConstructionLifts,stepConstructionLifts,restoreConstructionLifts,type ConstructionLifts} from './sim/construction-lifts.ts';
 import {CONSTRUCTION_SHUTTLE_OBJECTS,createConstructionShuttles,moveConstructionShuttles,stepConstructionShuttles,restoreConstructionShuttles,type ConstructionShuttles} from './sim/construction-shuttles.ts';
@@ -336,6 +337,7 @@ async function showLevel(index: number): Promise<void> {
   constructionBridge = null;
   constructionShuttles = null;
   constructionLifts = null;
+  constructionStompLift = null;
   constructionScenery = null;
   waterEffects=createWaterEffects();
   tarmacHelicopter = null;
@@ -444,7 +446,7 @@ async function showLevel(index: number): Promise<void> {
       for(const id of platformObjects(levelNumber(level.id)??0)) {
         const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);
       }
-      if(levelNumber(level.id)===4)for(const id of [...PAINT_CAN_OBJECTS,...CONSTRUCTION_BRIDGE_OBJECTS,...CONSTRUCTION_SHUTTLE_OBJECTS,...CONSTRUCTION_LIFT_OBJECTS,...CONSTRUCTION_SCENERY_OBJECTS]){
+      if(levelNumber(level.id)===4)for(const id of [...PAINT_CAN_OBJECTS,...CONSTRUCTION_BRIDGE_OBJECTS,...CONSTRUCTION_SHUTTLE_OBJECTS,...CONSTRUCTION_LIFT_OBJECTS,...CONSTRUCTION_SCENERY_OBJECTS,...CONSTRUCTION_STOMP_LIFT_OBJECTS]){
         const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);
       }
       if(levelNumber(level.id)===11&&exeBytes)for(const id of penthouseObjects(readPenthouseTables(exeBytes))){
@@ -741,6 +743,7 @@ async function open(dir: GameDir): Promise<void> {
       get tarmacScenery() { return tarmacScenery; },
       get levelPlatforms() { return levelPlatforms; },
       get constructionScenery() { return constructionScenery; },
+      get constructionStompLift() { return constructionStompLift; },
       get constructionLifts() { return constructionLifts; },
       get constructionShuttles() { return constructionShuttles; },
       get constructionBridge() { return constructionBridge; },
@@ -1327,6 +1330,7 @@ async function spawnPlayer(): Promise<void> {
 
   constructionDebris=null;
   constructionScenery=null;
+  if(constructionStompLift){restoreConstructionStompLift(constructionStompLift,currentCollisionWorld);constructionStompLift=null;}
   if(constructionLifts){restoreConstructionLifts(constructionLifts,currentCollisionWorld);constructionLifts=null;}
   if(constructionShuttles){restoreConstructionShuttles(constructionShuttles,currentCollisionWorld);constructionShuttles=null;}
   if(constructionBridge){restoreConstructionBridge(constructionBridge,currentCollisionWorld);constructionBridge=null;}
@@ -1388,6 +1392,8 @@ async function spawnPlayer(): Promise<void> {
   drawConstructionShuttles();
   constructionLifts=level===4&&exeBytes?createConstructionLifts(currentLevel.level,currentCollisionWorld,exeBytes):null;
   drawConstructionLifts();
+  constructionStompLift=level===4?createConstructionStompLift(currentLevel.level,currentCollisionWorld):null;
+  drawConstructionStompLift();
   constructionScenery=level===4?createConstructionScenery(currentLevel.level):null;
   drawConstructionScenery();
   tarmacWeather = level === 14 ? createTarmacWeather() : null; setWeatherLight(128);
@@ -2596,6 +2602,14 @@ function drawConstructionScenery():void{
     scale:[1,constructionScenery!.height/4096,1] as [number,number,number],
   }])));
 }
+function drawConstructionStompLift():void{
+  if(!viewer||!constructionStompLift)return;
+  const s=constructionStompLift;
+  const transforms=new Map<number,ObjectTransform>(s.switches.map(b=>[b.art.index,{angles:[b.pressed?-384:0,0,0]}]));
+  transforms.set(s.art.index,{angles:s.art.angles,offset:[(s.position.x-s.art.rest.x)*GAME_TO_RENDER,
+    -(s.position.y-s.art.rest.y)*GAME_TO_RENDER,-(s.position.z-s.art.rest.z)*GAME_TO_RENDER]});
+  viewer.setObjectTransforms(transforms);
+}
 function drawConstructionLifts():void{
   if(!viewer||!constructionLifts)return;
   viewer.setObjectTransforms(new Map(constructionLifts.lifts.flatMap(l=>l.objects.map(o=>[o.index,{angles:o.angles,scale:o.scale,
@@ -3102,6 +3116,7 @@ function discardLevel(): void {
   constructionBridge = null;
   constructionShuttles = null;
   constructionLifts = null;
+  constructionStompLift = null;
   constructionScenery = null;
   waterEffects=createWaterEffects();
   tarmacHelicopter = null;
@@ -3531,6 +3546,7 @@ let constructionDebris:ConstructionDebris|null=null;
 let constructionBridge:ConstructionBridge|null=null;
 let constructionShuttles:ConstructionShuttles|null=null;
 let constructionLifts:ConstructionLifts|null=null;
+let constructionStompLift:ConstructionStompLift|null=null;
 let constructionScenery:ConstructionScenery|null=null;
 let waterEffects=createWaterEffects();
 let tarmacHelicopter: TarmacHelicopter | null = null;
@@ -3807,6 +3823,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   playerGround.waterY = penthouse?.water.y??null;
   playerGround.beforeMove = () => {
     tickPushBlocks(held);
+    if(constructionStompLift)moveConstructionStompLift(constructionStompLift,currentCollisionWorld!,player!);
     if(constructionLifts)moveConstructionLifts(constructionLifts,currentCollisionWorld!,player!);
     if(constructionShuttles)moveConstructionShuttles(constructionShuttles,currentCollisionWorld!,player!);
     if(constructionBridge)moveConstructionBridge(constructionBridge,currentCollisionWorld!,player!);
@@ -3954,6 +3971,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     playEvent(0x9b,aircraftSoundPoint({x:pose.position.x*32,y:pose.position.y*32,z:pose.position.z*32},camera));
   }
 
+  if(constructionStompLift){stepConstructionStompLift(constructionStompLift,currentCollisionWorld,player,id=>spendGuide(guideSparkles,effects,id,true));drawConstructionStompLift();}
   if(constructionLifts&&creatureSim){stepConstructionLifts(constructionLifts,player,()=>creatureSim!.rand.byte());drawConstructionLifts();}
   if(constructionShuttles&&creatureSim){stepConstructionShuttles(constructionShuttles,()=>creatureSim!.rand.byte());drawConstructionShuttles();}
   if(constructionBridge){

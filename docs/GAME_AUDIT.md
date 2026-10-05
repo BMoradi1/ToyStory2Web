@@ -7,6 +7,23 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-04 — Construction Yard stomp-selected lift
+
+- Restored the three switches (collision 22–24/artwork 65–67) and their
+  shared lift (collision 21/artwork 68) from `0041dac0..0041dd73`. Stomps
+  pitch switches −384 angle units and retire guide points 4–6 once each.
+- The highest pressed switch selects one of three upper thresholds. Native
+  acceleration/braking (8 per tick, speed cap 1024), direction-bit changes,
+  lower reversal threshold and stopping overshoot are retained. Hull and
+  artwork move together; standing/climbing passengers receive translation.
+- Installed probe uses real stomp collisions for all six activation orders
+  and exercises complete lift cycles after each press, including all three
+  height selections, precedence, bounds, guide retirement and collision
+  restore. Browser verifies all switches, top-height round trip, artwork,
+  guide state, pause/restart/exit. Lift/bridge regressions and build pass.
+- Collision IDs 13/25 remain review leads. Natural route completion and
+  exact retail crush/contact behavior are still unverified.
+
 ## 2026-10-04 — Construction Yard trailer portal gating
 
 - Corrected the earlier interpretation of `0054f3bc`: it belongs to the
@@ -633,7 +650,7 @@ not evidence for untested interactions.
 | 1 | Andy's House | Tin intro/fight/reward integration tested; hover wobble/sparks partial. Chair stomp and pushables implemented. | Remaining numbered props and platforms; all five token routes. |
 | 2 | Andy's Neighborhood | Lawnmower effects, kite flight/combat/reward and ZGCAR hook implemented. | Moving scenery and natural race/token routes. |
 | 3 | Bombs Away (internal 6) | `stepBossFight` exists. | Complete boss attacks, damage windows, defeat, token and replay. |
-| 4 | Construction Yard | DRILL combat/reward and ZGCAR implemented; trailer paint, outdoor lids, debris, stomp bridge, four shuttles, four linked tilting lifts, distant crate and proximity scenery implemented. | Review collision IDs 13/21–25; natural traversal/token routes. |
+| 4 | Construction Yard | DRILL combat/reward and ZGCAR implemented; trailer paint, outdoor lids, debris, stomp bridge, four shuttles, four linked tilting lifts, stomp-selected lift, distant crate and proximity scenery/portals implemented. | Review collision IDs 13/25; natural traversal/token routes. |
 | 5 | Alleys and Gullies | BOX/BPLANE launch cycle, boat cannon and clown combat/reward implemented. | Moving scenery/collision; 37 poles and 11 zip lines need route checks. |
 | 6 | Slime Time (internal 3) | Dedicated slime controller exists. | Full encounter, arena effects, reward and replay comparison. |
 | 7 | Al's Toy Barn | Dinosaur breath/combat/defeat/reward and BOX/BPLANE launch cycle implemented. | Original moving-collision calls and full token routes. |

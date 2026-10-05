@@ -7,6 +7,23 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-05 — Alley seesaws and spring
+
+Restored collision 1/2's weight-responsive tilt using `0049ec00`: side of the
+pivot, radial distance and pre-landing vertical speed determine the force;
+friction, unoccupied recentering, ±1792 raw-angle limits and 3/4 rebound follow
+the original. Near/far artwork 4–7 shares the resulting angles. Floor and
+ledge passengers rotate with the collision. Collision 3 launches normal
+landings at -2432 and ground pounds at -3072, consumes guide 1 and plays 0x1c.
+`00434090` leaves normal air control in place.
+
+Installed probes cover both seesaws in both directions, landing force, limit
+rebound, ledge handling and restored geometry, plus actual collision-driven
+normal/stomp spring landings. Browser tests trigger both seesaws through real
+landings, check paired artwork, both spring impulses/sound, pause, restart and
+exit. Build passes. Full natural traversal and exact original camera framing
+remain unverified. The bubble machine and bridge remain separate audit work.
+
 ## 2026-10-05 — Alleys and Gullies lane platforms
 
 Restored eight platforms from `0041e390/0041e150/0041e020`: collision 5–12,

@@ -1,3 +1,4 @@
+import {createSpaceLasers,stepSpaceLasers,type SpaceLasers} from './sim/space-lasers.ts';
 import {SPACE_SCENERY_OBJECTS,createSpaceScenery,stepSpaceScenery,type SpaceScenery} from './sim/space-scenery.ts';
 import {SPACE_CLAW_OBJECTS,createSpaceClaw,stepSpaceClaw,syncSpaceClawPrize,type SpaceClaw} from './sim/space-claw.ts';
 import {constructionMudY} from './sim/construction-mud.ts';
@@ -344,6 +345,7 @@ async function showLevel(index: number): Promise<void> {
   constructionScenery = null;
   spaceClaw = null;
   spaceScenery = null;
+  spaceLasers = null;
   waterEffects=createWaterEffects();
   tarmacHelicopter = null;
   tarmacLights = null;
@@ -750,6 +752,7 @@ async function open(dir: GameDir): Promise<void> {
       get tarmacWeather() { return tarmacWeather; },
       get tarmacScenery() { return tarmacScenery; },
       get levelPlatforms() { return levelPlatforms; },
+      get spaceLasers(){return spaceLasers;},
       get spaceScenery(){return spaceScenery;},
       get spaceClaw(){return spaceClaw;},
       get clawPrize(){return pickups?.items.find(i=>i.id===53);},
@@ -1344,6 +1347,7 @@ async function spawnPlayer(): Promise<void> {
   constructionScenery=null;
   spaceClaw=null;
   spaceScenery=null;
+  spaceLasers=null;
   if(constructionStompLift){restoreConstructionStompLift(constructionStompLift,currentCollisionWorld);constructionStompLift=null;}
   if(constructionLifts){restoreConstructionLifts(constructionLifts,currentCollisionWorld);constructionLifts=null;}
   if(constructionShuttles){restoreConstructionShuttles(constructionShuttles,currentCollisionWorld);constructionShuttles=null;}
@@ -1529,6 +1533,7 @@ async function spawnPlayer(): Promise<void> {
   spaceClaw=level===8?createSpaceClaw(currentLevel.level):null;
   spaceScenery=level===8?createSpaceScenery(currentLevel.level):null;
   drawSpaceScenery();
+  spaceLasers=level===8?createSpaceLasers(currentLevel.level):null;
   if(spaceClaw){syncSpaceClawPrize(spaceClaw,pickups);drawSpaceClaw();}
   tokenRevealProfile=exeBytes?readTokenReveal(exeBytes):null;
   // Lives and health carry over from the record, as `FUN_004a2cc0` copies
@@ -1937,7 +1942,7 @@ function drawEffects(): void {
   // Sprite 9 is the beam strip. The engine tiles it every 400 level units,
   // with frame 2 at the tail and frame 1 along the remainder.
   const strip = spriteTable[9];
-  if (strip) for (const beam of [...laserBeams,...podBeams]) {
+  if (strip) for (const beam of [...laserBeams,...podBeams,...spaceLasers?.beams??[]]) {
     const dx = beam.to.x - beam.from.x, dy = beam.to.y - beam.from.y, dz = beam.to.z - beam.from.z;
     const length = Math.hypot(dx, dy, dz);
     for (let offset = 0; offset < length; offset += 400 * 32) {
@@ -3159,6 +3164,7 @@ function discardLevel(): void {
   constructionScenery = null;
   spaceClaw = null;
   spaceScenery = null;
+  spaceLasers = null;
   waterEffects=createWaterEffects();
   tarmacHelicopter = null;
   tarmacLights = null;
@@ -3591,6 +3597,7 @@ let constructionStompLift:ConstructionStompLift|null=null;
 let constructionScenery:ConstructionScenery|null=null;
 let spaceClaw:SpaceClaw|null=null;
 let spaceScenery:SpaceScenery|null=null;
+let spaceLasers:SpaceLasers|null=null;
 let waterEffects=createWaterEffects();
 let tarmacHelicopter: TarmacHelicopter | null = null;
 let tarmacLights: TarmacLights | null = null;
@@ -4015,6 +4022,12 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     playEvent(0x9b,aircraftSoundPoint({x:pose.position.x*32,y:pose.position.y*32,z:pose.position.z*32},camera));
   }
 
+  if(spaceLasers&&creatureSim&&effects&&camera){
+    const world=effectWorld();
+    stepSpaceLasers(spaceLasers,player,{randomByte:()=>creatureSim!.rand.byte(),
+      effect:(at,kind,mode)=>spawnChild(effects!,world,at.x,at.y,at.z,kind,mode),
+      light:l=>addPointLight(pointLights,l),sound:(id,at)=>playEvent(id,at),hurt:angle=>applyCreatureTouch(angle,2)});
+  }
   if(spaceClaw&&creatureSim&&pickups){
     stepSpaceClaw(spaceClaw,player,{zone:zones.player,stomp:!!player.stompImpact&&standingSurface(player,currentCollisionWorld)===8,
       randomByte:()=>creatureSim!.rand.byte(),sound:(id,at)=>playEvent(id,at),guide:()=>spendGuide(guideSparkles,effects,0,true)});

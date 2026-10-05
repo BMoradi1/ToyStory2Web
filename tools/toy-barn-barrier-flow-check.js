@@ -43,7 +43,10 @@
     check(ts2.toyBarnBarrier.height===16384&&!ts2.toyBarnBarrier.enabled,'offer failed to open gate '+JSON.stringify({gate:ts2.toyBarnBarrier.height,tasks:ts2.tasks}));
     check(ts2.viewer.objectTransforms.get(ts2.toyBarnBarrier.index).split('|')[1]==='0,2,0','raised gate artwork mismatch');
   }
-  await offer();ts2.killCreature(6);for(let t=0;t<40;t++)safeTick();
+  await offer();
+  for(let t=0;t<120&&ts2.tasks.fetchDone===0;t++){ts2.goToCreature(6);Object.assign(ts2.player,{vy:0,fallTimer:0});ts2.tickGame({},1,0);}
+  check(ts2.tasks.fetchDone===1&&ts2.player.vy===-1536&&!ts2.player.onGround,'real first objective collection/bounce missing');
+  for(let t=0;t<40;t++)safeTick();
   check(ts2.tasks.fetchDone===1&&ts2.tasks.fetch===0,'first fetch did not complete');
   check(ts2.toyBarnBarrier.height===0&&ts2.toyBarnBarrier.enabled,'first completion left gate open');
   await offer();

@@ -7,6 +7,24 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-04 — Toy Barn hoops and first-fetch bounce
+
+Restored slots 10/11's level-owned hoop rules from `00421340`: the native
+unsigned X minimum, signed Z minimum, crate-dependent side/corner limits and
+-2304 Z reversal. A hoop must have been visible before crossing the lane end
+or disappearing can recycle it. Nearby recycling uses removal without death
+rewards; distant recycling zeros health. Both retain their installed respawn
+intervals. Also restored the first fetch completion's one-shot -1536 bounce.
+
+`toy-barn-hoops-probe.ts` verifies installed bounds, strict corner equality,
+reversal, seen/unseen behavior, reward-free recycling and shared respawn.
+The browser checks real model visibility, disappearance/reappearance, boundary
+positions after normal movement, pause, restart and exit, without injecting
+hoop health or flags. The fetch browser test now collects its first objective
+through actual contact, verifies the bounce, then completes timeout, retry and
+second-run token collection. Build passes. Tests reposition/protect Buzz;
+unassisted crate/hoop traversal and exact camera comparison remain open.
+
 ## 2026-10-04 — Toy Barn timed stomp cannon
 
 Restored switch collision 15/art 33 and cannon collision 0/art 0/1 from
@@ -44,8 +62,8 @@ retry and success using installed creatures/pickups. The expanded barrier
 browser regression passes withdrawal after an actual deadline, a new offer,
 actual token collection, both barrier completion states and lifecycle cleanup.
 Tarmac timed-path and Space Land saucer probes still pass; build passes.
-First-stage completion's native small bounce remains open. The later cannon
-entry above covers its shared-timer interaction.
+Later entries above cover the first-stage bounce and shared cannon-timer
+interaction.
 
 ## 2026-10-04 — Toy Barn timed-fetch barrier
 

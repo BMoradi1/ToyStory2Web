@@ -1,3 +1,4 @@
+import {createToyBarnHoops,stepToyBarnHoops,type ToyBarnHoops} from './sim/toy-barn-hoops.ts';
 import {TOY_BARN_CANNON_OBJECTS,createToyBarnCannon,moveToyBarnCannon,stepToyBarnCannon,restoreToyBarnCannon,toyBarnCannonPoses,type ToyBarnCannon} from './sim/toy-barn-cannon.ts';
 import {TOY_BARN_BARRIER_OBJECT,createToyBarnBarrier,stepToyBarnBarrier,restoreToyBarnBarrier,type ToyBarnBarrier} from './sim/toy-barn-barrier.ts';
 import {TOY_BARN_LAUNCH_OBJECTS,createToyBarnLaunchPlatforms,moveToyBarnLaunchPlatforms,stepToyBarnLaunchPlatforms,restoreToyBarnLaunchPlatforms,type ToyBarnLaunchPlatforms} from './sim/toy-barn-launch-platforms.ts';
@@ -86,7 +87,7 @@ import { validBindingCode, InputSource } from './sim/input.ts';
 import { laserTargetCentre, fireBeam, stepBeams, type LaserBeam, type LaserTarget } from './sim/laser.ts';
 import { GAME_UNITS_PER_LEVEL_UNIT } from './sim/player-constants.ts';
 import {
-  createPlayer, createRuntime, groundFromCollision, stepPlayer,
+  createPlayer, createRuntime, groundFromCollision, stepPlayer, JumpState,
   type PlayerInput, type PlayerRuntime, type PlayerState,
 } from './sim/player.ts';
 import { cos as cosOf, sin as sinOf, toRadians, yawOf } from './sim/trig.ts';
@@ -350,6 +351,7 @@ async function showLevel(index: number): Promise<void> {
   paintCans = null;
   constructionDebris = null;
   toyBarnEffects = null;
+  toyBarnHoops = null;
   toyBarnSprings = null;
   constructionBridge = null;
   constructionShuttles = null;
@@ -794,6 +796,7 @@ async function open(dir: GameDir): Promise<void> {
       get constructionShuttles() { return constructionShuttles; },
       get constructionBridge() { return constructionBridge; },
       get toyBarnSprings(){return toyBarnSprings;},
+      get toyBarnHoops(){return toyBarnHoops;},
       get toyBarnEffects(){return toyBarnEffects;},
       get constructionDebris() { return constructionDebris?structuredClone(constructionDebris):null; },
       get paintCans() { return paintCans; },
@@ -1379,6 +1382,7 @@ async function spawnPlayer(): Promise<void> {
 
   constructionDebris=null;
   toyBarnEffects=null;
+  toyBarnHoops=null;
   toyBarnSprings=null;
   constructionScenery=null;
   spaceClaw=null;
@@ -1450,6 +1454,7 @@ async function spawnPlayer(): Promise<void> {
   drawPaintCans();
   toyBarnSprings=level===7?createToyBarnSprings(currentLevel.level):null;
   drawToyBarnSprings();
+  toyBarnHoops=level===7?createToyBarnHoops():null;
   toyBarnEffects=level===7?createToyBarnEffects(currentLevel.level):null;
   constructionDebris=level===4?createConstructionDebris(currentLevel.level):null;
   constructionBridge=level===4?createConstructionBridge(currentLevel.level,currentCollisionWorld):null;
@@ -3260,6 +3265,7 @@ function discardLevel(): void {
   paintCans = null;
   constructionDebris = null;
   toyBarnEffects = null;
+  toyBarnHoops = null;
   toyBarnSprings = null;
   constructionBridge = null;
   constructionShuttles = null;
@@ -3703,6 +3709,7 @@ let levelPlatforms: LevelPlatforms | null = null;
 let penthouse:Penthouse|null=null;
 let paintCans:PaintCans|null=null;
 let toyBarnSprings:ToyBarnSprings|null=null;
+let toyBarnHoops:ToyBarnHoops|null=null;
 let toyBarnEffects:ToyBarnEffects|null=null;
 let constructionDebris:ConstructionDebris|null=null;
 let constructionBridge:ConstructionBridge|null=null;
@@ -4200,6 +4207,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       effect:(at,kind,mode)=>spawnChild(effects!,world,at.x,at.y,at.z,kind,mode),
     });drawPaintCans();
   }
+  if(toyBarnHoops&&creatureSim&&pushBlocks?.blocks[0])stepToyBarnHoops(toyBarnHoops,creatureSim.creatures,pushBlocks.blocks[0]);
   if(toyBarnEffects&&creatureSim&&effects&&camera){
     const world=effectWorld();
     stepToyBarnEffects(toyBarnEffects,player,{gate64:effects.gate.sixtyFour,randomByte:()=>creatureSim!.rand.byte(),
@@ -4243,6 +4251,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
           // `DAT_0050a1f8`: a task that has just been accepted waits for the
           // box to close before its clock starts.
           cannonActive:!!toyBarnCannon?.timer,
+          bouncePlayer:vy=>{if(player)Object.assign(player,{vy,stomp:0,stompImpact:false,onGround:false,coyote:0,fallTimer:0,jumpState:JumpState.Released,animPhase:2,launched:false});},
           talking: talk !== null,
           x: player.x, y: player.y, z: player.z, level,
           items: pickups?.itemsFound ?? 0,

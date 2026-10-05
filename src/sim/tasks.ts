@@ -492,6 +492,8 @@ export function stepTasks(
     shake?: SlimeWorld['shake'];
     /** Toy Barn cannon owns the shared timed-task slot while running. */
     cannonActive?: boolean;
+    /** Native first-fetch completion bounce, 00434090(-1536, 2). */
+    bouncePlayer?: (velocity:number) => void;
     coins: number; found: number; rand: RandomStream; talking: boolean;
     /** Where Buzz is, for the race's lap box and the boss's height band. */
     x: number; y: number; z: number;
@@ -583,7 +585,7 @@ export function stepTasks(
       if (tasks.fetchDone === 0) {
         // First run: done when the chick is gone.
         const watched = creatureAt(fetch.watch);
-        if (watched?.health === 0) { tasks.fetchDone = 1; tasks.fetch = 0; }
+        if (watched?.health === 0) { tasks.fetchDone = 1; tasks.fetch = 0; world.bouncePlayer?.(-1536); }
       } else if ((world.tokens & (1 << fetch.slot)) !== 0) {
         // Second run: done when its token has been taken. The tick reads
         // that from the shared "challenge finished" word at 0x830cf0, which

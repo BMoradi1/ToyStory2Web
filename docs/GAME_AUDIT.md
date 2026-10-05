@@ -7,6 +7,26 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-05 — Complete regression checkpoint
+
+After the particle-distance, underwater-camera, footstep/audio and audit-tool
+changes, the complete discovered suites pass:
+
+- `npm run audit:sim`: **127/127**, zero failures or skipped probes (70 seconds).
+- `npm run audit:browser`: **99/99**, zero failures or skipped flows (527 seconds).
+- Production build passes.
+- Fresh original-motion export covers 45 level functions across all 15 ticks;
+  the generated inventory records 315 mutation targets with no unavailable
+  helpers in the bounded direct-call graph.
+
+Browser sessions use disposable saves and the supplied read-only installation.
+Detailed local results are `/tmp/toystory-simulation-final.json` and
+`/tmp/toystory-browser-final/report.json`, with per-flow logs and screenshots
+beside the browser report. These temporary artifacts are not committed.
+This checkpoint verifies the automated coverage; it does not close natural
+all-token routes, unassisted boss fights or outstanding original visual parity.
+The level-by-level queue below remains the source of those open items.
+
 ## 2026-10-05 — Broader original-behavior inventory
 
 The static audit previously recognized only four mutation functions and

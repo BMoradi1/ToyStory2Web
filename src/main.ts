@@ -1,3 +1,4 @@
+import {constructionMudY} from './sim/construction-mud.ts';
 import {CONSTRUCTION_STOMP_LIFT_OBJECTS,createConstructionStompLift,moveConstructionStompLift,stepConstructionStompLift,restoreConstructionStompLift,type ConstructionStompLift} from './sim/construction-stomp-lift.ts';
 import {CONSTRUCTION_SCENERY_OBJECTS,createConstructionScenery,stepConstructionScenery,constructionPortals,type ConstructionScenery} from './sim/construction-scenery.ts';
 import {CONSTRUCTION_LIFT_OBJECTS,createConstructionLifts,moveConstructionLifts,stepConstructionLifts,restoreConstructionLifts,type ConstructionLifts} from './sim/construction-lifts.ts';
@@ -1742,6 +1743,9 @@ function spawnCreatureEffects(): void {
 }
 
 /** What the effect tick needs to know about the rest of the world. */
+function currentLiquidY():number|null{
+  return constructionScenery&&player?constructionMudY(player):penthouse?.water.y??null;
+}
 function effectWorld(): EffectWorld {
   const S2 = GAME_UNITS_PER_LEVEL_UNIT;
   // Scripted switch cuts must keep effects around the scene being shown alive.
@@ -1755,7 +1759,8 @@ function effectWorld(): EffectWorld {
       const hit = groundBelow(currentCollisionWorld, x / S2, y / S2, z / S2);
       return hit ? hit.y * S2 : null;
     },
-    waterY: penthouse?.water.y??null,
+    waterY: currentLiquidY(),
+    waterKind: constructionScenery?2:1,
   };
 }
 
@@ -3820,7 +3825,8 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   if(aimView.active)viewer.setAimPose(aimModelAngles(aimView));
   if(aimView.active) held={...held,moveX:0,moveY:0,jump:false,spin:false,cameraLeft:false,cameraRight:false};
   const playerGround = groundFromCollision(currentCollisionWorld, levelPoles, levelZipLines);
-  playerGround.waterY = penthouse?.water.y??null;
+  playerGround.waterY = currentLiquidY();
+  playerGround.waterKind = constructionScenery?2:1;
   playerGround.beforeMove = () => {
     tickPushBlocks(held);
     if(constructionStompLift)moveConstructionStompLift(constructionStompLift,currentCollisionWorld!,player!);

@@ -833,3 +833,24 @@ still need their own verified water/slime region controllers.
 modes, terminal speed and override order; the existing land probe remains
 24/24. The Penthouse water browser regression also exercises live integration.
 Player water particles and camera/audio presentation remain separate work.
+
+### Construction Yard mud (type 2)
+
+`construction-mud.ts` supplies the strict X/Z bounds and inclusive upper
+height gate from `0041d680..0041d712`. `Ground.waterKind = 2` selects the
+shared type-2 row: the submerged flag starts immediately below the surface,
+top speed is 256, jump impulse −768, vertical divisor 4 and sink cap 64.
+`004340d0` refreshes coyote time to 6 while sinking, permitting a shallow
+escape jump without a solid floor. Water keeps its separate 8192-depth gate
+and 1024 fall cap. Both liquid flags clear on exit or a dry world.
+
+The shared presentation controller selects mud splashes/droplets (kind 53),
+ripples (51/52), 180-tick footprints (54) and entry sound 0x4e. Mud uses the
+sixteen-tick ripple gate even while moving, consumes two random bytes per
+droplet and does not generate water bubbles or underwater camera ambience.
+The level also starts muddy footprints when leaving the active region.
+`construction-mud-probe.ts` covers region/depth boundaries, speed/sinking,
+escape jumps, installed effects and footprint expiry; the browser regression
+checks movement, particles, sound, pause/restart/exit. Native model clipping
+at the liquid surface and the full surface-dependent footstep-sound selector
+remain separate presentation work.

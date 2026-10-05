@@ -101,6 +101,8 @@ export interface EffectWorld {
   groundAt: (x: number, y: number, z: number) => number | null;
   /** The water line, for the modes that die under it. */
   waterY: number | null;
+  /** Shared liquid plane: 1 water (default), 2 mud. */
+  waterKind?: 1 | 2;
 }
 
 export interface EffectSim {

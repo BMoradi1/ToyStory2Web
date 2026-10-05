@@ -191,7 +191,7 @@ export const TALK_SCRIPTS = {
  * for none) and `collisionObject` the number of the dynamic collision group
  * in TERRAIN.ALL that moves with it (`AllGroup.objectNumber`).
  */
-export interface PushBlock { sceneObject: number; collisionObject: number; pathTag: number }
+export interface PushBlock { sceneObject: number; sceneFollowers?: readonly number[]; collisionObject: number; pathTag: number }
 
 /**
  * Each level's push-block table, from the `FUN_004335d0(table)` call in its
@@ -214,7 +214,7 @@ export const PUSH_BLOCKS: Readonly<Record<number, readonly PushBlock[]>> = {
   ],
   4: [
     { sceneObject: 32, collisionObject: 0, pathTag: 3 },
-    { sceneObject: 12, collisionObject: 18, pathTag: 5 },
+    { sceneObject: 12, sceneFollowers: [13], collisionObject: 18, pathTag: 5 },
   ],
   5: [
     { sceneObject: 14, collisionObject: 0, pathTag: 12 },

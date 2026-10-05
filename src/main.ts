@@ -422,8 +422,8 @@ async function showLevel(index: number): Promise<void> {
       // level mesh. Keeping each in a draw group of its own is what lets a
       // collected one, or a token whose task is not done, be taken away.
       const separate = pickupObjects(parsed, levelNumber(level.id) ?? 0);
-      for (const block of PUSH_BLOCKS[levelNumber(level.id) ?? 0] ?? []) {
-        const index = parsed.objectIds[block.sceneObject];
+      for (const block of PUSH_BLOCKS[levelNumber(level.id) ?? 0] ?? []) for(const id of [block.sceneObject,...(block.sceneFollowers??[])]) {
+        const index = parsed.objectIds[id];
         if (index !== undefined && index >= 0) separate.add(index);
       }
       for (const id of stompObjects(levelNumber(level.id) ?? 0)) {
@@ -786,7 +786,7 @@ async function open(dir: GameDir): Promise<void> {
         return {
           held: pushBlocks.held,
           blocks: pushBlocks.blocks.map((b) => ({
-            index: b.index, object: currentLevel?.level.objectIds[b.sceneObject] ?? -1, seg: b.seg, run: b.run, segLen: b.segLen, tipPoint: b.tipPoint,
+            index: b.index, object: currentLevel?.level.objectIds[b.sceneObject] ?? -1, followers:b.sceneFollowers.map(id=>currentLevel?.level.objectIds[id]??-1), seg: b.seg, run: b.run, segLen: b.segLen, tipPoint: b.tipPoint,
             fall: b.fallSpeed, x: b.x, y: b.y, z: b.z, group: b.group,
           })),
         };
@@ -2638,14 +2638,19 @@ function drawPushBlocks(): void {
   if (!viewer || !pushBlocks || !currentLevel) return;
   const transforms = new Map<number, ObjectTransform>();
   for (const b of pushBlocks.blocks) {
-    const index = currentLevel.level.objectIds[b.sceneObject];
-    const object = index === undefined ? undefined : currentLevel.level.objects[index];
-    if (!object || index === undefined) continue;
-    const start = { x: object.position.x * object.unitScale * 32, y: object.position.y * object.unitScale * 32, z: object.position.z * object.unitScale * 32 };
-    transforms.set(index, {
-      angles: [object.rotation.x, object.rotation.y, object.rotation.z],
-      offset: [(b.x - start.x) * GAME_TO_RENDER, -(b.y - start.y) * GAME_TO_RENDER, -(b.z - start.z) * GAME_TO_RENDER],
-    });
+    for(const id of [b.sceneObject,...b.sceneFollowers]){
+      const index = currentLevel.level.objectIds[id];
+      const object = index === undefined ? undefined : currentLevel.level.objects[index];
+      if (!object || index === undefined) continue;
+      const start = { x: object.position.x * object.unitScale * 32, y: object.position.y * object.unitScale * 32, z: object.position.z * object.unitScale * 32 };
+      // Native far copies use an arithmetic coordinate shift (0041c640).
+      const quantum=object.unitScale*32;
+      const coordinate=(n:number)=>id===b.sceneObject?n:Math.floor(n/quantum)*quantum;
+      transforms.set(index, {
+        angles: [object.rotation.x, object.rotation.y, object.rotation.z],
+        offset: [(coordinate(b.x) - start.x) * GAME_TO_RENDER, -(coordinate(b.y) - start.y) * GAME_TO_RENDER, -(coordinate(b.z) - start.z) * GAME_TO_RENDER],
+      });
+    }
   }
   viewer.setObjectTransforms(transforms);
 }

@@ -7,6 +7,15 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-04 — Push-block distant artwork
+
+The Construction Yard crate moved artwork 12 but left its distant copy 13
+at its authored position. Shared push-block configuration now supports
+follower artwork, with the original coordinate quantization for scaled
+copies. Browser verification pushes the real crate, checks the distant
+model follows, and checks pause/restart/exit. Existing physical push-block
+regression and the production build pass.
+
 ## 2026-10-04 — Construction Yard linked lift assemblies
 
 - Restored four path-4 lift routes from installed wordcode, including the

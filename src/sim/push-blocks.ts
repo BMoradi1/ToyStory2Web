@@ -48,6 +48,8 @@ export interface PushBlock {
   index: number;
   /** The `.ngn` object drawn for it, or -2 for none. */
   sceneObject: number;
+  /** Additional near/far artwork that follows this block. */
+  sceneFollowers: readonly number[];
   /** The number of its dynamic collision group (docs/FORMATS.md). */
   collisionObject: number;
   /** Which group that resolved to in the collision world, or -1. */
@@ -167,6 +169,7 @@ export function createPushBlocks(
     const block: PushBlock = {
       index,
       sceneObject: entry.sceneObject,
+      sceneFollowers: entry.sceneFollowers ?? [],
       collisionObject: entry.collisionObject,
       group: groupFor(entry.collisionObject),
       pathTag: entry.pathTag,

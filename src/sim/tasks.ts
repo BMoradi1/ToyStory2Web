@@ -576,12 +576,12 @@ export function stepTasks(
       }
     }
     // The clock does not start until the box is out of the way.
-    if (tasks.fetch === 1 && !world.talking) tasks.fetch = 2;
+    if (tasks.fetch === 1 && !world.talking && !request) tasks.fetch = 2;
     if (tasks.fetch === 2) {
       if (tasks.fetchDone === 0) {
         // First run: done when the chick is gone.
         const watched = creatureAt(fetch.watch);
-        if (!watched || watched.type === 0) { tasks.fetchDone = 1; tasks.fetch = 0; }
+        if (watched?.health === 0) { tasks.fetchDone = 1; tasks.fetch = 0; }
       } else if ((world.tokens & (1 << fetch.slot)) !== 0) {
         // Second run: done when its token has been taken. The tick reads
         // that from the shared "challenge finished" word at 0x830cf0, which
@@ -592,7 +592,13 @@ export function stepTasks(
       if (tasks.fetch === 2) {
         if (fetch.failZone >= 0 && world.cameraZone === fetch.failZone) tasks.fetchClock = 99;
         else if (slow) tasks.fetchClock -= 1;
-        if (tasks.fetchClock < 100) { tasks.fetchClock = 100; tasks.fetch = 0; }
+        if (tasks.fetchClock < 100) {
+          tasks.fetchClock = 100; tasks.fetch = 0;
+          if (tasks.fetchDone !== 0) {
+            tasks.done &= ~(1 << fetch.slot);
+            world.hideToken?.(fetch.slot);
+          }
+        }
       }
     }
     // The egg is kept awake and drawn for as long as a run is going, and

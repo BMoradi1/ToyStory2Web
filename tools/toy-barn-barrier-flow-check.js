@@ -35,7 +35,7 @@
   async function offer(){
     ts2.goToCreature(13);
     for(let t=0;t<180&&!ts2.talk;t++)ts2.tickGame({},1,0);
-    check(ts2.talk&&ts2.tasks.fetch!==0,'fetch offer missing '+JSON.stringify(ts2.tasks));
+    check(ts2.talk&&ts2.tasks.fetch===1,'fetch offer missing '+JSON.stringify(ts2.tasks));
     const frozen=JSON.stringify(ts2.toyBarnBarrier);ts2.tickGame({},100,0);check(JSON.stringify(ts2.toyBarnBarrier)===frozen,'dialogue advanced barrier');
     for(let t=0;t<2000&&ts2.talk;t++)ts2.tickGame({jump:(t&1)===0},1,0);
     check(!ts2.talk,'fetch dialogue stuck');
@@ -51,6 +51,7 @@
   for(let t=0;t<2300&&ts2.tasks.fetch!==0;t++)safeTick();
   for(let t=0;t<40;t++)safeTick();
   check(ts2.tasks.fetch===0&&ts2.tasks.fetchDone===1,'second fetch did not time out');
+  check(!ts2.pickups.tokenItems.find(t=>t.slot===2).enabled&&(ts2.tasks.done&4)===0&&ts2.tokenReveals.timers[2]===0,'timeout retained reward/reveal');
   check(ts2.toyBarnBarrier.height===0&&ts2.toyBarnBarrier.enabled,'timeout left gate open');
   await offer();
   const token=ts2.pickups.tokenItems.find(t=>t.slot===2);check(token.enabled,'second-run token absent');

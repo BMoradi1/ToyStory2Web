@@ -7,6 +7,24 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-04 — Toy Barn fetch failure and retry
+
+Fixed three shared-fetch state rules against `00421340`: the offer stays in
+phase 1 until its dialogue closes, first completion requires the watched
+creature's health zero (not the dying 999 sentinel), and second-run failure
+withdraws the uncollected slot-2 token, clears the task bit and cancels its
+reveal. This closes the timeout-reward gap identified in the barrier pass.
+A collected reward takes precedence over the failure-zone test.
+
+`toy-barn-fetch-probe.ts` checks both offers, dialogue-held clocks, death
+sentinel, full deadline and forbidden-zone failures, token/reveal withdrawal,
+retry and success using installed creatures/pickups. The expanded barrier
+browser regression passes withdrawal after an actual deadline, a new offer,
+actual token collection, both barrier completion states and lifecycle cleanup.
+Tarmac timed-path and Space Land saucer probes still pass; build passes.
+First-stage completion's native small bounce and interaction with the separate
+stomp-cannon timer remain open.
+
 ## 2026-10-04 — Toy Barn timed-fetch barrier
 
 Restored collision 18/art 31 from `00421340`: starting a fetch run raises
@@ -21,9 +39,8 @@ hull, opening/closing timing, both success states and restoration. The browser
 check follows NPC offers/dialogue, injected first objective removal, a full
 second-run timeout, retry, actual token collection, rendered motion, pause,
 restart and exit. Build passes. It positions Buzz for NPC/token contacts;
-unassisted challenge traversal remains open. This pass also identified that
-the shared fetch task fails to withdraw its second-run token on timeout; that
-progression issue is the next fix, separate from barrier motion.
+unassisted challenge traversal remains open. This pass identified the second-run timeout reward gap; the later fetch
+failure/retry entry above records its fix.
 
 ## 2026-10-04 — Toy Barn boarding rides
 

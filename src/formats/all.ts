@@ -380,11 +380,13 @@ export const MODEL_SCALE = 256;
  */
 export const PSX_NEUTRAL = 128;
 
-/** A run of triangles sharing one texture page. */
+/** A run of triangles sharing one texture page and blending mode. */
 export interface MeshGroup {
   start: number;
   count: number;
   page: number | null;
+  /** PSX ABR mode; null/undefined means opaque. Enabled by polygon opcode bit 1. */
+  blend?: number | null;
 }
 
 export interface MeshData {
@@ -409,11 +411,6 @@ export function characterTexturePage(material: number): number {
   return material & 0x1f;
 }
 
-/** Bit 0x20 of the material byte marks PSX semi-transparency. */
-export function isSemiTransparent(material: number): boolean {
-  return (material & 0x20) !== 0;
-}
-
 /**
  * Flatten a whole `.all` file's meshes into one triangle soup.
  *
@@ -423,9 +420,10 @@ export function isSemiTransparent(material: number): boolean {
  * limbs float away from the body.
  */
 export function buildMeshData(file: AllFile): MeshData {
-  // Bucket by texture page so each page becomes its own draw group.
-  const buckets = new Map<number | null, { pos: number[]; col: number[]; uv: number[] }>();
-  const bucketFor = (page: number | null) => {
+  // Split opaque and translucent polygons even when they share a texture page.
+  // Keys 0..31 are opaque; subsequent banks of 32 encode the four ABR modes.
+  const buckets = new Map<number, { pos: number[]; col: number[]; uv: number[] }>();
+  const bucketFor = (page: number) => {
     let bucket = buckets.get(page);
     if (!bucket) { bucket = { pos: [], col: [], uv: [] }; buckets.set(page, bucket); }
     return bucket;
@@ -436,7 +434,7 @@ export function buildMeshData(file: AllFile): MeshData {
     const origin = group.position;
 
     for (const face of parseGfxMesh(group)) {
-      const bucket = bucketFor(characterTexturePage(face.material));
+      const bucket = bucketFor(characterTexturePage(face.material) + (face.translucent ? (1 + ((face.material >> 5) & 3)) * 32 : 0));
       const push = (v: MeshVertex) => {
         bucket.pos.push(
           (v.x + origin.x) / MODEL_SCALE,
@@ -474,12 +472,12 @@ export function buildMeshData(file: AllFile): MeshData {
 
   let posOffset = 0, uvOffset = 0;
   for (const [page, bucket] of [...buckets].sort((a, b) =>
-    a[0] === null ? 1 : b[0] === null ? -1 : a[0] - b[0])) {
+    a[0] - b[0])) {
     if (bucket.pos.length === 0) continue;
     positions.set(bucket.pos, posOffset);
     colors.set(bucket.col, posOffset);
     uvs.set(bucket.uv, uvOffset);
-    groups.push({ start: posOffset / 3, count: bucket.pos.length / 3, page });
+    groups.push({ start: posOffset / 3, count: bucket.pos.length / 3, page: page & 31, blend: page < 32 ? null : (page >> 5) - 1 });
     posOffset += bucket.pos.length;
     uvOffset += bucket.uv.length;
   }

@@ -184,6 +184,22 @@ check('no double jump while held', heldJump.peak, apex);
   check('coyote jump entered Rising', p.jumpState, JumpState.Rising);
 }
 
+// Native double jump deploys the wings once, through the authored sound event.
+{
+  const {p,rt}=settled(), ground=flatGround(FLOOR);
+  stepPlayer(p,held({jump:true}),rt,ground,0);
+  check('first jump keeps normal sound',p.sounds.includes('BUZJMP1'),true);
+  stepPlayer(p,NO_INPUT,rt,ground,0);
+  stepPlayer(p,held({jump:true}),rt,ground,0);
+  check('double jump deploys wings',p.events.includes(0x10),true);
+  check('double jump does not grunt',p.sounds.includes('BUZJMP3'),false);
+  stepPlayer(p,held({jump:true}),rt,ground,0);
+  check('held double jump does not repeat sound',p.events.includes(0x10),false);
+  stepPlayer(p,NO_INPUT,rt,ground,0);
+  stepPlayer(p,held({jump:true}),rt,ground,0);
+  check('rejected third jump makes no wing sound',p.events.includes(0x10),false);
+}
+
 // --- report -----------------------------------------------------------------
 const width = Math.max(...results.map((r) => r.name.length));
 let failed = 0;

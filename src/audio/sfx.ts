@@ -240,6 +240,6 @@ export class SoundBank {
  * Preloading these means the first of each is audible rather than swallowed.
  */
 export const PLAYER_EFFECTS = [
-  'BUZJMP1', 'BUZJMP3', 'BUZSKID', 'BUZSPIN', 'BUZTSPIN', 'BUZDIZZY',
+  'BUZJMP1', 'BUZJMP3', 'BUZWING', 'BUZSKID', 'BUZSPIN', 'BUZTSPIN', 'BUZDIZZY',
   'BUZLASER', 'BUZYLASR', 'BUZFALL1', 'SPLAT',
 ] as const;

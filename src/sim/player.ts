@@ -389,7 +389,7 @@ function vertical(p: PlayerState, input: PlayerInput, t: MoveTable, k = 2): void
         : VERTICAL.doubleJumpImpulse(k);
       p.jumpState = JumpState.DoubleJump;
       p.animPhase = 8;
-      p.sounds.push('BUZJMP3');
+      p.events.push(0x10); // Native double-jump wing deployment (BUZWING).
     }
 
     if (p.jumpState === JumpState.Rising || p.jumpState >= 4) {

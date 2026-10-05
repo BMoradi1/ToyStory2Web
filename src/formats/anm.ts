@@ -236,8 +236,8 @@ export function buildPosedMeshData(
    */
   partSpin?: readonly (number | undefined)[] | null,
 ): MeshData {
-  const buckets = new Map<number | null, { pos: number[]; col: number[]; uv: number[] }>();
-  const bucketFor = (page: number | null) => {
+  const buckets = new Map<number, { pos: number[]; col: number[]; uv: number[] }>();
+  const bucketFor = (page: number) => {
     let bucket = buckets.get(page);
     if (!bucket) { bucket = { pos: [], col: [], uv: [] }; buckets.set(page, bucket); }
     return bucket;
@@ -268,7 +268,7 @@ export function buildPosedMeshData(
     const t = pose?.translation;
 
     for (const face of parseGfxMesh(group)) {
-      const bucket = bucketFor(characterTexturePage(face.material));
+      const bucket = bucketFor(characterTexturePage(face.material) + (face.translucent ? (1 + ((face.material >> 5) & 3)) * 32 : 0));
       const push = (v: MeshVertex) => {
         let matrix=m, translation=t;
         if(!matrix || !translation) {
@@ -312,12 +312,12 @@ export function buildPosedMeshData(
 
   let posOffset = 0, uvOffset = 0;
   for (const [page, bucket] of [...buckets].sort((a, b) =>
-    a[0] === null ? 1 : b[0] === null ? -1 : a[0] - b[0])) {
+    a[0] - b[0])) {
     if (bucket.pos.length === 0) continue;
     positions.set(bucket.pos, posOffset);
     colors.set(bucket.col, posOffset);
     uvs.set(bucket.uv, uvOffset);
-    groups.push({ start: posOffset / 3, count: bucket.pos.length / 3, page });
+    groups.push({ start: posOffset / 3, count: bucket.pos.length / 3, page: page & 31, blend: page < 32 ? null : (page >> 5) - 1 });
     posOffset += bucket.pos.length;
     uvOffset += bucket.uv.length;
   }

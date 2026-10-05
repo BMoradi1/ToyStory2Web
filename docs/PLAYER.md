@@ -144,6 +144,10 @@ than 1,536. The sum of the actual steps is `v^2/2g - v/2`, exactly 768 lower.
 Anything predicting jump heights from the continuous formula will be wrong by
 that much.
 
+The accepted double jump raises sound event `0x10` (`BUZWING`), as in
+`004340d0`, through the sound table so its authored pitch and volume apply.
+`BUZJMP3` is a hurt grunt and does not belong to this transition.
+
 The PC's double jump tops out 27,264 above takeoff. If you never release the
 button the jump stays in state 1 for its whole rise and no double jump is
 possible; the release cut is what makes short hops.

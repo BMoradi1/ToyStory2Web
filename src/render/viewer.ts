@@ -5,6 +5,7 @@ import {Backdrop} from './backdrop.ts';
 import type { FlareSprite } from '../sim/lens-flare.ts';
 import type { SpriteHeader } from '../formats/sprite-table.ts';
 import { GameMaterial } from './game-material.ts';
+import { characterMaterial } from './character-material.ts';
 import { lightPlayerColours } from './player-light.ts';
 import { getGamma, gammaModulate, gammaRGB } from './gamma.ts';
 /**
@@ -324,24 +325,7 @@ export class Viewer {
     for (const group of mesh.groups) {
       const texture = group.page === null ? undefined : textures?.get(group.page);
       geometry.addGroup(group.start, group.count, materials.length);
-      // Double-sided: the bits that would mark single-sided faces aren't
-      // decoded, and culling by unknown winding drops visible geometry.
-      // Cutout, not blended. `alphaTest` discards colour-keyed texels while
-      // the material stays in the OPAQUE queue, so depth testing works per
-      // pixel. Marking these `transparent` instead moves them to the blended
-      // queue, which sorts per draw group rather than per pixel — with one
-      // group per texture page, surfaces then draw over each other in the
-      // wrong order and the level looks scrambled.
-      // Characters stay double-sided: measured offline, both culling
-      // conventions punch holes through 13-15% of Buzz's silhouette, so his
-      // parts are not closed shells. Their own material bits are not decoded
-      // yet — the `.ngn` creature chunk is the place to look.
-      materials.push(new GameMaterial({
-        map: texture ?? null,
-        vertexColors: true,
-        side: this.sideOverride ?? THREE.DoubleSide,
-        alphaTest: 0.5,
-      }));
+      materials.push(characterMaterial(group, texture, this.sideOverride ?? THREE.DoubleSide));
     }
 
     this.current = new THREE.Mesh(geometry, materials);
@@ -609,12 +593,7 @@ export class Viewer {
     const materials: THREE.Material[] = [];
     for (const group of mesh.groups) {
       geometry.addGroup(group.start, group.count, materials.length);
-      materials.push(new GameMaterial({
-        map: (group.page === null ? undefined : textures?.get(group.page)) ?? null,
-        vertexColors: true,
-        side: THREE.DoubleSide,
-        alphaTest: 0.5,
-      }));
+      materials.push(characterMaterial(group, group.page === null ? undefined : textures?.get(group.page)));
     }
     this.player = new THREE.Mesh(geometry, materials);
     this.scene.add(this.player);
@@ -636,12 +615,7 @@ export class Viewer {
     const materials: THREE.Material[] = [];
     for (const group of mesh.groups) {
       geometry.addGroup(group.start, group.count, materials.length);
-      materials.push(new GameMaterial({
-        map: (group.page === null ? undefined : textures?.get(group.page)) ?? null,
-        vertexColors: true,
-        side: THREE.DoubleSide,
-        alphaTest: 0.5,
-      }));
+      materials.push(characterMaterial(group, group.page === null ? undefined : textures?.get(group.page)));
     }
     this.player.geometry.dispose();
     for (const m of this.player.material as THREE.Material[]) m.dispose();
@@ -803,12 +777,7 @@ export class Viewer {
     const materials: THREE.Material[] = [];
     for (const group of mesh.groups) {
       geometry.addGroup(group.start, group.count, materials.length);
-      materials.push(new GameMaterial({
-        map: (group.page === null ? undefined : textures?.get(group.page)) ?? null,
-        vertexColors: true,
-        side: THREE.DoubleSide,
-        alphaTest: 0.5,
-      }));
+      materials.push(characterMaterial(group, group.page === null ? undefined : textures?.get(group.page)));
     }
 
     if (existing) {

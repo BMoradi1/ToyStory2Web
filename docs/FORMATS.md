@@ -865,7 +865,8 @@ models and animations. Their art lives in the **level `.ngn` files at slots
 flag byte:
 
     page = material & 0x1f          -> slots 16..24
-    semi-transparent = (material & 0x20) != 0
+    semi-transparent = (polygonCode & 0x02) != 0
+    blend mode = (material >> 5) & 3
 
 Verified: all 68 character models use **exactly one page each**, and 67 of 68
 fall in 16-24 (`hoola.all` reports page 0 and is unexplained). Because the art
@@ -873,8 +874,10 @@ lives in level files, a character only textures correctly against a scene that
 carries its page — Buzz is page 16 and appears in `level01`, while the
 Prospector is page 23 and needs `level03`.
 
-**Still unimplemented:** PSX semi-transparency (`material & 0x20`), which is why
-Buzz's helmet renders as an opaque dome rather than a clear bubble.
+Character geometry now separates opaque and translucent faces sharing a page,
+including animated poses. Buzz's bone 13 has 49 translucent triangles with
+material `0x30`: additive blending lets the black areas of the dome texture
+leave his face visible. The body remains opaque and writes depth.
 
 **Bits 13/14, 0x8000 and the low nibble** are resolved in the material
 section below, read out of the PC executable rather than inferred.

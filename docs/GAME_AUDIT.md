@@ -7,6 +7,23 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-05 — Buzz helmet and double-jump corrections
+
+Character meshes now retain polygon translucency and blend mode through rest
+and animated geometry. Buzz's 49 helmet triangles use additive blending while
+his body remains opaque. Shared material creation covers the model viewer,
+player poses and creatures. Front and rear in-game screenshots were inspected.
+Double jump now raises native event `0x10` (`BUZWING`) with the sound table's
+pitch/volume instead of playing the `BUZJMP3` grunt directly.
+
+Validation: **128/128 simulation probes**, production build, the new Buzz
+presentation browser flow and the existing aim-render browser flow pass.
+The new material probe checks 60 Buzz poses; controller checks cover first
+jump, accepted double jump, held input and a rejected third jump. Browser
+coverage checks the wing event reaches audio playback and helmet materials
+survive jumping and landing. The complete browser suite was not rerun for
+this correction; the previous full checkpoint is recorded below.
+
 ## 2026-10-05 — Complete regression checkpoint
 
 After the particle-distance, underwater-camera, footstep/audio and audit-tool

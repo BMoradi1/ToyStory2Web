@@ -6,6 +6,8 @@ export function createWaterEffects(y=0){return {previousY:y,dripTicks:0,dripKind
 export type WaterEffects=ReturnType<typeof createWaterEffects>;
 export function stepWaterEffects(state:WaterEffects,sim:EffectSim,world:EffectWorld,p:PlayerState,
   footfallMask:number,surface:number,cameraY:number,sound:(event:number)=>void){
+  // Type 3 uses the level's coloured ball scatter, never splash/ripple/drips.
+  if(world.waterKind===3){state.previousY=p.y;state.previousKind=3;state.dripTicks=0;return;}
   const water=world.waterY,wet=water!==null&&p.y>water,mud=world.waterKind===2;
   // Construction's level script also marks muddy feet on leaving its volume.
   if(water===null&&state.previousKind===2){state.dripTicks=180;state.dripKind=54;}

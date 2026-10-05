@@ -1,3 +1,4 @@
+import {createSpaceBallPit,spaceBallPitY,stepSpaceBallPit,type SpaceBallPit} from './sim/space-ball-pit.ts';
 import {createSpaceProjectiles,stepSpaceProjectiles,type SpaceProjectiles} from './sim/space-projectiles.ts';
 import {createSpaceLasers,stepSpaceLasers,type SpaceLasers} from './sim/space-lasers.ts';
 import {SPACE_SCENERY_OBJECTS,createSpaceScenery,stepSpaceScenery,type SpaceScenery} from './sim/space-scenery.ts';
@@ -348,6 +349,7 @@ async function showLevel(index: number): Promise<void> {
   spaceScenery = null;
   spaceLasers = null;
   spaceProjectiles = null;
+  spaceBallPit = null;
   waterEffects=createWaterEffects();
   tarmacHelicopter = null;
   tarmacLights = null;
@@ -754,6 +756,7 @@ async function open(dir: GameDir): Promise<void> {
       get tarmacWeather() { return tarmacWeather; },
       get tarmacScenery() { return tarmacScenery; },
       get levelPlatforms() { return levelPlatforms; },
+      get spaceBallPit(){return spaceBallPit;},
       get spaceProjectiles(){return spaceProjectiles;},
       get spaceLasers(){return spaceLasers;},
       get spaceScenery(){return spaceScenery;},
@@ -1352,6 +1355,7 @@ async function spawnPlayer(): Promise<void> {
   spaceScenery=null;
   spaceLasers=null;
   spaceProjectiles=null;
+  spaceBallPit=null;
   if(constructionStompLift){restoreConstructionStompLift(constructionStompLift,currentCollisionWorld);constructionStompLift=null;}
   if(constructionLifts){restoreConstructionLifts(constructionLifts,currentCollisionWorld);constructionLifts=null;}
   if(constructionShuttles){restoreConstructionShuttles(constructionShuttles,currentCollisionWorld);constructionShuttles=null;}
@@ -1539,6 +1543,7 @@ async function spawnPlayer(): Promise<void> {
   drawSpaceScenery();
   spaceLasers=level===8?createSpaceLasers(currentLevel.level):null;
   spaceProjectiles=level===8?createSpaceProjectiles(currentLevel.level):null;
+  spaceBallPit=level===8&&exeBytes?createSpaceBallPit(exeBytes):null;
   if(spaceClaw){syncSpaceClawPrize(spaceClaw,pickups);drawSpaceClaw();}
   tokenRevealProfile=exeBytes?readTokenReveal(exeBytes):null;
   // Lives and health carry over from the record, as `FUN_004a2cc0` copies
@@ -1771,6 +1776,7 @@ function spawnCreatureEffects(): void {
 
 /** What the effect tick needs to know about the rest of the world. */
 function currentLiquidY():number|null{
+  if(spaceBallPit&&player)return spaceBallPitY(player);
   return constructionScenery&&player?constructionMudY(player):penthouse?.water.y??null;
 }
 function effectWorld(): EffectWorld {
@@ -1787,7 +1793,7 @@ function effectWorld(): EffectWorld {
       return hit ? hit.y * S2 : null;
     },
     waterY: currentLiquidY(),
-    waterKind: constructionScenery?2:1,
+    waterKind: constructionScenery?2:spaceBallPit?3:1,
   };
 }
 
@@ -3171,6 +3177,7 @@ function discardLevel(): void {
   spaceScenery = null;
   spaceLasers = null;
   spaceProjectiles = null;
+  spaceBallPit = null;
   waterEffects=createWaterEffects();
   tarmacHelicopter = null;
   tarmacLights = null;
@@ -3605,6 +3612,7 @@ let spaceClaw:SpaceClaw|null=null;
 let spaceScenery:SpaceScenery|null=null;
 let spaceLasers:SpaceLasers|null=null;
 let spaceProjectiles:SpaceProjectiles|null=null;
+let spaceBallPit:SpaceBallPit|null=null;
 let waterEffects=createWaterEffects();
 let tarmacHelicopter: TarmacHelicopter | null = null;
 let tarmacLights: TarmacLights | null = null;
@@ -3878,7 +3886,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   if(aimView.active) held={...held,moveX:0,moveY:0,jump:false,spin:false,cameraLeft:false,cameraRight:false};
   const playerGround = groundFromCollision(currentCollisionWorld, levelPoles, levelZipLines);
   playerGround.waterY = currentLiquidY();
-  playerGround.waterKind = constructionScenery?2:1;
+  playerGround.waterKind = constructionScenery?2:spaceBallPit?3:1;
   playerGround.beforeMove = () => {
     tickPushBlocks(held);
     if(constructionStompLift)moveConstructionStompLift(constructionStompLift,currentCollisionWorld!,player!);
@@ -4043,6 +4051,11 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   if(spaceScenery&&creatureSim){
     stepSpaceScenery(spaceScenery,{zone:zones.player,randomByte:()=>creatureSim!.rand.byte(),sound:(id,at)=>playEvent(id,at)});
     drawSpaceScenery();
+  }
+  if(spaceBallPit&&effects&&creatureSim&&camera){
+    const world=effectWorld();
+    stepSpaceBallPit(spaceBallPit,player,{gateFour:effects.gate.four,randomByte:()=>creatureSim!.rand.byte(),
+      effect:(at,kind,mode)=>spawnChild(effects!,world,at.x,at.y,at.z,kind,mode)});
   }
   if(spaceProjectiles&&effects&&camera){
     const world=effectWorld();

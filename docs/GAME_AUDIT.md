@@ -7,6 +7,23 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-04 — Space Land ball pit
+
+Added the type-3 volume from `00423f29..00423ff2`: strict XZ bounds and surface
+`-0x8200`, slow shared movement, 64/tick sinking cap and shallow escape jump.
+The movement code now distinguishes water, mud and balls, while types 2/3
+share their native movement overrides. Forward speed above 32 or absolute
+vertical speed above 32 scatters kind-95 balls on the four-tick gate, with
+colours read from the installed executable. Type 3 does not inherit water
+splashes, bubbles, mud droplets or wet footprints.
+
+Installed-data checks cover volume/depth boundaries, movement/jump/exit,
+scatter speed/cadence/colour and culled random-byte consumption. The browser
+verifies slow movement, sinking, rendered scatter, escape jump and lifecycle.
+Shared player checks (24/24), water/mud probes and both existing liquid browser
+flows pass, as does the production build. Native model clipping at the ball
+surface and natural traversal remain unimplemented/unverified.
+
 ## 2026-10-04 — Space Land projectile volley
 
 Restored `00423ff2..004241b1`: room 2 and strict X gating, 200 active ticks
@@ -779,7 +796,7 @@ not evidence for untested interactions.
 | 5 | Alleys and Gullies | BOX/BPLANE launch cycle, boat cannon and clown combat/reward implemented. | Moving scenery/collision; 37 poles and 11 zip lines need route checks. |
 | 6 | Slime Time (internal 3) | Dedicated slime controller exists. | Full encounter, arena effects, reward and replay comparison. |
 | 7 | Al's Toy Barn | Dinosaur breath/combat/defeat/reward and BOX/BPLANE launch cycle implemented. | Original moving-collision calls and full token routes. |
-| 8 | Al's Space Land | Buggy fight/reward, ZGCAR, claw puzzle/token delivery, saucer course/deadline/retry, hanging toys/display motion/sounds, paired laser hazards, projectile volley and visibility-gated Mother texture animation implemented. | Remaining ambient/projectile effects and natural route validation. |
+| 8 | Al's Space Land | Buggy fight/reward, ZGCAR, claw puzzle/token delivery, saucer course/deadline/retry, hanging toys/display motion/sounds, paired laser hazards, projectile volley, ball-pit movement/scatter and visibility-gated Mother texture animation implemented. | Remaining ambient/projectile effects and natural route validation. |
 | 9 | Toy Barn Encounter | Dedicated pod controller, beam tests and ZGCAR hook implemented. | Full natural fight/summon cycles and reward traversal. |
 | 10 | Elevator Hop | Wire puzzle, compound lifts, GUNSP combat/reward, fan switches/rotation/airflow implemented. | Other ambient effects, exact collision/script/force timing and full-level traversal. |
 | 11 | Al's Penthouse | Shared enemies, GUNSL combat/reward, hazards, water/floats, train routing and underwater movement implemented. | Underwater camera colour/warp, light/texture helpers and collision 24 review. |

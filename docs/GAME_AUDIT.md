@@ -7,6 +7,22 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-05 — Neighborhood push bridges
+
+Restored both bridges from 00418e50/004190c0. Holding push block 0 lowers
+artwork 5/11 from angle 750; crossing 665 swaps collision 2/3 for 4 and
+releases Buzz, then gravity, quarter-speed rebound and impact cues settle it.
+Push block 1 only triggers above the strict Y -0x102f9 boundary: it swaps
+collision 11 for 12, clears horizontal velocity and grip, then accelerates
+artwork 30/31 to angle 3514 with a single completion cue. Near/far meshes
+retain independent transforms. Disabled push hulls remain absent when moved.
+
+Installed probes pass exact trigger boundaries, release/velocity, rebound,
+settling, completion cues, real collision casts and reset. Browser checks use
+actual movement/push inputs from positioned approaches, including the second
+bridge's elevated walkway; both animations, sounds, pause/restart/exit pass.
+Production build passes. Full natural traversal remains open.
+
 ## 2026-10-05 — Andy's room-4 environmental effects
 
 Restored the path-22 lobber and three emitter positions from 00417680 and

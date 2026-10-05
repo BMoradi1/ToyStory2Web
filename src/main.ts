@@ -1,3 +1,4 @@
+import {NEIGHBORHOOD_BRIDGE_OBJECTS,createNeighborhoodBridges,stepNeighborhoodBridges,restoreNeighborhoodBridges,type NeighborhoodBridges} from './sim/neighborhood-bridges.ts';
 import {createAndyEffects,stepAndyEffects,type AndyEffects} from './sim/andy-effects.ts';
 import {ANDY_ROPE_OBJECT,createAndyRope,stepAndyRope,restoreAndyRope,type AndyRope} from './sim/andy-rope.ts';
 import {ANDY_COT_OBJECTS,createAndyCot,stepAndyCot,restoreAndyCot,type AndyCot} from './sim/andy-cot.ts';
@@ -373,6 +374,7 @@ async function showLevel(index: number): Promise<void> {
   alleyPlatforms = null;
   alleyTraversal = null;
   alleyBubbles = null;
+  neighborhoodBridges = null;
   alleyBridge = null;
   alleyEffects = null;
   andyMachinery = null;
@@ -504,6 +506,7 @@ async function showLevel(index: number): Promise<void> {
       }
       for(const id of seesawObjects(levelNumber(level.id)??0)){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
       if(levelNumber(level.id)===1)for(const id of [...ANDY_MACHINERY_OBJECTS,...ANDY_GATE_OBJECTS,...ANDY_COT_OBJECTS,ANDY_ROPE_OBJECT]){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
+      if(levelNumber(level.id)===2)for(const id of NEIGHBORHOOD_BRIDGE_OBJECTS){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
       if(levelNumber(level.id)===5)for(const id of [...ALLEY_PLATFORM_OBJECTS,...ALLEY_SEESAW_OBJECTS,...ALLEY_BUBBLE_OBJECTS,...ALLEY_BRIDGE_OBJECTS,...ALLEY_WATER_OBJECTS]){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
       if(levelNumber(level.id)===7)for(const id of [...TOY_BARN_PLATFORM_OBJECTS,...TOY_BARN_ROTOR_OBJECTS,...TOY_BARN_SPRING_OBJECTS,...TOY_BARN_LAUNCH_OBJECTS,TOY_BARN_BARRIER_OBJECT,...TOY_BARN_CANNON_OBJECTS]){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
       if(levelNumber(level.id)===4)for(const id of [...PAINT_CAN_OBJECTS,...CONSTRUCTION_BRIDGE_OBJECTS,...CONSTRUCTION_SHUTTLE_OBJECTS,...CONSTRUCTION_LIFT_OBJECTS,...CONSTRUCTION_SCENERY_OBJECTS,...CONSTRUCTION_STOMP_LIFT_OBJECTS]){
@@ -823,6 +826,7 @@ async function open(dir: GameDir): Promise<void> {
       get toyBarnLaunchPlatforms(){return toyBarnLaunchPlatforms;},
       get toyBarnRotors(){return toyBarnRotors;},
       get alleyEffects(){return alleyEffects;},
+      get neighborhoodBridges(){return neighborhoodBridges;},
       get alleyBridge(){return alleyBridge;},
       get alleyBubbles(){return alleyBubbles;},
       get alleyTraversal(){return alleyTraversal;},
@@ -1437,6 +1441,7 @@ async function spawnPlayer(): Promise<void> {
   if(andyCot){restoreAndyCot(andyCot,currentCollisionWorld);andyCot=null;}
   if(andyGates){restoreAndyGates(andyGates,currentCollisionWorld);andyGates=null;}
   if(andyMachinery){restoreAndyMachinery(andyMachinery,currentCollisionWorld);andyMachinery=null;}
+  if(neighborhoodBridges){restoreNeighborhoodBridges(neighborhoodBridges,currentCollisionWorld);neighborhoodBridges=null;}
   if(alleyBridge){restoreAlleyBridge(alleyBridge,currentCollisionWorld);alleyBridge=null;}
   if(alleyBubbles){restoreAlleyBubbles(alleyBubbles,currentCollisionWorld);alleyBubbles=null;}
   if(alleyTraversal){restoreAlleyTraversal(alleyTraversal,currentCollisionWorld);alleyTraversal=null;}
@@ -1604,6 +1609,7 @@ async function spawnPlayer(): Promise<void> {
   }
   drawPushBlocks();
 
+  neighborhoodBridges=level===2?createNeighborhoodBridges(currentLevel.level,currentCollisionWorld):null;drawNeighborhoodBridges();
   alleyBridge=level===5?createAlleyBridge(currentLevel.level,currentCollisionWorld):null;drawAlleyBridge();
 
   // The sprite table the HUD and the coins draw from lives in the user's own
@@ -2824,6 +2830,10 @@ function drawToyBarnRotors():void{
   if(!viewer||!toyBarnRotors)return;
   viewer.setObjectTransforms(new Map(toyBarnRotors.map(r=>[r.index,{angles:[0,0,r.angle/4] as [number,number,number]}])));
 }
+function drawNeighborhoodBridges():void{
+  if(!viewer||!neighborhoodBridges)return;
+  viewer.setObjectTransforms(new Map(neighborhoodBridges.objects.map(o=>[o.index,{angles:o.angles}])));
+}
 function drawAlleyBridge():void{
   if(!viewer||!alleyBridge)return;
   viewer.setObjectTransforms(new Map(alleyBridge.objects.map(o=>[o.index,{angles:o.angles,scale:o.scale}])));
@@ -3377,6 +3387,7 @@ function discardLevel(): void {
   alleyPlatforms = null;
   alleyTraversal = null;
   alleyBubbles = null;
+  neighborhoodBridges = null;
   alleyBridge = null;
   alleyEffects = null;
   andyMachinery = null;
@@ -3839,6 +3850,7 @@ let toyBarnBarrier:ToyBarnBarrier|null=null;
 let toyBarnLaunchPlatforms:ToyBarnLaunchPlatforms|null=null;
 let toyBarnRotors:ToyBarnRotors|null=null;
 let alleyEffects:AlleyEffects|null=null;
+let neighborhoodBridges:NeighborhoodBridges|null=null;
 let alleyBridge:AlleyBridge|null=null;
 let alleyBubbles:AlleyBubbles|null=null;
 let alleyTraversal:AlleyTraversal|null=null;
@@ -4336,6 +4348,10 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   if(toyBarnLaunchPlatforms){stepToyBarnLaunchPlatforms(toyBarnLaunchPlatforms,player,{guide:id=>spendGuide(guideSparkles,effects,id,true),sound:(id,at)=>playEvent(id,at)});drawToyBarnLaunchPlatforms();}
   if(toyBarnSprings){stepToyBarnSprings(toyBarnSprings,player,currentCollisionWorld,{guide:()=>spendGuide(guideSparkles,effects,1,true),sound:()=>playEvent(0x1c,player!)});drawToyBarnSprings();}
   if(toyBarnRotors){stepToyBarnRotors(toyBarnRotors);drawToyBarnRotors();}
+  if(neighborhoodBridges&&pushBlocks){
+    stepNeighborhoodBridges(neighborhoodBridges,currentCollisionWorld,player,pushBlocks);drawNeighborhoodBridges();
+    for(const id of neighborhoodBridges.sounds)playEvent(0x34,neighborhoodBridges.objects.find(o=>o.id===id)!.at);
+  }
   if(alleyBridge&&pushBlocks){
     stepAlleyBridge(alleyBridge,currentCollisionWorld!,player,pushBlocks);drawAlleyBridge();
     if(alleyBridge.burst){

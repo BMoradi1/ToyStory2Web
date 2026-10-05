@@ -1,3 +1,4 @@
+import {SPACE_SCENERY_OBJECTS,createSpaceScenery,stepSpaceScenery,type SpaceScenery} from './sim/space-scenery.ts';
 import {SPACE_CLAW_OBJECTS,createSpaceClaw,stepSpaceClaw,syncSpaceClawPrize,type SpaceClaw} from './sim/space-claw.ts';
 import {constructionMudY} from './sim/construction-mud.ts';
 import {CONSTRUCTION_STOMP_LIFT_OBJECTS,createConstructionStompLift,moveConstructionStompLift,stepConstructionStompLift,restoreConstructionStompLift,type ConstructionStompLift} from './sim/construction-stomp-lift.ts';
@@ -342,6 +343,7 @@ async function showLevel(index: number): Promise<void> {
   constructionStompLift = null;
   constructionScenery = null;
   spaceClaw = null;
+  spaceScenery = null;
   waterEffects=createWaterEffects();
   tarmacHelicopter = null;
   tarmacLights = null;
@@ -452,7 +454,7 @@ async function showLevel(index: number): Promise<void> {
       if(levelNumber(level.id)===4)for(const id of [...PAINT_CAN_OBJECTS,...CONSTRUCTION_BRIDGE_OBJECTS,...CONSTRUCTION_SHUTTLE_OBJECTS,...CONSTRUCTION_LIFT_OBJECTS,...CONSTRUCTION_SCENERY_OBJECTS,...CONSTRUCTION_STOMP_LIFT_OBJECTS]){
         const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);
       }
-      if(levelNumber(level.id)===8)for(const id of SPACE_CLAW_OBJECTS){
+      if(levelNumber(level.id)===8)for(const id of [...SPACE_CLAW_OBJECTS,...SPACE_SCENERY_OBJECTS]){
         const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);
       }
       if(levelNumber(level.id)===11&&exeBytes)for(const id of penthouseObjects(readPenthouseTables(exeBytes))){
@@ -748,6 +750,7 @@ async function open(dir: GameDir): Promise<void> {
       get tarmacWeather() { return tarmacWeather; },
       get tarmacScenery() { return tarmacScenery; },
       get levelPlatforms() { return levelPlatforms; },
+      get spaceScenery(){return spaceScenery;},
       get spaceClaw(){return spaceClaw;},
       get clawPrize(){return pickups?.items.find(i=>i.id===53);},
       get constructionScenery() { return constructionScenery; },
@@ -1339,6 +1342,7 @@ async function spawnPlayer(): Promise<void> {
   constructionDebris=null;
   constructionScenery=null;
   spaceClaw=null;
+  spaceScenery=null;
   if(constructionStompLift){restoreConstructionStompLift(constructionStompLift,currentCollisionWorld);constructionStompLift=null;}
   if(constructionLifts){restoreConstructionLifts(constructionLifts,currentCollisionWorld);constructionLifts=null;}
   if(constructionShuttles){restoreConstructionShuttles(constructionShuttles,currentCollisionWorld);constructionShuttles=null;}
@@ -1522,6 +1526,8 @@ async function spawnPlayer(): Promise<void> {
   revealedSlots = new Set();
   pickups = createPickups(currentLevel.level, level);
   spaceClaw=level===8?createSpaceClaw(currentLevel.level):null;
+  spaceScenery=level===8?createSpaceScenery(currentLevel.level):null;
+  drawSpaceScenery();
   if(spaceClaw){syncSpaceClawPrize(spaceClaw,pickups);drawSpaceClaw();}
   tokenRevealProfile=exeBytes?readTokenReveal(exeBytes):null;
   // Lives and health carry over from the record, as `FUN_004a2cc0` copies
@@ -2610,6 +2616,13 @@ function drawTarmacHelicopter(): void {
   viewer.setObjectTransforms(transforms);
 }
 
+function drawSpaceScenery():void{
+  if(!viewer||!spaceScenery)return;
+  viewer.setObjectTransforms(new Map(spaceScenery.objects.map(o=>[o.index,{angles:o.angles,
+    offset:[(o.position.x-o.rest.x)*GAME_TO_RENDER,-(o.position.y-o.rest.y)*GAME_TO_RENDER,
+      -(o.position.z-o.rest.z)*GAME_TO_RENDER] as [number,number,number],
+  }])));
+}
 function drawSpaceClaw():void{
   if(!viewer||!spaceClaw)return;
   viewer.setObjectTransforms(new Map(spaceClaw.objects.map(o=>[o.index,{angles:o.angles,
@@ -3144,6 +3157,7 @@ function discardLevel(): void {
   constructionStompLift = null;
   constructionScenery = null;
   spaceClaw = null;
+  spaceScenery = null;
   waterEffects=createWaterEffects();
   tarmacHelicopter = null;
   tarmacLights = null;
@@ -3575,6 +3589,7 @@ let constructionLifts:ConstructionLifts|null=null;
 let constructionStompLift:ConstructionStompLift|null=null;
 let constructionScenery:ConstructionScenery|null=null;
 let spaceClaw:SpaceClaw|null=null;
+let spaceScenery:SpaceScenery|null=null;
 let waterEffects=createWaterEffects();
 let tarmacHelicopter: TarmacHelicopter | null = null;
 let tarmacLights: TarmacLights | null = null;
@@ -4003,6 +4018,10 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     stepSpaceClaw(spaceClaw,player,{zone:zones.player,stomp:!!player.stompImpact&&standingSurface(player,currentCollisionWorld)===8,
       randomByte:()=>creatureSim!.rand.byte(),sound:(id,at)=>playEvent(id,at),guide:()=>spendGuide(guideSparkles,effects,0,true)});
     syncSpaceClawPrize(spaceClaw,pickups);drawSpaceClaw();
+  }
+  if(spaceScenery&&creatureSim){
+    stepSpaceScenery(spaceScenery,{zone:zones.player,randomByte:()=>creatureSim!.rand.byte(),sound:(id,at)=>playEvent(id,at)});
+    drawSpaceScenery();
   }
   if(constructionStompLift){stepConstructionStompLift(constructionStompLift,currentCollisionWorld,player,id=>spendGuide(guideSparkles,effects,id,true));drawConstructionStompLift();}
   if(constructionLifts&&creatureSim){stepConstructionLifts(constructionLifts,player,()=>creatureSim!.rand.byte());drawConstructionLifts();}

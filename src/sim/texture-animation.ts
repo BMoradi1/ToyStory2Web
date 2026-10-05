@@ -34,7 +34,10 @@ export function stepTextureAnimation(s:ReturnType<typeof createTextureAnimation>
       {const r=scroll(24,0,64,64,64,0,s.phase,0,64);s.phase=(s.phase-1)&63;return [r];}
     case 5:return [scroll(5,192,128,64,64,0,s.ticks&63,0,64)];
     case 8: {
-      const rows=[scroll(5,0,0,64,64,0,s.phase>>1,0,64)];s.phase=(s.phase+1)&127;
+      const rows:TextureScroll[]=[];
+      // The page-5 display belongs to the room-4 claw block; its phase
+      // freezes outside that room (00423640 branches past 00423bea).
+      if(playerZone===4){rows.push(scroll(5,0,0,64,64,0,s.phase>>1,0,64));s.phase=(s.phase+1)&127;}
       // 00424206: 0052c9b8 is entity slot 2's flags (base + 2*0x9c + 0x40).
       // The MOTHER NPC's visible bit gates this additional texture region.
       if(visibleCreature(2))rows.push(scroll(18,64,0,20,64,0,s.ticks&255,20,0));

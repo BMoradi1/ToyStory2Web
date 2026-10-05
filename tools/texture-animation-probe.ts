@@ -19,7 +19,7 @@ for(const level of [1,2,3,5,8,11,13]){
  const textures=new Map(parseNgn(readFileSync(`${root}/data/${name}/${level>10?'level1':'level'}.ngn`)).map(t=>[t.slot,decodeBmp(t.bmp)]));
  const s=createTextureAnimation();let changes=0;
  for(let i=0;i<256;i++){
-  const scrolls=stepTextureAnimation(s,level,6,5);assert.equal(scrolls.length,1);
+  const scrolls=stepTextureAnimation(s,level,6,level===8?4:5);assert.equal(scrolls.length,1);
   for(const scroll of scrolls){
    const t=textures.get(scroll.page)!;assert(t,`level ${level} page ${scroll.page}`);
    const old=t.rgba.slice();assert(copyScrolledTexture({data:t.rgba,width:t.width,height:t.height},scroll),`valid bounds level ${level}`);
@@ -35,14 +35,14 @@ for(const level of [1,2,3,5,8,11,13]){
  if(level===1)assert(changes>1);
  console.log(`PASS level ${level}: authored texture bounds, scrolling and untouched surroundings (${changes} changed frames)`);
 }
-for(const [level,camera,player] of [[1,5,5],[11,6,4]] as const){
+for(const [level,camera,player] of [[1,5,5],[11,6,4],[8,4,3]] as const){
  const s=createTextureAnimation();for(let i=0;i<10;i++)assert.deepEqual(stepTextureAnimation(s,level,camera,player),[]);
  assert.equal(s.phase,0,'zone-gated phase holds');
 }
 console.log('PASS: rectangle wrapping, PC axis precedence, overlap, invalid bounds and zone gates.');
 
 // Space Land's extra strip follows the actual slot-2 visible flag, while the
-// base scroll and the global byte phase continue on hidden frames.
+// global byte phase continues outside the claw room and on hidden frames.
 {
  const textures=new Map(parseNgn(readFileSync(`${root}/data/level08/level.ngn`)).map(t=>[t.slot,decodeBmp(t.bmp)]));
  const image=textures.get(18)!;assert(image,'installed Mother texture page');
@@ -50,9 +50,9 @@ console.log('PASS: rectangle wrapping, PC axis precedence, overlap, invalid boun
  for(let i=1;i<=300;i++){
   const visible=i%3===0;
   const rows=stepTextureAnimation(state,8,0,0,slot=>visible&&slot===2);
-  assert.equal(rows.length,visible?2:1);assert.equal(rows[0]!.page,5);
+  assert.equal(rows.length,visible?1:0);assert.equal(state.phase,0);
   if(!visible)continue;
-  const strip=rows[1]!;assert.equal(strip.scrollY,i&255);
+  const strip=rows[0]!;assert.equal(strip.scrollY,i&255);
   const before=image.rgba.slice();assert(copyScrolledTexture({data:image.rgba,width:image.width,height:image.height},strip));
   if(!before.every((v,i)=>v===image.rgba[i]))changed++;
   for(let y=0;y<image.height;y++)for(let x=0;x<image.width;x++){
@@ -61,6 +61,6 @@ console.log('PASS: rectangle wrapping, PC axis precedence, overlap, invalid boun
   }
  }
  assert(changed>0,'installed strip produces changing pixels');
- assert.equal(stepTextureAnimation(state,8,0,0,slot=>slot===1).length,1,'other visible slots cannot activate Mother scroll');
+ assert.equal(stepTextureAnimation(state,8,0,0,slot=>slot===1).length,0,'other visible slots cannot activate Mother scroll');
  console.log(`PASS Space Land Mother: visible-slot gate, global byte wrap, exact strip bounds and ${changed} changed frames`);
 }

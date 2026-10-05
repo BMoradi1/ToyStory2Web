@@ -7,6 +7,15 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-04 — Shared mover flag operand width
+
+Corrected the movement interpreter's wait/set/clear masks to unsigned 16-bit
+operands, matching `0048acc0`. Script storage is signed for movement offsets;
+reusing that signed value for `0x8000` flags incorrectly treated unrelated
+upper-word bits as part of the mask. The regression reproduces the false
+wait completion and verifies all four flag opcodes preserve unrelated bits.
+Installed shuttle and linked-lift cycles still pass; production build passes.
+
 ## 2026-10-04 — Space Land Mother texture animation
 
 - Identified `0052c9b8 & 1` as entity slot 2's visible flag: runtime entity

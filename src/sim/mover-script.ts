@@ -14,7 +14,9 @@ export function stepMoverScript(s:MoverScript,at:Vec3,rest:Vec3,host:{
     s.wait-=dt;if(s.wait<1){s.wait=0;s.pc+=op===2?2:3;}return;
   }
   if(op>=6&&op<=9){
-    const mask=word(1);
+    // Script storage is signed for offsets/speeds, but native flag operands
+    // are uint16. Sign extension must not touch unrelated upper-word bits.
+    const mask=word(1)&0xffff;
     if(op===8)host.bits|=mask;
     if(op===9)host.bits&=~mask;
     if(op>=8||(op===6?(host.bits&mask)!==0:(host.bits&mask)===0))s.pc+=2;

@@ -28,4 +28,15 @@ restoreConstructionShuttles(s,w);for(const m of s.movers)for(const base of m.hul
 const vm=createMoverScript([6,256,3,127,32,9,256,0,7]),host={bits:0,randomByte:()=>255,point:()=>undefined},at={x:0,y:0,z:0};
 stepMoverScript(vm,at,at,host);assert.equal(vm.pc,0);host.bits=256;stepMoverScript(vm,at,at,host);assert.equal(vm.pc,2);
 stepMoverScript(vm,at,at,host);assert.equal(vm.wait,159);for(let i=0;i<159;i++)stepMoverScript(vm,at,at,host);assert.equal(vm.pc,5);stepMoverScript(vm,at,at,host);assert.equal(host.bits,0);stepMoverScript(vm,at,at,host);assert.equal(vm.pc,0);
-console.log('PASS: 4 installed shuttle scripts complete out/back/wait cycles, collision alignment, passenger/airborne isolation, restore and shared wordcode flag/random timing');
+// High-bit masks are unsigned even though script words are read as int16.
+// An unrelated bit above the 16-bit operand must not satisfy or be cleared
+// by a 0x8000 wait/set/clear instruction.
+for(const op of [6,7,8,9]){
+ const script=createMoverScript([op,-32768,0,2]);
+ const flags={bits:op===9?0x18000:0x10000,randomByte:()=>0,point:()=>undefined};
+ stepMoverScript(script,at,at,flags);
+ assert.equal(script.pc,op===6?0:2,`opcode ${op}: unrelated upper flag affected wait`);
+ assert.equal(flags.bits,op===8?0x18000:0x10000,`opcode ${op}: high mask damaged unrelated flags`);
+ if(op===6){flags.bits|=0x8000;stepMoverScript(script,at,at,flags);assert.equal(script.pc,2);}
+}
+console.log('PASS: 4 installed shuttle scripts complete out/back/wait cycles, collision alignment, passenger/airborne isolation, restore and shared wordcode unsigned-flag/random timing');

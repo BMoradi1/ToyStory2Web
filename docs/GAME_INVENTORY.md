@@ -14,7 +14,7 @@ This is static inventory, **not** a completed playthrough or parity score. Missi
 | 4 (4) | construction yard | yes | — | 13, 25 | 5 / 0 | drill.ts + tasks.ts reward |
 | 5 (5) | alleys and gullies | yes | — | 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 19, 20, 21, 22, 23, 24, 25 | 37 / 11 | clown.ts + tasks.ts reward |
 | 6 (3) | slime time | yes | — | — | 0 / 0 | slime-boss.ts |
-| 7 (7) | al's toy barn | yes | — | 0, 10, 14, 15, 16, 17, 18, 19, 20 | 4 / 1 | dinosaur.ts + tasks.ts reward |
+| 7 (7) | al's toy barn | yes | — | 0, 15, 16, 17, 18, 19, 20 | 4 / 1 | dinosaur.ts + tasks.ts reward |
 | 8 (8) | al's space land | yes | — | 2 | 9 / 9 | buggy.ts + tasks.ts reward |
 | 9 (9) | toy barn encounter | yes | — | — | 0 / 0 | pod-boss.ts |
 | 10 (10) | elevator hop | yes | — | 18 | 0 / 1 | gunslinger.ts + tasks.ts reward |
@@ -46,7 +46,7 @@ This is static inventory, **not** a completed playthrough or parity score. Missi
 - construction yard: tasks boss, challenge, potato, hamm, hintNpc, findFive; 2 push blocks; motion paint-cans.ts (outdoor lids, collision 10/11/12), construction-bridge.ts (stomp drawbridge, collision 26), construction-shuttles.ts (scripted shuttles, collision 14–17), construction-lifts.ts (linked tilting lifts, collision 1–4/6–9), construction-scenery.ts (proximity artwork/portals), construction-stomp-lift.ts (switches 22–24 and lift 21); stomp-driven object IDs 33, 34, 35, 48, 49, 50, 51, 52, 53.
 - alleys and gullies: tasks boss, challenge, hamm, hintNpc, findFive; 4 push blocks; motion none mapped; stomp-driven object IDs none.
 - slime time: tasks slimeBoss; 0 push blocks; motion none mapped; stomp-driven object IDs none.
-- al's toy barn: tasks potato, fetch, boss, hamm, hintNpc, findFive; 2 push blocks; motion toy-barn-platforms.ts (six scripted platforms, collision 7–9/11–13), toy-barn-rotors.ts (four rotors, collision 1–4); stomp-driven object IDs none.
+- al's toy barn: tasks potato, fetch, boss, hamm, hintNpc, findFive; 2 push blocks; motion toy-barn-platforms.ts (six scripted platforms, collision 7–9/11–13), toy-barn-rotors.ts (four rotors, collision 1–4), toy-barn-launch-platforms.ts (boarding rides, collision 10/14), toy-barn-springs.ts (surfaces 8/9); stomp-driven object IDs none.
 - al's space land: tasks boss, reachBox, hamm, hintNpc, findFive; 3 push blocks; motion none mapped; stomp-driven object IDs none.
 - toy barn encounter: tasks none; 0 push blocks; motion none mapped; stomp-driven object IDs none.
 - elevator hop: tasks potato, offer, boss, hamm, hintNpc, findFive; 0 push blocks; motion level-platforms.ts (lifts), elevator-fans.ts (rotors, switches, airflow); stomp-driven object IDs none.

@@ -7,6 +7,26 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-04 — Toy Barn boarding rides
+
+Restored collision 10/art 11's accelerating, bouncing one-way ride and
+collision 14/art 24's returning ride from `00421340`. Real floor contact
+starts each ride, retires its guide and starts motor sound `0x7a`. At the
+far end, a rider receives vertical impulse -2560 and yaw `0x81e`, with the
+ride-specific horizontal velocity. The return ride reverses at seven-eighths
+speed and decelerates after its return threshold; it does not snap to its
+initial position. Artwork follows quantized collision position, including the
+second ride's initial difference between authored artwork and collision pivot.
+
+`toy-barn-launch-platforms-probe.ts` checks full routes, acceleration/bounce,
+launch/return, contact gates, carry, collision and restoration. It also
+physically boards and rides both installed hulls to their final launches.
+The browser check passes those complete physical rides without injected
+contacts, rendered alignment, pause, return/deceleration, restart and exit.
+Build passes. Tests position Buzz above each starting platform; reaching the
+platforms and destinations unaided, dynamic motor pitch and exact retail
+launch camera/input-lock timing remain unverified.
+
 ## 2026-10-04 — Toy Barn spring launchers
 
 Restored surface 8's stomp-only launcher and surface 9's bounce pad from

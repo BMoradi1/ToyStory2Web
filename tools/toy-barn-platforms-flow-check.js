@@ -31,6 +31,18 @@
   }
   const check=(ok,message)=>{if(!ok)throw Error(message);};
   const level=7;await enter(level);await ts2.spawnPlayer();ts2.viewer.stop();
+  const offset=s=>s.split('|')[1].split(',').map(Number);
+  for(const id of [0,1]){
+    const start=ts2.pushBlocks.blocks[id],far=start.followers[0];check(far>=0,'far crate missing');
+    const initial=ts2.viewer.objectTransforms.get(far),pose=ts2.goToPushBlock(id);
+    for(let i=0;i<100;i++)ts2.tickGame({moveY:1},1,pose.yaw);
+    const moved=ts2.pushBlocks.blocks[id];
+    check(Math.hypot(moved.x-start.x,moved.z-start.z)>1000,'real push failed '+id+' '+JSON.stringify({start,moved,p:ts2.player}));
+    const a=offset(initial),b=offset(ts2.viewer.objectTransforms.get(far));
+    const delta=[moved.x-start.x,-(moved.y-start.y),-(moved.z-start.z)];
+    for(let axis=0;axis<3;axis++)check(Math.abs((b[axis]-a[axis])*8192-delta[axis])<128,'far art drift '+id);
+    await ts2.spawnPlayer();ts2.viewer.stop();check(ts2.viewer.objectTransforms.get(far)===initial,'far art restart mismatch');
+  }
   const initial=ts2.toyBarnPlatforms.movers.map(m=>({...m.position}));
   for(let t=0;t<100;t++){ts2.setPlayerPos(0,0,-2000000);ts2.player.fallTimer=0;ts2.tickGame({},1,0);}
   for(let i=3;i<6;i++)check(JSON.stringify(ts2.toyBarnPlatforms.movers[i].position)===JSON.stringify(initial[i]),'enemy-gated platform moved early');
@@ -64,5 +76,5 @@
   await wait(()=>['summary','select'].includes(ts2.front.screen),'exit failed');
   if(ts2.front.screen==='summary'){ts2.frontDrive(0,650);ts2.frontDrive(0x4000);ts2.frontDrive(0,130);}
   await wait(()=>ts2.front.screen==='select','selector missing');check(ts2.toyBarnPlatforms===null,'shuttle controller leaked after exit');
-  console.log('PASS Toy Barn six platform out/back/wait cycles, artwork alignment, pause/restart/exit');
+  console.log('PASS Toy Barn two real crate pushes/far art and six platform out/back/wait cycles, artwork alignment, pause/restart/exit');
 })()

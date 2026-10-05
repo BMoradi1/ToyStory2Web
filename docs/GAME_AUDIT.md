@@ -7,6 +7,15 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-04 — Toy Barn distant crate models
+
+Connected push-crate art 8/9 to far models 21/22, matching `00421340`'s
+128-game-unit position quantization. The shared push renderer already owns
+movement, separation and reset, so this restores the missing level mapping.
+The extended Toy Barn browser check physically pushes both crates, verifies
+far-model displacement and restart restoration, then reruns all six scripted
+platform cycles and lifecycle checks. Production build passes.
+
 ## 2026-10-04 — Toy Barn scripted platforms
 
 Restored all six `0048acc0` platforms from the installed scripts at

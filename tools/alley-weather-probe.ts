@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {createRain} from '../src/sim/rain.ts';
+import {stepAlleyWeather,type AlleyWeatherWorld} from '../src/sim/alley-weather.ts';
+let bytes=0;const splashes:{x:number;y:number;z:number}[]=[];
+const w:AlleyWeatherWorld={render:{x:0,y:0,z:0,yaw:0,pitch:0},follow:{x:0,y:0,z:0,yaw:0},zone:0,playerVY:0,waterY:65536,eighthTick:true,byte:()=>{bytes++;return 128;},ground:()=>90000,splash:at=>splashes.push(at)};
+const s=createRain();stepAlleyWeather(s,w);assert.equal(bytes,6);assert.deepEqual(splashes,[{x:0,y:65536,z:49152}]);
+w.ground=()=>32000;stepAlleyWeather(s,w);assert.equal(splashes.at(-1)!.y,32000);
+w.follow.y=65537;const count=splashes.length,before=bytes;stepAlleyWeather(s,w);assert.equal(splashes.length,count);assert.equal(bytes-before,4,'underwater rejects splash before its random bytes');
+w.follow.y=0;w.ground=()=>-10;stepAlleyWeather(s,w);assert.equal(splashes.length,count,'roof above camera rejects splash');
+w.ground=()=>null;stepAlleyWeather(s,w);assert.equal(splashes.length,count,'absent floor rejects splash');
+w.eighthTick=false;w.ground=()=>1000;stepAlleyWeather(s,w);assert.equal(splashes.length,count);
+assert(s.rain.some(d=>d.bottom!==0));assert.equal(s.rain.length,64);
+console.log('PASS shared Alley rain pool, water/ground splash clipping, underwater and eighth-tick gates, no-floor/roof rejection and random consumption');

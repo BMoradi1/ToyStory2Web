@@ -43,6 +43,11 @@
   const at=ts2.alleyEffects.points[2];
   for(let t=0;t<300;t++){hold({x:at.x+10000,y:at.y,z:at.z});projectile ||= ts2.effects.activeKinds.includes(76);sounded ||= ts2.sound.raised.some(e=>e.startsWith('a4:'));}
   check(projectile&&sounded,'paired path projectile/sound missing');
+  const drops=ts2.alleyEffects.weather.rain.filter(d=>d.bottom!==0),rainPage=ts2.viewer.effectPageData.get(8);
+  const cards=rainPage?.cards.filter(c=>Math.abs(c.width-30/256)<1e-8&&Math.abs(c.height-200/256)<1e-8)??[];
+  check(drops.length>0&&cards.length===drops.length,'Alley rain cards missing');
+  check(cards.every(c=>c.u0===128/rainPage.texture.image.width&&c.v0===0),'rain must use Alley sprite 52');
+  check(ts2.sound.raised.some(e=>e.startsWith('6f:')),'Alley rain loop missing');
   for(let t=0;t<700;t++){hold({x:0x29630+10000,y:-0xa5660,z:-0x2eb06});vent ||= ts2.effects.activeKinds.includes(93);}
   check(ts2.zones.camera===2&&vent,'room-2 emitter missing '+JSON.stringify({zone:ts2.zones,vent}));
   for(const z of [900000,1100000]){
@@ -57,9 +62,10 @@
     }
     check(splash,'water entry splash missing '+z);
   }
-  ts2.openMenu();const before=[ts2.alleyEffects.timer,ts2.alleyEffects.node,ts2.alleyEffects.vent].join();ts2.tickGame({},120);
-  check(before===[ts2.alleyEffects.timer,ts2.alleyEffects.node,ts2.alleyEffects.vent].join(),'paused emitter advanced');ts2.pressMenu('back');ts2.tickGame({},1);
+  ts2.openMenu();const before=JSON.stringify(ts2.alleyEffects);ts2.tickGame({},120);
+  check(before===JSON.stringify(ts2.alleyEffects),'paused emitter advanced');ts2.pressMenu('back');ts2.tickGame({},1);
   await ts2.spawnPlayer();ts2.viewer.stop();check(ts2.alleyEffects.timer===0&&ts2.alleyEffects.node===0&&ts2.alleyEffects.vent===0,'restart retained emitters');
+  check(ts2.alleyEffects.weather.rain.every(d=>d.bottom===0),'restart retained rain');
   await leave();check(ts2.alleyEffects===null,'Alley effects survived exit');
-  console.log('PASS Alley paired projectile/sound, room-2 emitter, both water heights/swimming/splashes, underwater artwork, pause/restart/exit');
+  console.log('PASS Alley live rain cards/audio, paired projectile/sound, room-2 emitter, both water heights/swimming/splashes, underwater artwork, pause/restart/exit');
 })()

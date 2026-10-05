@@ -7,6 +7,22 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-05 — Shared rain and Alley weather
+
+Extracted the existing native `0044ed90` drop pool into `rain.ts` and reused
+it for Alley. Tarmac retains sprite 0x33; Alley uses its installed sprite
+0x34/page 8. Both retain the 64-slot pool, four random bytes per new drop,
+vertical speed adjustment, quota and camera-zone floor cap. Alley adds its
+water-clipped eighth-tick ground splashes and above-water RainLoop event.
+
+Shared/Alley probes pass pool, bounds, clipping, underwater rejection and
+random-byte checks. Alley browser tests verify live installed-sprite cards,
+RainLoop, water/emitter behavior and pause/restart/exit. The Tarmac weather
+browser regression also passes rain cards, ground splashes, actual framebuffer
+lightning, thunder, pause, restart and reentry. Build passes. Native global
+fade-byte suppression of ambient audio and underwater camera tint/warp remain
+unimplemented; this change does not claim complete presentation parity.
+
 ## 2026-10-05 — Alley water and environmental emitters
 
 Connected `0041e880`'s water heights to player physics and shared liquid
@@ -1148,7 +1164,7 @@ not evidence for untested interactions.
 | 2 | Andy's Neighborhood | Lawnmower effects, kite flight/combat/reward and ZGCAR hook implemented. | Moving scenery and natural race/token routes. |
 | 3 | Bombs Away (internal 6) | `stepBossFight` exists. | Complete boss attacks, damage windows, defeat, token and replay. |
 | 4 | Construction Yard | DRILL combat/reward and ZGCAR implemented; trailer paint, outdoor lids, debris, stomp bridge, four shuttles, four linked tilting lifts, stomp-selected lift, distant crate, proximity scenery/portals and mud movement/effects implemented. | Review collision IDs 13/25; natural traversal/token routes. |
-| 5 | Alleys and Gullies | BOX/BPLANE launch cycle, boat cannon, clown combat/reward, eight lane platforms, two seesaws, spring, bubble machine, moving bubble attachments, push-triggered bridge, distant crates, water and timed environmental emitters implemented. | Rain, underwater camera treatment and remaining scenery/effects and natural pole/zip-line routes. |
+| 5 | Alleys and Gullies | BOX/BPLANE launch cycle, boat cannon, clown combat/reward, eight lane platforms, two seesaws, spring, bubble machine, moving bubble attachments, push-triggered bridge, distant crates, water, rain and timed environmental emitters implemented. | Underwater camera treatment and remaining scenery/effects and natural pole/zip-line routes. |
 | 6 | Slime Time (internal 3) | Dedicated slime controller exists. | Full encounter, arena effects, reward and replay comparison. |
 | 7 | Al's Toy Barn | Dinosaur breath/combat/defeat/reward and BOX/BPLANE launch cycle implemented. | Original moving-collision calls and full token routes. |
 | 8 | Al's Space Land | Buggy fight/reward/projectile model, ZGCAR, claw puzzle/token delivery, saucer course/deadline/retry, hanging toys/display motion/sounds, paired laser hazards, projectile volley, ball-pit movement/scatter, rocking-block trigger/far crates and visibility-gated Mother texture animation implemented. | Remaining ambient/projectile effects and natural route validation. |

@@ -1,3 +1,4 @@
+import {stepAlleyWeather} from './sim/alley-weather.ts';
 import {ALLEY_WATER_OBJECTS,alleyWaterY,createAlleyEffects,stepAlleyEffects,type AlleyEffects} from './sim/alley-effects.ts';
 import {ALLEY_BRIDGE_OBJECTS,ALLEY_BRIDGE_BURST,createAlleyBridge,stepAlleyBridge,restoreAlleyBridge,type AlleyBridge} from './sim/alley-bridge.ts';
 import {ALLEY_BUBBLE_OBJECTS,createAlleyBubbles,stepAlleyBubbles,restoreAlleyBubbles,type AlleyBubbles} from './sim/alley-bubbles.ts';
@@ -2024,10 +2025,11 @@ function drawEffects(): void {
     };
     addCard(header.texture,card,(e.flags & EFFECT_FLAGS.flat) !== 0);
   }
-  // 0044f010: sprite 0x33, 30 by 200 level units, neutral 0x40 modulation.
-  const rainHeader=spriteTable[0x33],rainFrame=rainHeader?.frames[0];
+  // 0044f010: level-selected rain sprite, 30 by 200 level units, neutral 0x40 modulation.
+  const rainState=tarmacWeather??alleyEffects?.weather;
+  const rainHeader=spriteTable[alleyEffects?0x34:0x33],rainFrame=rainHeader?.frames[0];
   const rainSheet=rainHeader?sceneSheets.get(rainHeader.texture):null;
-  if(tarmacWeather&&rainHeader&&rainFrame&&rainSheet)for(const drop of tarmacWeather.rain){
+  if(rainState&&rainHeader&&rainFrame&&rainSheet)for(const drop of rainState.rain){
     if(drop.bottom===0)continue;
     addCard(rainHeader.texture,{...effectCardPlacement({...drop,width:30,height:200}),
       u0:rainFrame.u/rainSheet.width,v0:rainFrame.v/rainSheet.height,
@@ -4203,6 +4205,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   // table, which is what lets the spin's whine and whirl hold rather than
   // restart every tick.
   for (const event of player.events) playEvent(event, player);
+  if(alleyEffects&&camera&&((alleyWaterY(player.z)-camera.y)>>4)>0)playEvent(0x6f);
   if (tarmacPlane && camera) {
     playEvent(0x6f);
     playEvent(0x9c, aircraftSoundPoint(tarmacPlane.renderOrigin, camera));
@@ -4460,6 +4463,17 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   }
   stepEffectsNow();
   stepPodBeams();
+  if(alleyEffects&&effects&&camera){
+    const direction=viewer.camera.getWorldDirection(new THREE.Vector3()),eye=viewer.camera.position;
+    stepAlleyWeather(alleyEffects.weather,{
+      render:{x:eye.x/GAME_TO_RENDER,y:-eye.y/GAME_TO_RENDER,z:-eye.z/GAME_TO_RENDER,
+        yaw:yawOf(-direction.x,-direction.z),pitch:Math.round(Math.atan2(-direction.y,Math.hypot(direction.x,direction.z))*4096/(2*Math.PI))},
+      follow:camera,waterY:alleyWaterY(player.z),playerVY:player.vy,zone:zones.camera,eighthTick:effects.gate.eight,
+      byte:()=>effects!.rand.byte(),
+      ground:at=>{const hit=groundBelow(currentCollisionWorld!,at.x/32,at.y/32,at.z/32);return hit?hit.y*32:null;},
+      splash:at=>{spawnChild(effects!,effectWorld(),at.x,at.y,at.z,0x1b,2);},
+    });
+  }
   if (tarmacWeather && effects && camera) {
     const direction=viewer.camera.getWorldDirection(new THREE.Vector3());
     const eye=viewer.camera.position;

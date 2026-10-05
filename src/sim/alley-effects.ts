@@ -1,3 +1,4 @@
+import {createRain} from './rain.ts';
 /** Alley water, path projectiles and room-2 emitter, 0041e880. */
 import type {DatLevel,Vec3} from '../formats/dat.ts';
 import type {Effect} from './effects.ts';
@@ -6,7 +7,7 @@ export function alleyWaterY(playerZ:number){return playerZ>0xf329f?0x70000:0x100
 export function createAlleyEffects(dat:DatLevel){
  const path=dat.paths.find(p=>p.id===14)?.points;if(!path||path.length<4||path.length%2)throw Error('Missing paired Alley effect path 14');
  const objects=ALLEY_WATER_OBJECTS.map(id=>{const index=dat.objectIds[id]!,o=dat.objects[index];if(!o)throw Error(`Missing Alley water artwork ${id}`);return {index,angles:[o.rotation.x,o.rotation.y,o.rotation.z] as const,scale:[1,1,1] as [number,number,number],baseScale:o.scale};});
- return {points:path.map(p=>({x:p.x*32,y:p.y*32,z:p.z*32})),node:0,timer:0,vent:0,objects};
+ return {weather:createRain(),points:path.map(p=>({x:p.x*32,y:p.y*32,z:p.z*32})),node:0,timer:0,vent:0,objects};
 }
 export type AlleyEffects=ReturnType<typeof createAlleyEffects>;
 export interface AlleyEffectWorld {

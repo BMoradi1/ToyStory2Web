@@ -1,3 +1,4 @@
+import {createNeighborhoodLeaves,stepNeighborhoodLeaves,type NeighborhoodLeaves} from './sim/neighborhood-leaves.ts';
 import {createNeighborhoodHoles,stepNeighborhoodHoles,type NeighborhoodHoles} from './sim/neighborhood-holes.ts';
 import {NEIGHBORHOOD_PUMP_OBJECTS,neighborhoodLiquid,createNeighborhoodPump,moveNeighborhoodPump,stepNeighborhoodPump,restoreNeighborhoodPump,type NeighborhoodPump} from './sim/neighborhood-pump.ts';
 import {NEIGHBORHOOD_STRUCTURE_OBJECTS,createNeighborhoodStructure,stepNeighborhoodStructure,restoreNeighborhoodStructure,type NeighborhoodStructure} from './sim/neighborhood-structure.ts';
@@ -384,6 +385,7 @@ async function showLevel(index: number): Promise<void> {
   andyMachinery = null;
   andyGates = null;
   andyCot = null;
+  neighborhoodLeaves = null;
   neighborhoodHoles = null;
   neighborhoodPump = null;
   neighborhoodStructure = null;
@@ -849,6 +851,7 @@ async function open(dir: GameDir): Promise<void> {
       get paintCans() { return paintCans; },
       get seesaws() { return seesaws; },
       get andyEffects() { return andyEffects; },
+      get neighborhoodLeaves(){return neighborhoodLeaves;},
       get neighborhoodHoles(){return neighborhoodHoles;},
       get neighborhoodPump(){return neighborhoodPump;},
       get neighborhoodStructure(){return neighborhoodStructure;},
@@ -1431,6 +1434,7 @@ async function spawnPlayer(): Promise<void> {
   constructionDebris=null;
   toyBarnEffects=null;
   alleyEffects=null;
+  neighborhoodLeaves=null;
   neighborhoodHoles=null;
   andyEffects=null;
   toyBarnHoops=null;
@@ -1651,6 +1655,7 @@ async function spawnPlayer(): Promise<void> {
       return createEffects(table.kinds, table.modes, creatureSim!.rand);
     })()
     : null;
+  neighborhoodLeaves=level===2?createNeighborhoodLeaves(currentLevel.level):null;
   neighborhoodHoles=level===2&&creatureSim?createNeighborhoodHoles(currentLevel.level,creatureSim.creatures):null;
   waterEffects=createWaterEffects(player.y);
   pointLights=createPointLights(exeBytes&&level>=1&&level<=15?readCharacterLight(exeBytes,level):null);playerLight=null;
@@ -1940,7 +1945,7 @@ function effectWorld(): EffectWorld {
       return hit ? hit.y * S2 : null;
     },
     waterY: currentLiquidY(),
-    waterKind: constructionScenery?2:spaceBallPit?3:1,
+    waterKind: neighborhoodPump&&player?neighborhoodLiquid(player.x).kind:constructionScenery?2:spaceBallPit?3:1,
   };
 }
 
@@ -3426,6 +3431,7 @@ function discardLevel(): void {
   andyMachinery = null;
   andyGates = null;
   andyCot = null;
+  neighborhoodLeaves = null;
   neighborhoodHoles = null;
   neighborhoodPump = null;
   neighborhoodStructure = null;
@@ -3871,6 +3877,7 @@ let tarmacPlane: TarmacPlane | null = null;
 let levelPlatforms: LevelPlatforms | null = null;
 let seesaws:Seesaws|null=null;
 let andyEffects:AndyEffects|null=null;
+let neighborhoodLeaves:NeighborhoodLeaves|null=null;
 let neighborhoodHoles:NeighborhoodHoles|null=null;
 let neighborhoodPump:NeighborhoodPump|null=null;
 let neighborhoodStructure:NeighborhoodStructure|null=null;
@@ -4337,6 +4344,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       child:(at,kind,mode)=>spawnChild(effects!,world,at.x,at.y,at.z,kind,mode),hurt:()=>applyCreatureTouch(0,2)});
   }
   if(neighborhoodHoles&&creatureSim&&camera){stepNeighborhoodHoles(neighborhoodHoles,creatureSim.creatures,player,{focus:cameraTarget(player,camera),sound:(id,at)=>playEvent(id,at),stopSequence:()=>{sequenceVoice=null;},effect:(at,kind,mode)=>{if(effects)spawnChild(effects,effectWorld(),at.x,at.y,at.z,kind,mode);},clearWarning:()=>{for(const e of effects?.effects??[])if(e.kind===59&&e.life>0)e.life=1;}});}
+  if(neighborhoodLeaves&&effects){const world=effectWorld();stepNeighborhoodLeaves(neighborhoodLeaves,player,{four:effects.gate.four,sixteen:effects.gate.sixteen,byte:()=>effects!.rand.byte(),spawn:at=>spawnChild(effects!,world,at.x,at.y,at.z,55,19),ground:at=>world.groundAt(at.x,at.y,at.z)});}
   if(neighborhoodPump&&camera){stepNeighborhoodPump(neighborhoodPump,currentCollisionWorld,player,{cameraZone:zones.camera,cameraY:camera.y,guide:()=>spendGuide(guideSparkles,effects,3,true),sound:(id,at)=>playEvent(id,at),splash:at=>{if(effects)spawnChild(effects,effectWorld(),at.x,at.y,at.z,0x39,2);}});drawNeighborhoodPump();}
   if(neighborhoodStructure){
     stepNeighborhoodStructure(neighborhoodStructure,currentCollisionWorld,player,{guide:id=>spendGuide(guideSparkles,effects,id,true),sound:(id,at)=>playEvent(id,at),release:()=>{if(pushBlocks)pushBlocks.held=0;},refreshFloors:()=>{

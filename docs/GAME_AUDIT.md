@@ -7,6 +7,20 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-05 — Neighborhood falling leaves
+
+Restored path-0 leaves from 004190c0: height selects the shared four- or
+sixteen-tick random gate; an armed scan persists until a suitable emitter
+passes strict vertical/horizontal bounds. Kind 55 / mode 19 uses random X/Z
+spread and spin, a floor ray from Y -16384, and fallback floor 0x1460. Culled
+spawns preserve script random consumption. Shared effect worlds now receive
+the Neighborhood water/mud type as well as the liquid height.
+
+The installed probe covers all 17 emitters and real effect templates, strict
+bounds, height-gate boundary, pending scan, floor fallback and random bytes.
+Browser checks pass live falling leaves, scan progression, pause/restart/exit.
+They position Buzz near the tree; natural traversal remains open. Production build passes.
+
 ## 2026-10-05 — Neighborhood burrowing soldier rescue
 
 Restored slot-4 ARMY's seven-hole path-2 puzzle from 00418e50/004190c0.
@@ -1410,7 +1424,7 @@ not evidence for untested interactions.
 | Play order | Level | Confirmed gaps / implementation evidence | Next behavior comparison |
 |---|---|---|---|
 | 1 | Andy's House | Tin intro/fight/reward integration tested; hover wobble/sparks partial. Cot support/drop puzzle, chair stomp, pushables, five room-2 machinery cycles, growing doorway, falling hatch, lowering rope, attic bounce, biased seesaw and room-4 environmental hazards implemented. | Remaining numbered props and platforms; all five token routes. |
-| 2 | Andy's Neighborhood | Lawnmower effects, kite flight/combat/reward, ZGCAR hook and two weight-driven seesaws implemented. | Moving scenery and natural race/token routes. |
+| 2 | Andy's Neighborhood | Lawnmower/kite, seesaws, both push bridges, extending rope, stomp structure/launcher, pump/floating prop, water/mud, burrowing soldier rescue and leaves implemented with focused browser checks. | Full natural race/token routes, remaining collision inventory and underwater presentation. |
 | 3 | Bombs Away (internal 6) | `stepBossFight` exists. | Complete boss attacks, damage windows, defeat, token and replay. |
 | 4 | Construction Yard | DRILL combat/reward and ZGCAR implemented; trailer paint, outdoor lids, debris, stomp bridge, four shuttles, four linked tilting lifts, stomp-selected lift, distant crate, proximity scenery/portals and mud movement/effects implemented. | Review collision IDs 13/25; natural traversal/token routes. |
 | 5 | Alleys and Gullies | BOX/BPLANE launch cycle, boat cannon, clown combat/reward, eight lane platforms, two seesaws, spring, bubble machine, moving bubble attachments, push-triggered bridge, distant crates, water, rain and timed environmental emitters implemented. | Underwater camera treatment and remaining scenery/effects and natural pole/zip-line routes. |

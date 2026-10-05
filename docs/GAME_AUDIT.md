@@ -7,6 +7,23 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-04 — Construction Yard linked lift assemblies
+
+- Restored four path-4 lift routes from installed wordcode, including the
+  shared flag-256 synchronization between the second and third lifts.
+  Primary collision 1–4 and follower collision 7/8/9/6 move with the assemblies.
+- Ported linked near/far platforms, undersides, overhead supports, lateral
+  rails and stretching cables from `0041bee0`. Far coordinates retain the
+  original integer shifts. Moving hulls carry passengers; ledge grabs pause
+  route scripts. Tilt uses the recovered lever/landing-speed formula,
+  damping, empty-platform restoring force and ±224-angle bounce limits.
+- Installed probes cover all routes, synchronization, linked positions,
+  ledge pause, tilt limits/landing force, airborne independence and restore.
+  Browser checks all routes, flag changes, all 28 artwork transforms/cable
+  scales, pause, restart and exit. Production build passes.
+- Natural traversal, edge/crush response and retail visual comparison remain
+  unverified; this is controller coverage, not a completed level playthrough.
+
 ## 2026-10-04 — Construction Yard scripted shuttles
 
 - Restored all four shuttles (artwork 41–44, collision 14–17) using the

@@ -1,3 +1,4 @@
+import {CONSTRUCTION_LIFT_OBJECTS,createConstructionLifts,moveConstructionLifts,stepConstructionLifts,restoreConstructionLifts,type ConstructionLifts} from './sim/construction-lifts.ts';
 import {CONSTRUCTION_SHUTTLE_OBJECTS,createConstructionShuttles,moveConstructionShuttles,stepConstructionShuttles,restoreConstructionShuttles,type ConstructionShuttles} from './sim/construction-shuttles.ts';
 import {CONSTRUCTION_BRIDGE_OBJECTS,createConstructionBridge,moveConstructionBridge,stepConstructionBridge,restoreConstructionBridge,constructionBridgeRoll,type ConstructionBridge} from './sim/construction-bridge.ts';
 import {createConstructionDebris,stepConstructionDebris,type ConstructionDebris} from './sim/construction-debris.ts';
@@ -333,6 +334,7 @@ async function showLevel(index: number): Promise<void> {
   constructionDebris = null;
   constructionBridge = null;
   constructionShuttles = null;
+  constructionLifts = null;
   waterEffects=createWaterEffects();
   tarmacHelicopter = null;
   tarmacLights = null;
@@ -440,7 +442,7 @@ async function showLevel(index: number): Promise<void> {
       for(const id of platformObjects(levelNumber(level.id)??0)) {
         const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);
       }
-      if(levelNumber(level.id)===4)for(const id of [...PAINT_CAN_OBJECTS,...CONSTRUCTION_BRIDGE_OBJECTS,...CONSTRUCTION_SHUTTLE_OBJECTS]){
+      if(levelNumber(level.id)===4)for(const id of [...PAINT_CAN_OBJECTS,...CONSTRUCTION_BRIDGE_OBJECTS,...CONSTRUCTION_SHUTTLE_OBJECTS,...CONSTRUCTION_LIFT_OBJECTS]){
         const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);
       }
       if(levelNumber(level.id)===11&&exeBytes)for(const id of penthouseObjects(readPenthouseTables(exeBytes))){
@@ -736,6 +738,7 @@ async function open(dir: GameDir): Promise<void> {
       get tarmacWeather() { return tarmacWeather; },
       get tarmacScenery() { return tarmacScenery; },
       get levelPlatforms() { return levelPlatforms; },
+      get constructionLifts() { return constructionLifts; },
       get constructionShuttles() { return constructionShuttles; },
       get constructionBridge() { return constructionBridge; },
       get constructionDebris() { return constructionDebris?structuredClone(constructionDebris):null; },
@@ -1320,6 +1323,7 @@ async function spawnPlayer(): Promise<void> {
   if (!currentCollisionWorld) { infoEl.textContent = 'no collision for this scene'; return; }
 
   constructionDebris=null;
+  if(constructionLifts){restoreConstructionLifts(constructionLifts,currentCollisionWorld);constructionLifts=null;}
   if(constructionShuttles){restoreConstructionShuttles(constructionShuttles,currentCollisionWorld);constructionShuttles=null;}
   if(constructionBridge){restoreConstructionBridge(constructionBridge,currentCollisionWorld);constructionBridge=null;}
   if(paintCans){restorePaintCans(paintCans,currentCollisionWorld);paintCans=null;}
@@ -1378,6 +1382,8 @@ async function spawnPlayer(): Promise<void> {
   drawConstructionBridge();
   constructionShuttles=level===4&&exeBytes?createConstructionShuttles(currentLevel.level,currentCollisionWorld,exeBytes):null;
   drawConstructionShuttles();
+  constructionLifts=level===4&&exeBytes?createConstructionLifts(currentLevel.level,currentCollisionWorld,exeBytes):null;
+  drawConstructionLifts();
   tarmacWeather = level === 14 ? createTarmacWeather() : null; setWeatherLight(128);
   tarmacScenery = level === 14 ? createTarmacScenery(currentLevel.level) : null;
   tarmacHelicopter = level === 14 ? createTarmacHelicopter(currentLevel.level) : null;
@@ -2575,6 +2581,12 @@ function drawTarmacHelicopter(): void {
   viewer.setObjectTransforms(transforms);
 }
 
+function drawConstructionLifts():void{
+  if(!viewer||!constructionLifts)return;
+  viewer.setObjectTransforms(new Map(constructionLifts.lifts.flatMap(l=>l.objects.map(o=>[o.index,{angles:o.angles,scale:o.scale,
+    offset:[(o.position.x-o.rest.x)*GAME_TO_RENDER,-(o.position.y-o.rest.y)*GAME_TO_RENDER,-(o.position.z-o.rest.z)*GAME_TO_RENDER] as [number,number,number],
+  }] as const))));
+}
 function drawConstructionShuttles():void{
   if(!viewer||!constructionShuttles)return;
   viewer.setObjectTransforms(new Map(constructionShuttles.movers.map(m=>[m.index,{angles:m.angles,
@@ -3069,6 +3081,7 @@ function discardLevel(): void {
   constructionDebris = null;
   constructionBridge = null;
   constructionShuttles = null;
+  constructionLifts = null;
   waterEffects=createWaterEffects();
   tarmacHelicopter = null;
   tarmacLights = null;
@@ -3496,6 +3509,7 @@ let paintCans:PaintCans|null=null;
 let constructionDebris:ConstructionDebris|null=null;
 let constructionBridge:ConstructionBridge|null=null;
 let constructionShuttles:ConstructionShuttles|null=null;
+let constructionLifts:ConstructionLifts|null=null;
 let waterEffects=createWaterEffects();
 let tarmacHelicopter: TarmacHelicopter | null = null;
 let tarmacLights: TarmacLights | null = null;
@@ -3771,6 +3785,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   playerGround.waterY = penthouse?.water.y??null;
   playerGround.beforeMove = () => {
     tickPushBlocks(held);
+    if(constructionLifts)moveConstructionLifts(constructionLifts,currentCollisionWorld!,player!);
     if(constructionShuttles)moveConstructionShuttles(constructionShuttles,currentCollisionWorld!,player!);
     if(constructionBridge)moveConstructionBridge(constructionBridge,currentCollisionWorld!,player!);
     if(penthouse)movePenthouseFloats(penthouse,currentCollisionWorld!,player!);
@@ -3915,6 +3930,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     playEvent(0x9b,aircraftSoundPoint({x:pose.position.x*32,y:pose.position.y*32,z:pose.position.z*32},camera));
   }
 
+  if(constructionLifts&&creatureSim){stepConstructionLifts(constructionLifts,player,()=>creatureSim!.rand.byte());drawConstructionLifts();}
   if(constructionShuttles&&creatureSim){stepConstructionShuttles(constructionShuttles,()=>creatureSim!.rand.byte());drawConstructionShuttles();}
   if(constructionBridge){
     stepConstructionBridge(constructionBridge,player,currentCollisionWorld,{camera:camera??undefined,

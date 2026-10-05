@@ -7,6 +7,28 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-05 — Alley bubble machine and moving attachments
+
+Restored `0041e880`'s ground-pound machine: collision-4 switch compression,
+guide 0, motor ramp, oscillating head, rotor and paired bubble artwork. The
+first bubble grows before activation; the active machine starts subsequent
+bubbles in alternating windows. Both grow, oscillate vertically, accelerate
+sideways, pop and reset with their original sound events and near/far shifts.
+
+Bubble poles use `00414600`'s stored height: moving the top changes the bottom
+by that height. Acquisition gates follow growth, height and coyote state;
+attached Buzz follows the moving bubble, stays attached while new grabs are
+disabled, and releases on the reset tick after a pop. Restart restores both
+pole records and the compressed switch hull.
+
+Installed probes cover idle/active cycles, growth, emission/pop/recycle,
+attachment acquisition/carry/release and restoration. Browser checks use an
+actual ground pound and actual pole acquisition, ride a bubble for over 60
+ticks until it pops/releases Buzz, observe both bubbles recycle, compare all
+nine artwork transforms, and verify pause/restart/exit. Build passes. Tests
+reposition Buzz to the switch and bubble; a complete natural route and exact
+native camera comparison remain open. Dynamic motor pitch is not yet ported.
+
 ## 2026-10-05 — Alley seesaws and spring
 
 Restored collision 1/2's weight-responsive tilt using `0049ec00`: side of the
@@ -1086,7 +1108,7 @@ not evidence for untested interactions.
 | 2 | Andy's Neighborhood | Lawnmower effects, kite flight/combat/reward and ZGCAR hook implemented. | Moving scenery and natural race/token routes. |
 | 3 | Bombs Away (internal 6) | `stepBossFight` exists. | Complete boss attacks, damage windows, defeat, token and replay. |
 | 4 | Construction Yard | DRILL combat/reward and ZGCAR implemented; trailer paint, outdoor lids, debris, stomp bridge, four shuttles, four linked tilting lifts, stomp-selected lift, distant crate, proximity scenery/portals and mud movement/effects implemented. | Review collision IDs 13/25; natural traversal/token routes. |
-| 5 | Alleys and Gullies | BOX/BPLANE launch cycle, boat cannon and clown combat/reward implemented. | Moving scenery/collision; 37 poles and 11 zip lines need route checks. |
+| 5 | Alleys and Gullies | BOX/BPLANE launch cycle, boat cannon, clown combat/reward, eight lane platforms, two seesaws, spring, bubble machine and moving bubble attachments implemented. | Bridge, remaining scenery/effects and natural pole/zip-line routes. |
 | 6 | Slime Time (internal 3) | Dedicated slime controller exists. | Full encounter, arena effects, reward and replay comparison. |
 | 7 | Al's Toy Barn | Dinosaur breath/combat/defeat/reward and BOX/BPLANE launch cycle implemented. | Original moving-collision calls and full token routes. |
 | 8 | Al's Space Land | Buggy fight/reward/projectile model, ZGCAR, claw puzzle/token delivery, saucer course/deadline/retry, hanging toys/display motion/sounds, paired laser hazards, projectile volley, ball-pit movement/scatter, rocking-block trigger/far crates and visibility-gated Mother texture animation implemented. | Remaining ambient/projectile effects and natural route validation. |

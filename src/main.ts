@@ -1,3 +1,4 @@
+import {ALLEY_BUBBLE_OBJECTS,createAlleyBubbles,stepAlleyBubbles,restoreAlleyBubbles,type AlleyBubbles} from './sim/alley-bubbles.ts';
 import {ALLEY_SEESAW_OBJECTS,createAlleyTraversal,moveAlleyTraversal,stepAlleyTraversal,restoreAlleyTraversal,type AlleyTraversal} from './sim/alley-traversal.ts';
 import {ALLEY_PLATFORM_OBJECTS,createAlleyPlatforms,moveAlleyPlatforms,stepAlleyPlatforms,restoreAlleyPlatforms,alleyPlatformPoses,type AlleyPlatforms} from './sim/alley-platforms.ts';
 import { creatureModelGeometry } from './sim/creature-model.ts';
@@ -361,6 +362,7 @@ async function showLevel(index: number): Promise<void> {
   toyBarnPlatforms = null;
   alleyPlatforms = null;
   alleyTraversal = null;
+  alleyBubbles = null;
   toyBarnRotors = null;
   toyBarnLaunchPlatforms = null;
   toyBarnBarrier = null;
@@ -482,7 +484,7 @@ async function showLevel(index: number): Promise<void> {
       for(const id of platformObjects(levelNumber(level.id)??0)) {
         const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);
       }
-      if(levelNumber(level.id)===5)for(const id of [...ALLEY_PLATFORM_OBJECTS,...ALLEY_SEESAW_OBJECTS]){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
+      if(levelNumber(level.id)===5)for(const id of [...ALLEY_PLATFORM_OBJECTS,...ALLEY_SEESAW_OBJECTS,...ALLEY_BUBBLE_OBJECTS]){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
       if(levelNumber(level.id)===7)for(const id of [...TOY_BARN_PLATFORM_OBJECTS,...TOY_BARN_ROTOR_OBJECTS,...TOY_BARN_SPRING_OBJECTS,...TOY_BARN_LAUNCH_OBJECTS,TOY_BARN_BARRIER_OBJECT,...TOY_BARN_CANNON_OBJECTS]){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
       if(levelNumber(level.id)===4)for(const id of [...PAINT_CAN_OBJECTS,...CONSTRUCTION_BRIDGE_OBJECTS,...CONSTRUCTION_SHUTTLE_OBJECTS,...CONSTRUCTION_LIFT_OBJECTS,...CONSTRUCTION_SCENERY_OBJECTS,...CONSTRUCTION_STOMP_LIFT_OBJECTS]){
         const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);
@@ -798,6 +800,7 @@ async function open(dir: GameDir): Promise<void> {
       get toyBarnBarrier(){return toyBarnBarrier;},
       get toyBarnLaunchPlatforms(){return toyBarnLaunchPlatforms;},
       get toyBarnRotors(){return toyBarnRotors;},
+      get alleyBubbles(){return alleyBubbles;},
       get alleyTraversal(){return alleyTraversal;},
       get alleyPlatforms(){return alleyPlatforms;},
       get toyBarnPlatforms(){return toyBarnPlatforms;},
@@ -1397,6 +1400,7 @@ async function spawnPlayer(): Promise<void> {
   if(toyBarnBarrier){restoreToyBarnBarrier(toyBarnBarrier,currentCollisionWorld);toyBarnBarrier=null;}
   if(toyBarnLaunchPlatforms){restoreToyBarnLaunchPlatforms(toyBarnLaunchPlatforms,currentCollisionWorld);toyBarnLaunchPlatforms=null;}
   if(toyBarnRotors){restoreToyBarnRotors(toyBarnRotors,currentCollisionWorld);toyBarnRotors=null;}
+  if(alleyBubbles){restoreAlleyBubbles(alleyBubbles,currentCollisionWorld);alleyBubbles=null;}
   if(alleyTraversal){restoreAlleyTraversal(alleyTraversal,currentCollisionWorld);alleyTraversal=null;}
   if(alleyPlatforms){restoreAlleyPlatforms(alleyPlatforms,currentCollisionWorld);alleyPlatforms=null;}
   if(toyBarnPlatforms){restoreToyBarnPlatforms(toyBarnPlatforms,currentCollisionWorld);toyBarnPlatforms=null;}
@@ -1532,6 +1536,7 @@ async function spawnPlayer(): Promise<void> {
   const S = GAME_UNITS_PER_LEVEL_UNIT;
   levelZipLines = readZipLines(currentLevel!.level.paths.find(p => p.id === 62)?.points ?? []);
   levelPoles = readPoles(currentLevel!.level.paths.find(p => p.id === 61)?.points ?? []);
+  alleyBubbles=level===5?createAlleyBubbles(currentLevel.level,currentCollisionWorld,levelPoles):null;drawAlleyBubbles();
   spaceRockingBlock=level===8?createSpaceRockingBlock():null;
   const table = PUSH_BLOCKS[level];
   pushBlocks = table
@@ -2769,6 +2774,10 @@ function drawToyBarnRotors():void{
   if(!viewer||!toyBarnRotors)return;
   viewer.setObjectTransforms(new Map(toyBarnRotors.map(r=>[r.index,{angles:[0,0,r.angle/4] as [number,number,number]}])));
 }
+function drawAlleyBubbles():void{
+  if(!viewer||!alleyBubbles)return;
+  viewer.setObjectTransforms(new Map(alleyBubbles.objects.map(o=>[o.index,{angles:o.angles,scale:o.scale,offset:[(o.position.x-o.rest.x)*GAME_TO_RENDER,-(o.position.y-o.rest.y)*GAME_TO_RENDER,-(o.position.z-o.rest.z)*GAME_TO_RENDER] as [number,number,number]}])));
+}
 function drawAlleyTraversal():void{
   if(!viewer||!alleyTraversal)return;
   viewer.setObjectTransforms(new Map(alleyTraversal.seesaws.flatMap(r=>r.objects.map(o=>[o.index,{angles:[0,0,r.angle>>2] as [number,number,number]}] as const))));
@@ -3290,6 +3299,7 @@ function discardLevel(): void {
   toyBarnPlatforms = null;
   alleyPlatforms = null;
   alleyTraversal = null;
+  alleyBubbles = null;
   toyBarnRotors = null;
   toyBarnLaunchPlatforms = null;
   toyBarnBarrier = null;
@@ -3737,6 +3747,7 @@ let toyBarnCannon:ToyBarnCannon|null=null;
 let toyBarnBarrier:ToyBarnBarrier|null=null;
 let toyBarnLaunchPlatforms:ToyBarnLaunchPlatforms|null=null;
 let toyBarnRotors:ToyBarnRotors|null=null;
+let alleyBubbles:AlleyBubbles|null=null;
 let alleyTraversal:AlleyTraversal|null=null;
 let alleyPlatforms:AlleyPlatforms|null=null;
 let toyBarnPlatforms:ToyBarnPlatforms|null=null;
@@ -4217,6 +4228,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   if(toyBarnLaunchPlatforms){stepToyBarnLaunchPlatforms(toyBarnLaunchPlatforms,player,{guide:id=>spendGuide(guideSparkles,effects,id,true),sound:(id,at)=>playEvent(id,at)});drawToyBarnLaunchPlatforms();}
   if(toyBarnSprings){stepToyBarnSprings(toyBarnSprings,player,currentCollisionWorld,{guide:()=>spendGuide(guideSparkles,effects,1,true),sound:()=>playEvent(0x1c,player!)});drawToyBarnSprings();}
   if(toyBarnRotors){stepToyBarnRotors(toyBarnRotors);drawToyBarnRotors();}
+  if(alleyBubbles){stepAlleyBubbles(alleyBubbles,currentCollisionWorld!,player);if(alleyBubbles.guide)spendGuide(guideSparkles,effects,0,true);for(const sound of alleyBubbles.sounds)playEvent(sound.event,sound.at);drawAlleyBubbles();}
   if(alleyTraversal){stepAlleyTraversal(alleyTraversal,player);if(alleyTraversal.launched){spendGuide(guideSparkles,effects,1,true);playEvent(0x1c,player);}drawAlleyTraversal();}
   if(alleyPlatforms){stepAlleyPlatforms(alleyPlatforms,currentCollisionWorld!,player);drawAlleyPlatforms();}
   if(toyBarnPlatforms&&creatureSim){updateToyBarnGuards(creatureSim.creatures,effects?.effects.some(e=>e.life>0&&(e.kind===EFFECT_KIND.diskHoming||e.kind===EFFECT_KIND.diskStraight))??false);stepToyBarnPlatforms(toyBarnPlatforms,()=>creatureSim!.rand.byte(),slot=>creatureSim!.creatures.find(c=>c.slot===slot)?.health);drawToyBarnPlatforms();}

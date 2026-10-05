@@ -1837,3 +1837,15 @@ zero, decrements only in that room, and emits when negative before resetting
 to 100. Player room 1 emits kind 101/mode 10 on the two-tick gate, within a
 strict camera radius of 768 shifted units. The installed probes and browser
 checks are `penthouse-scenery-probe.ts` and `penthouse-scenery-flow-check.js`.
+
+### Construction Yard trailer portal gate
+
+`0041c190` moves room 1's doorway to room 2 to the end of that room's
+portal list. `0041c640` terminates the list before that entry when Buzz is
+outside the same strict 250-unit sphere that drives artwork 63/64. When
+near, it enables the doorway and swaps the first two aperture IDs in room
+2's list, retaining their destination bytes. The runtime lists at
+`0054f39c + room*32` come from the DAT portal records (`0043e6e0`); they
+are not texture-animation commands. `construction-scenery.ts` derives both
+variants without mutating the parsed scene. Zone updates and the render
+portal walk use the active variant.

@@ -7,6 +7,22 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-04 — Construction Yard trailer portal gating
+
+- Corrected the earlier interpretation of `0054f3bc`: it belongs to the
+  renderer's room portal lists, not texture commands. The loader `0043e6e0`
+  writes pairs of portal ID/destination at `0054f39c + room*32`; `0043f3d0`
+  traverses them. No texture effect is implied by this native block.
+- Restored the init-time reorder and proximity gate from `0041c190/0041c640`:
+  room 1's trailer doorway comes last and is disabled while Buzz is far away;
+  approaching also swaps the first two room-2 apertures without changing
+  their destination bytes. Both zone updates and visibility walks use the
+  active list, while parsed source data stays unchanged.
+- Installed regression verifies actual portal-walk visibility, interior
+  ordering and reset. Browser checks approach/departure, pause/restart/exit.
+  Existing portal validation and production build pass. Global portal-culling
+  preference is unchanged; this restores the level-specific portal graph.
+
 ## 2026-10-04 — Slime encounter regression unblocked
 
 The recorded Slime Time probe failure came from adding the face-only and
@@ -25,8 +41,8 @@ Restored the object-63/64 height animation at the start of `0041c640`:
 strict 250-unit 3D proximity, eight-tick collapse and eight-tick restoration.
 Installed probes cover all axes, diagonal exclusion, boundary and endpoint
 clamps. Browser checks both artwork scales, repeated approaches, pause,
-restart and exit; production build passes. The companion texture-command
-swap in that native block still needs separate implementation.
+restart and exit; production build passes. The companion portal-list mutation is implemented in the entry above; the
+earlier texture-command interpretation was incorrect.
 
 ## 2026-10-04 — Push-block distant artwork
 
@@ -617,7 +633,7 @@ not evidence for untested interactions.
 | 1 | Andy's House | Tin intro/fight/reward integration tested; hover wobble/sparks partial. Chair stomp and pushables implemented. | Remaining numbered props and platforms; all five token routes. |
 | 2 | Andy's Neighborhood | Lawnmower effects, kite flight/combat/reward and ZGCAR hook implemented. | Moving scenery and natural race/token routes. |
 | 3 | Bombs Away (internal 6) | `stepBossFight` exists. | Complete boss attacks, damage windows, defeat, token and replay. |
-| 4 | Construction Yard | DRILL combat/reward and ZGCAR implemented; trailer paint, outdoor lids, debris, stomp bridge, four shuttles, four linked tilting lifts, distant crate and proximity scenery implemented. | Review collision IDs 13/21–25 and proximity texture-command swap; natural traversal/token routes. |
+| 4 | Construction Yard | DRILL combat/reward and ZGCAR implemented; trailer paint, outdoor lids, debris, stomp bridge, four shuttles, four linked tilting lifts, distant crate and proximity scenery implemented. | Review collision IDs 13/21–25; natural traversal/token routes. |
 | 5 | Alleys and Gullies | BOX/BPLANE launch cycle, boat cannon and clown combat/reward implemented. | Moving scenery/collision; 37 poles and 11 zip lines need route checks. |
 | 6 | Slime Time (internal 3) | Dedicated slime controller exists. | Full encounter, arena effects, reward and replay comparison. |
 | 7 | Al's Toy Barn | Dinosaur breath/combat/defeat/reward and BOX/BPLANE launch cycle implemented. | Original moving-collision calls and full token routes. |

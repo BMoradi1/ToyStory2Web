@@ -1,4 +1,4 @@
-import {CONSTRUCTION_SCENERY_OBJECTS,createConstructionScenery,stepConstructionScenery,type ConstructionScenery} from './sim/construction-scenery.ts';
+import {CONSTRUCTION_SCENERY_OBJECTS,createConstructionScenery,stepConstructionScenery,constructionPortals,type ConstructionScenery} from './sim/construction-scenery.ts';
 import {CONSTRUCTION_LIFT_OBJECTS,createConstructionLifts,moveConstructionLifts,stepConstructionLifts,restoreConstructionLifts,type ConstructionLifts} from './sim/construction-lifts.ts';
 import {CONSTRUCTION_SHUTTLE_OBJECTS,createConstructionShuttles,moveConstructionShuttles,stepConstructionShuttles,restoreConstructionShuttles,type ConstructionShuttles} from './sim/construction-shuttles.ts';
 import {CONSTRUCTION_BRIDGE_OBJECTS,createConstructionBridge,moveConstructionBridge,stepConstructionBridge,restoreConstructionBridge,constructionBridgeRoll,type ConstructionBridge} from './sim/construction-bridge.ts';
@@ -1005,14 +1005,14 @@ async function open(dir: GameDir): Promise<void> {
       },
       /** The level's doorways, as from/to pairs. */
       zoneGraph() {
-        return currentLevel ? currentLevel.level.zones.map((z) => [z.from, z.to]) : null;
+        return currentLevel ? activePortals().map((z) => [z.from, z.to]) : null;
       },
       /** Re-run the walk from where the camera is now, reporting every doorway. */
       walkTrace() {
         if (!currentLevel || !camera || !player) return null;
         const log: unknown[] = [];
         const seen = walkPortals(
-          currentLevel.level.zones, zones.camera,
+          activePortals(), zones.camera,
           basisFromCamera(camera, cameraTarget(player, camera)),
           { backdropZone: BACKDROP_ZONE[levelNumber(levels[levelEl.selectedIndex]?.id ?? '') ?? 0] ?? null,
             alsoFrom: zones.floor, trace: (t) => log.push(t) },
@@ -2587,6 +2587,9 @@ function drawTarmacHelicopter(): void {
   viewer.setObjectTransforms(transforms);
 }
 
+function activePortals(){
+  return constructionScenery?constructionPortals(constructionScenery):currentLevel?.level.zones??[];
+}
 function drawConstructionScenery():void{
   if(!viewer||!constructionScenery)return;
   viewer.setObjectTransforms(new Map(constructionScenery.objects.map(o=>[o.index,{angles:o.angles,
@@ -3876,6 +3879,8 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     drawStompProps(levelNow);
   }
 
+  if(constructionScenery){stepConstructionScenery(constructionScenery,player);drawConstructionScenery();}
+
   // Game space to renderer space. A game facing of (sin yaw, cos yaw) becomes
   // (sin yaw, -cos yaw) once Z is negated. Characters are authored facing +Z
   // and stay that way through buildMeshData's flip, checked by rendering the
@@ -3893,7 +3898,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     // engine runs them in: the render pass sets both from the camera, and
     // the level ticks read them afterwards.
     if (currentCollision && currentLevel) {
-      stepZones(zones, currentCollision, currentLevel.level.zones, camera, player, {
+      stepZones(zones, currentCollision, activePortals(), camera, player, {
         level: levelNow, blending: cut.zoneBlend > 0,
       });
     }
@@ -3918,7 +3923,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       viewer.setVisibleZones(null);
     } else if (currentLevel && zones.camera >= 0 && zoneCulling) {
       const seen = walkPortals(
-        currentLevel.level.zones, zones.camera,
+        activePortals(), zones.camera,
         basisFromCamera(shown.eye, look),
         { backdropZone: BACKDROP_ZONE[levelNow] ?? null, alsoFrom: zones.floor },
       );
@@ -3949,7 +3954,6 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
     playEvent(0x9b,aircraftSoundPoint({x:pose.position.x*32,y:pose.position.y*32,z:pose.position.z*32},camera));
   }
 
-  if(constructionScenery){stepConstructionScenery(constructionScenery,player);drawConstructionScenery();}
   if(constructionLifts&&creatureSim){stepConstructionLifts(constructionLifts,player,()=>creatureSim!.rand.byte());drawConstructionLifts();}
   if(constructionShuttles&&creatureSim){stepConstructionShuttles(constructionShuttles,()=>creatureSim!.rand.byte());drawConstructionShuttles();}
   if(constructionBridge){

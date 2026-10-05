@@ -7,6 +7,25 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-04 — Toy Barn path effects
+
+Restored `00421340`'s two emitters on the shared 64-tick divider. Path 6
+advances before spawning kind 86 with spawn mode 25, floor zero and sound
+`0x74`. Path 7 selects one of six points using `(byte & 7)` with 6/7 mapped
+to 0/1, then spawns kind 80 with spawn mode 24 and caller-selected quarter-turn
+rotation. Both preserve strict XZ activation bounds and the original random
+consumption when a spawn is culled. Spawn modes configure initial velocity;
+the installed templates still supply their own ongoing behavior modes.
+
+`toy-barn-effects-probe.ts` verifies every path point, wrap/random/boundary
+rules, divider timing, sound/floor/rotation and installed effect animation.
+`toy-barn-effects-flow-check.js` verifies both regions' live sprites in their
+level texture batches, sound, pause, restart and exit. The disk-lock browser
+regression still passes with these emitters active; all 15 levels also pass
+load, short simulation and exit. Production build passes. Exact retail camera
+framing, global divider phase and natural traversal through the effects remain
+unverified.
+
 ## 2026-10-04 — Toy Barn disk-gated locks
 
 Resolved `00882968` as the six shared disk permits. `00421340` sets lock

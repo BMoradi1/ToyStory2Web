@@ -1,3 +1,4 @@
+import {createToyBarnEffects,stepToyBarnEffects,type ToyBarnEffects} from './sim/toy-barn-effects.ts';
 import {TOY_BARN_ROTOR_OBJECTS,createToyBarnRotors,moveToyBarnRotors,stepToyBarnRotors,restoreToyBarnRotors,type ToyBarnRotors} from './sim/toy-barn-rotors.ts';
 import {TOY_BARN_PLATFORM_OBJECTS,updateToyBarnGuards,createToyBarnPlatforms,moveToyBarnPlatforms,stepToyBarnPlatforms,restoreToyBarnPlatforms,toyBarnPlatformPoses,type ToyBarnPlatforms} from './sim/toy-barn-platforms.ts';
 import {SPACE_BUGGY_MODEL,createSpaceBuggyModel,stepSpaceBuggyModel,type SpaceBuggyModel} from './sim/space-buggy-model.ts';
@@ -344,6 +345,7 @@ async function showLevel(index: number): Promise<void> {
   penthouse = null;
   paintCans = null;
   constructionDebris = null;
+  toyBarnEffects = null;
   constructionBridge = null;
   constructionShuttles = null;
   toyBarnPlatforms = null;
@@ -780,6 +782,7 @@ async function open(dir: GameDir): Promise<void> {
       get toyBarnPlatforms(){return toyBarnPlatforms;},
       get constructionShuttles() { return constructionShuttles; },
       get constructionBridge() { return constructionBridge; },
+      get toyBarnEffects(){return toyBarnEffects;},
       get constructionDebris() { return constructionDebris?structuredClone(constructionDebris):null; },
       get paintCans() { return paintCans; },
       get penthouse() { return penthouse; },
@@ -1363,6 +1366,7 @@ async function spawnPlayer(): Promise<void> {
   if (!currentCollisionWorld) { infoEl.textContent = 'no collision for this scene'; return; }
 
   constructionDebris=null;
+  toyBarnEffects=null;
   constructionScenery=null;
   spaceClaw=null;
   spaceScenery=null;
@@ -1428,6 +1432,7 @@ async function spawnPlayer(): Promise<void> {
   drawPenthouse();
   paintCans=level===4?createPaintCans(currentLevel.level,currentCollisionWorld):null;
   drawPaintCans();
+  toyBarnEffects=level===7?createToyBarnEffects(currentLevel.level):null;
   constructionDebris=level===4?createConstructionDebris(currentLevel.level):null;
   constructionBridge=level===4?createConstructionBridge(currentLevel.level,currentCollisionWorld):null;
   drawConstructionBridge();
@@ -3209,6 +3214,7 @@ function discardLevel(): void {
   penthouse = null;
   paintCans = null;
   constructionDebris = null;
+  toyBarnEffects = null;
   constructionBridge = null;
   constructionShuttles = null;
   toyBarnPlatforms = null;
@@ -3647,6 +3653,7 @@ let tarmacPlane: TarmacPlane | null = null;
 let levelPlatforms: LevelPlatforms | null = null;
 let penthouse:Penthouse|null=null;
 let paintCans:PaintCans|null=null;
+let toyBarnEffects:ToyBarnEffects|null=null;
 let constructionDebris:ConstructionDebris|null=null;
 let constructionBridge:ConstructionBridge|null=null;
 let toyBarnRotors:ToyBarnRotors|null=null;
@@ -4133,6 +4140,11 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
       sound:(event,at)=>playEvent(event,at),shake:ticks=>{if(camera)camera.shake=ticks;},
       effect:(at,kind,mode)=>spawnChild(effects!,world,at.x,at.y,at.z,kind,mode),
     });drawPaintCans();
+  }
+  if(toyBarnEffects&&creatureSim&&effects&&camera){
+    const world=effectWorld();
+    stepToyBarnEffects(toyBarnEffects,player,{gate64:effects.gate.sixtyFour,randomByte:()=>creatureSim!.rand.byte(),
+      effect:(at,kind,mode)=>spawnChild(effects!,world,at.x,at.y,at.z,kind,mode),sound:(id,at)=>playEvent(id,at)});
   }
   if(constructionDebris&&creatureSim&&effects&&camera){
     const world=effectWorld();

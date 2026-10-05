@@ -125,7 +125,7 @@ export interface EffectSim {
   /** Raised when a shot touched Buzz: the angle it came from. */
   hurt: number | null;
   /** The engine's frame dividers, rebuilt each tick. */
-  gate: { two: number; three: number; four: boolean; five: boolean; six: boolean; seven: boolean; eight: boolean; sixteen: boolean; thirtyTwo: boolean };
+  gate: { two: number; three: number; four: boolean; five: boolean; six: boolean; seven: boolean; eight: boolean; sixteen: boolean; thirtyTwo: boolean; sixtyFour: boolean };
   /** The 1-in-16 counter itself, which one mode reads as a triangle wave. */
   counter16: number;
   /** Shared 32-tick phase, used by Elevator wind particle rotation. */
@@ -150,14 +150,14 @@ export function createEffects(
     effects: Array.from({ length: EFFECT.slots }, dead),
     cursor: 0, rand, templates, modes,
     marks: [], lights: [], pointLights: [], sounds: [], coins: 0, spinning: false, hurt: null,
-    gate: { two: 0, three: 0, four: false, five: false, six: false, seven: false, eight: false, sixteen: false, thirtyTwo: false },
+    gate: { two: 0, three: 0, four: false, five: false, six: false, seven: false, eight: false, sixteen: false, thirtyTwo: false, sixtyFour: false },
     counter16: 0,counter32:0,
     hits: [],
   };
 }
 
 /** The dividers `FUN_004a5a30` rebuilds every tick, which the emitters gate on. */
-const counters = { two: 0, three: 0, four: 0, five: 0, six: 0, seven: 0, eight: 0, sixteen: 0, thirtyTwo: 0 };
+const counters = { two: 0, three: 0, four: 0, five: 0, six: 0, seven: 0, eight: 0, sixteen: 0, thirtyTwo: 0, sixtyFour: 0 };
 
 export function stepEffectGates(sim: EffectSim, dt = 1): void {
   const g = sim.gate;
@@ -165,7 +165,7 @@ export function stepEffectGates(sim: EffectSim, dt = 1): void {
   for (counters.two += dt; counters.two > 1; counters.two -= 2) g.two++;
   g.three = 0;
   for (counters.three += dt; counters.three > 2; counters.three -= 3) g.three++;
-  const step = (name: 'four' | 'five' | 'six' | 'seven' | 'eight' | 'sixteen' | 'thirtyTwo', wrap: number) => {
+  const step = (name: 'four' | 'five' | 'six' | 'seven' | 'eight' | 'sixteen' | 'thirtyTwo' | 'sixtyFour', wrap: number) => {
     counters[name] += dt;
     const hit = counters[name] > wrap - 1;
     if (hit) counters[name] -= wrap;
@@ -178,6 +178,7 @@ export function stepEffectGates(sim: EffectSim, dt = 1): void {
   g.eight = step('eight', 8);
   g.sixteen = step('sixteen', 16);
   g.thirtyTwo = step('thirtyTwo', 32);
+  g.sixtyFour = step('sixtyFour', 64);
   sim.counter16 = counters.sixteen;
   sim.counter32 = counters.thirtyTwo;
 }

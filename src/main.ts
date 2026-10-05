@@ -1,3 +1,4 @@
+import {createSpaceRockingBlock,stepSpaceRockingBlock,type SpaceRockingBlock} from './sim/space-rocking-block.ts';
 import {createSpaceBallPit,spaceBallPitY,stepSpaceBallPit,type SpaceBallPit} from './sim/space-ball-pit.ts';
 import {createSpaceProjectiles,stepSpaceProjectiles,type SpaceProjectiles} from './sim/space-projectiles.ts';
 import {createSpaceLasers,stepSpaceLasers,type SpaceLasers} from './sim/space-lasers.ts';
@@ -350,6 +351,7 @@ async function showLevel(index: number): Promise<void> {
   spaceLasers = null;
   spaceProjectiles = null;
   spaceBallPit = null;
+  spaceRockingBlock = null;
   waterEffects=createWaterEffects();
   tarmacHelicopter = null;
   tarmacLights = null;
@@ -756,6 +758,7 @@ async function open(dir: GameDir): Promise<void> {
       get tarmacWeather() { return tarmacWeather; },
       get tarmacScenery() { return tarmacScenery; },
       get levelPlatforms() { return levelPlatforms; },
+      get spaceRockingBlock(){return spaceRockingBlock;},
       get spaceBallPit(){return spaceBallPit;},
       get spaceProjectiles(){return spaceProjectiles;},
       get spaceLasers(){return spaceLasers;},
@@ -1356,6 +1359,7 @@ async function spawnPlayer(): Promise<void> {
   spaceLasers=null;
   spaceProjectiles=null;
   spaceBallPit=null;
+  spaceRockingBlock=null;
   if(constructionStompLift){restoreConstructionStompLift(constructionStompLift,currentCollisionWorld);constructionStompLift=null;}
   if(constructionLifts){restoreConstructionLifts(constructionLifts,currentCollisionWorld);constructionLifts=null;}
   if(constructionShuttles){restoreConstructionShuttles(constructionShuttles,currentCollisionWorld);constructionShuttles=null;}
@@ -1474,6 +1478,7 @@ async function spawnPlayer(): Promise<void> {
   const S = GAME_UNITS_PER_LEVEL_UNIT;
   levelZipLines = readZipLines(currentLevel!.level.paths.find(p => p.id === 62)?.points ?? []);
   levelPoles = readPoles(currentLevel!.level.paths.find(p => p.id === 61)?.points ?? []);
+  spaceRockingBlock=level===8?createSpaceRockingBlock():null;
   const table = PUSH_BLOCKS[level];
   pushBlocks = table
     ? createPushBlocks(
@@ -2731,7 +2736,7 @@ function drawPushBlocks(): void {
       const quantum=object.unitScale*32;
       const coordinate=(n:number)=>id===b.sceneObject?n:Math.floor(n/quantum)*quantum;
       transforms.set(index, {
-        angles: [object.rotation.x, object.rotation.y, object.rotation.z],
+        angles: [object.rotation.x+(id===19?spaceRockingBlock?.pitch??0:0), object.rotation.y, object.rotation.z],
         offset: [(coordinate(b.x) - start.x) * GAME_TO_RENDER, -(coordinate(b.y) - start.y) * GAME_TO_RENDER, -(coordinate(b.z) - start.z) * GAME_TO_RENDER],
       });
     }
@@ -3178,6 +3183,7 @@ function discardLevel(): void {
   spaceLasers = null;
   spaceProjectiles = null;
   spaceBallPit = null;
+  spaceRockingBlock = null;
   waterEffects=createWaterEffects();
   tarmacHelicopter = null;
   tarmacLights = null;
@@ -3613,6 +3619,7 @@ let spaceScenery:SpaceScenery|null=null;
 let spaceLasers:SpaceLasers|null=null;
 let spaceProjectiles:SpaceProjectiles|null=null;
 let spaceBallPit:SpaceBallPit|null=null;
+let spaceRockingBlock:SpaceRockingBlock|null=null;
 let waterEffects=createWaterEffects();
 let tarmacHelicopter: TarmacHelicopter | null = null;
 let tarmacLights: TarmacLights | null = null;
@@ -4051,6 +4058,9 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   if(spaceScenery&&creatureSim){
     stepSpaceScenery(spaceScenery,{zone:zones.player,randomByte:()=>creatureSim!.rand.byte(),sound:(id,at)=>playEvent(id,at)});
     drawSpaceScenery();
+  }
+  if(spaceRockingBlock&&pushBlocks){
+    stepSpaceRockingBlock(spaceRockingBlock,player,zones.player,textureAnimation.ticks,pushBlocks);drawPushBlocks();
   }
   if(spaceBallPit&&effects&&creatureSim&&camera){
     const world=effectWorld();

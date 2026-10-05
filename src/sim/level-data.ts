@@ -227,8 +227,8 @@ export const PUSH_BLOCKS: Readonly<Record<number, readonly PushBlock[]>> = {
     { sceneObject: 9, collisionObject: 6, pathTag: 1 },
   ],
   8: [
-    { sceneObject: 0, collisionObject: 0, pathTag: 1 },
-    { sceneObject: 15, collisionObject: 3, pathTag: 2 },
+    { sceneObject: 0, sceneFollowers:[17], collisionObject: 0, pathTag: 1 },
+    { sceneObject: 15, sceneFollowers:[18], collisionObject: 3, pathTag: 2 },
     { sceneObject: 19, collisionObject: 4, pathTag: 3 },
   ],
   11: [

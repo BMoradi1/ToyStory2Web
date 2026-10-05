@@ -1,3 +1,4 @@
+import {TOY_BARN_SPRING_OBJECTS,createToyBarnSprings,stepToyBarnSprings,type ToyBarnSprings} from './sim/toy-barn-springs.ts';
 import {createToyBarnEffects,stepToyBarnEffects,type ToyBarnEffects} from './sim/toy-barn-effects.ts';
 import {TOY_BARN_ROTOR_OBJECTS,createToyBarnRotors,moveToyBarnRotors,stepToyBarnRotors,restoreToyBarnRotors,type ToyBarnRotors} from './sim/toy-barn-rotors.ts';
 import {TOY_BARN_PLATFORM_OBJECTS,updateToyBarnGuards,createToyBarnPlatforms,moveToyBarnPlatforms,stepToyBarnPlatforms,restoreToyBarnPlatforms,toyBarnPlatformPoses,type ToyBarnPlatforms} from './sim/toy-barn-platforms.ts';
@@ -346,6 +347,7 @@ async function showLevel(index: number): Promise<void> {
   paintCans = null;
   constructionDebris = null;
   toyBarnEffects = null;
+  toyBarnSprings = null;
   constructionBridge = null;
   constructionShuttles = null;
   toyBarnPlatforms = null;
@@ -467,7 +469,7 @@ async function showLevel(index: number): Promise<void> {
       for(const id of platformObjects(levelNumber(level.id)??0)) {
         const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);
       }
-      if(levelNumber(level.id)===7)for(const id of [...TOY_BARN_PLATFORM_OBJECTS,...TOY_BARN_ROTOR_OBJECTS]){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
+      if(levelNumber(level.id)===7)for(const id of [...TOY_BARN_PLATFORM_OBJECTS,...TOY_BARN_ROTOR_OBJECTS,...TOY_BARN_SPRING_OBJECTS]){const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);}
       if(levelNumber(level.id)===4)for(const id of [...PAINT_CAN_OBJECTS,...CONSTRUCTION_BRIDGE_OBJECTS,...CONSTRUCTION_SHUTTLE_OBJECTS,...CONSTRUCTION_LIFT_OBJECTS,...CONSTRUCTION_SCENERY_OBJECTS,...CONSTRUCTION_STOMP_LIFT_OBJECTS]){
         const index=parsed.objectIds[id];if(index!==undefined&&index>=0)separate.add(index);
       }
@@ -782,6 +784,7 @@ async function open(dir: GameDir): Promise<void> {
       get toyBarnPlatforms(){return toyBarnPlatforms;},
       get constructionShuttles() { return constructionShuttles; },
       get constructionBridge() { return constructionBridge; },
+      get toyBarnSprings(){return toyBarnSprings;},
       get toyBarnEffects(){return toyBarnEffects;},
       get constructionDebris() { return constructionDebris?structuredClone(constructionDebris):null; },
       get paintCans() { return paintCans; },
@@ -1367,6 +1370,7 @@ async function spawnPlayer(): Promise<void> {
 
   constructionDebris=null;
   toyBarnEffects=null;
+  toyBarnSprings=null;
   constructionScenery=null;
   spaceClaw=null;
   spaceScenery=null;
@@ -1432,6 +1436,8 @@ async function spawnPlayer(): Promise<void> {
   drawPenthouse();
   paintCans=level===4?createPaintCans(currentLevel.level,currentCollisionWorld):null;
   drawPaintCans();
+  toyBarnSprings=level===7?createToyBarnSprings(currentLevel.level):null;
+  drawToyBarnSprings();
   toyBarnEffects=level===7?createToyBarnEffects(currentLevel.level):null;
   constructionDebris=level===4?createConstructionDebris(currentLevel.level):null;
   constructionBridge=level===4?createConstructionBridge(currentLevel.level,currentCollisionWorld):null;
@@ -2707,6 +2713,10 @@ function drawConstructionLifts():void{
     offset:[(o.position.x-o.rest.x)*GAME_TO_RENDER,-(o.position.y-o.rest.y)*GAME_TO_RENDER,-(o.position.z-o.rest.z)*GAME_TO_RENDER] as [number,number,number],
   }] as const))));
 }
+function drawToyBarnSprings():void{
+  if(!viewer||!toyBarnSprings)return;
+  viewer.setObjectTransforms(new Map(toyBarnSprings.objects.map(o=>[o.index,{angles:o.angles,scale:o.scale}])));
+}
 function drawToyBarnRotors():void{
   if(!viewer||!toyBarnRotors)return;
   viewer.setObjectTransforms(new Map(toyBarnRotors.map(r=>[r.index,{angles:[0,0,r.angle/4] as [number,number,number]}])));
@@ -3215,6 +3225,7 @@ function discardLevel(): void {
   paintCans = null;
   constructionDebris = null;
   toyBarnEffects = null;
+  toyBarnSprings = null;
   constructionBridge = null;
   constructionShuttles = null;
   toyBarnPlatforms = null;
@@ -3653,6 +3664,7 @@ let tarmacPlane: TarmacPlane | null = null;
 let levelPlatforms: LevelPlatforms | null = null;
 let penthouse:Penthouse|null=null;
 let paintCans:PaintCans|null=null;
+let toyBarnSprings:ToyBarnSprings|null=null;
 let toyBarnEffects:ToyBarnEffects|null=null;
 let constructionDebris:ConstructionDebris|null=null;
 let constructionBridge:ConstructionBridge|null=null;
@@ -4126,6 +4138,7 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   }
   if(constructionStompLift){stepConstructionStompLift(constructionStompLift,currentCollisionWorld,player,id=>spendGuide(guideSparkles,effects,id,true));drawConstructionStompLift();}
   if(constructionLifts&&creatureSim){stepConstructionLifts(constructionLifts,player,()=>creatureSim!.rand.byte());drawConstructionLifts();}
+  if(toyBarnSprings){stepToyBarnSprings(toyBarnSprings,player,currentCollisionWorld,{guide:()=>spendGuide(guideSparkles,effects,1,true),sound:()=>playEvent(0x1c,player!)});drawToyBarnSprings();}
   if(toyBarnRotors){stepToyBarnRotors(toyBarnRotors);drawToyBarnRotors();}
   if(toyBarnPlatforms&&creatureSim){updateToyBarnGuards(creatureSim.creatures,effects?.effects.some(e=>e.life>0&&(e.kind===EFFECT_KIND.diskHoming||e.kind===EFFECT_KIND.diskStraight))??false);stepToyBarnPlatforms(toyBarnPlatforms,()=>creatureSim!.rand.byte(),slot=>creatureSim!.creatures.find(c=>c.slot===slot)?.health);drawToyBarnPlatforms();}
   if(constructionShuttles&&creatureSim){stepConstructionShuttles(constructionShuttles,()=>creatureSim!.rand.byte());drawConstructionShuttles();}

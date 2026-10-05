@@ -7,6 +7,23 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-04 — Toy Barn spring launchers
+
+Restored surface 8's stomp-only launcher and surface 9's bounce pad from
+`00421340`. The first launches four ticks after the impact, with vertical
+impulse -3072, yaw `0x81e`, and horizontal sine/cosine velocity divided by 8.
+The second launches immediately at -2432, or -3072 after a stomp, while
+preserving air steering. Artwork 2/30 follows the delayed spring timer;
+artwork 3 uses the native signed, decaying sine scale. Absolute native scale
+writes compensate for object 30's non-unit authored scale.
+
+`toy-barn-springs-probe.ts` physically lands/stomps on both installed collision
+surfaces, verifies trigger timing/impulses, ordinary landing rejection on the
+first spring, guide/sound, animation decay and scale. The browser check passes
+all three launch cases, rendered poses, pause, restart and exit. Build passes.
+Full destination traversal and the original launch camera/input-lock timing
+remain unverified.
+
 ## 2026-10-04 — Toy Barn path effects
 
 Restored `00421340`'s two emitters on the shared 64-tick divider. Path 6

@@ -7,6 +7,25 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-05 — Andy's room-4 environmental effects
+
+Restored the path-22 lobber and three emitter positions from 00417680 and
+004f0eb8. The lobber uses the shared 64-tick gate, native horizontal-distance
+trajectory, gravity 128, random spin and one-based random target wrapping.
+The three emitters advance after 120 active ticks, emit kind 34 on transition
+and kind 16 on the shared two-tick gate with randomized lifetime. The nearby
+steam source emits kind 17 on the eight-tick gate and damages Buzz strictly
+inside the original squared-distance threshold. All use camera room 4 and
+the original shifted-distance proximity test; culled spawns still consume
+the script's random bytes.
+
+Installed probes cover all 25 path targets, actual effect templates, emitter
+cadence, lifetime/spin, room/radius gates, steam damage boundaries and culled
+RNG consumption. Browser checks pass live kinds 12/16/17/34, all three emitters,
+path progression, actual steam damage and hurt cooldown, pause/restart/exit.
+The browser uses positioned approaches; natural hazard traversal remains open.
+Production build and all fifteen levels' selector entry/exit checks pass.
+
 ## 2026-10-05 — Andy's lowering rope
 
 Restored room-2 artwork 6 and path-61 pole index 8 from 004171d0/00417680.
@@ -1302,7 +1321,7 @@ not evidence for untested interactions.
 
 | Play order | Level | Confirmed gaps / implementation evidence | Next behavior comparison |
 |---|---|---|---|
-| 1 | Andy's House | Tin intro/fight/reward integration tested; hover wobble/sparks partial. Cot support/drop puzzle, chair stomp, pushables, five room-2 machinery cycles, growing doorway, falling hatch, lowering rope, attic bounce and biased seesaw with collision gates/effects implemented. | Remaining numbered props and platforms; all five token routes. |
+| 1 | Andy's House | Tin intro/fight/reward integration tested; hover wobble/sparks partial. Cot support/drop puzzle, chair stomp, pushables, five room-2 machinery cycles, growing doorway, falling hatch, lowering rope, attic bounce, biased seesaw and room-4 environmental hazards implemented. | Remaining numbered props and platforms; all five token routes. |
 | 2 | Andy's Neighborhood | Lawnmower effects, kite flight/combat/reward, ZGCAR hook and two weight-driven seesaws implemented. | Moving scenery and natural race/token routes. |
 | 3 | Bombs Away (internal 6) | `stepBossFight` exists. | Complete boss attacks, damage windows, defeat, token and replay. |
 | 4 | Construction Yard | DRILL combat/reward and ZGCAR implemented; trailer paint, outdoor lids, debris, stomp bridge, four shuttles, four linked tilting lifts, stomp-selected lift, distant crate, proximity scenery/portals and mud movement/effects implemented. | Review collision IDs 13/25; natural traversal/token routes. |

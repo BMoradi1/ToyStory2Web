@@ -1,3 +1,4 @@
+import {createAndyEffects,stepAndyEffects,type AndyEffects} from './sim/andy-effects.ts';
 import {ANDY_ROPE_OBJECT,createAndyRope,stepAndyRope,restoreAndyRope,type AndyRope} from './sim/andy-rope.ts';
 import {ANDY_COT_OBJECTS,createAndyCot,stepAndyCot,restoreAndyCot,type AndyCot} from './sim/andy-cot.ts';
 import {stepAndySpring} from './sim/spring-launch.ts';
@@ -378,6 +379,7 @@ async function showLevel(index: number): Promise<void> {
   andyGates = null;
   andyCot = null;
   andyRope = null;
+  andyEffects = null;
   seesaws = null;
   toyBarnRotors = null;
   toyBarnLaunchPlatforms = null;
@@ -834,6 +836,7 @@ async function open(dir: GameDir): Promise<void> {
       get constructionDebris() { return constructionDebris?structuredClone(constructionDebris):null; },
       get paintCans() { return paintCans; },
       get seesaws() { return seesaws; },
+      get andyEffects() { return andyEffects; },
       get andyRope() { return andyRope; },
       get andyCot() { return andyCot; },
       get andyGates() { return andyGates; },
@@ -1412,6 +1415,7 @@ async function spawnPlayer(): Promise<void> {
   constructionDebris=null;
   toyBarnEffects=null;
   alleyEffects=null;
+  andyEffects=null;
   toyBarnHoops=null;
   toyBarnSprings=null;
   constructionScenery=null;
@@ -1495,6 +1499,7 @@ async function spawnPlayer(): Promise<void> {
   drawToyBarnSprings();
   toyBarnHoops=level===7?createToyBarnHoops():null;
   seesaws=createSeesaws(level,currentLevel.level,currentCollisionWorld);drawSeesaws();
+  andyEffects=level===1&&exeBytes?createAndyEffects(currentLevel.level,exeBytes):null;
   andyCot=level===1?createAndyCot(currentLevel.level,currentCollisionWorld):null;drawAndyCot();
   andyGates=level===1?createAndyGates(currentLevel.level,currentCollisionWorld):null;drawAndyGates();
   andyMachinery=level===1?createAndyMachinery(currentLevel.level,currentCollisionWorld):null;drawAndyMachinery();
@@ -3378,6 +3383,7 @@ function discardLevel(): void {
   andyGates = null;
   andyCot = null;
   andyRope = null;
+  andyEffects = null;
   seesaws = null;
   toyBarnRotors = null;
   toyBarnLaunchPlatforms = null;
@@ -3816,6 +3822,7 @@ let pushBlocks: PushState | null = null;
 let tarmacPlane: TarmacPlane | null = null;
 let levelPlatforms: LevelPlatforms | null = null;
 let seesaws:Seesaws|null=null;
+let andyEffects:AndyEffects|null=null;
 let andyRope:AndyRope|null=null;
 let andyCot:AndyCot|null=null;
 let andyGates:AndyGates|null=null;
@@ -4270,6 +4277,11 @@ function playTick(override?: Partial<PlayerInput>, bearing?: number): void {
   // table, which is what lets the spin's whine and whirl hold rather than
   // restart every tick.
   for (const event of player.events) playEvent(event, player);
+  if(andyEffects&&effects&&creatureSim){
+    const world=effectWorld();stepAndyEffects(andyEffects,{cameraZone:zones.camera,player,gate64:effects.gate.sixtyFour,gate8:effects.gate.eight,gateTwo:effects.gate.two,byte:()=>creatureSim!.rand.byte(),
+      projectile:(at,v,spin)=>spawnEffect(effects!,world,at.x,at.y,at.z,v.x,v.y,v.z,128,0,spin,12),
+      child:(at,kind,mode)=>spawnChild(effects!,world,at.x,at.y,at.z,kind,mode),hurt:()=>applyCreatureTouch(0,2)});
+  }
   if(andyRope){stepAndyRope(andyRope,player,zones.camera,(id,at)=>playEvent(id,at));drawAndyRope();}
   if(andyCot&&creatureSim){stepAndyCot(andyCot,currentCollisionWorld,player,creatureSim.creatures,zones.camera,(id,at)=>playEvent(id,at));drawAndyCot();}
   if(andyGates&&stepAndySpring(player,currentCollisionWorld,zones.camera)){if(pushBlocks)pushBlocks.held=0;spendGuide(guideSparkles,effects,1,true);playEvent(0x1c,player);}

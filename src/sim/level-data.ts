@@ -293,9 +293,9 @@ export interface BossFight {
   /** The phase clock: this to begin with, then this much every lap. */
   clock: number;
   lap: number;
-  /** Under this on the clock it charges; over that one it also roars. */
+  /** Under this on the clock it charges; under that one (but still chasing) it fires its guns. */
   chargeUnder: number;
-  roarOver: number;
+  gunOver: number;
   /** The height it flies at while chasing, and while charging. */
   chaseY: number;
   chargeY: number;
@@ -308,8 +308,8 @@ export interface BossFight {
   cutDistance: number;
   /** The entrance's eye starts this far back along x and up from the boss... */
   entranceEye: { back: number; up: number };
-  /** ...and pans: rising every tick, along x until this many ticks are left, then along z. */
-  entrancePan: { rise: number; turnAt: number; alongX: number; alongZ: number };
+  /** ...and pans: sinking (y grows) every tick, along z until this many ticks are left, then along x. */
+  entrancePan: { drop: number; turnAt: number; alongX: number; alongZ: number };
   /** The death's eye starts this far above the boss and rises this much a tick. */
   deathEyeUp: number;
   deathPanUp: number;
@@ -325,10 +325,17 @@ export interface BossFight {
   tauntGap: number;
   /** Ticks between the shouts it makes while chasing. */
   shoutGap: number;
-  /** The two feet, at this angle either side of the heading and this far out. */
-  foot: { angle: number; reach: number };
-  /** Sound events: the arena hum, the hit, the flying loop, the two taunts, the roar. */
-  sounds: { hum: number; hit: number; fly: number; taunt: number; roar: number; shout: number };
+  /** The two guns' strikes, at this angle either side of the heading and this many sine units out. */
+  gun: { angle: number; reach: number };
+  /** The bomb `FUN_0040fae0` drops on the 1-in-64 tick: effect kind and gravity. */
+  bomb: { kind: number; gravity: number };
+  /** With fewer than this many ticks of the death cut left, the creature is ended (`FUN_00405d20(e, 1)`). */
+  killUnder: number;
+  /** Exhaust points either side, local to the model; and the dying fire's point along z. */
+  exhaust: { x: number; y: number };
+  fireZ: number;
+  /** Sound events: the arena hum, the sputter while hurt, the engine loop, the two fly-bys, the guns, the voice. */
+  sounds: { hum: number; hit: number; fly: number; taunt: number; gun: number; shout: number };
 }
 
 export interface LevelTasks {
@@ -667,22 +674,25 @@ export const LEVEL_TASKS: Readonly<Record<number, LevelTasks>> = {
       creature: 0,
       start: { heading: 0xc00, flags: 0x800, pushX: 0x80000, range: 0x1000 },
       triggerX: 0x31f9e,
-      arena: { xMin: -233135, xMax: 233647, zMin: -139166, zMax: 139166 },
+      arena: { xMin: -233647, xMax: 233647, zMin: -139166, zMax: 139166 },
       swing: 0x40000,
       clock: 300, lap: 600,
-      chargeUnder: 0x12d, roarOver: 0x226,
+      chargeUnder: 0x12d, gunOver: 0x226,
       chaseY: -0x10b13, chargeY: 0x4000,
       stun: 0x78, deathStun: 300,
       handOver: 0x1e, flyIn: 0x800,
       cutDistance: 0x10,
       entranceEye: { back: 0x48000, up: 0x8000 },
-      entrancePan: { rise: -0x130, turnAt: 0xb4, alongX: 0x200, alongZ: 0x80 },
+      entrancePan: { drop: 0x130, turnAt: 0xb4, alongX: 0x200, alongZ: 0x80 },
       deathEyeUp: 0x5000, deathPanUp: 0x80,
       deathAt: 11,
       bar: { from: 10, over: 10 },
       noticeRange: 400, tauntGap: 100, shoutGap: 400,
-      foot: { angle: 0x80, reach: 4 },
-      sounds: { hum: 0x67, hit: 0x66, fly: 0x61, taunt: 0x62, roar: 0x65, shout: 0xd0 },
+      gun: { angle: 0x80, reach: 4 },
+      bomb: { kind: 0xc, gravity: 0x80 },
+      killUnder: 0x78,
+      exhaust: { x: 500, y: -400 }, fireZ: -200,
+      sounds: { hum: 0x67, hit: 0x66, fly: 0x61, taunt: 0x62, gun: 0x65, shout: 0xd0 },
     },
   },
   7: {

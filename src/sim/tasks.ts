@@ -21,7 +21,8 @@ import {stepGunslingerLevel,type Gunslinger} from './gunslinger.ts';
  * box and reveals the token, because both of those live above it.
  */
 
-import { CREATURE_FLAGS, CREATURE_HEALTH, type Creature } from './creatures.ts';
+import { CREATURE_FLAGS, CREATURE_HEALTH, killCreature, type Creature } from './creatures.ts';
+import { podAttachment } from './pod-beam.ts';
 import { HAMM_COINS, POTATO_PARTS, TASK_TEXT, type LevelTasks } from './level-data.ts';
 import type { RandomStream } from './creatures.ts';
 import { cos, sin } from './trig.ts';
@@ -102,10 +103,11 @@ export interface TaskState {
   bossYaw: number;
   /** `DAT_0052f9a8`, alternating, which drives the flicker while it is hurt. */
   bossFlip: number;
+  /** The draw scale that flicker gives the model: 2 on a lit tick, else 1. */
+  bossFlash: number;
   /**
-   * `DAT_0050a1f4`, the camera cut's countdown. The port has no camera cuts
-   * yet, so this only holds Buzz still and paces the phases, which is what
-   * the fight's own timing hangs off.
+   * `DAT_0050a1f4`, the camera cut's countdown, mirrored here so a fight
+   * without a live cut still paces its phases off it.
    */
   bossCut: number;
   /** Set on the hit that kills it, which is what writes the level's token byte. */
@@ -183,7 +185,7 @@ export function createTasks(): TaskState {
     slime: null, pod:null, zurg:null, finale:null, prospector:null, gunslinger:null, clown:null, drill:null, dinosaur:null, kite:null, buggy:null,
     boss: 0, bossGone: 0, saucer:createSpaceSaucer(), pathRun: 0, pathClock: 100, fetch: 0, fetchDone: 0, fetchClock: 100, slowTick: 0, potatoPart: 0, powerUps: 0, potatoChatter: 0, challenge: 0, challengeFrom: 0, challengeClock: 100,
     bossPhase: 0, bossClock: 0, bossHurt: 0, smithFlash:false, smithBarTicks:0, bossHealthWas: -1, bossRamp: 0, bossSwing: 0,
-    bossTaunt: 0, bossShout: 0, bossYaw: 0, bossFlip: 0, bossCut: 0,
+    bossTaunt: 0, bossShout: 0, bossYaw: 0, bossFlip: 0, bossFlash: 1, bossCut: 0,
     bossBeaten: false, levelWon: false,
     race: RaceState.Idle, laps: 0, raceQuadrant: 0, checkpoint: 0, raceBlocked: true,
     carNode: 0, carLaps: 0,
@@ -236,26 +238,62 @@ interface BossWorld {
   cut?: CutHandle;
   /** Raise a sound event, at a place or flat. */
   sound?: (event: number, at: { x: number; y: number; z: number } | null) => void;
-  /** Raise a sequence rather than an event. */
-  shout?: (event: number) => void;
+  /** Spawn a child effect; `spin` is offset by 0x80, as the host subtracts it. */
   effect?: (x: number, y: number, z: number, kind: number, mode: number, spin?: number) => void;
+  /** `FUN_0040fae0` with an explicit velocity: the bombs. */
+  projectile?: ZurgWorld['projectile'];
+  /** `FUN_0043c1c0`: a point local to one of the creature's parts, in the world. */
+  attachment?: PodWorld['attachment'];
+  /** `DAT_0050a118`: a point the camera is asked to turn toward. */
+  lookAt?: PodWorld['lookAt'];
+  /** The shared frame dividers (`DAT_0052f1c2`, `c6`, `c7`). */
+  releaseGate?: { two: number; six?: boolean; seven?: boolean };
+  /** `DAT_0052f1cb`, the shared 1-in-64 divider. */
+  timerGate?: boolean;
   groundAt?: (x: number, z: number, y: number) => number | null;
 }
 
 /**
+ * The world boss's init (level 6's `FUN_0041ffb0`): turned to face the
+ * arena, pushed off-stage along x, given a home box big enough to roam, and
+ * marked with the flag bit the level sets.
+ */
+export function startWorldBoss(
+  tasks: TaskState,
+  fight: NonNullable<LevelTasks['bossFight']>,
+  boss: Creature,
+): void {
+  boss.heading = fight.start.heading;
+  boss.wantYaw = fight.start.heading;
+  boss.flags |= fight.start.flags;
+  boss.x += fight.start.pushX;
+  boss.homeX = boss.x;
+  boss.record.rangeX = fight.start.range;
+  boss.record.rangeZ = fight.start.range;
+  tasks.bossHealthWas = boss.health;
+  tasks.bossSwing = fight.swing;
+  tasks.bossClock = fight.clock;
+  tasks.bossFlash = 1;
+}
+
+/** The world boss's bar, `(health - 10) * 0x36 / 10` in C's truncating division. */
+export function worldBossBar(fight: NonNullable<LevelTasks['bossFight']>, health: number): number {
+  return Math.max(0, Math.min(0x36, Math.trunc(((health - fight.bar.from) * 0x36) / fight.bar.over)));
+}
+
+/**
  * The world boss (level 6's `FUN_00420060`; docs/LEVELS.md "The world
- * boss"). A boss level's tick is nothing but this.
+ * boss"). A boss level's tick is nothing but this. The boss is a biplane
+ * (creatures.cfg type 48, `BI`): its loops are BIPLANE and SPUTTER, its
+ * passes FLYBY1/2, and what it fires while chasing is PLANEGUN.
  *
  * Five phases. It waits until Buzz walks in past `triggerX`, plays an
  * entrance, then flies laps of the arena: for most of each lap it chases him
- * at one height, and for the last third it charges straight along x at
- * another, flipping sides every lap. A hit stuns it and closes its shell
- * (`vulnerable` 4, the trick the tin robot uses too); the hit that takes it
- * under `deathAt` starts the long death and wins the level.
- *
- * `bossCut` stands in for the engine's camera cuts, which are not ported. It
- * still counts down and still holds the phases apart, so the fight keeps its
- * timing; only the camera move is missing.
+ * at one height, strafing the ground ahead of him and dropping bombs, and for
+ * the last third it charges straight along x at another, flipping sides every
+ * lap. A hit stuns it and closes its shell (`vulnerable` 4, the trick the tin
+ * robot uses too); the hit that takes it under `deathAt` starts the long
+ * death and wins the level.
  */
 function stepBossFight(
   tasks: TaskState,
@@ -278,8 +316,11 @@ function stepBossFight(
       tasks.bossClock = fight.clock - 1;
       if (boss.health < fight.deathAt) {
         tasks.bossHurt = fight.deathStun;
-        // The death is watched from right over the boss, sinking with it.
+        // The death is watched from right over the boss, climbing with it,
+        // and it stops steering: its target is pinned where it was hit.
         world.cut?.start(boss, fight.deathStun, fight.cutDistance);
+        boss.targetX = boss.x;
+        boss.targetZ = boss.z;
         if (world.cut) world.cut.eye = { x: boss.x, y: boss.y - fight.deathEyeUp, z: boss.z };
         tasks.bossPhase = 3;
         // This is what writes bit 7 of the level's token byte in the save.
@@ -292,16 +333,21 @@ function stepBossFight(
     }
   }
 
-  // --- the stun, and the shell opening again when it ends.
+  // --- the stun, and the shell opening again when it ends. While it lasts the
+  //     engine sputters and the model flickers to twice its size on every
+  //     other tick (+0x34 with the +0x24 scale triple at 0x2000).
   tasks.bossHurt -= dt;
   if (tasks.bossHurt < 0) {
     tasks.bossHurt = 0;
     boss.record.vulnerable = 7;
-  } else if (tasks.bossHurt < 0x5a) {
-    world.sound?.(fight.sounds.hit, boss);
+    tasks.bossFlash = 1;
+  } else if (boss.type !== 0) {
+    if (tasks.bossHurt < 0x5a) world.sound?.(fight.sounds.hit, boss);
+    tasks.bossFlash = tasks.bossFlip !== 0 ? 2 : 1;
   }
 
   // --- how far outside its arena it has drifted, which swings its height.
+  //     `FUN_0049f460` is a strict box test.
   const inside = boss.x > fight.arena.xMin && boss.x < fight.arena.xMax
     && boss.z > fight.arena.zMin && boss.z < fight.arena.zMax;
   tasks.bossRamp = Math.max(0, Math.min(0x800, tasks.bossRamp + (inside ? -1 : 1) * dt * 0x80));
@@ -319,7 +365,7 @@ function stepBossFight(
     tasks.bossCut = world.cut?.ticks ?? fight.clock;
   }
 
-  // --- it notices you turning away from it, and taunts.
+  // --- it notices you turning away from it, and makes a pass.
   if (tasks.bossPhase > 0 && tasks.bossPhase < 3) {
     if (tasks.bossHurt === 0) world.sound?.(fight.sounds.fly, boss);
     if (tasks.bossTaunt === 0 && dist256(world, boss) < fight.noticeRange) {
@@ -344,11 +390,12 @@ function stepBossFight(
     const sweep = Math.max(0, left - fight.handOver);
     boss.hover = ((cos(sweep * 0x14) >> 3) - 0x800) & 0xfff;
     boss.x -= dt * fight.flyIn;
-    // The cut pans: the look follows the boss in, the eye rises through the
-    // whole entrance, tracks along x for its first part and along z after.
+    // The cut pans: the look follows the boss in while the eye sinks through
+    // the whole entrance, tracking along z while more than `turnAt` ticks are
+    // left and along x for the rest.
     if (world.cut) {
       world.cut.look.x = boss.x;
-      world.cut.eye.y += dt * fight.entrancePan.rise;
+      world.cut.eye.y += dt * fight.entrancePan.drop;
       if (left < fight.entrancePan.turnAt) world.cut.eye.x -= dt * fight.entrancePan.alongX;
       else world.cut.eye.z -= dt * fight.entrancePan.alongZ;
     }
@@ -363,6 +410,16 @@ function stepBossFight(
       tasks.bossClock = fight.lap;
       tasks.bossSwing = -tasks.bossSwing;
     }
+    // The camera is asked to keep turning toward it.
+    world.lookAt?.({ x: boss.x, y: boss.y, z: boss.z });
+    // A bomb on the 1-in-64 tick while Buzz is near and it is not stunned,
+    // thrown with twice the plane's own horizontal velocity.
+    if (world.timerGate && tasks.bossHurt === 0 && dist256(world, boss) < fight.noticeRange) {
+      world.projectile?.({
+        x: boss.x, y: boss.y, z: boss.z, vx: boss.vx * 2, vy: 0, vz: boss.vz * 2,
+        gravity: fight.bomb.gravity, rotation: 0, spin: 0, kind: fight.bomb.kind,
+      });
+    }
     // The height it wants swings with how far out of the arena it has got.
     const lift = cos(tasks.bossRamp) * 3;
     if (tasks.bossClock < fight.chargeUnder) {
@@ -371,33 +428,53 @@ function stepBossFight(
       boss.targetZ = 0;
       boss.targetY = lift + fight.chargeY + boss.homeY;
     } else {
+      boss.targetY = lift + fight.chaseY;
       boss.targetX = world.x;
       boss.targetZ = world.z;
-      boss.targetY = lift + fight.chaseY;
-      if (tasks.bossClock < fight.roarOver) {
-        world.sound?.(fight.sounds.roar, boss);
+      if (tasks.bossClock < fight.gunOver) {
+        // The guns, heard where it is aiming.
+        world.sound?.(fight.sounds.gun, { x: boss.targetX, y: boss.targetY, z: boss.targetZ });
         tasks.bossShout -= dt;
         if (tasks.bossShout < 0) {
           tasks.bossShout = fight.shoutGap;
-          world.shout?.(fight.sounds.shout);
+          // `FUN_0049ea90`, the event record played directly, at Buzz.
+          world.sound?.(fight.sounds.shout, { x: world.x, y: world.y, z: world.z });
         }
-        // Dust off both feet, thrown where each one meets the ground.
-        for (const side of [-fight.foot.angle, fight.foot.angle]) {
-          const a = (boss.heading + side) & 0xfff;
-          const fx = boss.x + sin(a) * fight.foot.reach;
-          const fz = boss.z + cos(a) * fight.foot.reach;
-          const fy = world.groundAt?.(fx, fz, boss.y);
-          if (fy === null || fy === undefined) continue;
-          world.effect?.(fx, fy, fz, 0x7b, 2);
-          world.effect?.(fx, fy, fz, 0x7c, 1, world.rand.byte());
+        // Bullet strikes on one tick in six, a puff and a spray where each
+        // gun's line meets the ground under it.
+        if (world.releaseGate?.six) {
+          for (const side of [-fight.gun.angle, fight.gun.angle]) {
+            const a = (boss.heading + side) & 0xfff;
+            const fx = boss.x + sin(a) * fight.gun.reach;
+            const fz = boss.z + cos(a) * fight.gun.reach;
+            const fy = world.groundAt?.(fx, fz, boss.y);
+            if (fy === null || fy === undefined) continue;
+            world.effect?.(fx, fy, fz, 0x7b, 2);
+            world.effect?.(fx, fy, fz, 0x7c, 1, world.rand.byte() + 0x80);
+          }
         }
       }
     }
   }
 
-  // --- it banks into its turns, and spins while it is stunned. `hover` is
-  //     the spare angle the draw code reads (+0x10); the second one the
-  //     original rolls while dying (+0x0c) is not modelled here.
+  // --- dying: it climbs away (y falls, and up is negative), the creature is
+  //     ended with 120 ticks of the cut left, and the level is won when the
+  //     cut runs out.
+  if (tasks.bossPhase === 3) {
+    boss.targetY -= dt * 0x280;
+    boss.y -= dt * 0x280;
+    if (world.cut) world.cut.eye.y -= dt * fight.deathPanUp;
+    tasks.bossCut = world.cut ? world.cut.ticks : Math.max(0, tasks.bossCut - dt);
+    if (boss.health < fight.deathAt && tasks.bossCut < fight.killUnder) killCreature(boss, 1);
+    if (tasks.bossCut === 0) {
+      tasks.levelWon = true;
+      tasks.bossPhase = 4;
+    }
+  }
+
+  // --- it banks into its turns, and spins while it is stunned, pitching over
+  //     as well once it is going. `hover` is the spare angle the draw
+  //     code reads (+0x10), `pitch` the one before it (+0x0c).
   if ((boss.flags & CREATURE_FLAGS.scriptVelocity) !== 0) {
     if (tasks.bossHurt === 0) {
       let turned = (boss.heading - boss.wantYaw) & 0xfff;
@@ -405,18 +482,24 @@ function stepBossFight(
       boss.hover -= (boss.hover - ((turned / 2) | 0)) >> 5;
     } else {
       boss.hover = (boss.hover + dt * 0x40) & 0xfff;
+      if (tasks.bossPhase === 3) boss.pitch = (boss.pitch + dt * 0x24) & 0xfff;
     }
   }
 
-  // --- dying: it sinks, and the level is won when the cut runs out.
-  if (tasks.bossPhase === 3) {
-    boss.targetY -= dt * 0x280;
-    boss.y -= dt * 0x280;
-    if (world.cut) world.cut.eye.y -= dt * fight.deathPanUp;
-    tasks.bossCut = world.cut ? world.cut.ticks : Math.max(0, tasks.bossCut - dt);
-    if (tasks.bossCut === 0) {
-      tasks.levelWon = true;
-      tasks.bossPhase = 4;
+  // --- while it is on screen: exhaust off both wings every two ticks, and
+  //     once it is dying, fire from the engine one tick in seven.
+  if ((boss.flags & CREATURE_FLAGS.awake) !== 0) {
+    const at = (local: { x: number; y: number; z: number }) =>
+      world.attachment?.(boss, 0, local) ?? podAttachment(boss, null, local);
+    if ((world.releaseGate?.two ?? 0) > 0) {
+      for (const x of [fight.exhaust.x, -fight.exhaust.x]) {
+        const p = at({ x, y: fight.exhaust.y, z: 0 });
+        world.effect?.(p.x, p.y, p.z, 0x11, 2, (world.rand.byte() & 0x1f) - 0x10 + 0x80);
+      }
+    }
+    if (boss.health < fight.deathAt && world.releaseGate?.seven) {
+      const p = at({ x: 0, y: 0, z: fight.fireZ });
+      world.effect?.(p.x, p.y, p.z, 0x23, 0xe, world.rand.byte());
     }
   }
 }
@@ -483,7 +566,7 @@ export function stepTasks(
     projectile?:ZurgWorld['projectile'];
     pinPlayer?:ZurgWorld['pinPlayer'];
     attachment?:PodWorld['attachment'];
-    releaseGate?:PodWorld['releaseGate'];
+    releaseGate?:PodWorld['releaseGate']&{six?:boolean;seven?:boolean};
     cameraEye?:PodWorld['cameraEye'];
     lookAt?:PodWorld['lookAt'];
     burstLight?:PodWorld['burstLight'];

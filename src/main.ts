@@ -161,7 +161,7 @@ import {
 } from './sim/talk.ts';
 import { LEVEL_TASKS, TASK_TEXT } from './sim/level-data.ts';
 import {
-  RaceState, createTasks, markSlotDone, startLevelTasks, stepTasks, type TaskState,
+  RaceState, createTasks, markSlotDone, startLevelTasks, startWorldBoss, stepTasks, worldBossBar, type TaskState,
 } from './sim/tasks.ts';
 import { unpackRaw } from './formats/rnc.ts';
 import {
@@ -957,7 +957,7 @@ async function open(dir: GameDir): Promise<void> {
           gunslinger:tasks.gunslinger?{...tasks.gunslinger}:null,
           boss: tasks.boss, potatoPart: tasks.potatoPart, powerUps: tasks.powerUps,
           bossPhase: tasks.bossPhase, bossClock: tasks.bossClock, bossHurt: tasks.bossHurt, smithFlash:tasks.smithFlash, smithBarTicks:tasks.smithBarTicks,
-          bossCut: tasks.bossCut, bossRamp: tasks.bossRamp, bossSwing: tasks.bossSwing,
+          bossCut: tasks.bossCut, bossRamp: tasks.bossRamp, bossSwing: tasks.bossSwing, bossFlash: tasks.bossFlash,
           bossBeaten: tasks.bossBeaten, levelWon: tasks.levelWon,
           fetch: tasks.fetch, fetchDone: tasks.fetchDone, fetchClock: tasks.fetchClock,
           slowTick: tasks.slowTick, pathRun: tasks.pathRun, pathClock: tasks.pathClock,
@@ -2307,10 +2307,7 @@ function hudReadout(level: number): HudReadout {
   const fight = LEVEL_TASKS[level]?.bossFight;
   if (fight && creatureSim && tasks && tasks.bossPhase >= 2) {
     const c = creatureSim.creatures.find((q) => q.slot === fight.creature);
-    if (c) {
-      bossBar = Math.max(0, Math.min(0x36,
-        Math.round(((c.health - fight.bar.from) * 0x36) / fight.bar.over)));
-    }
+    if (c) bossBar = worldBossBar(fight, c.health);
   }
   if(level===14&&tasks&&tasks.smithBarTicks===0)bossBar=-1;
   if(tasks?.kite)bossBar=kiteBar(tasks.kite,creatureSim?.creatures.find(c=>c.slot===26));
@@ -2532,6 +2529,12 @@ function drawCreatures(): void {
     if(tasks?.pod){
       const {stretch,flashScale}=tasks.pod;
       viewer.setCreatureAppearance(0,[flashScale,stretch*flashScale,flashScale],[1,1,1]);
+    }
+    // Level 6's biplane flickers to twice its size while it is stunned.
+    const worldBoss=LEVEL_TASKS[levelNumber(levels[levelEl.selectedIndex]?.id ?? '') ?? 0]?.bossFight;
+    if(tasks&&worldBoss){
+      const scale=tasks.bossFlash;
+      viewer.setCreatureAppearance(worldBoss.creature,[scale,scale,scale],[1,1,1]);
     }
     if(tasks?.zurg){
       const scale=tasks.zurg.flashScale;
@@ -3815,17 +3818,7 @@ function startBossFight(level: number): void {
   const fight = LEVEL_TASKS[level]?.bossFight;
   if (!fight || !creatureSim || !tasks) return;
   const boss = creatureSim.creatures.find((c) => c.slot === fight.creature);
-  if (!boss) return;
-  boss.heading = fight.start.heading;
-  boss.wantYaw = fight.start.heading;
-  boss.flags |= fight.start.flags;
-  boss.x += fight.start.pushX;
-  boss.homeX = boss.x;
-  boss.record.rangeX = fight.start.range;
-  boss.record.rangeZ = fight.start.range;
-  tasks.bossHealthWas = boss.health;
-  tasks.bossSwing = fight.swing;
-  tasks.bossClock = fight.clock;
+  if (boss) startWorldBoss(tasks, fight, boss);
 }
 
 /**

@@ -208,7 +208,8 @@ along the line from the camera's last position. Both then copy eye and
 look into the scripted camera record at 0x52b7e8 (`FUN_00402030`) with
 no ease, and set the blend counter `DAT_0050a140` to 64. A level tick may
 go on moving the cut's eye and look every tick it runs, and level 6 does,
-panning up and along through its boss's entrance.
+sinking its eye and panning it along z, then x, through its boss's
+entrance (docs/LEVELS.md "The world boss").
 
 **Feeding it.** The script tick (`FUN_00402a10`, run before the player
 moves) copies the cut's look and eye into the record each tick and counts

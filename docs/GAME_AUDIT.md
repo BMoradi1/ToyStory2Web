@@ -7,6 +7,33 @@ controllers, original level motion calls, and browser entry/exit. **It is not
 a completed original-versus-port playthrough.**
 
 
+## 2026-10-24 — Bombs Away biplane fight re-audited
+
+Level 6's tick `00420060` was re-decompiled (`DumpLevelMotion.java`) and
+compared line by line with `stepBossFight`. The boss is a biplane (type 48
+`BI`; its events are BIPLANE, FLYBY1/2, PLANEGUN and SPUTTER). Restored:
+the 1-in-64-tick bomb (kind 0xc, twice the plane's horizontal velocity,
+gravity 0x80, only when Buzz is within 400 steps and the plane is not
+stunned); the camera look-at every fight tick; wing exhaust on two-tick
+boundaries and engine fire while dying; the stun flicker to double scale
+on alternate ticks; pitch while dying; ending the creature under 120 ticks
+of the death cut; and pinning its target where the killing hit lands.
+Corrected: the arena's lower x bound (-233647, not -233135); the entrance
+eye sinks rather than rises and pans along z before x; the dying plane
+climbs rather than sinks; bullet strikes are gated to one tick in six
+(they fired every tick); the gun is heard at its aim point; the strike
+spray's spin; and the bar truncates as C does. The init moved into
+`startWorldBoss` so the probe exercises the real code.
+
+Still open: the type-48 death explosion (`FUN_00410540`, sound -2), which
+is shared death work for types 15/22/31/32/48; and an unassisted win. The
+tick makes no scenery calls, so the empty motion inventory is correct.
+
+Validation: new `bombs-away-probe.ts` and `bombs-away-flow-check.js` pass;
+**129/129 simulation probes**, production build, and the game-audit, Zurg,
+pod-boss and finale browser flows pass. The complete browser suite was not
+rerun.
+
 ## 2026-10-05 — Buzz helmet and double-jump corrections
 
 Character meshes now retain polygon translucency and blend mode through rest
@@ -1577,7 +1604,7 @@ not evidence for untested interactions.
 |---|---|---|---|
 | 1 | Andy's House | Tin intro/fight/reward integration tested; hover wobble/sparks partial. Cot support/drop puzzle, chair stomp, pushables, five room-2 machinery cycles, growing doorway, falling hatch, lowering rope, attic bounce, biased seesaw and room-4 environmental hazards implemented. | Remaining numbered props and platforms; all five token routes. |
 | 2 | Andy's Neighborhood | Lawnmower/kite, seesaws, both push bridges, extending rope, stomp structure/launcher, pump/floating prop, water/mud, burrowing soldier rescue and leaves implemented with focused browser checks. | Full natural race/token routes, remaining collision inventory and underwater colour. |
-| 3 | Bombs Away (internal 6) | `stepBossFight` exists. | Complete boss attacks, damage windows, defeat, token and replay. |
+| 3 | Bombs Away (internal 6) | Biplane fight re-audited against `00420060`: entrance cut, chase/guns/charge laps, gated strikes, bombs, arena drift, hit stun/flicker, exhaust/fire, death climb/kill, save bit, win/movie and replay covered by `bombs-away-probe.ts` and `bombs-away-flow-check.js`. | Type-48 death explosion (`00410540`); unassisted win. |
 | 4 | Construction Yard | DRILL combat/reward and ZGCAR implemented; trailer paint, outdoor lids, debris, stomp bridge, four shuttles, four linked tilting lifts, stomp-selected lift, distant crate, proximity scenery/portals, mud movement/effects and timed collect-five retry implemented. | Review collision IDs 13/25; natural traversal/token routes. |
 | 5 | Alleys and Gullies | BOX/BPLANE launch cycle, boat cannon, clown combat/reward, eight lane platforms, two seesaws, spring, bubble machine, moving bubble attachments, push-triggered bridge, distant crates, water, rain, timed environmental emitters and timed collect-five retry implemented. | Underwater colour and remaining scenery/effects and natural pole/zip-line routes. |
 | 6 | Slime Time (internal 3) | Dedicated slime controller exists. | Full encounter, arena effects, reward and replay comparison. |
